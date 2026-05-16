@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Alert,
 } from 'react-native';
@@ -42,6 +42,21 @@ export default function ProfileTab() {
     totalSessions, totalCorrect, totalAnswered,
     getTopicElo, reset,
   } = useUserStore();
+
+  // Secret admin entry: tap version text 5 times
+  const tapCount = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleVersionTap = () => {
+    tapCount.current += 1;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (tapCount.current >= 5) {
+      tapCount.current = 0;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push('/admin');
+    } else {
+      tapTimer.current = setTimeout(() => { tapCount.current = 0; }, 2000);
+    }
+  };
 
   const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
@@ -157,7 +172,9 @@ export default function ProfileTab() {
           />
         </View>
 
-        <Text style={styles.version}>PsychoTechniPlus v1.0.0 · Sprint 1</Text>
+        <Pressable onPress={handleVersionTap}>
+    <Text style={styles.version}>PsychoTechniPlus v1.0.0 · Sprint 1</Text>
+  </Pressable>
       </ScrollView>
     </SafeAreaView>
   );

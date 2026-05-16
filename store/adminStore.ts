@@ -1,0 +1,384 @@
+import { create } from 'zustand';
+import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
+import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
+
+// ── Pending questions (validation queue seed) ──────────────────────────────
+const PENDING_SEED: Question[] = [
+  {
+    id: 'q_pending_001',
+    targetIds: ['target_psychometric'],
+    topicId: 'topic_quantitative',
+    questionType: 'multiple_choice',
+    questionText: 'בחנות יש 240 מוצרים. 35% מהם נמכרו. כמה מוצרים נותרו?',
+    options: [
+      { id: 'a', text: '84', isCorrect: false },
+      { id: 'b', text: '156', isCorrect: true },
+      { id: 'c', text: '144', isCorrect: false },
+      { id: 'd', text: '168', isCorrect: false },
+    ],
+    correctAnswer: 'b',
+    explanation: '35% מ-240 = 84 נמכרו. נותרו: 240 - 84 = 156.',
+    difficulty: 3,
+    psychometricStats: { elo: 1150, discrimination: 0.75, guessProbability: 0.25 },
+    accessLevel: 'free',
+    validationStatus: 'pending',
+    smartPracticeEligible: false,
+    generalPracticeEligible: false,
+  },
+  {
+    id: 'q_pending_002',
+    targetIds: ['target_psychometric'],
+    topicId: 'topic_verbal',
+    questionType: 'verbal',
+    questionText: 'מה ההפך של "מצמצם"?',
+    options: [
+      { id: 'a', text: 'מרחיב', isCorrect: true },
+      { id: 'b', text: 'מחזיק', isCorrect: false },
+      { id: 'c', text: 'מוסיף', isCorrect: false },
+      { id: 'd', text: 'מגדיל', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: '"מצמצם" = מקטין, מגביל. ההפך הדיוק הוא "מרחיב".',
+    difficulty: 4,
+    psychometricStats: { elo: 1200, discrimination: 0.7, guessProbability: 0.25 },
+    accessLevel: 'free',
+    validationStatus: 'pending',
+    smartPracticeEligible: false,
+    generalPracticeEligible: false,
+  },
+  {
+    id: 'q_pending_003',
+    targetIds: ['target_ktzina'],
+    topicId: 'topic_logic',
+    questionType: 'logic',
+    questionText: 'כולם שיחקו שחמט. יוסי לא שיחק שחמט. מה ניתן להסיק על יוסי?',
+    options: [
+      { id: 'a', text: 'יוסי לא שייך לקבוצה', isCorrect: true },
+      { id: 'b', text: 'יוסי לא אוהב שחמט', isCorrect: false },
+      { id: 'c', text: 'יוסי אינו מוכשר', isCorrect: false },
+      { id: 'd', text: 'אי אפשר להסיק', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: 'אם כולם בקבוצה שיחקו, ויוסי לא שיחק — יוסי אינו חלק מהקבוצה.',
+    difficulty: 2,
+    psychometricStats: { elo: 1050, discrimination: 0.8, guessProbability: 0.25 },
+    accessLevel: 'free',
+    validationStatus: 'pending',
+    smartPracticeEligible: false,
+    generalPracticeEligible: false,
+  },
+  {
+    id: 'q_pending_004',
+    targetIds: ['target_psychometric'],
+    topicId: 'topic_spatial',
+    questionType: 'shapes',
+    questionText: 'כמה מישורי סימטריה יש לריבוע?',
+    options: [
+      { id: 'a', text: '2', isCorrect: false },
+      { id: 'b', text: '3', isCorrect: false },
+      { id: 'c', text: '4', isCorrect: true },
+      { id: 'd', text: '8', isCorrect: false },
+    ],
+    correctAnswer: 'c',
+    explanation: 'לריבוע יש 4 מישורי סימטריה: 2 לאורך האלכסונות + 2 לאורך האמצעים (אנכי ואופקי).',
+    difficulty: 3,
+    psychometricStats: { elo: 1140, discrimination: 0.72, guessProbability: 0.25 },
+    accessLevel: 'free',
+    validationStatus: 'pending',
+    smartPracticeEligible: false,
+    generalPracticeEligible: false,
+  },
+  {
+    id: 'q_draft_001',
+    targetIds: ['target_hightech'],
+    topicId: 'topic_logic',
+    questionType: 'multiple_choice',
+    questionText: 'איזה מהבאים גדול יותר: 2^10 או 10^3?',
+    options: [
+      { id: 'a', text: '2^10 (1024)', isCorrect: true },
+      { id: 'b', text: '10^3 (1000)', isCorrect: false },
+      { id: 'c', text: 'שווים', isCorrect: false },
+      { id: 'd', text: 'תלוי ב-x', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: '2^10 = 1024, 10^3 = 1000. לכן 2^10 > 10^3.',
+    difficulty: 3,
+    psychometricStats: { elo: 1130, discrimination: 0.78, guessProbability: 0.25 },
+    accessLevel: 'free',
+    validationStatus: 'draft',
+    smartPracticeEligible: false,
+    generalPracticeEligible: false,
+  },
+];
+
+export interface SimulationRule {
+  id: string;
+  topicId: string;
+  count: number;
+  minDifficulty: number;
+  maxDifficulty: number;
+  useAdaptive: boolean;
+}
+
+export interface SmartExamTemplate {
+  id: string;
+  name: string;
+  description: string;
+  targetId: string;
+  totalQuestions: number;
+  timeLimitMinutes: number;
+  rules: SimulationRule[];
+  passingScore: number;
+  createdAt: Date;
+  isActive: boolean;
+}
+
+interface AdminStats {
+  totalQuestions: number;
+  validatedCount: number;
+  pendingCount: number;
+  draftCount: number;
+  rejectedCount: number;
+  questionsPerTopic: Record<string, number>;
+  questionsPerDifficulty: Record<number, number>;
+  questionsPerType: Record<string, number>;
+  avgDifficulty: number;
+  totalTargets: number;
+  totalTopics: number;
+}
+
+interface AdminState {
+  isAdmin: boolean;
+  questions: Question[];
+  topics: Topic[];
+  targets: Target[];
+  templates: SmartExamTemplate[];
+  selectedQuestionIds: string[];
+
+  // Actions — auth
+  login: (pin: string) => boolean;
+  logout: () => void;
+
+  // Actions — questions
+  addQuestion: (q: Omit<Question, 'id'>) => Question;
+  updateQuestion: (id: string, updates: Partial<Question>) => void;
+  deleteQuestion: (id: string) => void;
+  deleteQuestions: (ids: string[]) => void;
+  validateQuestion: (id: string, status: ValidationStatus) => void;
+  bulkValidate: (ids: string[], status: ValidationStatus) => void;
+  toggleSelectQuestion: (id: string) => void;
+  clearSelection: () => void;
+  selectAll: () => void;
+
+  // Actions — topics
+  addTopic: (t: Omit<Topic, 'id'>) => Topic;
+  updateTopic: (id: string, updates: Partial<Topic>) => void;
+  deleteTopic: (id: string) => void;
+
+  // Actions — targets
+  updateTarget: (id: string, updates: Partial<Target>) => void;
+
+  // Actions — templates
+  addTemplate: (t: Omit<SmartExamTemplate, 'id' | 'createdAt'>) => SmartExamTemplate;
+  updateTemplate: (id: string, updates: Partial<SmartExamTemplate>) => void;
+  deleteTemplate: (id: string) => void;
+
+  // Computed
+  getStats: () => AdminStats;
+  getPendingQuestions: () => Question[];
+  getQuestionsByStatus: (status: ValidationStatus) => Question[];
+}
+
+const ADMIN_PIN = '1234';
+
+const SEED_TEMPLATES: SmartExamTemplate[] = [
+  {
+    id: 'tmpl_001',
+    name: 'סימולציה פסיכומטרית מלאה',
+    description: '50 שאלות בחלוקה מדויקת לפי מבנה המבחן האמיתי',
+    targetId: 'target_psychometric',
+    totalQuestions: 50,
+    timeLimitMinutes: 90,
+    rules: [
+      { id: 'r1', topicId: 'topic_quantitative', count: 20, minDifficulty: 3, maxDifficulty: 8, useAdaptive: true },
+      { id: 'r2', topicId: 'topic_verbal', count: 20, minDifficulty: 3, maxDifficulty: 8, useAdaptive: true },
+      { id: 'r3', topicId: 'topic_english', count: 10, minDifficulty: 2, maxDifficulty: 7, useAdaptive: false },
+    ],
+    passingScore: 65,
+    createdAt: new Date('2025-01-10'),
+    isActive: true,
+  },
+  {
+    id: 'tmpl_002',
+    name: 'מבחן קצינות — שלב א׳',
+    description: 'פסיכוטכני לוגי-כמותי, 30 דקות',
+    targetId: 'target_ktzina',
+    totalQuestions: 25,
+    timeLimitMinutes: 30,
+    rules: [
+      { id: 'r1', topicId: 'topic_logic', count: 15, minDifficulty: 4, maxDifficulty: 9, useAdaptive: true },
+      { id: 'r2', topicId: 'topic_quantitative', count: 10, minDifficulty: 4, maxDifficulty: 8, useAdaptive: false },
+    ],
+    passingScore: 75,
+    createdAt: new Date('2025-01-15'),
+    isActive: true,
+  },
+];
+
+export const useAdminStore = create<AdminState>((set, get) => ({
+  isAdmin: false,
+  questions: [...QUESTIONS, ...PENDING_SEED],
+  topics: [...TOPICS],
+  targets: [...TARGETS],
+  templates: SEED_TEMPLATES,
+  selectedQuestionIds: [],
+
+  login: (pin) => {
+    if (pin === ADMIN_PIN) {
+      set({ isAdmin: true });
+      return true;
+    }
+    return false;
+  },
+
+  logout: () => set({ isAdmin: false, selectedQuestionIds: [] }),
+
+  addQuestion: (q) => {
+    const newQ: Question = { ...q, id: `q_admin_${Date.now()}` };
+    set(s => ({ questions: [...s.questions, newQ] }));
+    return newQ;
+  },
+
+  updateQuestion: (id, updates) => {
+    set(s => ({
+      questions: s.questions.map(q => (q.id === id ? { ...q, ...updates } : q)),
+    }));
+  },
+
+  deleteQuestion: (id) => {
+    set(s => ({
+      questions: s.questions.filter(q => q.id !== id),
+      selectedQuestionIds: s.selectedQuestionIds.filter(i => i !== id),
+    }));
+  },
+
+  deleteQuestions: (ids) => {
+    const idSet = new Set(ids);
+    set(s => ({
+      questions: s.questions.filter(q => !idSet.has(q.id)),
+      selectedQuestionIds: [],
+    }));
+  },
+
+  validateQuestion: (id, status) => {
+    set(s => ({
+      questions: s.questions.map(q =>
+        q.id === id
+          ? { ...q, validationStatus: status, smartPracticeEligible: status === 'validated', generalPracticeEligible: status === 'validated' }
+          : q
+      ),
+    }));
+  },
+
+  bulkValidate: (ids, status) => {
+    const idSet = new Set(ids);
+    set(s => ({
+      questions: s.questions.map(q =>
+        idSet.has(q.id)
+          ? { ...q, validationStatus: status, generalPracticeEligible: status === 'validated' }
+          : q
+      ),
+      selectedQuestionIds: [],
+    }));
+  },
+
+  toggleSelectQuestion: (id) => {
+    set(s => ({
+      selectedQuestionIds: s.selectedQuestionIds.includes(id)
+        ? s.selectedQuestionIds.filter(i => i !== id)
+        : [...s.selectedQuestionIds, id],
+    }));
+  },
+
+  clearSelection: () => set({ selectedQuestionIds: [] }),
+
+  selectAll: () => {
+    set(s => ({ selectedQuestionIds: s.questions.map(q => q.id) }));
+  },
+
+  addTopic: (t) => {
+    const newT: Topic = { ...t, id: `topic_admin_${Date.now()}` };
+    set(s => ({ topics: [...s.topics, newT] }));
+    return newT;
+  },
+
+  updateTopic: (id, updates) => {
+    set(s => ({
+      topics: s.topics.map(t => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+  },
+
+  deleteTopic: (id) => {
+    set(s => ({ topics: s.topics.filter(t => t.id !== id) }));
+  },
+
+  updateTarget: (id, updates) => {
+    set(s => ({
+      targets: s.targets.map(t => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+  },
+
+  addTemplate: (t) => {
+    const newT: SmartExamTemplate = {
+      ...t,
+      id: `tmpl_${Date.now()}`,
+      createdAt: new Date(),
+    };
+    set(s => ({ templates: [...s.templates, newT] }));
+    return newT;
+  },
+
+  updateTemplate: (id, updates) => {
+    set(s => ({
+      templates: s.templates.map(t => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+  },
+
+  deleteTemplate: (id) => {
+    set(s => ({ templates: s.templates.filter(t => t.id !== id) }));
+  },
+
+  getStats: () => {
+    const { questions, topics, targets } = get();
+    const questionsPerTopic: Record<string, number> = {};
+    const questionsPerDifficulty: Record<number, number> = {};
+    const questionsPerType: Record<string, number> = {};
+
+    questions.forEach(q => {
+      questionsPerTopic[q.topicId] = (questionsPerTopic[q.topicId] ?? 0) + 1;
+      questionsPerDifficulty[q.difficulty] = (questionsPerDifficulty[q.difficulty] ?? 0) + 1;
+      questionsPerType[q.questionType] = (questionsPerType[q.questionType] ?? 0) + 1;
+    });
+
+    const avgDifficulty = questions.length > 0
+      ? Math.round(questions.reduce((s, q) => s + q.difficulty, 0) / questions.length * 10) / 10
+      : 0;
+
+    return {
+      totalQuestions: questions.length,
+      validatedCount: questions.filter(q => q.validationStatus === 'validated').length,
+      pendingCount: questions.filter(q => q.validationStatus === 'pending').length,
+      draftCount: questions.filter(q => q.validationStatus === 'draft').length,
+      rejectedCount: questions.filter(q => q.validationStatus === 'rejected').length,
+      questionsPerTopic,
+      questionsPerDifficulty,
+      questionsPerType,
+      avgDifficulty,
+      totalTargets: targets.length,
+      totalTopics: topics.length,
+    };
+  },
+
+  getPendingQuestions: () => get().questions.filter(q => q.validationStatus === 'pending'),
+  getQuestionsByStatus: (status) => get().questions.filter(q => q.validationStatus === status),
+}));
