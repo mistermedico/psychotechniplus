@@ -3,14 +3,19 @@ import * as Haptics from 'expo-haptics';
 
 export { ImpactFeedbackStyle, NotificationFeedbackType } from 'expo-haptics';
 
+const isNative = Platform.OS === 'ios' || Platform.OS === 'android';
+
 export const impactAsync = (style: Haptics.ImpactFeedbackStyle): void => {
-  if (Platform.OS !== 'web') Haptics.impactAsync(style);
+  if (!isNative) return;
+  try { Haptics.impactAsync(style); } catch {}
 };
 
 export const notificationAsync = (type: Haptics.NotificationFeedbackType): void => {
-  if (Platform.OS !== 'web') Haptics.notificationAsync(type);
+  if (!isNative) return;
+  try { Haptics.notificationAsync(type); } catch {}
 };
 
 export const selectionAsync = (): void => {
-  if (Platform.OS !== 'web') Haptics.selectionAsync();
+  if (!isNative) return;
+  try { Haptics.selectionAsync(); } catch {}
 };

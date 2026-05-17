@@ -14,12 +14,8 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { DEFAULT_ELO } from '../utils/elo';
 
-const haptic = (style: Haptics.ImpactFeedbackStyle) => {
-  if (Platform.OS !== 'web') Haptics.impactAsync(style);
-};
-const hapticSuccess = () => {
-  if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-};
+const haptic = (style: Haptics.ImpactFeedbackStyle) => Haptics.impactAsync(style);
+const hapticSuccess = () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
 export default function Onboarding() {
   const [step, setStep] = useState(0);
