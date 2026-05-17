@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
 import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase } from '../lib/db';
+import { supabase } from '../lib/supabase';
+
+const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
 // ── Pending questions (validation queue seed) ──────────────────────────────
 const PENDING_SEED: Question[] = [
@@ -157,8 +160,8 @@ interface AdminState {
   selectedQuestionIds: string[];
 
   // Actions — auth
-  login: (pin: string) => boolean;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  logout: () => Promise<void>;
 
   // Actions — questions
   addQuestion: (q: Omit<Question, 'id'>) => Question;
@@ -193,8 +196,6 @@ interface AdminState {
   getPendingQuestions: () => Question[];
   getQuestionsByStatus: (status: ValidationStatus) => Question[];
 }
-
-const ADMIN_PIN = '1234';
 
 const SEED_TEMPLATES: SmartExamTemplate[] = [
   {
@@ -238,15 +239,34 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   templates: SEED_TEMPLATES,
   selectedQuestionIds: [],
 
-  login: (pin) => {
-    if (pin === ADMIN_PIN) {
+  login: async (email, password) => {
+    // Try sign in first
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data.user) {
+      // Verify it's the admin email
+      if (data.user.email !== ADMIN_EMAIL) {
+        await supabase.auth.signOut();
+        return { ok: false, error: 'אין הרשאות מנהל' };
+      }
       set({ isAdmin: true });
-      return true;
+      return { ok: true };
     }
-    return false;
+    // If user doesn't exist, create them (first-time setup)
+    if (error?.message?.includes('Invalid login credentials')) {
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (!signUpError && signUpData.user) {
+        set({ isAdmin: true });
+        return { ok: true };
+      }
+      return { ok: false, error: signUpError?.message ?? 'שגיאת הרשמה' };
+    }
+    return { ok: false, error: error?.message ?? 'שגיאת התחברות' };
   },
 
-  logout: () => set({ isAdmin: false, selectedQuestionIds: [] }),
+  logout: async () => {
+    await supabase.auth.signOut();
+    set({ isAdmin: false, selectedQuestionIds: [] });
+  },
 
   addQuestion: (q) => {
     const newQ: Question = { ...q, id: `q_admin_${Date.now()}` };
