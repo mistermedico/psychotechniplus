@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { supabase } from '../lib/supabase';
 import { useUserStore } from '../store/userStore';
+import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 
@@ -26,6 +27,7 @@ export default function AuthScreen() {
   const [emailPending, setEmailPending] = useState(false);
 
   const initialize = useUserStore(s => s.initialize);
+  const setIsAdmin = useAdminStore(s => s.setIsAdmin);
 
   const switchMode = (m: AuthMode) => {
     setMode(m);
@@ -80,6 +82,7 @@ export default function AuthScreen() {
       }
 
       await initialize(data.user.id);
+      if (data.user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const { hasCompletedOnboarding } = useUserStore.getState();
       router.replace(hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
@@ -114,6 +117,7 @@ export default function AuthScreen() {
       }
 
       await initialize(data.user.id);
+      if (data.user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/onboarding');
     }

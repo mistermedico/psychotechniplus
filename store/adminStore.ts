@@ -4,7 +4,7 @@ import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
 import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase } from '../lib/db';
 import { supabase } from '../lib/supabase';
 
-const ADMIN_EMAIL = 'mrmedico111@gmail.com';
+export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
 // ── Pending questions (validation queue seed) ──────────────────────────────
 const PENDING_SEED: Question[] = [
@@ -160,6 +160,7 @@ interface AdminState {
   selectedQuestionIds: string[];
 
   // Actions — auth
+  setIsAdmin: (val: boolean) => void;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
 
@@ -238,6 +239,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   targets: [...TARGETS],
   templates: SEED_TEMPLATES,
   selectedQuestionIds: [],
+
+  setIsAdmin: (val) => set({ isAdmin: val }),
 
   login: async (email, password) => {
     // Try sign in first

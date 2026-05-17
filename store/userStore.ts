@@ -14,6 +14,7 @@ interface TopicElo {
 
 interface UserState {
   userId: string;
+  email: string;
   name: string;
   selectedTargetId: string | null;
   hasCompletedOnboarding: boolean;
@@ -51,6 +52,7 @@ interface UserState {
 
 const INITIAL_STATE = {
   userId: '',
+  email: '',
   name: '',
   selectedTargetId: null,
   hasCompletedOnboarding: false,
@@ -98,7 +100,14 @@ export const useUserStore = create<UserState>((set, get) => ({
       }
     }
 
-    set({ userId, isAuthenticated: true });
+    // Store email from session for admin detection
+    let sessionEmail = '';
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionEmail = session?.user?.email ?? '';
+    } catch {}
+
+    set({ userId, isAuthenticated: true, email: sessionEmail });
 
     const [profile, elos, badges] = await Promise.all([
       loadUserProfile(userId),

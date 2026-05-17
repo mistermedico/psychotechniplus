@@ -14,6 +14,7 @@ import { SuezOne_400Regular } from '@expo-google-fonts/suez-one';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useUserStore } from '../store/userStore';
+import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
 
 // Force RTL for Hebrew
 if (!I18nManager.isRTL) {
@@ -27,6 +28,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
+  const setIsAdmin = useAdminStore(s => s.setIsAdmin);
 
   const [fontsLoaded, fontError] = useFonts({
     Heebo_400Regular,
@@ -39,7 +41,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
-      initialize(); // stable zustand action reference, safe to omit from deps
+      initialize().then(() => {
+        const { email } = useUserStore.getState();
+        if (email.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
+      });
     }
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps
 

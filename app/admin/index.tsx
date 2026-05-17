@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -7,7 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
-import { useAdminStore } from '../../store/adminStore';
+import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
+import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -24,12 +25,22 @@ const ADMIN_SECTIONS = [
 ];
 
 export default function AdminDashboard() {
-  const { isAdmin, login, logout, getStats, getPendingQuestions, seedToSupabase, loadQuestionsFromSupabase } = useAdminStore();
+  const { isAdmin, login, logout, setIsAdmin, getStats, getPendingQuestions, seedToSupabase, loadQuestionsFromSupabase } = useAdminStore();
   const [email, setEmail] = useState('mrmedico111@gmail.com');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [seeding, setSeeding] = useState(false);
+
+  // Auto-login if already authenticated as admin via regular auth
+  useEffect(() => {
+    if (isAdmin) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email?.toLowerCase() === ADMIN_EMAIL) {
+        setIsAdmin(true);
+      }
+    });
+  }, []);
 
   if (!isAdmin) {
     return (
@@ -65,7 +76,7 @@ export default function AdminDashboard() {
         <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
           <Text style={styles.headerTitle}>🛠️ פאנל ניהול</Text>
           <Text style={styles.headerSub}>PsychoTechniPlus Admin v1.0</Text>
-          <Pressable onPress={async () => { await logout(); router.replace('/(tabs)'); }} style={styles.logoutBtn}>
+          <Pressable onPress={async () => { await logout(); router.replace('/auth'); }} style={styles.logoutBtn}>
             <Text style={styles.logoutText}>יציאה →</Text>
           </Pressable>
         </LinearGradient>
