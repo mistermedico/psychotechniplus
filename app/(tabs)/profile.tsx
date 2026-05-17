@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Alert,
+  View, Text, StyleSheet, ScrollView, Pressable,
+  Alert, ActionSheetIOS, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,13 +27,30 @@ function SettingRow({ icon, label, value, onPress, danger }: SettingRowProps) {
       onPress={onPress}
       style={({ pressed }) => [styles.settingRow, pressed && { opacity: 0.7 }]}
     >
+      {/* RTL layout: arrow on the left (LTR coords), icon+label in middle, value on far right */}
       <Text style={[styles.settingArrow, danger && { color: Colors.danger }]}>←</Text>
-      {value && <Text style={styles.settingValue}>{value}</Text>}
-      <View style={styles.settingLeft}>
-        <Text style={styles.settingLabel(danger)}>{label}</Text>
+      <View style={styles.settingLabelWrap}>
+        <Text style={[styles.settingLabel, danger && { color: Colors.danger }]}>{label}</Text>
       </View>
+      {value ? <Text style={styles.settingValue}>{value}</Text> : null}
       <Text style={styles.settingIcon}>{icon}</Text>
     </Pressable>
+  );
+}
+
+// Gradient ring avatar: outer gradient view → white padding → inner circle
+function AvatarWithRing({ emoji }: { emoji: string }) {
+  return (
+    <LinearGradient
+      colors={['#F59E0B', '#9333EA', '#4F46E5']}
+      start={{ x: 0, y: 1 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.avatarRing}
+    >
+      <View style={styles.avatarRingInner}>
+        <Text style={styles.avatarEmoji}>{emoji}</Text>
+      </View>
+    </LinearGradient>
   );
 }
 
@@ -43,7 +61,7 @@ export default function ProfileTab() {
     getTopicElo, reset,
   } = useUserStore();
 
-  // Secret admin entry: tap version text 5 times
+  // Secret admin entry: tap version text 5 times within 2 seconds each
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleVersionTap = () => {
@@ -60,25 +78,46 @@ export default function ProfileTab() {
 
   const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+  const mainElo = getTopicElo('topic_quantitative');
 
   const avatarEmoji = ['🧠', '🎯', '🚀', '💎', '🌟'][Math.min(level - 1, 4)];
 
   const handleReset = () => {
-    Alert.alert(
-      'איפוס נתונים',
-      'האם אתה בטוח? כל ההתקדמות תימחק.',
-      [
-        { text: 'ביטול', style: 'cancel' },
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
         {
-          text: 'איפוס',
-          style: 'destructive',
-          onPress: () => {
+          title: 'איפוס כל הנתונים',
+          message: 'האם אתה בטוח? כל ההתקדמות תימחק לצמיתות.',
+          options: ['ביטול', 'איפוס'],
+          destructiveButtonIndex: 1,
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             reset();
             router.replace('/onboarding');
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        'איפוס נתונים',
+        'האם אתה בטוח? כל ההתקדמות תימחק.',
+        [
+          { text: 'ביטול', style: 'cancel' },
+          {
+            text: 'איפוס',
+            style: 'destructive',
+            onPress: () => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              reset();
+              router.replace('/onboarding');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   return (
@@ -87,6 +126,7 @@ export default function ProfileTab() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        bounces={true}
       >
         {/* Profile hero */}
         <LinearGradient
@@ -95,11 +135,11 @@ export default function ProfileTab() {
           end={{ x: 1, y: 1 }}
           style={styles.profileHero}
         >
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
-          </View>
+          <AvatarWithRing emoji={avatarEmoji} />
           <Text style={styles.profileName}>{name || 'מתאמן'}</Text>
-          <Text style={styles.profileLevel}>רמה {level} · {eloToTitle(getTopicElo('topic_quantitative'))}</Text>
+          <Text style={styles.profileLevel}>רמה {level} · {eloToTitle(mainElo)}</Text>
+          {/* ELO prominently displayed */}
+          <Text style={styles.profileElo}>{mainElo} ELO</Text>
 
           <View style={styles.profileStats}>
             <View style={styles.profileStat}>
@@ -152,18 +192,78 @@ export default function ProfileTab() {
         {/* Settings */}
         <Text style={styles.sectionTitle}>הגדרות</Text>
         <View style={styles.settingsCard}>
-          <SettingRow icon="🔔" label="התראות" value="פעיל" onPress={() => {}} />
-          <SettingRow icon="🌙" label="מצב לילה" value="כבוי" onPress={() => {}} />
-          <SettingRow icon="📊" label="קושי ברירת מחדל" value="אוטומטי" onPress={() => {}} />
-          <SettingRow icon="🔊" label="קול והפטיקה" value="פעיל" onPress={() => {}} />
+          <SettingRow
+            icon="🔔"
+            label="התראות"
+            value="פעיל"
+            onPress={() => {
+              Haptics.selectionAsync();
+              Alert.alert('התראות', 'ניהול התראות יהיה זמין בקרוב');
+            }}
+          />
+          <SettingRow
+            icon="🌙"
+            label="מצב לילה"
+            value="כבוי"
+            onPress={() => {
+              Haptics.selectionAsync();
+              Alert.alert('מצב לילה', 'מצב לילה יהיה זמין בקרוב');
+            }}
+          />
+          <SettingRow
+            icon="📊"
+            label="קושי ברירת מחדל"
+            value="אוטומטי"
+            onPress={() => {
+              Haptics.selectionAsync();
+              Alert.alert('קושי', 'הקושי מחושב אוטומטית על בסיס ה-ELO שלך');
+            }}
+          />
+          <SettingRow
+            icon="🔊"
+            label="קול והפטיקה"
+            value="פעיל"
+            onPress={() => {
+              Haptics.selectionAsync();
+              Alert.alert('קול והפטיקה', 'ניהול קול יהיה זמין בקרוב');
+            }}
+          />
         </View>
 
         <Text style={styles.sectionTitle}>חשבון</Text>
         <View style={styles.settingsCard}>
-          <SettingRow icon="⭐" label="שאלות מועדפות" onPress={() => {}} />
-          <SettingRow icon="📝" label="ההיסטוריה שלי" onPress={() => {}} />
-          <SettingRow icon="💬" label="צור קשר ותמיכה" onPress={() => {}} />
-          <SettingRow icon="📄" label="תנאי שימוש ופרטיות" onPress={() => {}} />
+          <SettingRow
+            icon="⭐"
+            label="שאלות מועדפות"
+            onPress={() => {
+              Haptics.selectionAsync();
+              Alert.alert('מועדפות', 'אפשרות זו תהיה זמינה בקרוב');
+            }}
+          />
+          <SettingRow
+            icon="📝"
+            label="ההיסטוריה שלי"
+            onPress={() => {
+              Haptics.selectionAsync();
+              Alert.alert('היסטוריה', 'היסטוריית סשנים תהיה זמינה בקרוב');
+            }}
+          />
+          <SettingRow
+            icon="💬"
+            label="צור קשר ותמיכה"
+            onPress={() => {
+              Haptics.selectionAsync();
+              Alert.alert('תמיכה', 'שלח אימייל: support@psychotechniplus.com');
+            }}
+          />
+          <SettingRow
+            icon="📄"
+            label="תנאי שימוש ופרטיות"
+            onPress={() => {
+              Haptics.selectionAsync();
+              Alert.alert('תנאי שימוש', 'תנאי השימוש זמינים באתר שלנו');
+            }}
+          />
           <SettingRow
             icon="🗑️"
             label="איפוס כל הנתונים"
@@ -173,8 +273,8 @@ export default function ProfileTab() {
         </View>
 
         <Pressable onPress={handleVersionTap}>
-    <Text style={styles.version}>PsychoTechniPlus v1.0.0 · Sprint 1</Text>
-  </Pressable>
+          <Text style={styles.version}>PsychoTechniPlus v1.0.0 · Sprint 1</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -190,16 +290,27 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     alignItems: 'center',
   },
-  avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+
+  // Gradient ring around avatar
+  avatarRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    padding: 3,
+  },
+  avatarRingInner: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarEmoji: { fontSize: 40 },
+
   profileName: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize['2xl'],
@@ -210,8 +321,17 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
     color: 'rgba(255,255,255,0.8)',
-    marginBottom: 20,
+    marginBottom: 6,
   },
+  // Prominent ELO number
+  profileElo: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize['3xl'],
+    color: '#fff',
+    marginBottom: 18,
+    letterSpacing: 1,
+  },
+
   profileStats: {
     flexDirection: 'row-reverse',
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -300,6 +420,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  // RTL row: arrow (←) on the left end, label in the flex center, value then icon on the right
   settingRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -309,18 +430,19 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   settingIcon: { fontSize: 20 },
-  settingLeft: { flex: 1, alignItems: 'flex-end' },
-  settingLabel: (danger?: boolean) => ({
+  settingLabelWrap: { flex: 1, alignItems: 'flex-end' },
+  settingLabel: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.base,
-    color: danger ? Colors.danger : Colors.text,
+    color: Colors.text,
     textAlign: 'right',
-  }),
+  },
   settingValue: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
     color: Colors.textTertiary,
   },
+  // The ← chevron sits on the leftmost end of the RTL row
   settingArrow: { color: Colors.textTertiary, fontSize: FontSize.base },
 
   version: {

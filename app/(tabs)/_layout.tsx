@@ -1,5 +1,8 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Platform, StyleSheet, View, Text } from 'react-native';
+import { BlurView } from 'expo-blur';
+import * as Haptics from '../../utils/haptics';
 import { Colors } from '../../constants/colors';
 import { FontFamily } from '../../constants/theme';
 
@@ -18,13 +21,27 @@ function TabIcon({ icon, label, focused }: TabIconProps) {
   );
 }
 
+function TabBarBackground() {
+  if (Platform.OS === 'ios') {
+    return (
+      <BlurView
+        tint="light"
+        intensity={80}
+        style={StyleSheet.absoluteFill}
+      />
+    );
+  }
+  return <View style={[StyleSheet.absoluteFill, styles.androidBackground]} />;
+}
+
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
+        tabBarBackground: () => <TabBarBackground />,
+        tabBarStyle: styles.tabBar,
       }}
     >
       <Tabs.Screen
@@ -34,6 +51,9 @@ export default function TabLayout() {
             <TabIcon icon="🏠" label="בית" focused={focused} />
           ),
         }}
+        listeners={{
+          tabPress: () => Haptics.selectionAsync(),
+        }}
       />
       <Tabs.Screen
         name="targets"
@@ -41,6 +61,9 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => (
             <TabIcon icon="🎯" label="מסלולים" focused={focused} />
           ),
+        }}
+        listeners={{
+          tabPress: () => Haptics.selectionAsync(),
         }}
       />
       <Tabs.Screen
@@ -50,6 +73,9 @@ export default function TabLayout() {
             <TabIcon icon="✏️" label="תרגול" focused={focused} />
           ),
         }}
+        listeners={{
+          tabPress: () => Haptics.selectionAsync(),
+        }}
       />
       <Tabs.Screen
         name="progress"
@@ -57,6 +83,9 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => (
             <TabIcon icon="📈" label="התקדמות" focused={focused} />
           ),
+        }}
+        listeners={{
+          tabPress: () => Haptics.selectionAsync(),
         }}
       />
       <Tabs.Screen
@@ -66,38 +95,51 @@ export default function TabLayout() {
             <TabIcon icon="👤" label="פרופיל" focused={focused} />
           ),
         }}
+        listeners={{
+          tabPress: () => Haptics.selectionAsync(),
+        }}
       />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
+  androidBackground: {
+    backgroundColor: '#fff',
+  },
   tabBar: {
-    backgroundColor: 'rgba(255,255,255,0.97)',
+    position: 'absolute',
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(0,0,0,0.08)',
-    height: Platform.OS === 'ios' ? 85 : 65,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    height: Platform.OS === 'ios' ? 88 : 65,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 8,
     paddingTop: 8,
+    backgroundColor: Platform.OS === 'android' ? '#fff' : 'transparent',
+    elevation: Platform.OS === 'android' ? 8 : 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
-    elevation: 8,
   },
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 12,
     gap: 2,
   },
   tabItemFocused: {
     backgroundColor: Colors.primaryLighter,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  tabIcon: { fontSize: 22 },
-  tabIconFocused: {},
+  tabIcon: {
+    fontSize: 20,
+  },
+  tabIconFocused: {
+    fontSize: 24,
+  },
   tabLabel: {
     fontFamily: FontFamily.regular,
     fontSize: 10,
@@ -105,6 +147,7 @@ const styles = StyleSheet.create({
   },
   tabLabelFocused: {
     fontFamily: FontFamily.medium,
+    fontSize: 10,
     color: Colors.primary,
   },
 });

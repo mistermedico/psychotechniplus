@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
+  Animated, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -13,16 +14,81 @@ import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { eloToTitle } from '../../utils/elo';
 
+// Animated topics container that springs in when a target is expanded
+function AnimatedTopicsContainer({
+  visible,
+  children,
+}: {
+  visible: boolean;
+  children: React.ReactNode;
+}) {
+  const translateY = useRef(new Animated.Value(visible ? 0 : 20)).current;
+  const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const [shouldRender, setShouldRender] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 160,
+          friction: 14,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 20,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setShouldRender(false));
+      // Reset for next open
+      translateY.setValue(20);
+    }
+  }, [visible]);
+
+  if (!shouldRender) return null;
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export default function TargetsTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const { getTopicElo, totalSessions } = useUserStore();
 
   const selected = TARGETS.find(t => t.id === selectedId);
   const selectedTopics = selected ? TOPICS.filter(t => t.targetId === selected.id) : [];
 
-  const handleTargetPress = (id: string) => {
+  const handleTargetPress = (id: string, comingSoon: boolean) => {
+    if (comingSoon) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedId(prev => (prev === id ? null : id));
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
   return (
@@ -36,6 +102,14 @@ export default function TargetsTab() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        bounces={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Colors.primary}
+          />
+        }
       >
         {TARGETS.map(target => {
           const topics = TOPICS.filter(t => t.targetId === target.id);
@@ -43,77 +117,121 @@ export default function TargetsTab() {
             ? topics.reduce((s, t) => s + getTopicElo(t.id), 0) / topics.length
             : 1200;
           const progress = Math.max(0, Math.min(1, (avgElo - 900) / 600));
+          const progressPct = Math.round(progress * 100);
+          const isExpanded = selectedId === target.id;
 
           return (
             <View key={target.id}>
-              <TargetCard
-                target={target}
-                progress={progress}
-                sessionsCount={totalSessions}
-                onPress={() => handleTargetPress(target.id)}
-              />
+              {/* TargetCard with coming-soon overlay */}
+              <View style={styles.cardWrapper}>
+                <TargetCard
+                  target={target}
+                  progress={progress}
+                  sessionsCount={totalSessions}
+                  onPress={() => handleTargetPress(target.id, !!target.comingSoon)}
+                />
+                {/* Progress percentage badge */}
+                <View style={styles.progressPctBadge}>
+                  <Text style={styles.progressPctText}>{progressPct}%</Text>
+                </View>
+                {/* Coming-soon overlay */}
+                {target.comingSoon && (
+                  <View style={styles.comingSoonOverlay}>
+                    <View style={styles.comingSoonBadge}>
+                      <Text style={styles.comingSoonText}>בקרוב</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
 
-              {/* Expanded topics */}
-              {selectedId === target.id && !target.comingSoon && (
+              {/* Expanded topics section — animates in with spring */}
+              <AnimatedTopicsContainer visible={isExpanded && !target.comingSoon}>
                 <View style={styles.topicsContainer}>
                   <Text style={styles.topicsTitle}>נושאים במסלול</Text>
-                  {selectedTopics.map(topic => {
-                    const elo = getTopicElo(topic.id);
-                    const topicProgress = Math.max(0, Math.min(1, (elo - 900) / 600));
-                    return (
-                      <Pressable
-                        key={topic.id}
-                        style={({ pressed }) => [
-                          styles.topicRow,
-                          pressed && { opacity: 0.85 },
-                          topic.isPremiumOnly && styles.topicLocked,
-                        ]}
-                        onPress={() => {
-                          if (topic.isPremiumOnly) return;
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          router.push({
-                            pathname: '/practice-session',
-                            params: {
-                              topicId: topic.id,
-                              targetId: target.id,
-                              mode: 'practice',
-                            },
-                          });
-                        }}
-                      >
-                        <View style={styles.topicLeft}>
-                          <Text style={styles.topicIcon}>{topic.icon}</Text>
-                          <View>
-                            <Text style={styles.topicName}>{topic.name}</Text>
-                            <Text style={styles.topicElo}>
-                              {eloToTitle(elo)} · ELO {elo}
-                            </Text>
-                            <View style={styles.topicProgressWrap}>
-                              <ProgressBar
-                                progress={topicProgress}
-                                color={topic.color}
-                                height={4}
-                              />
+
+                  {selectedTopics.length === 0 ? (
+                    <Text style={styles.emptyTopics}>אין נושאים זמינים</Text>
+                  ) : (
+                    selectedTopics.map((topic, index) => {
+                      const elo = getTopicElo(topic.id);
+                      const topicProgress = Math.max(0, Math.min(1, (elo - 900) / 600));
+                      const topicPct = Math.round(topicProgress * 100);
+                      const isLast = index === selectedTopics.length - 1;
+
+                      return (
+                        <View
+                          key={topic.id}
+                          style={[
+                            styles.topicRow,
+                            topic.isPremiumOnly && styles.topicLocked,
+                            isLast && styles.topicRowLast,
+                          ]}
+                        >
+                          {/* Right side: icon + name + elo */}
+                          <View style={styles.topicInfo}>
+                            <Text style={styles.topicIcon}>{topic.icon}</Text>
+                            <View style={styles.topicTextBlock}>
+                              <Text style={styles.topicName}>{topic.name}</Text>
+                              <Text style={styles.topicElo}>
+                                {eloToTitle(elo)} · ELO {elo}
+                              </Text>
+                              <View style={styles.topicProgressRow}>
+                                <View style={styles.topicProgressWrap}>
+                                  <ProgressBar
+                                    progress={topicProgress}
+                                    color={topic.color}
+                                    height={4}
+                                  />
+                                </View>
+                                <Text style={[styles.topicProgressPct, { color: topic.color }]}>
+                                  {topicPct}%
+                                </Text>
+                              </View>
                             </View>
                           </View>
-                        </View>
-                        {topic.isPremiumOnly ? (
-                          <Text style={styles.lockIcon}>💎</Text>
-                        ) : (
-                          <Text style={styles.arrow}>←</Text>
-                        )}
-                      </Pressable>
-                    );
-                  })}
 
+                          {/* Left side: "תרגל ←" chip or 💎 lock */}
+                          {topic.isPremiumOnly ? (
+                            <Text style={styles.lockIcon}>💎</Text>
+                          ) : (
+                            <Pressable
+                              style={({ pressed }) => [
+                                styles.practiceChip,
+                                { borderColor: topic.color, backgroundColor: topic.color + '18' },
+                                pressed && { opacity: 0.75, transform: [{ scale: 0.96 }] },
+                              ]}
+                              onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push({
+                                  pathname: '/practice-session',
+                                  params: {
+                                    topicId: topic.id,
+                                    targetId: target.id,
+                                    mode: 'practice',
+                                  },
+                                });
+                              }}
+                            >
+                              <Text style={[styles.practiceChipText, { color: topic.color }]}>
+                                תרגל ←
+                              </Text>
+                            </Pressable>
+                          )}
+                        </View>
+                      );
+                    })
+                  )}
+
+                  {/* Adaptive practice button at bottom of expanded section */}
                   <Pressable
                     style={({ pressed }) => [
-                      styles.practiceBtn,
+                      styles.adaptiveBtn,
                       pressed && { opacity: 0.85 },
                     ]}
                     onPress={() => {
                       const firstFreeTopic = selectedTopics.find(t => !t.isPremiumOnly);
                       if (firstFreeTopic) {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         router.push({
                           pathname: '/practice-session',
                           params: {
@@ -125,10 +243,10 @@ export default function TargetsTab() {
                       }
                     }}
                   >
-                    <Text style={styles.practiceBtnText}>⚡ תרגול אדפטיבי</Text>
+                    <Text style={styles.adaptiveBtnText}>⚡ תרגול אדפטיבי</Text>
                   </Pressable>
                 </View>
-              )}
+              </AnimatedTopicsContainer>
             </View>
           );
         })}
@@ -160,6 +278,51 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
 
+  // Wrapper for TargetCard + overlays
+  cardWrapper: {
+    position: 'relative',
+  },
+
+  // Progress percentage badge — top-left corner (RTL: visually top-right)
+  progressPctBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    zIndex: 2,
+  },
+  progressPctText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: '#fff',
+  },
+
+  // Coming-soon overlay covers the entire card
+  comingSoonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderRadius: Radius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  comingSoonBadge: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.lg,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    ...Shadow.primary,
+  },
+  comingSoonText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: '#fff',
+  },
+
+  // Expanded topics container
   topicsContainer: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
@@ -176,6 +339,15 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 12,
   },
+  emptyTopics: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+
+  // Topic row: right side = info, left side = chip
   topicRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -185,9 +357,20 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     gap: 12,
   },
+  topicRowLast: {
+    borderBottomWidth: 0,
+  },
   topicLocked: { opacity: 0.5 },
-  topicLeft: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, flex: 1 },
+
+  // Right side: icon + text block
+  topicInfo: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
   topicIcon: { fontSize: 24 },
+  topicTextBlock: { flex: 1, alignItems: 'flex-end' },
   topicName: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.base,
@@ -201,11 +384,39 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 2,
   },
-  topicProgressWrap: { width: 120, marginTop: 6 },
-  lockIcon: { fontSize: 18 },
-  arrow: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.primary },
+  topicProgressRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  topicProgressWrap: { flex: 1 },
+  topicProgressPct: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    minWidth: 32,
+    textAlign: 'left',
+  },
 
-  practiceBtn: {
+  lockIcon: { fontSize: 18 },
+
+  // "תרגל ←" chip button
+  practiceChip: {
+    borderWidth: 1.5,
+    borderRadius: Radius.lg,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  practiceChipText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+  },
+
+  // Adaptive practice button at bottom
+  adaptiveBtn: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.lg,
     padding: 14,
@@ -213,7 +424,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     ...Shadow.primary,
   },
-  practiceBtnText: {
+  adaptiveBtnText: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.base,
     color: '#fff',

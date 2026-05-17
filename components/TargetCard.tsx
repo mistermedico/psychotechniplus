@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     letterSpacing: 1,
   },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  header: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start' },
   icon: { fontSize: 36 },
   freeBadge: {
     backgroundColor: 'rgba(255,255,255,0.25)',
@@ -140,10 +140,10 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 4,
   },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  footer: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 8 },
   stats: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.85)' },
   sessions: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' },
-  progressContainer: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressContainer: { marginTop: 10, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   progressText: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.xs,

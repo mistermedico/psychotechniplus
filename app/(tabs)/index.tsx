@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Dimensions,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Dimensions,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,7 +40,11 @@ const BADGE_INFO: Record<string, { icon: string; label: string }> = {
 };
 
 export default function Dashboard() {
-  const { name, streak, level, xp, badges, totalSessions, totalCorrect, totalAnswered, selectedTargetId, getTopicElo } = useUserStore();
+  const {
+    name, streak, level, xp, badges,
+    totalSessions, totalCorrect, totalAnswered,
+    selectedTargetId, getTopicElo,
+  } = useUserStore();
 
   const selectedTarget = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const mainTopic = TOPICS.find(t => t.targetId === selectedTarget.id);
@@ -42,7 +52,32 @@ export default function Dashboard() {
   const title = eloToTitle(currentElo);
 
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+  const xpPercent = Math.min(100, Math.round((xp / (level * 100)) * 100));
   const recentBadges = badges.slice(-3);
+
+  // Streak badge pulse animation — only when streak > 0
+  const streakPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (streak > 0) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(streakPulse, {
+            toValue: 1.08,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(streakPulse, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [streak]);
 
   const startQuickPractice = (topicId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -58,8 +93,9 @@ export default function Dashboard() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        bounces={true}
       >
-        {/* Hero */}
+        {/* Hero card */}
         <LinearGradient
           colors={Colors.gradients.primary}
           start={{ x: 0, y: 0 }}
@@ -67,9 +103,14 @@ export default function Dashboard() {
           style={styles.hero}
         >
           <View style={styles.heroTop}>
-            <View style={styles.streakBadge}>
+            <Animated.View
+              style={[
+                styles.streakBadge,
+                { transform: [{ scale: streakPulse }] },
+              ]}
+            >
               <Text style={styles.streakText}>🔥 {streak}</Text>
-            </View>
+            </Animated.View>
             <View style={styles.heroGreeting}>
               <Text style={styles.heroName}>שלום, {name || 'מתאמן'}! 👋</Text>
               <Text style={styles.heroTitle}>{title} · ELO {currentElo}</Text>
@@ -93,22 +134,28 @@ export default function Dashboard() {
             </View>
           </View>
 
-          {/* XP bar */}
+          {/* XP bar — correct formula: xp / (level * 100) */}
           <View style={styles.xpContainer}>
-            <Text style={styles.xpLabel}>XP לרמה {level + 1}</Text>
+            <Text style={styles.xpLabel}>XP לרמה {level + 1} — {xpPercent}%</Text>
             <View style={styles.xpTrack}>
-              <View style={[styles.xpFill, { width: `${Math.min(100, Math.round((xp / (level * 100)) * 100))}%` }]} />
+              <View style={[styles.xpFill, { width: `${xpPercent}%` }]} />
             </View>
           </View>
         </LinearGradient>
 
-        {/* Main CTA */}
+        {/* Main CTA — with subtitle showing number of available questions */}
         <Pressable
-          style={({ pressed }) => [styles.mainCta, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
-          onPress={() => startQuickPractice(mainTopic?.id ?? 'topic_quantitative')}
+          style={({ pressed }) => [
+            styles.mainCta,
+            pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            startQuickPractice(mainTopic?.id ?? 'topic_quantitative');
+          }}
         >
           <LinearGradient
-            colors={selectedTarget.gradientColors}
+            colors={selectedTarget.gradientColors as [string, string]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.mainCtaGrad}
@@ -116,13 +163,15 @@ export default function Dashboard() {
             <Text style={styles.mainCtaIcon}>{selectedTarget.icon}</Text>
             <View style={styles.mainCtaText}>
               <Text style={styles.mainCtaTitle}>המשך תרגול</Text>
-              <Text style={styles.mainCtaSubtitle}>{selectedTarget.name}</Text>
+              <Text style={styles.mainCtaSubtitle}>
+                {selectedTarget.name} · {selectedTarget.totalQuestions} שאלות זמינות
+              </Text>
             </View>
             <Text style={styles.mainCtaArrow}>←</Text>
           </LinearGradient>
         </Pressable>
 
-        {/* Quick actions */}
+        {/* Quick actions — each tappable with haptics */}
         <Text style={styles.sectionTitle}>תרגול מהיר</Text>
         <View style={styles.quickActions}>
           {QUICK_ACTIONS.map(action => (
@@ -132,7 +181,7 @@ export default function Dashboard() {
               style={({ pressed }) => [
                 styles.quickAction,
                 { borderColor: action.color + '40' },
-                pressed && { transform: [{ scale: 0.95 }] },
+                pressed && { transform: [{ scale: 0.95 }], opacity: 0.85 },
               ]}
             >
               <LinearGradient
@@ -155,25 +204,30 @@ export default function Dashboard() {
           <StatCard icon="🎯" label="סשנים" value={totalSessions} color={Colors.accent} />
         </View>
 
-        {/* Badges */}
-        {recentBadges.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>הישגים אחרונים</Text>
-            <View style={styles.badgesRow}>
-              {recentBadges.map(badge => {
-                const info = BADGE_INFO[badge.badgeType] ?? { icon: '🏅', label: badge.badgeType };
-                return (
-                  <View key={badge.id} style={styles.badgeCard}>
-                    <Text style={styles.badgeIcon}>{info.icon}</Text>
-                    <Text style={styles.badgeLabel}>{info.label}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </>
+        {/* Badges — with empty state */}
+        <Text style={styles.sectionTitle}>הישגים אחרונים</Text>
+        {recentBadges.length > 0 ? (
+          <View style={styles.badgesRow}>
+            {recentBadges.map(badge => {
+              const info = BADGE_INFO[badge.badgeType] ?? { icon: '🏅', label: badge.badgeType };
+              return (
+                <View key={badge.id} style={styles.badgeCard}>
+                  <Text style={styles.badgeIcon}>{info.icon}</Text>
+                  <Text style={styles.badgeLabel}>{info.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.emptyBadges}>
+            <Text style={styles.emptyBadgesEmoji}>🏅</Text>
+            <Text style={styles.emptyBadgesText}>
+              השלם את הסשן הראשון שלך כדי להרוויח הישגים!
+            </Text>
+          </View>
         )}
 
-        {/* Target cards */}
+        {/* Target cards — horizontal scroll */}
         <Text style={styles.sectionTitle}>המסלולים שלי</Text>
         <ScrollView
           horizontal
@@ -185,7 +239,9 @@ export default function Dashboard() {
               <TargetCard
                 target={t}
                 compact
-                onPress={() => router.push({ pathname: '/targets', params: { targetId: t.id } })}
+                onPress={() =>
+                  router.push({ pathname: '/targets', params: { targetId: t.id } })
+                }
               />
             </View>
           ))}
@@ -198,8 +254,9 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  content: { paddingBottom: 32 },
+  content: { paddingBottom: 100 },
 
+  // ── Hero ──────────────────────────────────────────────────────────────────
   hero: {
     margin: 16,
     borderRadius: Radius.xl,
@@ -218,14 +275,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  streakText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+  streakText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: '#fff',
+  },
   heroGreeting: { alignItems: 'flex-end' },
-  heroName: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
+  heroName: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize['2xl'],
+    color: '#fff',
+  },
   heroTitle: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
+    textAlign: 'right',
   },
 
   heroStats: {
@@ -236,7 +302,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   heroStat: { flex: 1, alignItems: 'center' },
-  heroStatValue: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: '#fff' },
+  heroStatValue: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize.xl,
+    color: '#fff',
+  },
   heroStatLabel: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
@@ -261,6 +331,7 @@ const styles = StyleSheet.create({
   },
   xpFill: { height: 6, backgroundColor: '#fff', borderRadius: 3 },
 
+  // ── Main CTA ──────────────────────────────────────────────────────────────
   mainCta: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -276,14 +347,26 @@ const styles = StyleSheet.create({
   },
   mainCtaIcon: { fontSize: 32 },
   mainCtaText: { flex: 1, alignItems: 'flex-end' },
-  mainCtaTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+  mainCtaTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: '#fff',
+    textAlign: 'right',
+  },
   mainCtaSubtitle: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
     color: 'rgba(255,255,255,0.8)',
+    textAlign: 'right',
+    marginTop: 2,
   },
-  mainCtaArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: '#fff' },
+  mainCtaArrow: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xl,
+    color: '#fff',
+  },
 
+  // ── Section title ─────────────────────────────────────────────────────────
   sectionTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize.xl,
@@ -294,6 +377,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
+  // ── Quick actions ─────────────────────────────────────────────────────────
   quickActions: {
     flexDirection: 'row-reverse',
     paddingHorizontal: 16,
@@ -313,10 +397,21 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   quickActionIcon: { fontSize: 24 },
-  quickActionLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, textAlign: 'center' },
+  quickActionLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    textAlign: 'center',
+  },
 
-  statsRow: { flexDirection: 'row-reverse', paddingHorizontal: 16, gap: 10, marginBottom: 8 },
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  statsRow: {
+    flexDirection: 'row-reverse',
+    paddingHorizontal: 16,
+    gap: 10,
+    marginBottom: 8,
+  },
 
+  // ── Badges ────────────────────────────────────────────────────────────────
   badgesRow: {
     flexDirection: 'row-reverse',
     paddingHorizontal: 16,
@@ -341,6 +436,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  emptyBadges: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.sm,
+  },
+  emptyBadgesEmoji: { fontSize: 36, marginBottom: 8 },
+  emptyBadgesText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+
+  // ── Targets horizontal scroll ─────────────────────────────────────────────
   targetsScroll: { paddingHorizontal: 16, gap: 12, paddingBottom: 4 },
   targetCardWrap: { width: W * 0.65 },
 });

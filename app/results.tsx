@@ -275,7 +275,7 @@ const scoreRowStyles = StyleSheet.create({
   },
   right: { flex: 1, alignItems: 'flex-end' },
   left: { width: 80, alignItems: 'flex-start' },
-  value: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, textAlign: 'left' },
+  value: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, textAlign: 'right' },
   barTrack: { height: 4, width: 70, backgroundColor: Colors.surfaceTertiary, borderRadius: 2, marginTop: 4, overflow: 'hidden' },
   barFill: { height: 4, borderRadius: 2 },
   label: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
