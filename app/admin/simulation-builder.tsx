@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../../utils/haptics';
 import { useAdminStore, SmartExamTemplate, SimulationRule } from '../../store/adminStore';
 import { TOPICS, TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';

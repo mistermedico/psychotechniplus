@@ -1,36 +1,30 @@
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Dimensions,
+  View, Text, StyleSheet, Pressable,
   ScrollView, TextInput, Platform, KeyboardAvoidingView, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../utils/haptics';
 import { useUserStore } from '../store/userStore';
 import { TARGETS, TOPICS } from '../data/mockData';
 import { Target } from '../data/types';
 import { Colors } from '../constants/colors';
-import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../constants/theme';
+import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { DEFAULT_ELO } from '../utils/elo';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-
-const PLACEMENT_QUESTIONS = [
-  { q: 'מה תוצאת: 15 × 8 - 40?', options: ['80', '120', '100', '140'], correct: 0 },
-  { q: 'מצא את החריג: 2, 4, 8, 15, 32', options: ['2', '4', '15', '32'], correct: 2 },
-  { q: 'ספר : ספרייה = תמונה : ___', options: ['גלריה', 'צייר', 'מסגרת', 'קיר'], correct: 0 },
-  { q: 'אם כל A הוא B, וכל B הוא C, האם כל A הוא C?', options: ['כן', 'לא', 'אולי', 'תלוי'], correct: 0 },
-  { q: '60% מ-200 הוא?', options: ['100', '120', '140', '90'], correct: 1 },
-];
+const haptic = (style: Haptics.ImpactFeedbackStyle) => {
+  if (Platform.OS !== 'web') Haptics.impactAsync(style);
+};
+const hapticSuccess = () => {
+  if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+};
 
 export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
-  const [placementIndex, setPlacementIndex] = useState(0);
-  const [placementScore, setPlacementScore] = useState(0);
-  const [placementDone, setPlacementDone] = useState(false);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const completeOnboarding = useUserStore(s => s.completeOnboarding);
@@ -40,41 +34,21 @@ export default function Onboarding() {
   };
 
   const goNext = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next = step + 1;
-    setStep(next);
-    animateTo(next / 2);
+    haptic(Haptics.ImpactFeedbackStyle.Light);
+    setStep(1);
+    animateTo(0.5);
   };
 
   const handleTargetSelect = (t: Target) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptic(Haptics.ImpactFeedbackStyle.Medium);
     setSelectedTarget(t);
   };
 
-  const handlePlacementAnswer = (idx: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const q = PLACEMENT_QUESTIONS[placementIndex];
-    const correct = idx === q.correct;
-    if (correct) setPlacementScore(s => s + 1);
-    const next = placementIndex + 1;
-    if (next >= PLACEMENT_QUESTIONS.length) {
-      setPlacementDone(true);
-    } else {
-      setPlacementIndex(next);
-    }
-  };
-
   const handleFinish = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Calculate initial ELO based on placement score
-    const ratio = placementScore / PLACEMENT_QUESTIONS.length;
-    const initialElo = Math.round(DEFAULT_ELO + (ratio - 0.5) * 400);
-
+    hapticSuccess();
+    animateTo(1);
     const initialElos: Record<string, number> = {};
-    TOPICS.forEach(t => {
-      initialElos[t.id] = initialElo;
-    });
-
+    TOPICS.forEach(t => { initialElos[t.id] = DEFAULT_ELO; });
     completeOnboarding(name || 'מתאמן', selectedTarget?.id ?? TARGETS[0].id, initialElos);
     router.replace('/(tabs)');
   };
@@ -86,7 +60,6 @@ export default function Onboarding() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Progress bar */}
       <View style={styles.progressTrack}>
         <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
       </View>
@@ -96,16 +69,6 @@ export default function Onboarding() {
         <StepSelectTarget
           selected={selectedTarget}
           onSelect={handleTargetSelect}
-          onNext={goNext}
-        />
-      )}
-      {step === 2 && (
-        <StepPlacement
-          questions={PLACEMENT_QUESTIONS}
-          index={placementIndex}
-          score={placementScore}
-          done={placementDone}
-          onAnswer={handlePlacementAnswer}
           onFinish={handleFinish}
         />
       )}
@@ -168,11 +131,11 @@ function StepWelcome({
 // ── Step 2: Select Target ──────────────────────────────────────────────────
 
 function StepSelectTarget({
-  selected, onSelect, onNext,
+  selected, onSelect, onFinish,
 }: {
   selected: Target | null;
   onSelect: (t: Target) => void;
-  onNext: () => void;
+  onFinish: () => void;
 }) {
   const activeTargets = TARGETS.filter(t => !t.comingSoon);
 
@@ -229,83 +192,13 @@ function StepSelectTarget({
           !selected && { opacity: 0.4 },
           pressed && selected && { opacity: 0.85 },
         ]}
-        onPress={selected ? onNext : undefined}
+        onPress={selected ? onFinish : undefined}
         disabled={!selected}
       >
         <LinearGradient colors={Colors.gradients.primary} style={styles.primaryBtnGrad}>
-          <Text style={styles.primaryBtnText}>המשך ←</Text>
+          <Text style={styles.primaryBtnText}>כניסה לאפליקציה 🚀</Text>
         </LinearGradient>
       </Pressable>
-    </View>
-  );
-}
-
-// ── Step 3: Placement Test ─────────────────────────────────────────────────
-
-function StepPlacement({
-  questions, index, score, done, onAnswer, onFinish,
-}: {
-  questions: typeof PLACEMENT_QUESTIONS;
-  index: number;
-  score: number;
-  done: boolean;
-  onAnswer: (i: number) => void;
-  onFinish: () => void;
-}) {
-  if (done) {
-    const ratio = score / questions.length;
-    const level = ratio >= 0.8 ? 'גבוהה' : ratio >= 0.6 ? 'בינונית' : 'מתחילה';
-    const elo = Math.round(DEFAULT_ELO + (ratio - 0.5) * 400);
-    return (
-      <View style={[styles.stepContainer, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ fontSize: 64 }}>🎯</Text>
-        <Text style={[styles.h1, { marginTop: 16 }]}>נקודת ההתחלה שלך</Text>
-        <Text style={styles.subtitle}>
-          {score}/{questions.length} נכון · רמה {level}
-        </Text>
-        <View style={styles.eloCard}>
-          <Text style={styles.eloValue}>{elo}</Text>
-          <Text style={styles.eloLabel}>ELO התחלתי</Text>
-        </View>
-        <Pressable
-          style={({ pressed }) => [styles.primaryBtn, { width: '100%' }, pressed && { opacity: 0.85 }]}
-          onPress={onFinish}
-        >
-          <LinearGradient colors={Colors.gradients.primary} style={styles.primaryBtnGrad}>
-            <Text style={styles.primaryBtnText}>כניסה לאפליקציה 🚀</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
-    );
-  }
-
-  const q = questions[index];
-  return (
-    <View style={styles.stepContainer}>
-      <View style={styles.placementHeader}>
-        <Text style={styles.placementCounter}>{index + 1}/{questions.length}</Text>
-        <Text style={styles.h2}>מבחן רמה קצר</Text>
-        <Text style={styles.subtitle}>נגדיר את נקודת ההתחלה שלך</Text>
-      </View>
-
-      <View style={styles.placementQuestion}>
-        <Text style={styles.placementQ}>{q.q}</Text>
-      </View>
-
-      <View style={styles.placementOptions}>
-        {q.options.map((opt, i) => (
-          <Pressable
-            key={i}
-            onPress={() => onAnswer(i)}
-            style={({ pressed }) => [
-              styles.placementOption,
-              pressed && { transform: [{ scale: 0.97 }], backgroundColor: Colors.primaryLighter },
-            ]}
-          >
-            <Text style={styles.placementOptionText}>{opt}</Text>
-          </Pressable>
-        ))}
-      </View>
     </View>
   );
 }
@@ -318,7 +211,6 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 4,
     backgroundColor: Colors.surfaceTertiary,
-    marginHorizontal: 0,
   },
   progressFill: {
     height: 4,
@@ -333,10 +225,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
 
-  heroEmoji: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
+  heroEmoji: { alignItems: 'center', marginBottom: 24 },
   heroEmojiText: { fontSize: 72 },
 
   h1: {
@@ -345,13 +234,6 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'right',
     marginBottom: 10,
-  },
-  h2: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    color: Colors.text,
-    textAlign: 'right',
-    marginBottom: 8,
   },
   subtitle: {
     fontFamily: FontFamily.regular,
@@ -424,68 +306,5 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     textAlign: 'right',
     lineHeight: 20,
-  },
-
-  placementHeader: { marginBottom: 24 },
-  placementCounter: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: Colors.textTertiary,
-    textAlign: 'right',
-    marginBottom: 4,
-  },
-  placementQuestion: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: 24,
-    marginBottom: 20,
-    ...Shadow.md,
-    borderRightWidth: 4,
-    borderRightColor: Colors.primary,
-  },
-  placementQ: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.lg,
-    color: Colors.text,
-    textAlign: 'right',
-    lineHeight: 28,
-  },
-  placementOptions: { gap: 10 },
-  placementOption: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    minHeight: 56,
-    justifyContent: 'center',
-    ...Shadow.sm,
-  },
-  placementOptionText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    textAlign: 'right',
-  },
-
-  eloCard: {
-    backgroundColor: Colors.primaryLighter,
-    borderRadius: Radius.xl,
-    padding: 32,
-    alignItems: 'center',
-    marginVertical: 24,
-    width: '100%',
-    ...Shadow.md,
-  },
-  eloValue: {
-    fontFamily: FontFamily.heading,
-    fontSize: 56,
-    color: Colors.primary,
-  },
-  eloLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.base,
-    color: Colors.textSecondary,
-    marginTop: 4,
   },
 });

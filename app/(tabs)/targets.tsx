@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../../utils/haptics';
 import { TARGETS, TOPICS, getQuestionsByTarget } from '../../data/mockData';
 import { TargetCard } from '../../components/TargetCard';
 import { ProgressBar } from '../../components/ProgressBar';

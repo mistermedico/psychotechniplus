@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../utils/haptics';
 import { usePracticeStore } from '../store/practiceStore';
 import { useUserStore } from '../store/userStore';
 import { getQuestionsByTopic, getTopicById, getTargetById } from '../data/mockData';
