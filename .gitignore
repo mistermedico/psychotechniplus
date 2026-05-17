@@ -11,3 +11,4 @@ build/
 web-build/
 .env
 .env.local
+.claude/
