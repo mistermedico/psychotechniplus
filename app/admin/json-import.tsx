@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  TextInput, Alert, ActivityIndicator,
+  TextInput, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,8 +9,6 @@ import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
-import { Question } from '../../data/types';
-import { upsertQuestion } from '../../lib/db';
 
 const EXAMPLE_JSON = `[
   {
@@ -108,8 +106,7 @@ export default function JsonImportScreen() {
 
     for (const item of preview) {
       try {
-        const question: Question = {
-          id: `q_import_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        addQuestion({
           targetIds: item.targetIds ?? ['target_psychometric'],
           topicId: item.topicId,
           questionType: (item.questionType as any) ?? 'multiple_choice',
@@ -126,11 +123,7 @@ export default function JsonImportScreen() {
           validationStatus: 'pending',
           smartPracticeEligible: false,
           generalPracticeEligible: false,
-        };
-
-        const { error } = await upsertQuestion(question);
-        if (error) { failed++; continue; }
-        addQuestion(question);
+        });
         success++;
       } catch {
         failed++;
