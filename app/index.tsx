@@ -4,17 +4,19 @@ import { useUserStore } from '../store/userStore';
 import { Colors } from '../constants/colors';
 
 export default function Index() {
-  const hasCompletedOnboarding = useUserStore(s => s.hasCompletedOnboarding);
   const isLoaded = useUserStore(s => s.isLoaded);
+  const isAuthenticated = useUserStore(s => s.isAuthenticated);
+  const hasCompletedOnboarding = useUserStore(s => s.hasCompletedOnboarding);
 
-  // Wait for Supabase to load user data before deciding where to route
   if (!isLoaded) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A' }}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
 
-  return <Redirect href={hasCompletedOnboarding ? '/(tabs)' : '/onboarding'} />;
+  if (!isAuthenticated) return <Redirect href="/auth" />;
+  if (!hasCompletedOnboarding) return <Redirect href="/onboarding" />;
+  return <Redirect href="/(tabs)" />;
 }

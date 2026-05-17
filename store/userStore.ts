@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { DEFAULT_ELO, updatePlayerElo } from '../utils/elo';
 import { UserBadge, BadgeType } from '../data/types';
+import { supabase } from '../lib/supabase';
 import {
   getOrCreateUserId, loadUserProfile, saveUserProfile,
   loadUserElos, saveUserElo, loadUserBadges, saveUserBadge,
@@ -30,10 +31,12 @@ interface UserState {
   totalCorrect: number;
   totalAnswered: number;
 
-  // Supabase sync
+  // Auth + Supabase sync
   isLoaded: boolean;
   isSyncing: boolean;
-  initialize: () => Promise<void>;
+  isAuthenticated: boolean;
+  initialize: (overrideUserId?: string) => Promise<void>;
+  signOut: () => Promise<void>;
 
   // Actions
   completeOnboarding: (name: string, targetId: string, initialElos: Record<string, number>) => void;
@@ -63,6 +66,7 @@ const INITIAL_STATE = {
   totalAnswered: 0,
   isLoaded: false,
   isSyncing: false,
+  isAuthenticated: false,
 };
 
 function xpForLevel(level: number): number { return level * 100; }
@@ -70,12 +74,31 @@ function xpForLevel(level: number): number { return level * 100; }
 export const useUserStore = create<UserState>((set, get) => ({
   ...INITIAL_STATE,
 
-  initialize: async () => {
-    if (get().isLoaded) return;
+  initialize: async (overrideUserId?: string) => {
+    // If already loaded and no override, skip
+    if (get().isLoaded && !overrideUserId) return;
     set({ isSyncing: true });
 
-    const userId = await getOrCreateUserId();
-    set({ userId });
+    let userId = overrideUserId;
+
+    // If no userId provided, check Supabase Auth session
+    if (!userId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          userId = session.user.id;
+        } else {
+          // Not authenticated — stop here, let index.tsx redirect to /auth
+          set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
+          return;
+        }
+      } catch {
+        set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
+        return;
+      }
+    }
+
+    set({ userId, isAuthenticated: true });
 
     const [profile, elos, badges] = await Promise.all([
       loadUserProfile(userId),
@@ -103,6 +126,11 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (badges.length > 0) set({ badges });
 
     set({ isLoaded: true, isSyncing: false });
+  },
+
+  signOut: async () => {
+    await supabase.auth.signOut();
+    set({ ...INITIAL_STATE, isLoaded: true });
   },
 
   completeOnboarding: (name, targetId, initialElos) => {

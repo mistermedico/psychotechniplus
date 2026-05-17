@@ -45,7 +45,8 @@ export default function Onboarding() {
     animateTo(1);
     const initialElos: Record<string, number> = {};
     TOPICS.forEach(t => { initialElos[t.id] = DEFAULT_ELO; });
-    completeOnboarding(name || 'מתאמן', selectedTarget?.id ?? TARGETS[0].id, initialElos);
+    const finalName = name.trim() || 'מתאמן';
+    completeOnboarding(finalName, selectedTarget?.id ?? TARGETS[0].id, initialElos);
     router.replace('/(tabs)');
   };
 

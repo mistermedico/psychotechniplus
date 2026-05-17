@@ -58,7 +58,7 @@ export default function ProfileTab() {
   const {
     name, level, xp, streak, selectedTargetId,
     totalSessions, totalCorrect, totalAnswered,
-    getTopicElo, reset,
+    getTopicElo, reset, signOut,
   } = useUserStore();
 
   // Secret admin entry: tap version text 5 times within 2 seconds each
@@ -81,6 +81,25 @@ export default function ProfileTab() {
   const mainElo = getTopicElo('topic_quantitative');
 
   const avatarEmoji = ['🧠', '🎯', '🚀', '💎', '🌟'][Math.min(level - 1, 4)];
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'יציאה מהחשבון',
+      'האם אתה בטוח שברצונך לצאת?',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'יציאה',
+          style: 'destructive',
+          onPress: async () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            await signOut();
+            router.replace('/auth');
+          },
+        },
+      ]
+    );
+  };
 
   const handleReset = () => {
     if (Platform.OS === 'ios') {
@@ -263,6 +282,12 @@ export default function ProfileTab() {
               Haptics.selectionAsync();
               Alert.alert('תנאי שימוש', 'תנאי השימוש זמינים באתר שלנו');
             }}
+          />
+          <SettingRow
+            icon="🚪"
+            label="יציאה מהחשבון"
+            onPress={handleSignOut}
+            danger
           />
           <SettingRow
             icon="🗑️"
