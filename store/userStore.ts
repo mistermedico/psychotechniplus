@@ -82,13 +82,15 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isSyncing: true });
 
     let userId = overrideUserId;
+    let sessionEmail = '';
 
-    // If no userId provided, check Supabase Auth session
+    // If no userId provided, check Supabase Auth session (single call)
     if (!userId) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.id) {
           userId = session.user.id;
+          sessionEmail = session.user.email ?? '';
         } else {
           // Not authenticated — stop here, let index.tsx redirect to /auth
           set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
@@ -98,14 +100,13 @@ export const useUserStore = create<UserState>((set, get) => ({
         set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
         return;
       }
+    } else {
+      // userId provided externally (after login) — still grab email from session
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        sessionEmail = session?.user?.email ?? '';
+      } catch {}
     }
-
-    // Store email from session for admin detection
-    let sessionEmail = '';
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      sessionEmail = session?.user?.email ?? '';
-    } catch {}
 
     set({ userId, isAuthenticated: true, email: sessionEmail });
 

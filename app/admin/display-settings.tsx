@@ -5,13 +5,14 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useSettingsStore, FontSizeOption, AutoAdvanceOption } from '../../store/settingsStore';
+import { useSettingsStore, FontSizeOption, AutoAdvanceOption, DisplaySettings } from '../../store/settingsStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../../constants/theme';
 
 export default function DisplaySettingsScreen() {
-  const settings = useSettingsStore();
-  const { updateSetting, resetSettings } = settings;
+  const storeState = useSettingsStore();
+  const { updateSetting, resetSettings } = storeState;
+  const settings: DisplaySettings = storeState;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -244,7 +245,7 @@ function SettingRow({
   );
 }
 
-function PreviewCard({ settings }: { settings: ReturnType<typeof useSettingsStore> }) {
+function PreviewCard({ settings }: { settings: DisplaySettings }) {
   const [passageExpanded, setPassageExpanded] = useState(false);
 
   const fontSizeMap: Record<FontSizeOption, number> = {

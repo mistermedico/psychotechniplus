@@ -272,7 +272,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   addQuestion: (q) => {
-    const newQ: Question = { ...q, id: `q_admin_${Date.now()}` };
+    const newQ: Question = { ...q, id: `q_admin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` };
     set(s => ({ questions: [...s.questions, newQ] }));
     dbUpsert(newQ);
     return newQ;

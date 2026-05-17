@@ -40,7 +40,7 @@ export function calcSpeedAdjustedScore(
     if (a.timeSpent < 30 && a.questionDifficulty >= 4) return 1;
     return 0;
   });
-  const totalBonus = speedBonuses.reduce((s, b) => s + b, 0);
+  const totalBonus = speedBonuses.reduce((s: number, b: number) => s + b, 0);
   return Math.min(100, baseScore + Math.round(totalBonus / answered.length));
 }
 

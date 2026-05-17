@@ -23,11 +23,13 @@ import { eloToTitle } from '../../utils/elo';
 
 const { width: W } = Dimensions.get('window');
 
-const QUICK_ACTIONS = [
-  { icon: '⚡', label: 'תרגול מהיר', color: Colors.primary, topicId: 'topic_quantitative' },
-  { icon: '🧩', label: 'לוגיקה', color: Colors.accent, topicId: 'topic_logic' },
-  { icon: '📚', label: 'מילולי', color: Colors.success, topicId: 'topic_verbal' },
-];
+const QUICK_ACTION_META: Record<string, { icon: string; color: string }> = {
+  topic_quantitative: { icon: '⚡', color: Colors.primary },
+  topic_verbal:       { icon: '📚', color: Colors.success },
+  topic_logic:        { icon: '🧩', color: Colors.accent },
+  topic_spatial:      { icon: '🔷', color: '#F59E0B' },
+  topic_english:      { icon: '🔤', color: '#0EA5E9' },
+};
 
 const BADGE_INFO: Record<string, { icon: string; label: string }> = {
   first_session: { icon: '🌱', label: 'סשן ראשון' },
@@ -48,8 +50,16 @@ export default function Dashboard() {
   } = useUserStore();
 
   const selectedTarget = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
-  const mainTopic = TOPICS.find(t => t.targetId === selectedTarget.id);
+  const targetTopics = TOPICS.filter(t => t.targetId === selectedTarget.id);
+  const mainTopic = targetTopics[0] ?? null;
   const currentElo = mainTopic ? getTopicElo(mainTopic.id) : 1200;
+
+  const quickActions = targetTopics.slice(0, 3).map(t => ({
+    topicId: t.id,
+    label: t.name,
+    icon: QUICK_ACTION_META[t.id]?.icon ?? '📖',
+    color: QUICK_ACTION_META[t.id]?.color ?? Colors.primary,
+  }));
   const title = eloToTitle(currentElo);
 
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
@@ -176,7 +186,7 @@ export default function Dashboard() {
         {/* Quick actions — each tappable with haptics */}
         <Text style={styles.sectionTitle}>תרגול מהיר</Text>
         <View style={styles.quickActions}>
-          {QUICK_ACTIONS.map(action => (
+          {quickActions.map(action => (
             <Pressable
               key={action.topicId}
               onPress={() => startQuickPractice(action.topicId)}

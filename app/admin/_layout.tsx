@@ -49,6 +49,8 @@ export default function AdminLayout() {
       <Stack.Screen name="display-settings"   options={{ title: '🎨 הגדרות תצוגה' }} />
       <Stack.Screen name="users"              options={{ title: '👥 ניהול משתמשים' }} />
       <Stack.Screen name="json-import"        options={{ title: '📥 ייבוא JSON' }} />
+      <Stack.Screen name="export"            options={{ title: '📤 ייצוא שאלות' }} />
+      <Stack.Screen name="app-settings"      options={{ title: '⚙️ הגדרות אפליקציה' }} />
     </Stack>
   );
 }
