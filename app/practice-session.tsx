@@ -4,7 +4,7 @@ import {
   Animated, Alert, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { usePracticeStore } from '../store/practiceStore';
@@ -28,6 +28,8 @@ export default function PracticeSession() {
     targetId: string;
     mode?: SessionMode;
   }>();
+
+  const insets = useSafeAreaInsets();
 
   const {
     session, startSession, submitAnswer, skipQuestion,
@@ -359,7 +361,7 @@ export default function PracticeSession() {
       </ScrollView>
 
       {/* Bottom actions */}
-      <View style={styles.actions}>
+      <View style={[styles.actions, { paddingBottom: Math.max(24, insets.bottom + 12) }]}>
         {!revealed ? (
           <View style={styles.actionsRow}>
             <Pressable

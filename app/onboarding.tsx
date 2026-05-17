@@ -106,8 +106,10 @@ function StepWelcome({
           onChangeText={setName}
           textAlign="right"
           autoFocus
-          returnKeyType="next"
+          returnKeyType="go"
           onSubmitEditing={onNext}
+          textContentType="name"
+          autoComplete="name"
         />
       </View>
 

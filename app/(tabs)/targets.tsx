@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Animated, RefreshControl,
+  Animated, RefreshControl, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -102,7 +102,8 @@ export default function TargetsTab() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        bounces={true}
+        bounces={Platform.OS === 'ios'}
+        decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

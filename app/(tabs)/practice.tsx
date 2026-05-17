@@ -137,7 +137,8 @@ export default function PracticeTab() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        bounces={true}
+        bounces={Platform.OS === 'ios'}
+        decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
       >
         {/* Header */}
         <View style={styles.header}>

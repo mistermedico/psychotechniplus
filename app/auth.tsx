@@ -192,6 +192,9 @@ export default function AuthScreen() {
                 textAlign="right"
                 autoCorrect={false}
                 autoCapitalize="words"
+                textContentType="name"
+                autoComplete="name"
+                returnKeyType="next"
               />
             )}
             <TextInput
@@ -204,6 +207,8 @@ export default function AuthScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               textAlign="right"
+              textContentType="emailAddress"
+              autoComplete="email"
             />
             <TextInput
               style={styles.input}
@@ -214,6 +219,9 @@ export default function AuthScreen() {
               secureTextEntry
               textAlign="right"
               onSubmitEditing={mode === 'login' ? handleSubmit : undefined}
+              textContentType={mode === 'login' ? 'password' : 'newPassword'}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              returnKeyType={mode === 'login' ? 'go' : 'next'}
             />
             {mode === 'register' && (
               <TextInput
@@ -225,6 +233,9 @@ export default function AuthScreen() {
                 secureTextEntry
                 textAlign="right"
                 onSubmitEditing={handleSubmit}
+                textContentType="newPassword"
+                autoComplete="new-password"
+                returnKeyType="go"
               />
             )}
 

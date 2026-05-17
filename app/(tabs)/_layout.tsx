@@ -2,6 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, View, Text } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { Colors } from '../../constants/colors';
 import { FontFamily } from '../../constants/theme';
@@ -35,13 +36,28 @@ function TabBarBackground() {
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
         tabBarBackground: () => <TabBarBackground />,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: {
+          position: 'absolute',
+          borderTopWidth: 0.5,
+          borderTopColor: 'rgba(0,0,0,0.1)',
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom || 8,
+          paddingTop: 8,
+          backgroundColor: Platform.OS === 'android' ? '#fff' : 'transparent',
+          elevation: Platform.OS === 'android' ? 8 : 0,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+        },
       }}
     >
       <Tabs.Screen
@@ -106,20 +122,6 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   androidBackground: {
     backgroundColor: '#fff',
-  },
-  tabBar: {
-    position: 'absolute',
-    borderTopWidth: 0.5,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-    height: Platform.OS === 'ios' ? 88 : 65,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 8,
-    paddingTop: 8,
-    backgroundColor: Platform.OS === 'android' ? '#fff' : 'transparent',
-    elevation: Platform.OS === 'android' ? 8 : 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
   },
   tabItem: {
     alignItems: 'center',

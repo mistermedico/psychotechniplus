@@ -159,6 +159,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
             key={opt.id}
             onPress={() => !revealed && onSelect(opt.id)}
             disabled={revealed}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             style={({ pressed }) => [
               styles.optionBase,
               getOptionStyle(opt.id),

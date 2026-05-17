@@ -7,6 +7,7 @@ import {
   Pressable,
   Dimensions,
   Animated,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -93,7 +94,8 @@ export default function Dashboard() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        bounces={true}
+        bounces={Platform.OS === 'ios'}
+        decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
       >
         {/* Hero card */}
         <LinearGradient

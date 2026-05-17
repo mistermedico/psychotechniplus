@@ -6,14 +6,18 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "psychotechniplus",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.psychotechniplus.app",
+      "userInterfaceStyle": "light",
+      "requireFullScreen": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "לצילום תמונות לפרופיל",
-        "UIRequiresFullScreen": true
+        "UIRequiresFullScreen": true,
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "לאימות מהיר לחשבונך",
+        "NSCameraUsageDescription": "לצילום תמונות לפרופיל"
       }
     },
     "android": {
