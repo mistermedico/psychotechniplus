@@ -39,9 +39,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
-      initialize();
+      initialize(); // stable zustand action reference, safe to omit from deps
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!fontsLoaded && !fontError) return null;
 

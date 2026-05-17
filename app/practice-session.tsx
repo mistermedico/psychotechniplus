@@ -10,7 +10,8 @@ import * as Haptics from '../utils/haptics';
 import { usePracticeStore } from '../store/practiceStore';
 import { useUserStore } from '../store/userStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { getQuestionsByTopic, getTopicById, getTargetById } from '../data/mockData';
+import { getTopicById, getTargetById } from '../data/mockData';
+import { fetchQuestions } from '../lib/db';
 import { QuestionCard } from '../components/QuestionCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { Colors } from '../constants/colors';
@@ -25,7 +26,7 @@ export default function PracticeSession() {
   const { topicId, targetId, mode } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
-    mode: SessionMode;
+    mode?: SessionMode;
   }>();
 
   const {
@@ -43,6 +44,7 @@ export default function PracticeSession() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [lastAnswerCorrect, setLastAnswerCorrect] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const [timer, setTimer] = useState(SPEED_LIMIT);
   const [isFinished, setIsFinished] = useState(false);
@@ -59,27 +61,29 @@ export default function PracticeSession() {
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice)
   const showTimer = isSpeedMode || showTimerInPractice;
 
-  // Initialize session
+  // Initialize session — loads from Supabase (falls back to mock data)
   useEffect(() => {
-    const questions = getQuestionsByTopic(topicId ?? '');
-    if (questions.length === 0) {
-      Alert.alert('שגיאה', 'לא נמצאו שאלות לנושא זה');
-      router.back();
-      return;
-    }
-
-    startSession({
-      targetId: targetId ?? '',
-      topicId: topicId ?? '',
-      mode: mode ?? 'practice',
-      questions: questions.slice(0, 10),
+    let cancelled = false;
+    fetchQuestions({ topicId: topicId ?? '' }).then(questions => {
+      if (cancelled) return;
+      if (questions.length === 0) {
+        Alert.alert('שגיאה', 'לא נמצאו שאלות לנושא זה');
+        router.back();
+        return;
+      }
+      startSession({
+        targetId: targetId ?? '',
+        topicId: topicId ?? '',
+        mode: mode ?? 'practice',
+        questions: questions.slice(0, 10),
+      });
     });
-
     return () => {
+      cancelled = true;
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Speed mode timer (only in speed mode — showTimerInPractice shows timer but doesn't auto-skip)
   useEffect(() => {
@@ -152,6 +156,7 @@ export default function PracticeSession() {
       updateElo(question.topicId, question.psychometricStats.elo, isCorrect);
     }
 
+    setLastAnswerCorrect(isCorrect);
     setRevealed(true);
 
     // Only auto-show explanation if setting is on
@@ -184,6 +189,7 @@ export default function PracticeSession() {
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     setSelectedId(null);
     setRevealed(false);
+    setLastAnswerCorrect(false);
     setShowExplanation(false);
     explanationAnim.setValue(0);
     advanceOrEnd();
@@ -327,14 +333,14 @@ export default function PracticeSession() {
           >
             <LinearGradient
               colors={
-                selectedId === question.correctAnswer
+                lastAnswerCorrect
                   ? [Colors.successLight, '#fff']
                   : [Colors.dangerLight, '#fff']
               }
               style={styles.explanationGrad}
             >
               <Text style={styles.explanationResult}>
-                {selectedId === question.correctAnswer ? '✅ נכון!' : '❌ לא נכון'}
+                {lastAnswerCorrect ? '✅ נכון!' : '❌ לא נכון'}
               </Text>
               <Text style={styles.explanationTitle}>הסבר:</Text>
               <Text style={styles.explanationText}>{question.explanation}</Text>

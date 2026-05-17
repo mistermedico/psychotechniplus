@@ -202,7 +202,11 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   reset: () => {
     const { userId } = get();
-    if (userId) saveUserProfile(userId, { ...INITIAL_STATE, has_completed_onboarding: false });
+    if (userId) saveUserProfile(userId, {
+      name: '', selected_target_id: null, has_completed_onboarding: false,
+      streak: 0, longest_streak: 0, last_practiced_date: null,
+      level: 1, xp: 0, total_sessions: 0, total_correct: 0, total_answered: 0,
+    });
     set({ ...INITIAL_STATE, userId, isLoaded: true });
   },
 }));
