@@ -13,6 +13,7 @@ import {
 import { SuezOne_400Regular } from '@expo-google-fonts/suez-one';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useUserStore } from '../store/userStore';
 
 // Force RTL for Hebrew
 if (!I18nManager.isRTL) {
@@ -25,6 +26,8 @@ if (!I18nManager.isRTL) {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const initialize = useUserStore(s => s.initialize);
+
   const [fontsLoaded, fontError] = useFonts({
     Heebo_400Regular,
     Heebo_500Medium,
@@ -36,6 +39,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
+      initialize();
     }
   }, [fontsLoaded, fontError]);
 

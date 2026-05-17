@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { DEFAULT_ELO, updatePlayerElo } from '../utils/elo';
 import { UserBadge, BadgeType } from '../data/types';
+import {
+  getOrCreateUserId, loadUserProfile, saveUserProfile,
+  loadUserElos, saveUserElo, loadUserBadges, saveUserBadge,
+} from '../lib/db';
 
 interface TopicElo {
   elo: number;
@@ -13,10 +17,8 @@ interface UserState {
   selectedTargetId: string | null;
   hasCompletedOnboarding: boolean;
 
-  // ELO per topic
   topicElos: Record<string, TopicElo>;
 
-  // Gamification
   streak: number;
   longestStreak: number;
   lastPracticedDate: string | null;
@@ -24,10 +26,14 @@ interface UserState {
   xp: number;
   badges: UserBadge[];
 
-  // Stats
   totalSessions: number;
   totalCorrect: number;
   totalAnswered: number;
+
+  // Supabase sync
+  isLoaded: boolean;
+  isSyncing: boolean;
+  initialize: () => Promise<void>;
 
   // Actions
   completeOnboarding: (name: string, targetId: string, initialElos: Record<string, number>) => void;
@@ -41,7 +47,7 @@ interface UserState {
 }
 
 const INITIAL_STATE = {
-  userId: `user_${Date.now()}`,
+  userId: '',
   name: '',
   selectedTargetId: null,
   hasCompletedOnboarding: false,
@@ -55,25 +61,63 @@ const INITIAL_STATE = {
   totalSessions: 0,
   totalCorrect: 0,
   totalAnswered: 0,
+  isLoaded: false,
+  isSyncing: false,
 };
 
-function xpForLevel(level: number): number {
-  return level * 100;
-}
+function xpForLevel(level: number): number { return level * 100; }
 
 export const useUserStore = create<UserState>((set, get) => ({
   ...INITIAL_STATE,
+
+  initialize: async () => {
+    if (get().isLoaded) return;
+    set({ isSyncing: true });
+
+    const userId = await getOrCreateUserId();
+    set({ userId });
+
+    const [profile, elos, badges] = await Promise.all([
+      loadUserProfile(userId),
+      loadUserElos(userId),
+      loadUserBadges(userId),
+    ]);
+
+    if (profile) {
+      set({
+        name: profile.name,
+        selectedTargetId: profile.selected_target_id,
+        hasCompletedOnboarding: profile.has_completed_onboarding,
+        streak: profile.streak,
+        longestStreak: profile.longest_streak,
+        lastPracticedDate: profile.last_practiced_date,
+        level: profile.level,
+        xp: profile.xp,
+        totalSessions: profile.total_sessions,
+        totalCorrect: profile.total_correct,
+        totalAnswered: profile.total_answered,
+      });
+    }
+
+    if (Object.keys(elos).length > 0) set({ topicElos: elos });
+    if (badges.length > 0) set({ badges });
+
+    set({ isLoaded: true, isSyncing: false });
+  },
 
   completeOnboarding: (name, targetId, initialElos) => {
     const topicElos: Record<string, TopicElo> = {};
     Object.entries(initialElos).forEach(([topicId, elo]) => {
       topicElos[topicId] = { elo, history: [{ elo, date: new Date().toISOString() }] };
     });
-    set({
-      name,
-      selectedTargetId: targetId,
-      hasCompletedOnboarding: true,
-      topicElos,
+    set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true, topicElos });
+
+    const { userId } = get();
+    saveUserProfile(userId, {
+      name, selected_target_id: targetId, has_completed_onboarding: true,
+    });
+    Object.entries(topicElos).forEach(([topicId, { elo, history }]) => {
+      saveUserElo(userId, topicId, elo, history);
     });
   },
 
@@ -82,14 +126,10 @@ export const useUserStore = create<UserState>((set, get) => ({
       const current = state.topicElos[topicId] ?? { elo: DEFAULT_ELO, history: [] };
       const newElo = updatePlayerElo(current.elo, questionElo, isCorrect);
       const entry = { elo: newElo, date: new Date().toISOString() };
+      const updated = { elo: newElo, history: [...current.history.slice(-29), entry] };
+      saveUserElo(state.userId, topicId, newElo, updated.history);
       return {
-        topicElos: {
-          ...state.topicElos,
-          [topicId]: {
-            elo: newElo,
-            history: [...current.history.slice(-29), entry],
-          },
-        },
+        topicElos: { ...state.topicElos, [topicId]: updated },
       };
     });
   },
@@ -102,6 +142,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         newXp -= xpForLevel(newLevel);
         newLevel += 1;
       }
+      saveUserProfile(state.userId, { xp: newXp, level: newLevel });
       return { xp: newXp, level: newLevel };
     });
   },
@@ -111,13 +152,18 @@ export const useUserStore = create<UserState>((set, get) => ({
       const today = new Date().toDateString();
       const yesterday = new Date(Date.now() - 86400000).toDateString();
       if (state.lastPracticedDate === today) return {};
-      const newStreak =
-        state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
-      return {
+      const newStreak = state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
+      const updates = {
         streak: newStreak,
         longestStreak: Math.max(newStreak, state.longestStreak),
         lastPracticedDate: today,
       };
+      saveUserProfile(state.userId, {
+        streak: updates.streak,
+        longest_streak: updates.longestStreak,
+        last_practiced_date: today,
+      });
+      return updates;
     });
   },
 
@@ -128,27 +174,35 @@ export const useUserStore = create<UserState>((set, get) => ({
       badgeType: type,
       earnedAt: new Date(),
     };
-    set(state => ({
-      badges: [...state.badges, badge],
-    }));
+    set(state => ({ badges: [...state.badges, badge] }));
+    saveUserBadge(badge);
     return badge;
   },
 
   recordSession: (correct, total) => {
-    set(state => ({
-      totalSessions: state.totalSessions + 1,
-      totalCorrect: state.totalCorrect + correct,
-      totalAnswered: state.totalAnswered + total,
-    }));
+    set(state => {
+      const updates = {
+        totalSessions: state.totalSessions + 1,
+        totalCorrect: state.totalCorrect + correct,
+        totalAnswered: state.totalAnswered + total,
+      };
+      saveUserProfile(state.userId, {
+        total_sessions: updates.totalSessions,
+        total_correct: updates.totalCorrect,
+        total_answered: updates.totalAnswered,
+      });
+      return updates;
+    });
     get().updateStreak();
     get().addXp(correct * 10 + 20);
-    // First session badge
     if (get().totalSessions === 1) get().earnBadge('first_session');
   },
 
-  getTopicElo: (topicId) => {
-    return get().topicElos[topicId]?.elo ?? DEFAULT_ELO;
-  },
+  getTopicElo: (topicId) => get().topicElos[topicId]?.elo ?? DEFAULT_ELO,
 
-  reset: () => set(INITIAL_STATE),
+  reset: () => {
+    const { userId } = get();
+    if (userId) saveUserProfile(userId, { ...INITIAL_STATE, has_completed_onboarding: false });
+    set({ ...INITIAL_STATE, userId, isLoaded: true });
+  },
 }));

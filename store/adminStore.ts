@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
+import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase } from '../lib/db';
 
 // ── Pending questions (validation queue seed) ──────────────────────────────
 const PENDING_SEED: Question[] = [
@@ -183,6 +184,10 @@ interface AdminState {
   updateTemplate: (id: string, updates: Partial<SmartExamTemplate>) => void;
   deleteTemplate: (id: string) => void;
 
+  // Supabase sync
+  loadQuestionsFromSupabase: () => Promise<void>;
+  seedToSupabase: () => Promise<{ ok: boolean; message: string }>;
+
   // Computed
   getStats: () => AdminStats;
   getPendingQuestions: () => Question[];
@@ -246,13 +251,17 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   addQuestion: (q) => {
     const newQ: Question = { ...q, id: `q_admin_${Date.now()}` };
     set(s => ({ questions: [...s.questions, newQ] }));
+    dbUpsert(newQ);
     return newQ;
   },
 
   updateQuestion: (id, updates) => {
-    set(s => ({
-      questions: s.questions.map(q => (q.id === id ? { ...q, ...updates } : q)),
-    }));
+    set(s => {
+      const updated = s.questions.map(q => (q.id === id ? { ...q, ...updates } : q));
+      const q = updated.find(x => x.id === id);
+      if (q) dbUpsert(q);
+      return { questions: updated };
+    });
   },
 
   deleteQuestion: (id) => {
@@ -260,6 +269,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       questions: s.questions.filter(q => q.id !== id),
       selectedQuestionIds: s.selectedQuestionIds.filter(i => i !== id),
     }));
+    dbDelete(id);
   },
 
   deleteQuestions: (ids) => {
@@ -268,28 +278,33 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       questions: s.questions.filter(q => !idSet.has(q.id)),
       selectedQuestionIds: [],
     }));
+    ids.forEach(id => dbDelete(id));
   },
 
   validateQuestion: (id, status) => {
-    set(s => ({
-      questions: s.questions.map(q =>
+    set(s => {
+      const updated = s.questions.map(q =>
         q.id === id
           ? { ...q, validationStatus: status, smartPracticeEligible: status === 'validated', generalPracticeEligible: status === 'validated' }
           : q
-      ),
-    }));
+      );
+      const q = updated.find(x => x.id === id);
+      if (q) dbUpsert(q);
+      return { questions: updated };
+    });
   },
 
   bulkValidate: (ids, status) => {
     const idSet = new Set(ids);
-    set(s => ({
-      questions: s.questions.map(q =>
+    set(s => {
+      const updated = s.questions.map(q =>
         idSet.has(q.id)
           ? { ...q, validationStatus: status, generalPracticeEligible: status === 'validated', smartPracticeEligible: status === 'validated' }
           : q
-      ),
-      selectedQuestionIds: [],
-    }));
+      );
+      updated.filter(q => idSet.has(q.id)).forEach(q => dbUpsert(q));
+      return { questions: updated, selectedQuestionIds: [] };
+    });
   },
 
   toggleSelectQuestion: (id) => {
@@ -378,6 +393,13 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       totalTopics: topics.length,
     };
   },
+
+  loadQuestionsFromSupabase: async () => {
+    const questions = await fetchAllQuestions();
+    set({ questions });
+  },
+
+  seedToSupabase: () => seedDatabase(),
 
   getPendingQuestions: () => get().questions.filter(q => q.validationStatus === 'pending'),
   getQuestionsByStatus: (status) => get().questions.filter(q => q.validationStatus === status),

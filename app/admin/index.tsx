@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  TextInput, Alert, KeyboardAvoidingView, Platform,
+  TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -87,9 +87,10 @@ const ADMIN_SECTIONS = [
 ];
 
 export default function AdminDashboard() {
-  const { isAdmin, login, logout, getStats, getPendingQuestions } = useAdminStore();
+  const { isAdmin, login, logout, getStats, getPendingQuestions, seedToSupabase, loadQuestionsFromSupabase } = useAdminStore();
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   if (!isAdmin) {
     return <PinScreen pin={pin} setPin={setPin} error={pinError} onSubmit={() => {
@@ -183,6 +184,38 @@ export default function AdminDashboard() {
               <Text style={styles.sectionDesc}>{section.desc}</Text>
             </Pressable>
           ))}
+        </View>
+
+        {/* Supabase seed */}
+        <View style={styles.seedRow}>
+          <Pressable
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setSeeding(true);
+              const result = await seedToSupabase();
+              setSeeding(false);
+              Alert.alert(result.ok ? '✅ הצלחה' : '❌ שגיאה', result.message);
+              if (result.ok) loadQuestionsFromSupabase();
+            }}
+            style={({ pressed }) => [styles.seedBtn, pressed && { opacity: 0.85 }]}
+            disabled={seeding}
+          >
+            <LinearGradient colors={['#0EA5E9', '#0284C7']} style={styles.seedBtnGrad}>
+              {seeding
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.seedBtnText}>☁️ זרע ל-Supabase</Text>}
+            </LinearGradient>
+          </Pressable>
+          <Pressable
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              await loadQuestionsFromSupabase();
+              Alert.alert('✅ עודכן', 'שאלות נטענו מ-Supabase');
+            }}
+            style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.refreshBtnText}>🔄 טען</Text>
+          </Pressable>
         </View>
 
         {/* Quick add */}
@@ -375,7 +408,7 @@ const styles = StyleSheet.create({
 
   quickAdd: {
     margin: 16,
-    marginTop: 20,
+    marginTop: 8,
     backgroundColor: Colors.primary,
     borderRadius: Radius.xl,
     padding: 18,
@@ -383,4 +416,19 @@ const styles = StyleSheet.create({
     ...Shadow.primary,
   },
   quickAddText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+
+  seedRow: { flexDirection: 'row-reverse', marginHorizontal: 16, marginTop: 20, gap: 10 },
+  seedBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
+  seedBtnGrad: { paddingVertical: 16, alignItems: 'center' },
+  seedBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+  refreshBtn: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.sm,
+  },
+  refreshBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
 });
