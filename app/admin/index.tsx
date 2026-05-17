@@ -66,6 +66,24 @@ const ADMIN_SECTIONS = [
     gradient: Colors.gradients.success,
     route: '/admin/topics-admin',
   },
+  {
+    id: 'display-settings',
+    icon: '🎨',
+    label: 'הגדרות תצוגה',
+    desc: 'שליטה בממשק שאלות למשתמש',
+    color: '#EC4899',
+    gradient: ['#EC4899', '#BE185D'] as [string, string],
+    route: '/admin/display-settings',
+  },
+  {
+    id: 'users',
+    icon: '👥',
+    label: 'ניהול משתמשים',
+    desc: 'צפייה, השהייה, שדרוג תוכניות',
+    color: '#0EA5E9',
+    gradient: ['#0EA5E9', '#0284C7'] as [string, string],
+    route: '/admin/users',
+  },
 ];
 
 export default function AdminDashboard() {

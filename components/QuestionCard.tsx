@@ -1,10 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Animated,
 } from 'react-native';
 import { Question } from '../data/types';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../constants/theme';
+import { useSettingsStore, FontSizeOption } from '../store/settingsStore';
 
 interface Props {
   question: Question;
@@ -13,9 +14,51 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
+function shuffleArray<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+const fontSizeMap: Record<FontSizeOption, number> = {
+  small: FontSize.base,
+  medium: FontSize.lg,
+  large: FontSize.xl,
+};
+
 export function QuestionCard({ question, selectedId, revealed, onSelect }: Props) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+
+  const {
+    showDifficultyBadge,
+    showEloOnQuestion,
+    shuffleOptions,
+    collapseReadingPassage,
+    questionFontSize,
+  } = useSettingsStore();
+
+  // Stable shuffled options order — computed once per question.id
+  const shuffledOptionsRef = useRef<typeof question.options | null>(null);
+  const lastQuestionIdRef = useRef<string | null>(null);
+
+  if (lastQuestionIdRef.current !== question.id) {
+    lastQuestionIdRef.current = question.id;
+    shuffledOptionsRef.current = shuffleOptions
+      ? shuffleArray(question.options)
+      : question.options;
+  }
+  const displayOptions = shuffledOptionsRef.current ?? question.options;
+
+  const [passageExpanded, setPassageExpanded] = useState(!collapseReadingPassage);
+
+  // Reset passage expansion when question changes
+  useEffect(() => {
+    setPassageExpanded(!collapseReadingPassage);
+  }, [question.id, collapseReadingPassage]);
 
   useEffect(() => {
     fadeAnim.setValue(0);
@@ -54,6 +97,8 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
     return '○';
   };
 
+  const questionFontSize_ = fontSizeMap[questionFontSize];
+
   return (
     <Animated.View
       style={[
@@ -64,24 +109,52 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
       {/* Reading passage */}
       {question.readingPassage && (
         <View style={styles.passageBox}>
-          <Text style={styles.passageLabel}>📖 קטע לקריאה</Text>
-          <ScrollView style={styles.passageScroll} nestedScrollEnabled>
-            <Text style={styles.passageText}>{question.readingPassage}</Text>
-          </ScrollView>
+          <View style={styles.passageHeaderRow}>
+            <Text style={styles.passageLabel}>📖 קטע לקריאה</Text>
+            {collapseReadingPassage && (
+              <Pressable
+                onPress={() => setPassageExpanded(v => !v)}
+                style={styles.passageToggleBtn}
+              >
+                <Text style={styles.passageToggleText}>
+                  {passageExpanded ? 'הסתר קטע' : 'הצג קטע'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+          {passageExpanded && (
+            <ScrollView style={styles.passageScroll} nestedScrollEnabled>
+              <Text style={styles.passageText}>{question.readingPassage}</Text>
+            </ScrollView>
+          )}
         </View>
       )}
 
       {/* Question text */}
       <View style={styles.questionBox}>
-        <View style={styles.difficultyBadge}>
-          <Text style={styles.difficultyText}>רמה {question.difficulty}</Text>
-        </View>
-        <Text style={styles.questionText}>{question.questionText}</Text>
+        {/* Badge row: difficulty + ELO */}
+        {(showDifficultyBadge || showEloOnQuestion) && (
+          <View style={styles.badgeRow}>
+            {showDifficultyBadge && (
+              <View style={styles.difficultyBadge}>
+                <Text style={styles.difficultyText}>רמה {question.difficulty}</Text>
+              </View>
+            )}
+            {showEloOnQuestion && (
+              <View style={styles.eloBadge}>
+                <Text style={styles.eloText}>ELO {question.psychometricStats.elo}</Text>
+              </View>
+            )}
+          </View>
+        )}
+        <Text style={[styles.questionText, { fontSize: questionFontSize_ }]}>
+          {question.questionText}
+        </Text>
       </View>
 
       {/* Options */}
       <View style={styles.optionsContainer}>
-        {question.options.map(opt => (
+        {displayOptions.map(opt => (
           <Pressable
             key={opt.id}
             onPress={() => !revealed && onSelect(opt.id)}
@@ -116,12 +189,28 @@ const styles = StyleSheet.create({
     borderRightWidth: 3,
     borderRightColor: Colors.primary,
   },
+  passageHeaderRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   passageLabel: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
     color: Colors.primary,
     textAlign: 'right',
-    marginBottom: 6,
+  },
+  passageToggleBtn: {
+    backgroundColor: Colors.primaryLighter,
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  passageToggleText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.primary,
   },
   passageScroll: { maxHeight: 120 },
   passageText: {
@@ -139,22 +228,38 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     ...Shadow.md,
   },
+  badgeRow: {
+    flexDirection: 'row-reverse',
+    gap: 6,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
   difficultyBadge: {
-    alignSelf: 'flex-end',
+    alignSelf: 'flex-start',
     backgroundColor: Colors.primaryLighter,
     borderRadius: Radius.full,
     paddingHorizontal: 10,
     paddingVertical: 3,
-    marginBottom: 10,
   },
   difficultyText: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.xs,
     color: Colors.primary,
   },
+  eloBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.warningLight,
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  eloText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.warning,
+  },
   questionText: {
     fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.lg,
     color: Colors.text,
     lineHeight: 28,
     textAlign: 'right',

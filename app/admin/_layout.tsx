@@ -1,9 +1,21 @@
-import { Stack, router } from 'expo-router';
+import { Stack, router, usePathname } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/theme';
+import { useAdminStore } from '../../store/adminStore';
 
 export default function AdminLayout() {
+  const { isAdmin } = useAdminStore();
+  const pathname = usePathname();
+
+  // Auth guard — redirect to PIN screen for any protected admin route
+  useEffect(() => {
+    if (!isAdmin && pathname !== '/admin') {
+      router.replace('/admin');
+    }
+  }, [isAdmin, pathname]);
+
   return (
     <Stack
       screenOptions={{
@@ -27,13 +39,15 @@ export default function AdminLayout() {
           <Text style={styles.backText}>→ יציאה</Text>
         </Pressable>
       )}} />
-      <Stack.Screen name="questions" options={{ title: '📋 מאגר שאלות' }} />
-      <Stack.Screen name="question-editor" options={{ title: '✏️ עריכת שאלה' }} />
-      <Stack.Screen name="validate" options={{ title: '✅ תור ולידציה' }} />
-      <Stack.Screen name="analytics" options={{ title: '📊 אנליטיקס' }} />
-      <Stack.Screen name="ai-generator" options={{ title: '🤖 מחולל AI' }} />
+      <Stack.Screen name="questions"          options={{ title: '📋 מאגר שאלות' }} />
+      <Stack.Screen name="question-editor"    options={{ title: '✏️ עריכת שאלה' }} />
+      <Stack.Screen name="validate"           options={{ title: '✅ תור ולידציה' }} />
+      <Stack.Screen name="analytics"          options={{ title: '📊 אנליטיקס' }} />
+      <Stack.Screen name="ai-generator"       options={{ title: '🤖 מחולל AI' }} />
       <Stack.Screen name="simulation-builder" options={{ title: '🏗️ בניית סימולציה' }} />
-      <Stack.Screen name="topics-admin" options={{ title: '📚 ניהול נושאים' }} />
+      <Stack.Screen name="topics-admin"       options={{ title: '📚 ניהול נושאים' }} />
+      <Stack.Screen name="display-settings"   options={{ title: '🎨 הגדרות תצוגה' }} />
+      <Stack.Screen name="users"              options={{ title: '👥 ניהול משתמשים' }} />
     </Stack>
   );
 }

@@ -9,6 +9,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { usePracticeStore } from '../store/practiceStore';
 import { useUserStore } from '../store/userStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { getQuestionsByTopic, getTopicById, getTargetById } from '../data/mockData';
 import { QuestionCard } from '../components/QuestionCard';
 import { ProgressBar } from '../components/ProgressBar';
@@ -34,6 +35,12 @@ export default function PracticeSession() {
 
   const { updateElo, recordSession, getTopicElo } = useUserStore();
 
+  const {
+    showTimerInPractice,
+    autoAdvanceDelay,
+    showExplanationAuto,
+  } = useSettingsStore();
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -43,10 +50,14 @@ export default function PracticeSession() {
   const explanationAnim = useRef(new Animated.Value(0)).current;
   const resultAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const topic = getTopicById(topicId ?? '');
   const target = getTargetById(targetId ?? '');
   const isSpeedMode = mode === 'speed';
+
+  // Whether to show the timer (speed mode OR user enabled showTimerInPractice)
+  const showTimer = isSpeedMode || showTimerInPractice;
 
   // Initialize session
   useEffect(() => {
@@ -66,10 +77,11 @@ export default function PracticeSession() {
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     };
   }, []);
 
-  // Speed mode timer
+  // Speed mode timer (only in speed mode — showTimerInPractice shows timer but doesn't auto-skip)
   useEffect(() => {
     if (!isSpeedMode || revealed) return;
     setTimer(SPEED_LIMIT);
@@ -84,6 +96,29 @@ export default function PracticeSession() {
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [session?.currentIndex, revealed]);
+
+  // Non-speed timer display (counts up to SPEED_LIMIT for display only)
+  const [practiceTimer, setPracticeTimer] = useState(0);
+  useEffect(() => {
+    if (isSpeedMode || revealed) return;
+    setPracticeTimer(0);
+    const id = setInterval(() => {
+      setPracticeTimer(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [session?.currentIndex, revealed, isSpeedMode]);
+
+  // Auto-advance after answer is revealed
+  useEffect(() => {
+    if (!revealed || autoAdvanceDelay === 0) return;
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    autoAdvanceRef.current = setTimeout(() => {
+      handleNext();
+    }, autoAdvanceDelay * 1000);
+    return () => {
+      if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    };
+  }, [revealed, autoAdvanceDelay]);
 
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -118,8 +153,20 @@ export default function PracticeSession() {
     }
 
     setRevealed(true);
-    setShowExplanation(true);
 
+    // Only auto-show explanation if setting is on
+    if (showExplanationAuto) {
+      setShowExplanation(true);
+      Animated.spring(explanationAnim, {
+        toValue: 1,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const handleShowExplanation = () => {
+    setShowExplanation(true);
     Animated.spring(explanationAnim, {
       toValue: 1,
       friction: 8,
@@ -134,6 +181,7 @@ export default function PracticeSession() {
   };
 
   const handleNext = () => {
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     setSelectedId(null);
     setRevealed(false);
     setShowExplanation(false);
@@ -200,7 +248,12 @@ export default function PracticeSession() {
 
   const progress = (session.currentIndex + 1) / session.questions.length;
   const correct = session.answers.filter(a => a.isCorrect).length;
-  const timerColor = timer <= 10 ? Colors.danger : timer <= 20 ? Colors.warning : Colors.success;
+
+  // Timer display values
+  const displayTimer = isSpeedMode ? timer : practiceTimer;
+  const timerColor = isSpeedMode
+    ? (timer <= 10 ? Colors.danger : timer <= 20 ? Colors.warning : Colors.success)
+    : Colors.textSecondary;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -218,12 +271,15 @@ export default function PracticeSession() {
           </Text>
         </View>
 
-        {isSpeedMode && (
+        {showTimer ? (
           <View style={[styles.timerBadge, { borderColor: timerColor }]}>
-            <Text style={[styles.timerText, { color: timerColor }]}>{timer}ש׳</Text>
+            <Text style={[styles.timerText, { color: timerColor }]}>
+              {displayTimer}ש׳
+            </Text>
           </View>
+        ) : (
+          <View style={{ width: 48 }} />
         )}
-        {!isSpeedMode && <View style={{ width: 48 }} />}
       </View>
 
       {/* Progress */}
@@ -249,7 +305,16 @@ export default function PracticeSession() {
           onSelect={handleSelect}
         />
 
-        {/* Explanation panel */}
+        {/* Explanation panel — either auto or manual */}
+        {revealed && !showExplanation && !showExplanationAuto && (
+          <Pressable
+            onPress={handleShowExplanation}
+            style={({ pressed }) => [styles.showExplanationBtn, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.showExplanationText}>הצג הסבר</Text>
+          </Pressable>
+        )}
+
         {showExplanation && (
           <Animated.View
             style={[
@@ -275,6 +340,15 @@ export default function PracticeSession() {
               <Text style={styles.explanationText}>{question.explanation}</Text>
             </LinearGradient>
           </Animated.View>
+        )}
+
+        {/* Auto-advance countdown indicator */}
+        {revealed && autoAdvanceDelay > 0 && (
+          <View style={styles.autoAdvanceBanner}>
+            <Text style={styles.autoAdvanceText}>
+              ממשיך אוטומטית עוד {autoAdvanceDelay} שניות...
+            </Text>
+          </View>
         )}
       </ScrollView>
 
@@ -400,6 +474,35 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'right',
     lineHeight: 24,
+  },
+
+  showExplanationBtn: {
+    backgroundColor: Colors.primaryLighter,
+    borderRadius: Radius.xl,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  showExplanationText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: Colors.primary,
+  },
+
+  autoAdvanceBanner: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: Radius.lg,
+    padding: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  autoAdvanceText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.textTertiary,
+    textAlign: 'center',
   },
 
   actions: {
