@@ -285,7 +285,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => ({
       questions: s.questions.map(q =>
         idSet.has(q.id)
-          ? { ...q, validationStatus: status, generalPracticeEligible: status === 'validated' }
+          ? { ...q, validationStatus: status, generalPracticeEligible: status === 'validated', smartPracticeEligible: status === 'validated' }
           : q
       ),
       selectedQuestionIds: [],

@@ -151,7 +151,7 @@ export default function PracticeSession() {
     if (!finished) return;
     const scores = calcAllScores(finished.answers);
     const correct = finished.answers.filter(a => a.isCorrect).length;
-    recordSession(correct, finished.answers.length);
+    recordSession(correct, finished.answers.filter(a => !a.isSkipped).length);
 
     router.replace({
       pathname: '/results',

@@ -41,11 +41,11 @@ export function calcSpeedAdjustedScore(
     return 0;
   });
   const totalBonus = speedBonuses.reduce((s, b) => s + b, 0);
-  return Math.min(100, baseScore + Math.round(totalBonus / answers.length));
+  return Math.min(100, baseScore + Math.round(totalBonus / answered.length));
 }
 
 export function calcStabilityScore(answers: UserAnswer[]): number {
-  if (answers.length < 3) return 1;
+  if (answers.length < 3) return 100;
   // Sliding window of 3: measure variance in correctness
   const windows: number[] = [];
   for (let i = 0; i <= answers.length - 3; i++) {

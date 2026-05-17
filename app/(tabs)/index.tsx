@@ -97,7 +97,7 @@ export default function Dashboard() {
           <View style={styles.xpContainer}>
             <Text style={styles.xpLabel}>XP לרמה {level + 1}</Text>
             <View style={styles.xpTrack}>
-              <View style={[styles.xpFill, { width: `${Math.min(100, xp)}%` }]} />
+              <View style={[styles.xpFill, { width: `${Math.min(100, Math.round((xp / (level * 100)) * 100))}%` }]} />
             </View>
           </View>
         </LinearGradient>

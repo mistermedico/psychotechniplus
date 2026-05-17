@@ -30,9 +30,9 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
     if (!revealed) {
       return selectedId === optId ? styles.optionSelected : styles.optionDefault;
     }
-    const opt = question.options.find(o => o.id === optId)!;
-    if (opt.isCorrect) return styles.optionCorrect;
-    if (selectedId === optId && !opt.isCorrect) return styles.optionWrong;
+    const opt = question.options.find(o => o.id === optId);
+    if (opt?.isCorrect) return styles.optionCorrect;
+    if (selectedId === optId && !opt?.isCorrect) return styles.optionWrong;
     return styles.optionDefault;
   };
 
@@ -40,16 +40,16 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
     if (!revealed) {
       return selectedId === optId ? styles.optionTextSelected : styles.optionText;
     }
-    const opt = question.options.find(o => o.id === optId)!;
-    if (opt.isCorrect) return styles.optionTextCorrect;
-    if (selectedId === optId && !opt.isCorrect) return styles.optionTextWrong;
+    const opt = question.options.find(o => o.id === optId);
+    if (opt?.isCorrect) return styles.optionTextCorrect;
+    if (selectedId === optId && !opt?.isCorrect) return styles.optionTextWrong;
     return styles.optionText;
   };
 
   const getOptionIcon = (optId: string) => {
-    if (!revealed) return selectedId === optId ? '○' : '○';
-    const opt = question.options.find(o => o.id === optId)!;
-    if (opt.isCorrect) return '✓';
+    if (!revealed) return '○';
+    const opt = question.options.find(o => o.id === optId);
+    if (opt?.isCorrect) return '✓';
     if (selectedId === optId) return '✗';
     return '○';
   };

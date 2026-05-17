@@ -80,5 +80,6 @@ export function eloToProgress(elo: number): number {
   if (level >= 10) return 1;
   const low = thresholds[level];
   const high = thresholds[level + 1];
-  return (elo - low) / (high - low);
+  if (high === low) return 0;
+  return Math.max(0, Math.min(1, (elo - low) / (high - low)));
 }
