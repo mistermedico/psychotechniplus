@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  TextInput, ActivityIndicator,
+  TextInput, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -54,20 +54,27 @@ function validateQuestion(q: unknown, index: number): string | null {
 }
 
 export default function JsonImportScreen() {
-  const { addQuestion } = useAdminStore();
+  const { addQuestion, questions: existingQuestions } = useAdminStore();
   const [jsonText, setJsonText] = useState('');
   const [preview, setPreview] = useState<ImportedQuestion[]>([]);
+  const [duplicates, setDuplicates] = useState<number[]>([]);
   const [parseError, setParseError] = useState('');
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; skipped: number } | null>(null);
 
   const handleParse = () => {
     setParseError('');
     setPreview([]);
+    setDuplicates([]);
     setImportResult(null);
 
     if (!jsonText.trim()) {
       setParseError('הדבק JSON לפני הניתוח');
+      return;
+    }
+
+    if (jsonText.length > 500000) {
+      setParseError('הקובץ גדול מדי — מקסימום 500,000 תווים (~1,000 שאלות)');
       return;
     }
 
@@ -92,19 +99,32 @@ export default function JsonImportScreen() {
       return;
     }
 
-    setPreview(arr as ImportedQuestion[]);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const importedArr = arr as ImportedQuestion[];
+
+    // Detect duplicates by exact questionText match
+    const existingTexts = new Set(existingQuestions.map(q => q.questionText.trim().toLowerCase()));
+    const dupIndexes: number[] = [];
+    importedArr.forEach((q, i) => {
+      if (existingTexts.has(q.questionText.trim().toLowerCase())) dupIndexes.push(i);
+    });
+    setDuplicates(dupIndexes);
+
+    setPreview(importedArr);
+    Haptics.notificationAsync(dupIndexes.length > 0 ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleImport = async () => {
+  const doImport = async (skipDups: boolean) => {
     if (preview.length === 0) return;
     setImporting(true);
     setImportResult(null);
 
     let success = 0;
     let failed = 0;
+    let skipped = 0;
 
-    for (const item of preview) {
+    for (let i = 0; i < preview.length; i++) {
+      const item = preview[i];
+      if (skipDups && duplicates.includes(i)) { skipped++; continue; }
       try {
         addQuestion({
           targetIds: item.targetIds ?? ['target_psychometric'],
@@ -117,7 +137,7 @@ export default function JsonImportScreen() {
           })),
           correctAnswer: item.correctAnswer,
           explanation: item.explanation ?? '',
-          difficulty: item.difficulty ?? 3,
+          difficulty: Math.max(1, Math.min(10, item.difficulty ?? 3)),
           psychometricStats: { elo: 1200, discrimination: 0.7, guessProbability: 0.25 },
           accessLevel: item.accessLevel ?? 'free',
           validationStatus: 'pending',
@@ -131,11 +151,28 @@ export default function JsonImportScreen() {
     }
 
     setImporting(false);
-    setImportResult({ success, failed });
+    setImportResult({ success, failed, skipped });
     if (success > 0) {
       setPreview([]);
+      setDuplicates([]);
       setJsonText('');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
+  const handleImport = async () => {
+    if (duplicates.length > 0) {
+      Alert.alert(
+        `${duplicates.length} שאלות כפולות`,
+        'נמצאו שאלות שכבר קיימות במאגר. מה לעשות?',
+        [
+          { text: 'ביטול', style: 'cancel' },
+          { text: 'דלג על כפולות', onPress: () => doImport(true) },
+          { text: 'ייבא הכל בכל זאת', style: 'destructive', onPress: () => doImport(false) },
+        ],
+      );
+    } else {
+      doImport(false);
     }
   };
 
@@ -196,17 +233,29 @@ export default function JsonImportScreen() {
         {preview.length > 0 && (
           <View style={styles.previewSection}>
             <Text style={styles.previewTitle}>תצוגה מקדימה — {preview.length} שאלות</Text>
-            {preview.slice(0, 5).map((q, i) => (
-              <View key={i} style={styles.previewCard}>
-                <Text style={styles.previewNum}>שאלה {i + 1}</Text>
-                <Text style={styles.previewText} numberOfLines={3}>{q.questionText}</Text>
-                <View style={styles.previewMeta}>
-                  <Text style={styles.previewMetaText}>נושא: {q.topicId}</Text>
-                  <Text style={styles.previewMetaText}>קושי: {q.difficulty ?? 3}</Text>
-                  <Text style={styles.previewMetaText}>תשובות: {q.options.length}</Text>
-                </View>
+            {duplicates.length > 0 && (
+              <View style={styles.dupWarning}>
+                <Text style={styles.dupWarningText}>⚠️ {duplicates.length} שאלות כפולות (כבר קיימות במאגר)</Text>
               </View>
-            ))}
+            )}
+            {preview.slice(0, 5).map((q, i) => {
+              const isDup = duplicates.includes(i);
+              return (
+                <View key={i} style={[styles.previewCard, isDup && { borderColor: Colors.warning, backgroundColor: Colors.warningLight + '30' }]}>
+                  <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <Text style={styles.previewNum}>שאלה {i + 1}</Text>
+                    {isDup && <Text style={{ fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.warning }}>⚠️ כפולה</Text>}
+                  </View>
+                  <Text style={styles.previewText} numberOfLines={3}>{q.questionText}</Text>
+                  <View style={styles.previewMeta}>
+                    <Text style={styles.previewMetaText}>נושא: {q.topicId}</Text>
+                    <Text style={styles.previewMetaText}>קושי: {q.difficulty ?? 3}</Text>
+                    <Text style={styles.previewMetaText}>תשובות: {q.options.length}</Text>
+                    <Text style={styles.previewMetaText}>{q.accessLevel ?? 'free'}</Text>
+                  </View>
+                </View>
+              );
+            })}
             {preview.length > 5 && (
               <Text style={styles.moreText}>+ עוד {preview.length - 5} שאלות...</Text>
             )}
@@ -231,7 +280,8 @@ export default function JsonImportScreen() {
             </Text>
             <Text style={styles.resultText}>
               עברו בהצלחה: {importResult.success}{'\n'}
-              נכשלו: {importResult.failed}{'\n'}
+              {importResult.skipped > 0 ? `דולגו כפולות: ${importResult.skipped}\n` : ''}
+              {importResult.failed > 0 ? `נכשלו: ${importResult.failed}\n` : ''}
               {'\n'}השאלות המיובאות יופיעו בתור ולידציה לאישור.
             </Text>
           </View>
@@ -315,6 +365,11 @@ const styles = StyleSheet.create({
   previewText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', lineHeight: 20, marginBottom: 8 },
   previewMeta: { flexDirection: 'row-reverse', gap: 12 },
   previewMetaText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
+  dupWarning: {
+    backgroundColor: Colors.warning + '20', borderRadius: Radius.lg, padding: 10,
+    borderWidth: 1, borderColor: Colors.warning + '60', marginBottom: 10,
+  },
+  dupWarningText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.warning, textAlign: 'right' },
   moreText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginBottom: 12 },
 
   importBtnWrap: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary, marginTop: 8 },

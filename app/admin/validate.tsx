@@ -13,20 +13,29 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 export default function ValidateQueue() {
-  const { getPendingQuestions, validateQuestion, getQuestionsByStatus } = useAdminStore();
+  const { getPendingQuestions, validateQuestion, getQuestionsByStatus, bulkValidate } = useAdminStore();
   const pending = getPendingQuestions();
+  const rejected = getQuestionsByStatus('rejected');
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [filter, setFilter] = useState<'pending' | 'rejected' | 'all'>('pending');
+  const [filter, setFilter] = useState<'pending' | 'rejected'>('pending');
+
+  const queue = filter === 'pending' ? pending : rejected;
+  const safeIdx = Math.min(currentIdx, Math.max(0, queue.length - 1));
+  const current = queue[safeIdx];
 
   const slideAnim = useState(new Animated.Value(0))[0];
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const animateOut = (direction: 'approve' | 'reject', cb: () => void) => {
+    if (isAnimating) return;
+    setIsAnimating(true);
     Animated.timing(slideAnim, {
       toValue: direction === 'approve' ? -400 : 400,
-      duration: 250,
+      duration: 220,
       useNativeDriver: true,
     }).start(() => {
       slideAnim.setValue(0);
+      setIsAnimating(false);
       cb();
     });
   };
@@ -35,7 +44,8 @@ export default function ValidateQueue() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     animateOut('approve', () => {
       validateQuestion(q.id, 'validated');
-      if (currentIdx >= pending.length - 1) setCurrentIdx(0);
+      // After removal the queue shrinks — keep idx in bounds
+      setCurrentIdx(i => Math.max(0, i >= pending.length - 1 ? 0 : i));
     });
   };
 
@@ -43,51 +53,67 @@ export default function ValidateQueue() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     animateOut('reject', () => {
       validateQuestion(q.id, 'rejected');
-      if (currentIdx >= pending.length - 1) setCurrentIdx(0);
+      setCurrentIdx(i => Math.max(0, i >= pending.length - 1 ? 0 : i));
+    });
+  };
+
+  const handleReApprove = (q: Question) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    animateOut('approve', () => {
+      validateQuestion(q.id, 'validated');
+      setCurrentIdx(i => Math.max(0, i >= rejected.length - 1 ? 0 : i));
     });
   };
 
   const handleSkip = () => {
-    setCurrentIdx(i => (i + 1) % Math.max(1, pending.length));
+    Haptics.selectionAsync();
+    setCurrentIdx(i => (i + 1) % Math.max(1, queue.length));
   };
 
   const handleEdit = (q: Question) => {
     router.push({ pathname: '/admin/question-editor', params: { questionId: q.id, mode: 'edit' } });
   };
 
-  const current = pending[currentIdx];
-
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       {/* Header stats */}
       <View style={styles.statsRow}>
-        <StatPill label="ממתינות" value={pending.length} color={Colors.warning} />
-        <StatPill label="נדחו" value={getQuestionsByStatus('rejected').length} color={Colors.danger} />
-        <StatPill label="אושרו" value={getQuestionsByStatus('validated').length} color={Colors.success} />
+        <Pressable onPress={() => { setFilter('pending'); setCurrentIdx(0); }}>
+          <StatPill label="ממתינות" value={pending.length} color={Colors.warning} active={filter === 'pending'} />
+        </Pressable>
+        <Pressable onPress={() => { setFilter('rejected'); setCurrentIdx(0); }}>
+          <StatPill label="נדחו" value={rejected.length} color={Colors.danger} active={filter === 'rejected'} />
+        </Pressable>
+        <StatPill label="אושרו" value={getQuestionsByStatus('validated').length} color={Colors.success} active={false} />
       </View>
 
-      {pending.length === 0 ? (
+      {queue.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>🎉</Text>
-          <Text style={styles.emptyTitle}>אין שאלות ממתינות!</Text>
-          <Text style={styles.emptyDesc}>כל השאלות עברו ולידציה.</Text>
-          <Pressable
-            onPress={() => router.push('/admin/ai-generator')}
-            style={styles.emptyBtn}
-          >
-            <Text style={styles.emptyBtnText}>🤖 יצור שאלות חדשות</Text>
-          </Pressable>
+          <Text style={styles.emptyIcon}>{filter === 'pending' ? '🎉' : '✨'}</Text>
+          <Text style={styles.emptyTitle}>{filter === 'pending' ? 'אין שאלות ממתינות!' : 'אין שאלות נדחות'}</Text>
+          <Text style={styles.emptyDesc}>{filter === 'pending' ? 'כל השאלות עברו ולידציה.' : 'לא נדחתה אף שאלה.'}</Text>
+          {filter === 'pending' && (
+            <Pressable
+              onPress={() => router.push('/admin/ai-generator')}
+              style={styles.emptyBtn}
+            >
+              <Text style={styles.emptyBtnText}>🤖 יצור שאלות חדשות</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         <>
           {/* Progress */}
           <View style={styles.progressRow}>
             <Text style={styles.progressText}>
-              {currentIdx + 1} / {pending.length}
+              {safeIdx + 1} / {queue.length}
             </Text>
             <View style={styles.progressTrack}>
               <View
-                style={[styles.progressFill, { width: `${((currentIdx + 1) / pending.length) * 100}%` }]}
+                style={[styles.progressFill, {
+                  width: `${((safeIdx + 1) / queue.length) * 100}%`,
+                  backgroundColor: filter === 'pending' ? Colors.warning : Colors.danger,
+                }]}
               />
             </View>
           </View>
@@ -99,64 +125,121 @@ export default function ValidateQueue() {
               { transform: [{ translateX: slideAnim }] },
             ]}
           >
-            <QuestionPreviewCard question={current} />
+            {current && <QuestionPreviewCard question={current} />}
           </Animated.View>
 
           {/* Action buttons */}
           <View style={styles.actions}>
-            <Pressable
-              onPress={() => handleReject(current)}
-              style={({ pressed }) => [styles.rejectBtn, pressed && { transform: [{ scale: 0.95 }] }]}
-            >
-              <Text style={styles.rejectIcon}>❌</Text>
-              <Text style={styles.rejectText}>דחה</Text>
-            </Pressable>
+            {filter === 'pending' ? (
+              <>
+                <Pressable
+                  onPress={() => !isAnimating && handleReject(current)}
+                  style={({ pressed }) => [styles.rejectBtn, (pressed || isAnimating) && { transform: [{ scale: 0.95 }] }]}
+                >
+                  <Text style={styles.rejectIcon}>❌</Text>
+                  <Text style={styles.rejectText}>דחה</Text>
+                </Pressable>
 
-            <Pressable
-              onPress={handleSkip}
-              style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.skipText}>דלג</Text>
-            </Pressable>
+                <Pressable
+                  onPress={handleSkip}
+                  style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.skipText}>דלג</Text>
+                </Pressable>
 
-            <Pressable
-              onPress={() => handleEdit(current)}
-              style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.editText}>✏️ ערוך</Text>
-            </Pressable>
+                <Pressable
+                  onPress={() => current && handleEdit(current)}
+                  style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.editText}>✏️ ערוך</Text>
+                </Pressable>
 
-            <Pressable
-              onPress={() => handleApprove(current)}
-              style={({ pressed }) => [styles.approveBtn, pressed && { transform: [{ scale: 0.95 }] }]}
-            >
-              <Text style={styles.approveIcon}>✅</Text>
-              <Text style={styles.approveText}>אשר</Text>
-            </Pressable>
+                <Pressable
+                  onPress={() => !isAnimating && handleApprove(current)}
+                  style={({ pressed }) => [styles.approveBtn, (pressed || isAnimating) && { transform: [{ scale: 0.95 }] }]}
+                >
+                  <Text style={styles.approveIcon}>✅</Text>
+                  <Text style={styles.approveText}>אשר</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable
+                  onPress={handleSkip}
+                  style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.skipText}>דלג</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => current && handleEdit(current)}
+                  style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.editText}>✏️ ערוך</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => !isAnimating && current && handleReApprove(current)}
+                  style={({ pressed }) => [styles.approveBtn, (pressed || isAnimating) && { transform: [{ scale: 0.95 }] }]}
+                >
+                  <Text style={styles.approveIcon}>↩️</Text>
+                  <Text style={styles.approveText}>אשר מחדש</Text>
+                </Pressable>
+              </>
+            )}
           </View>
 
-          {/* Bulk approve all */}
-          <Pressable
-            onPress={() => {
-              Alert.alert(
-                'אישור קבוצתי',
-                `לאשר את כל ${pending.length} השאלות הממתינות?`,
-                [
-                  { text: 'ביטול', style: 'cancel' },
-                  {
-                    text: 'אשר הכל',
-                    onPress: () => {
-                      pending.forEach(q => validateQuestion(q.id, 'validated'));
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    },
-                  },
-                ]
-              );
-            }}
-            style={styles.bulkApproveBtn}
-          >
-            <Text style={styles.bulkApproveText}>✅ אשר את כל {pending.length} הממתינות</Text>
-          </Pressable>
+          {/* Bulk actions */}
+          <View style={styles.bulkRow}>
+            {filter === 'pending' && (
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    'אישור קבוצתי',
+                    `לאשר את כל ${pending.length} השאלות הממתינות?`,
+                    [
+                      { text: 'ביטול', style: 'cancel' },
+                      {
+                        text: 'אשר הכל',
+                        onPress: () => {
+                          bulkValidate(pending.map(q => q.id), 'validated');
+                          setCurrentIdx(0);
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        },
+                      },
+                    ]
+                  );
+                }}
+                style={[styles.bulkApproveBtn, { flex: 1 }]}
+              >
+                <Text style={styles.bulkApproveText}>✅ אשר את כל {pending.length} הממתינות</Text>
+              </Pressable>
+            )}
+            {filter === 'rejected' && (
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    'אישור מחדש',
+                    `לאשר את כל ${rejected.length} השאלות הנדחות?`,
+                    [
+                      { text: 'ביטול', style: 'cancel' },
+                      {
+                        text: 'אשר הכל',
+                        onPress: () => {
+                          bulkValidate(rejected.map(q => q.id), 'validated');
+                          setCurrentIdx(0);
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        },
+                      },
+                    ]
+                  );
+                }}
+                style={[styles.bulkApproveBtn, { flex: 1, backgroundColor: Colors.successLight, borderColor: Colors.success }]}
+              >
+                <Text style={[styles.bulkApproveText, { color: Colors.success }]}>↩️ אשר מחדש את כל {rejected.length} הנדחות</Text>
+              </Pressable>
+            )}
+          </View>
         </>
       )}
     </SafeAreaView>
@@ -218,9 +301,9 @@ function QuestionPreviewCard({ question }: { question: Question }) {
   );
 }
 
-function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
+function StatPill({ label, value, color, active }: { label: string; value: number; color: string; active: boolean }) {
   return (
-    <View style={[pillStyles.pill, { borderColor: color + '40' }]}>
+    <View style={[pillStyles.pill, { borderColor: active ? color : color + '40', borderWidth: active ? 2 : 1.5, backgroundColor: active ? color + '15' : Colors.surface }]}>
       <Text style={[pillStyles.value, { color }]}>{value}</Text>
       <Text style={pillStyles.label}>{label}</Text>
     </View>
@@ -360,9 +443,8 @@ const styles = StyleSheet.create({
   },
   approveIcon: { fontSize: 20 },
   approveText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.success, marginTop: 2 },
+  bulkRow: { flexDirection: 'row-reverse', paddingHorizontal: 16, marginBottom: 16, gap: 8 },
   bulkApproveBtn: {
-    marginHorizontal: 16,
-    marginBottom: 16,
     backgroundColor: Colors.successLight,
     borderRadius: Radius.lg,
     padding: 14,

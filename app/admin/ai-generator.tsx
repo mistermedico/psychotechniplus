@@ -140,18 +140,25 @@ export default function AiGenerator() {
 
     const pool = AI_TEMPLATES[selectedTopicId] ?? AI_TEMPLATES['topic_quantitative'];
     const picked: GeneratedPreview[] = [];
-    for (let i = 0; i < Math.min(count, pool.length); i++) {
+    // Cycle through all pool templates, varying difficulty slightly per question
+    for (let i = 0; i < count; i++) {
       const template = pool[i % pool.length];
+      const diffVariance = i % 3 === 2 ? 1 : i % 3 === 1 ? 0 : -1;
+      const finalDiff = Math.max(1, Math.min(10, difficulty + diffVariance));
       picked.push({
         topicId: selectedTopicId,
         question: {
           ...template,
-          difficulty,
+          difficulty: finalDiff,
           targetIds: ['target_psychometric'],
           accessLevel: 'free',
           validationStatus: 'pending',
           topicId: selectedTopicId,
-          psychometricStats: { elo: 1000 + difficulty * 80, discrimination: 0.8, guessProbability: 0.25 },
+          psychometricStats: {
+            elo: 900 + finalDiff * 90 + Math.floor(Math.random() * 40),
+            discrimination: 0.65 + Math.round(Math.random() * 20) / 100,
+            guessProbability: 0.25,
+          },
           smartPracticeEligible: false,
           generalPracticeEligible: false,
         } as Partial<Question>,

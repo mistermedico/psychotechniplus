@@ -26,11 +26,11 @@ const STATUS_LABELS: Record<ValidationStatus, string> = {
   rejected: 'נדחה',
 };
 
-const SORT_OPTIONS = ['חדש → ישן', 'ישן → חדש', 'קושי ↑', 'קושי ↓'];
+const SORT_OPTIONS = ['חדש → ישן', 'ישן → חדש', 'קושי ↑', 'קושי ↓', 'ELO ↑', 'ELO ↓'];
 
 export default function QuestionsAdmin() {
   const { questions, topics, selectedQuestionIds, toggleSelectQuestion, clearSelection,
-    selectAll, deleteQuestions, bulkValidate, deleteQuestion } = useAdminStore();
+    selectAll, deleteQuestions, bulkValidate, deleteQuestion, addQuestion } = useAdminStore();
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<ValidationStatus | 'all'>('all');
@@ -42,15 +42,19 @@ export default function QuestionsAdmin() {
     let q = [...questions];
     if (search.trim()) {
       const s = search.toLowerCase();
-      q = q.filter(x => x.questionText.toLowerCase().includes(s));
+      q = q.filter(x => x.questionText.toLowerCase().includes(s) ||
+        x.explanation?.toLowerCase().includes(s));
     }
     if (filterStatus !== 'all') q = q.filter(x => x.validationStatus === filterStatus);
     if (filterTopicId !== 'all') q = q.filter(x => x.topicId === filterTopicId);
 
     switch (sortIdx) {
-      case 0: q.reverse(); break;
-      case 2: q.sort((a, b) => a.difficulty - b.difficulty); break;
-      case 3: q.sort((a, b) => b.difficulty - a.difficulty); break;
+      case 0: q = q.slice().reverse(); break;
+      case 1: /* natural order = oldest first, no sort */ break;
+      case 2: q = q.slice().sort((a, b) => a.difficulty - b.difficulty); break;
+      case 3: q = q.slice().sort((a, b) => b.difficulty - a.difficulty); break;
+      case 4: q = q.slice().sort((a, b) => a.psychometricStats.elo - b.psychometricStats.elo); break;
+      case 5: q = q.slice().sort((a, b) => b.psychometricStats.elo - a.psychometricStats.elo); break;
     }
     return q;
   }, [questions, search, filterStatus, filterTopicId, sortIdx]);
@@ -74,6 +78,18 @@ export default function QuestionsAdmin() {
         },
       ]
     );
+  };
+
+  const handleDuplicate = (item: Question) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    addQuestion({
+      ...item,
+      questionText: `[עותק] ${item.questionText}`,
+      validationStatus: 'draft',
+      smartPracticeEligible: false,
+      generalPracticeEligible: false,
+    });
+    Alert.alert('שוכפל', 'עותק נוצר כטיוטה');
   };
 
   const renderItem = ({ item }: { item: Question }) => {
@@ -111,6 +127,9 @@ export default function QuestionsAdmin() {
             <Text style={styles.diffText}>רמה {item.difficulty}</Text>
           </View>
           <Text style={styles.eloText}>ELO {item.psychometricStats.elo}</Text>
+          <Text style={[styles.accessBadge, { color: item.accessLevel === 'premium' ? Colors.warning : Colors.success }]}>
+            {item.accessLevel === 'premium' ? '💎' : '🆓'}
+          </Text>
           {bulkMode && (
             <View style={[styles.checkCircle, isSelected && styles.checkCircleActive]}>
               {isSelected && <Text style={styles.checkMark}>✓</Text>}
@@ -124,7 +143,7 @@ export default function QuestionsAdmin() {
         {/* Topic + type */}
         <View style={styles.cardFooter}>
           <Text style={styles.footerMeta}>{item.questionType}</Text>
-          <Text style={styles.footerTopic}>{topic?.icon} {topic?.name ?? item.topicId}</Text>
+          <Text style={styles.footerTopic}>{topic?.icon ?? '📝'} {topic?.name ?? item.topicId}</Text>
         </View>
 
         {/* Quick actions */}
@@ -134,7 +153,7 @@ export default function QuestionsAdmin() {
               onPress={() => router.push({ pathname: '/admin/question-editor', params: { questionId: item.id, mode: 'edit' } })}
               style={[styles.qaBtn, { backgroundColor: Colors.primaryLighter }]}
             >
-              <Text style={[styles.qaBtnText, { color: Colors.primary }]}>✏️ עריכה</Text>
+              <Text style={[styles.qaBtnText, { color: Colors.primary }]}>✏️ ערוך</Text>
             </Pressable>
             {item.validationStatus === 'pending' && (
               <Pressable
@@ -147,6 +166,23 @@ export default function QuestionsAdmin() {
                 <Text style={[styles.qaBtnText, { color: Colors.success }]}>✅ אשר</Text>
               </Pressable>
             )}
+            {(item.validationStatus === 'pending' || item.validationStatus === 'validated') && (
+              <Pressable
+                onPress={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  bulkValidate([item.id], 'rejected');
+                }}
+                style={[styles.qaBtn, { backgroundColor: Colors.dangerLight }]}
+              >
+                <Text style={[styles.qaBtnText, { color: Colors.danger }]}>❌ דחה</Text>
+              </Pressable>
+            )}
+            <Pressable
+              onPress={() => handleDuplicate(item)}
+              style={[styles.qaBtn, { backgroundColor: Colors.surfaceSecondary }]}
+            >
+              <Text style={[styles.qaBtnText, { color: Colors.textSecondary }]}>📋 שכפל</Text>
+            </Pressable>
             <Pressable
               onPress={() => {
                 Alert.alert('מחיקה', 'למחוק שאלה זו?', [
@@ -164,17 +200,20 @@ export default function QuestionsAdmin() {
     );
   };
 
+  const pendingCount = questions.filter(q => q.validationStatus === 'pending').length;
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       {/* Search */}
       <View style={styles.searchBar}>
         <TextInput
           style={styles.searchInput}
-          placeholder="🔍 חיפוש שאלה..."
+          placeholder="🔍 חיפוש בשאלות ובהסברים..."
           placeholderTextColor={Colors.textTertiary}
           value={search}
           onChangeText={setSearch}
           textAlign="right"
+          clearButtonMode="while-editing"
         />
       </View>
 
@@ -188,6 +227,7 @@ export default function QuestionsAdmin() {
           >
             <Text style={[styles.filterChipText, filterStatus === s && { color: '#fff' }]}>
               {s === 'all' ? 'הכל' : STATUS_LABELS[s]}
+              {s === 'pending' && pendingCount > 0 ? ` (${pendingCount})` : ''}
             </Text>
           </Pressable>
         ))}
@@ -205,6 +245,7 @@ export default function QuestionsAdmin() {
         >
           <Text style={styles.topicFilterText}>
             {filterTopicId === 'all' ? '📚 כל הנושאים' :
+              (TOPICS.find(t => t.id === filterTopicId)?.icon ?? '') + ' ' +
               (TOPICS.find(t => t.id === filterTopicId)?.name ?? filterTopicId)}
             {' ▾'}
           </Text>
@@ -241,7 +282,7 @@ export default function QuestionsAdmin() {
       )}
 
       {/* Count */}
-      <Text style={styles.resultCount}>{filtered.length} שאלות</Text>
+      <Text style={styles.resultCount}>{filtered.length} שאלות מתוך {questions.length}</Text>
 
       <FlatList
         data={filtered}
@@ -356,7 +397,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   diffText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
-  eloText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, marginRight: 4, flex: 1, textAlign: 'left' },
+  eloText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, flex: 1, textAlign: 'left' },
+  accessBadge: { fontSize: 12 },
   checkCircle: {
     width: 22, height: 22, borderRadius: 11,
     borderWidth: 2, borderColor: Colors.border,
@@ -375,7 +417,7 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between' },
   footerTopic: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary },
   footerMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
-  quickActions: { flexDirection: 'row-reverse', gap: 6, marginTop: 8, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8 },
+  quickActions: { flexDirection: 'row-reverse', gap: 6, marginTop: 8, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8, flexWrap: 'wrap' },
   qaBtn: { borderRadius: Radius.md, paddingHorizontal: 10, paddingVertical: 5 },
   qaBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs },
 

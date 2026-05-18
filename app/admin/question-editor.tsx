@@ -52,6 +52,20 @@ export default function QuestionEditor() {
   const [targetIds, setTargetIds] = useState<string[]>(existing?.targetIds ?? [TARGETS[0]?.id ?? '']);
   const [options, setOptions] = useState<QuestionOption[]>(existing?.options ?? DEFAULT_OPTIONS.map(o => ({ ...o })));
   const [eloOverride, setEloOverride] = useState(String(existing?.psychometricStats.elo ?? 1200));
+  const [isDirty, setIsDirty] = useState(false);
+
+  const markDirty = () => { if (!isDirty) setIsDirty(true); };
+
+  const handleBack = () => {
+    if (isDirty) {
+      Alert.alert('שינויים לא שמורים', 'יש שינויים שלא נשמרו. לצאת בכל זאת?', [
+        { text: 'המשך עריכה', style: 'cancel' },
+        { text: 'צא ללא שמירה', style: 'destructive', onPress: () => router.back() },
+      ]);
+    } else {
+      router.back();
+    }
+  };
 
   const setCorrectOption = (id: string) => {
     setOptions(prev => prev.map(o => ({ ...o, isCorrect: o.id === id })));
@@ -83,6 +97,10 @@ export default function QuestionEditor() {
       Alert.alert('שגיאה', 'נא להזין את טקסט השאלה');
       return;
     }
+    if (questionText.trim().length < 10) {
+      Alert.alert('שגיאה', 'טקסט השאלה קצר מדי (מינימום 10 תווים)');
+      return;
+    }
     if (options.some(o => !o.text.trim())) {
       Alert.alert('שגיאה', 'נא למלא את כל האפשרויות');
       return;
@@ -92,8 +110,17 @@ export default function QuestionEditor() {
       Alert.alert('שגיאה', 'נא לסמן תשובה נכונה');
       return;
     }
+    if (!explanation.trim()) {
+      Alert.alert('שגיאה', 'נא להוסיף הסבר לשאלה');
+      return;
+    }
+    if (targetIds.length === 0) {
+      Alert.alert('שגיאה', 'יש לבחור לפחות מסלול אחד');
+      return;
+    }
 
-    const elo = parseInt(eloOverride) || 1200;
+    const rawElo = parseInt(eloOverride);
+    const elo = isNaN(rawElo) ? 1200 : Math.max(800, Math.min(2000, rawElo));
     const q: Omit<Question, 'id'> = {
       targetIds,
       topicId,
@@ -130,28 +157,34 @@ export default function QuestionEditor() {
       >
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
+          {/* Back button */}
+          <Pressable onPress={handleBack} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>→ חזרה{isDirty ? ' (שינויים לא שמורים)' : ''}</Text>
+          </Pressable>
+
           {/* Section: question text */}
           <Section title="📝 טקסט השאלה">
             <TextInput
               style={styles.textArea}
               multiline
               value={questionText}
-              onChangeText={setQuestionText}
+              onChangeText={v => { setQuestionText(v); markDirty(); }}
               placeholder="הזן את נוסח השאלה..."
               placeholderTextColor={Colors.textTertiary}
               textAlign="right"
               textAlignVertical="top"
               numberOfLines={4}
             />
+            <Text style={styles.charCount}>{questionText.length} תווים</Text>
           </Section>
 
-          {/* Reading passage (optional) */}
-          <Section title="📖 קטע קריאה (אופציונלי)">
+          {/* Reading passage — shown always for reading_comprehension, optional otherwise */}
+          <Section title={`📖 קטע קריאה${questionType === 'reading_comprehension' ? ' (נדרש)' : ' (אופציונלי)'}`}>
             <TextInput
-              style={[styles.textArea, { minHeight: 80 }]}
+              style={[styles.textArea, { minHeight: 80 }, questionType === 'reading_comprehension' && { borderColor: Colors.primary }]}
               multiline
               value={readingPassage}
-              onChangeText={setReadingPassage}
+              onChangeText={v => { setReadingPassage(v); markDirty(); }}
               placeholder="להבנת הנקרא — הכנס קטע טקסט..."
               placeholderTextColor={Colors.textTertiary}
               textAlign="right"
@@ -200,11 +233,11 @@ export default function QuestionEditor() {
               ))}
             </View>
 
-            <Text style={styles.fieldLabel}>ELO שאלה</Text>
+            <Text style={styles.fieldLabel}>ELO שאלה (800 – 2000)</Text>
             <TextInput
               style={styles.input}
               value={eloOverride}
-              onChangeText={setEloOverride}
+              onChangeText={v => { setEloOverride(v); markDirty(); }}
               keyboardType="number-pad"
               textAlign="right"
               placeholder="1200"
@@ -322,7 +355,7 @@ export default function QuestionEditor() {
           </Section>
 
           {/* Save */}
-          <Pressable onPress={handleSave} style={styles.saveBtn}>
+          <Pressable onPress={() => { handleSave(); }} style={styles.saveBtn}>
             <Text style={styles.saveBtnText}>{isEdit ? '💾 שמור שינויים' : '➕ הוסף שאלה'}</Text>
           </Pressable>
 
@@ -467,6 +500,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   switchLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.text },
+
+  backBtn: { paddingVertical: 8, marginBottom: 4 },
+  backBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary, textAlign: 'right' },
+  charCount: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'left', marginTop: 4 },
 
   saveBtn: {
     backgroundColor: Colors.primary,

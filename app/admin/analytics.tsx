@@ -17,13 +17,12 @@ const TYPE_LABELS: Record<string, string> = {
   quantitative: 'כמותי',
   shapes: 'צורות',
   reading_comprehension: 'הבנת הנקרא',
+  fill_in_the_blank: 'השלמת חסר',
 };
 
 export default function Analytics() {
   const { getStats, questions } = useAdminStore();
   const stats = getStats();
-
-  const totalAnswered = questions.length;
 
   // Per topic
   const topicData = TOPICS.map(t => ({
@@ -193,6 +192,65 @@ export default function Analytics() {
                   backgroundColor: d.color,
                 }]} />
               </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Access level breakdown */}
+        <Text style={styles.chartTitle}>🔓 התפלגות גישה</Text>
+        <View style={styles.card}>
+          {[
+            { label: 'חינמי 🆓', count: questions.filter(q => q.accessLevel === 'free').length, color: Colors.success },
+            { label: 'פרמיום 💎', count: questions.filter(q => q.accessLevel === 'premium').length, color: Colors.warning },
+          ].map(d => {
+            const pct = questions.length > 0 ? Math.round((d.count / questions.length) * 100) : 0;
+            return (
+              <View key={d.label} style={styles.barRow}>
+                <View style={styles.barLabelWrap}>
+                  <Text style={styles.barLabel}>{d.label}</Text>
+                  <Text style={[styles.barCount, { color: d.color }]}>{d.count} ({pct}%)</Text>
+                </View>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: d.color }]} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Per target breakdown */}
+        <Text style={styles.chartTitle}>🎯 שאלות לפי מסלול</Text>
+        <View style={styles.card}>
+          {TARGETS.map(t => {
+            const count = questions.filter(q => q.targetIds.includes(t.id)).length;
+            const pct = questions.length > 0 ? Math.round((count / questions.length) * 100) : 0;
+            return (
+              <View key={t.id} style={styles.barRow}>
+                <View style={styles.barLabelWrap}>
+                  <Text style={styles.barLabel}>{t.icon} {t.name}</Text>
+                  <Text style={[styles.barCount, { color: Colors.primary }]}>{count}</Text>
+                </View>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: Colors.primary }]} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Eligibility breakdown */}
+        <Text style={styles.chartTitle}>✅ כשירות לתרגול</Text>
+        <View style={[styles.card, { flexDirection: 'row-reverse', gap: 16, justifyContent: 'space-around' }]}>
+          {[
+            { label: 'כשיר לתרגול חכם', count: questions.filter(q => q.smartPracticeEligible).length, color: Colors.primary },
+            { label: 'כשיר לתרגול כללי', count: questions.filter(q => q.generalPracticeEligible).length, color: Colors.success },
+          ].map(d => (
+            <View key={d.label} style={{ alignItems: 'center', flex: 1 }}>
+              <Text style={[styles.donutPct, { color: d.color, fontSize: 28, fontFamily: 'SuezOne_400Regular' }]}>{d.count}</Text>
+              <Text style={[styles.donutLabel, { textAlign: 'center' }]}>{d.label}</Text>
+              <Text style={{ fontFamily: 'Heebo_400Regular', fontSize: 11, color: Colors.textTertiary }}>
+                {questions.length > 0 ? Math.round((d.count / questions.length) * 100) : 0}%
+              </Text>
             </View>
           ))}
         </View>
