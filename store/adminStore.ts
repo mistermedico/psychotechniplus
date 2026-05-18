@@ -173,6 +173,7 @@ export interface SmartExamTemplate {
   passingScore: number;
   createdAt: Date;
   isActive: boolean;
+  pinnedQuestionIds?: string[];  // specific questions always included
 }
 
 export interface PracticeSessionSettings {
@@ -182,6 +183,8 @@ export interface PracticeSessionSettings {
   shuffleAnswerOptions: boolean;          // default: false
   showTimerAlways: boolean;               // default: false
   premiumOnlyModes: string[];             // default: []
+  freeUserMaxDifficulty: number;          // default: 10
+  premiumUserQuestionLimit: number;       // default: 999 (effectively unlimited)
 }
 
 export interface ExamSessionSettings {
@@ -200,6 +203,8 @@ export const DEFAULT_PRACTICE_SETTINGS: PracticeSessionSettings = {
   shuffleAnswerOptions: false,
   showTimerAlways: false,
   premiumOnlyModes: [],
+  freeUserMaxDifficulty: 10,
+  premiumUserQuestionLimit: 999,
 };
 
 export const DEFAULT_EXAM_SETTINGS: ExamSessionSettings = {
@@ -260,6 +265,8 @@ interface AdminState {
   toggleSelectQuestion: (id: string) => void;
   clearSelection: () => void;
   selectAll: () => void;
+  assignQuestionsToTopic: (questionIds: string[], topicId: string) => void;
+  setQuestionsAccessLevel: (questionIds: string[], level: AccessLevel) => void;
 
   // Actions — topics
   addTopic: (t: Omit<Topic, 'id'>) => Topic;
@@ -273,6 +280,10 @@ interface AdminState {
   addTemplate: (t: Omit<SmartExamTemplate, 'id' | 'createdAt'>) => SmartExamTemplate;
   updateTemplate: (id: string, updates: Partial<SmartExamTemplate>) => void;
   deleteTemplate: (id: string) => void;
+  addTopicRuleToTemplate: (templateId: string, rule: SimulationRule) => void;
+  removeTopicRuleFromTemplate: (templateId: string, ruleId: string) => void;
+  pinQuestionToTemplate: (templateId: string, questionId: string) => void;
+  unpinQuestionFromTemplate: (templateId: string, questionId: string) => void;
 
   // Supabase sync
   loadQuestionsFromSupabase: () => Promise<void>;
@@ -454,6 +465,28 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => ({ selectedQuestionIds: s.questions.map(q => q.id) }));
   },
 
+  assignQuestionsToTopic: (questionIds, topicId) => {
+    const idSet = new Set(questionIds);
+    set(s => {
+      const updated = s.questions.map(q =>
+        idSet.has(q.id) ? { ...q, topicId } : q
+      );
+      updated.filter(q => idSet.has(q.id)).forEach(q => dbUpsert(q));
+      return { questions: updated };
+    });
+  },
+
+  setQuestionsAccessLevel: (questionIds, level) => {
+    const idSet = new Set(questionIds);
+    set(s => {
+      const updated = s.questions.map(q =>
+        idSet.has(q.id) ? { ...q, accessLevel: level } : q
+      );
+      updated.filter(q => idSet.has(q.id)).forEach(q => dbUpsert(q));
+      return { questions: updated };
+    });
+  },
+
   addTopic: (t) => {
     const newT: Topic = { ...t, id: `topic_admin_${Date.now()}` };
     set(s => ({ topics: [...s.topics, newT] }));
@@ -494,6 +527,46 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   deleteTemplate: (id) => {
     set(s => ({ templates: s.templates.filter(t => t.id !== id) }));
+  },
+
+  addTopicRuleToTemplate: (templateId, rule) => {
+    set(s => ({
+      templates: s.templates.map(t =>
+        t.id === templateId
+          ? { ...t, rules: [...t.rules.filter(r => r.id !== rule.id), rule] }
+          : t
+      ),
+    }));
+  },
+
+  removeTopicRuleFromTemplate: (templateId, ruleId) => {
+    set(s => ({
+      templates: s.templates.map(t =>
+        t.id === templateId
+          ? { ...t, rules: t.rules.filter(r => r.id !== ruleId) }
+          : t
+      ),
+    }));
+  },
+
+  pinQuestionToTemplate: (templateId, questionId) => {
+    set(s => ({
+      templates: s.templates.map(t =>
+        t.id === templateId
+          ? { ...t, pinnedQuestionIds: [...new Set([...(t.pinnedQuestionIds ?? []), questionId])] }
+          : t
+      ),
+    }));
+  },
+
+  unpinQuestionFromTemplate: (templateId, questionId) => {
+    set(s => ({
+      templates: s.templates.map(t =>
+        t.id === templateId
+          ? { ...t, pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(id => id !== questionId) }
+          : t
+      ),
+    }));
   },
 
   getStats: () => {

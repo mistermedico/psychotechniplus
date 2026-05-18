@@ -23,6 +23,8 @@ export default function SessionSettingsScreen() {
 
   // Local state for text inputs
   const [freeLimit, setFreeLimit] = useState(String(freePracticeLimit));
+  const [freeMaxDiff, setFreeMaxDiff] = useState(String(practiceSettings.freeUserMaxDifficulty));
+  const [premiumLimit, setPremiumLimit] = useState(String(practiceSettings.premiumUserQuestionLimit));
   const [speedSecs, setSpeedSecs] = useState(String(practiceSettings.speedModeSecondsPerQuestion));
   const [autoAdvance, setAutoAdvance] = useState(String(practiceSettings.autoAdvanceDelaySeconds));
   const [passingScore, setPassingScore] = useState(String(examSettings.defaultPassingScore));
@@ -52,7 +54,11 @@ export default function SessionSettingsScreen() {
     const ps = parseInt(passingScore, 10);
     const rt = parseInt(restTime, 10);
 
+    const fmd = parseInt(freeMaxDiff, 10);
+    const pl = parseInt(premiumLimit, 10);
     if (isNaN(fl) || fl < 5 || fl > 200) { Alert.alert('שגיאה', 'מגבלת שאלות חינמי: 5-200'); return; }
+    if (isNaN(fmd) || fmd < 1 || fmd > 10) { Alert.alert('שגיאה', 'קושי מקסימלי לחינמי: 1-10'); return; }
+    if (isNaN(pl) || pl < 1) { Alert.alert('שגיאה', 'מגבלת שאלות פרמיום חייבת להיות מספר חיובי'); return; }
     if (isNaN(ss) || ss < 10 || ss > 300) { Alert.alert('שגיאה', 'זמן מהירות: 10-300 שניות'); return; }
     if (isNaN(aa) || aa < 0 || aa > 30) { Alert.alert('שגיאה', 'קידום אוטומטי: 0-30 שניות (0 = כבוי)'); return; }
     if (isNaN(ps) || ps < 0 || ps > 100) { Alert.alert('שגיאה', 'ציון עובר: 0-100'); return; }
@@ -66,6 +72,8 @@ export default function SessionSettingsScreen() {
       shuffleAnswerOptions: shuffleOpts,
       showTimerAlways: showTimerAlways,
       premiumOnlyModes: premiumModes,
+      freeUserMaxDifficulty: fmd,
+      premiumUserQuestionLimit: pl,
     });
     setExamSettings({
       defaultPassingScore: ps,
@@ -92,12 +100,29 @@ export default function SessionSettingsScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Free Practice */}
-        <SectionHeader title="תרגול חופשי" />
+        {/* Free vs Premium tiers */}
+        <SectionHeader title="🆓 משתמשים חינמיים" />
         <View style={styles.card}>
-          <RowInput label="שאלות מקסימום (חינמי)" value={freeLimit} onChange={setFreeLimit} suffix="שאלות" hint="5-200" />
+          <RowInput label="מקסימום שאלות לסשן" value={freeLimit} onChange={setFreeLimit} suffix="שאלות" hint="5–200" />
           <Div />
-          <RowInput label="שניות לשאלה (מצב מהירות)" value={speedSecs} onChange={setSpeedSecs} suffix="שניות" hint="10-300" />
+          <RowInput label="רמת קושי מקסימלית" value={freeMaxDiff} onChange={setFreeMaxDiff} suffix="/10" hint="1–10" />
+        </View>
+
+        <SectionHeader title="💎 משתמשי פרמיום" />
+        <View style={styles.card}>
+          <RowInput label="מקסימום שאלות לסשן" value={premiumLimit} onChange={setPremiumLimit} suffix="שאלות" hint="999=ללא הגבלה" />
+          <Div />
+          <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
+            <Text style={{ fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', lineHeight: 18 }}>
+              💡 פרמיום מקבל גישה לכל הנושאים והמצבים שאינם נעולים לחינמיים. הגדר נושאים פרמיום בניהול נושאים.
+            </Text>
+          </View>
+        </View>
+
+        {/* Session speed */}
+        <SectionHeader title="⚡ מצב מהירות" />
+        <View style={styles.card}>
+          <RowInput label="שניות לשאלה" value={speedSecs} onChange={setSpeedSecs} suffix="שניות" hint="10–300" />
         </View>
 
         {/* Display */}
