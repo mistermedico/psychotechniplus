@@ -40,8 +40,8 @@ export default function PracticeSession() {
     nextQuestion, endSession, getCurrentQuestion,
   } = usePracticeStore();
 
-  const { updateElo, recordSession, getTopicElo, topicElos } = useUserStore();
-  const { templates, questions: adminQuestions } = useAdminStore();
+  const { updateElo, recordSession, getTopicElo, topicElos, userId, name: userName } = useUserStore();
+  const { templates, questions: adminQuestions, practiceSettings, addSessionRecord } = useAdminStore();
 
   const {
     showTimerInPractice,
@@ -53,7 +53,7 @@ export default function PracticeSession() {
   const [revealed, setRevealed] = useState(false);
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [timer, setTimer] = useState(SPEED_LIMIT);
+  const [timer, setTimer] = useState(practiceSettings.speedModeSecondsPerQuestion);
   const [isFinished, setIsFinished] = useState(false);
 
   // Favorite & note features
@@ -144,7 +144,7 @@ export default function PracticeSession() {
   // Speed mode timer (only in speed mode — showTimerInPractice shows timer but doesn't auto-skip)
   useEffect(() => {
     if (!isSpeedMode || revealed) return;
-    setTimer(SPEED_LIMIT);
+    setTimer(practiceSettings.speedModeSecondsPerQuestion);
     timerRef.current = setInterval(() => {
       setTimer(prev => {
         if (prev <= 1) {
@@ -289,6 +289,35 @@ export default function PracticeSession() {
     if (!finished) return;
     const scores = calcAllScores(finished.answers);
     const correct = finished.answers.filter(a => a.isCorrect).length;
+
+    // Save session record to Supabase and admin store
+    const template = isSimulation ? templates.find(t => t.id === templateId) : undefined;
+    const sessionRec = {
+      id: finished.id,
+      userId: userId ?? `anon_${Date.now()}`,
+      userName: userName || undefined,
+      targetId: targetId ?? '',
+      topicId: topicId ?? '',
+      mode: mode ?? 'practice',
+      templateId: templateId ?? undefined,
+      templateName: template?.name ?? undefined,
+      totalQuestions: finished.answers.length,
+      correctAnswers: correct,
+      skippedQuestions: finished.answers.filter((a: any) => a.isSkipped).length,
+      score: scores.score,
+      timeSpentSeconds: finished.answers.reduce((s: number, a: any) => s + a.timeSpent, 0),
+      startedAt: finished.startedAt.toISOString(),
+      completedAt: new Date().toISOString(),
+      answers: finished.answers.map((a: any) => ({
+        questionId: a.questionId,
+        isCorrect: a.isCorrect,
+        isSkipped: a.isSkipped ?? false,
+        timeSpent: a.timeSpent,
+        difficulty: a.questionDifficulty ?? 5,
+      })),
+    };
+    addSessionRecord(sessionRec);
+
     recordSession(correct, finished.answers.filter(a => !a.isSkipped).length);
 
     router.replace({
