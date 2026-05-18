@@ -124,6 +124,38 @@ export interface SimulationRule {
   useAdaptive: boolean;
 }
 
+export interface SubRule {
+  type: 'subcategory' | 'questionType';
+  value: string;
+  count: number;
+}
+
+export interface ExamCondition {
+  type: 'correctStreak' | 'incorrectStreak' | 'timeSpent';
+  operator: 'greaterThan' | 'lessThan' | 'equals';
+  value: number;
+}
+
+export interface ExcludeRule {
+  type: 'difficulty' | 'questionIds';
+  minDifficulty: number;
+  maxDifficulty: number;
+  ids?: string[];
+}
+
+export interface SmartRule {
+  id: string;
+  name: string;
+  topicId: string;
+  count: number;
+  minDifficulty: number;
+  maxDifficulty: number;
+  useAdaptiveAlgorithm: boolean;
+  subRules: SubRule[];
+  conditions: ExamCondition[];
+  fallback: { type: 'nextRule' | 'anyTopic' | 'skip' };
+}
+
 export interface SmartExamTemplate {
   id: string;
   name: string;
@@ -132,6 +164,12 @@ export interface SmartExamTemplate {
   totalQuestions: number;
   timeLimitMinutes: number;
   rules: SimulationRule[];
+  // Extended smart exam fields
+  smartRules?: SmartRule[];
+  topicTimeSettings?: Record<string, number>;
+  excludeRules?: ExcludeRule[];
+  restTimeBetweenRules?: number;
+  restScreenMessage?: string;
   passingScore: number;
   createdAt: Date;
   isActive: boolean;
@@ -153,6 +191,7 @@ interface AdminStats {
 
 interface AdminState {
   isAdmin: boolean;
+  freePracticeLimit: number;
   questions: Question[];
   topics: Topic[];
   targets: Target[];
@@ -161,6 +200,7 @@ interface AdminState {
 
   // Actions — auth
   setIsAdmin: (val: boolean) => void;
+  setFreePracticeLimit: (n: number) => void;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
 
@@ -234,6 +274,7 @@ const SEED_TEMPLATES: SmartExamTemplate[] = [
 
 export const useAdminStore = create<AdminState>((set, get) => ({
   isAdmin: false,
+  freePracticeLimit: 30,
   questions: [...QUESTIONS, ...PENDING_SEED],
   topics: [...TOPICS],
   targets: [...TARGETS],
@@ -241,6 +282,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   selectedQuestionIds: [],
 
   setIsAdmin: (val) => set({ isAdmin: val }),
+  setFreePracticeLimit: (n) => set({ freePracticeLimit: Math.max(5, Math.min(200, n)) }),
 
   login: async (email, password) => {
     // Try sign in first

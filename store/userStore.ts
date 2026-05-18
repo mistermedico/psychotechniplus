@@ -31,6 +31,7 @@ interface UserState {
   totalSessions: number;
   totalCorrect: number;
   totalAnswered: number;
+  isPremium: boolean;
 
   // Auth + Supabase sync
   isLoaded: boolean;
@@ -66,6 +67,7 @@ const INITIAL_STATE = {
   totalSessions: 0,
   totalCorrect: 0,
   totalAnswered: 0,
+  isPremium: false,
   isLoaded: false,
   isSyncing: false,
   isAuthenticated: false,

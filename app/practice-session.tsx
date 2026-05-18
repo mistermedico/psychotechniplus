@@ -9,8 +9,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { usePracticeStore } from '../store/practiceStore';
 import { useUserStore } from '../store/userStore';
+import { useAdminStore } from '../store/adminStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { getTopicById, getTargetById } from '../data/mockData';
+import { getTopicById, getTargetById, TOPICS } from '../data/mockData';
 import { fetchQuestions } from '../lib/db';
 import { QuestionCard } from '../components/QuestionCard';
 import { ProgressBar } from '../components/ProgressBar';
@@ -18,15 +19,18 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { calcAllScores } from '../utils/scoring';
 import { SessionMode } from '../data/types';
+import { generateSmartExamQuestions, GeneratedExamSection } from '../utils/smartExam';
 
 const { width: W } = Dimensions.get('window');
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 export default function PracticeSession() {
-  const { topicId, targetId, mode } = useLocalSearchParams<{
+  const { topicId, targetId, mode, templateId, questionLimit } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
     mode?: SessionMode;
+    templateId?: string;
+    questionLimit?: string;
   }>();
 
   const insets = useSafeAreaInsets();
@@ -36,7 +40,8 @@ export default function PracticeSession() {
     nextQuestion, endSession, getCurrentQuestion,
   } = usePracticeStore();
 
-  const { updateElo, recordSession, getTopicElo } = useUserStore();
+  const { updateElo, recordSession, getTopicElo, topicElos } = useUserStore();
+  const { templates, questions: adminQuestions } = useAdminStore();
 
   const {
     showTimerInPractice,
@@ -51,6 +56,14 @@ export default function PracticeSession() {
   const [timer, setTimer] = useState(SPEED_LIMIT);
   const [isFinished, setIsFinished] = useState(false);
 
+  // Simulation state
+  const [examSections, setExamSections] = useState<GeneratedExamSection[]>([]);
+  const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
+  const [showRestScreen, setShowRestScreen] = useState(false);
+  const [restCountdown, setRestCountdown] = useState(0);
+  const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isSimulation = mode === 'simulation' && !!templateId;
+
   const explanationAnim = useRef(new Animated.Value(0)).current;
   const resultAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -63,9 +76,44 @@ export default function PracticeSession() {
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice)
   const showTimer = isSpeedMode || showTimerInPractice;
 
-  // Initialize session — loads from Supabase (falls back to mock data)
+  // Initialize session — simulation mode or free practice
   useEffect(() => {
     let cancelled = false;
+
+    if (isSimulation && templateId) {
+      // SIMULATION MODE: generate questions from template
+      const template = templates.find(t => t.id === templateId);
+      if (!template) {
+        Alert.alert('שגיאה', 'תבנית המבחן לא נמצאה');
+        router.back();
+        return;
+      }
+      const userElos: Record<string, number> = {};
+      Object.entries(topicElos).forEach(([tid, data]) => {
+        userElos[tid] = (data as any).elo ?? 1200;
+      });
+      const generated = generateSmartExamQuestions(
+        template, adminQuestions.filter(q => q.validationStatus === 'validated'), userElos
+      );
+      if (generated.allQuestions.length === 0) {
+        Alert.alert('שגיאה', 'לא נמצאו שאלות מתאימות למבחן זה. נסה לאמת שאלות קודם.');
+        router.back();
+        return;
+      }
+      setExamSections(generated.sections);
+      // Start with first section's questions
+      const firstSection = generated.sections[0];
+      startSession({
+        targetId: targetId ?? '',
+        topicId: firstSection?.topicId ?? topicId ?? '',
+        mode: 'simulation',
+        questions: generated.allQuestions,
+      });
+      return () => { cancelled = true; };
+    }
+
+    // FREE PRACTICE MODE
+    const limit = questionLimit ? parseInt(questionLimit) : 10;
     fetchQuestions({ topicId: topicId ?? '' }).then(questions => {
       if (cancelled) return;
       if (questions.length === 0) {
@@ -77,7 +125,7 @@ export default function PracticeSession() {
         targetId: targetId ?? '',
         topicId: topicId ?? '',
         mode: mode ?? 'practice',
-        questions: questions.slice(0, 10),
+        questions: questions.slice(0, limit),
       });
     });
     return () => {
@@ -199,7 +247,35 @@ export default function PracticeSession() {
 
   const advanceOrEnd = () => {
     const hasMore = nextQuestion();
-    if (!hasMore) finishSession();
+    if (!hasMore) {
+      // In simulation: check if there are more sections
+      if (isSimulation && examSections.length > 1) {
+        const nextSectionIdx = currentSectionIdx + 1;
+        if (nextSectionIdx < examSections.length) {
+          // Show rest screen between sections
+          const template = templates.find(t => t.id === templateId);
+          const restTime = template?.restTimeBetweenRules ?? 0;
+          if (restTime > 0) {
+            setShowRestScreen(true);
+            setRestCountdown(restTime);
+            let t = restTime;
+            restTimerRef.current = setInterval(() => {
+              t--;
+              setRestCountdown(t);
+              if (t <= 0) {
+                if (restTimerRef.current) clearInterval(restTimerRef.current);
+                setShowRestScreen(false);
+                setCurrentSectionIdx(nextSectionIdx);
+              }
+            }, 1000);
+          } else {
+            setCurrentSectionIdx(nextSectionIdx);
+          }
+          return;
+        }
+      }
+      finishSession();
+    }
   };
 
   const finishSession = () => {
@@ -241,11 +317,49 @@ export default function PracticeSession() {
     ]);
   };
 
+  // REST SCREEN between simulation sections
+  if (showRestScreen) {
+    const template = templates.find(t => t.id === templateId);
+    const nextSection = examSections[currentSectionIdx + 1];
+    const nextTopic = nextSection ? TOPICS.find(t => t.id === nextSection.topicId) : null;
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.restScreen}>
+          <Text style={styles.restIcon}>😴</Text>
+          <Text style={styles.restTitle}>
+            {template?.restScreenMessage ?? 'כל הכבוד! מנוחה קצרה לפני החלק הבא'}
+          </Text>
+          {nextTopic && (
+            <Text style={styles.restNext}>
+              החלק הבא: {nextTopic.icon} {nextTopic.name}
+            </Text>
+          )}
+          <View style={styles.restCountdownWrap}>
+            <Text style={styles.restCountdown}>{restCountdown}</Text>
+            <Text style={styles.restCountdownLabel}>שניות</Text>
+          </View>
+          <Pressable
+            onPress={() => {
+              if (restTimerRef.current) clearInterval(restTimerRef.current);
+              setShowRestScreen(false);
+              setCurrentSectionIdx(prev => prev + 1);
+            }}
+            style={styles.restSkipBtn}
+          >
+            <Text style={styles.restSkipText}>דלג על המנוחה ←</Text>
+          </Pressable>
+        </LinearGradient>
+      </SafeAreaView>
+    );
+  }
+
   if (!session) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.loading}>
-          <Text style={styles.loadingText}>טוען שאלות...</Text>
+          <Text style={styles.loadingText}>
+            {isSimulation ? 'בונה מבחן חכם...' : 'טוען שאלות...'}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -272,7 +386,11 @@ export default function PracticeSession() {
         </Pressable>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTopic}>{topic?.name ?? 'תרגול'}</Text>
+          <Text style={styles.headerTopic}>
+            {isSimulation && examSections.length > 1
+              ? `${examSections[currentSectionIdx] ? TOPICS.find(t => t.id === examSections[currentSectionIdx].topicId)?.name ?? 'תרגול' : 'תרגול'} (חלק ${currentSectionIdx + 1}/${examSections.length})`
+              : (topic?.name ?? 'תרגול')}
+          </Text>
           <Text style={styles.headerProgress}>
             {session.currentIndex + 1} / {session.questions.length}
             {'  '}✅ {correct}
@@ -419,6 +537,17 @@ const styles = StyleSheet.create({
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: Colors.textSecondary },
+
+  // Rest screen between simulation sections
+  restScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  restIcon: { fontSize: 64, marginBottom: 20 },
+  restTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: '#fff', textAlign: 'center', lineHeight: 30, marginBottom: 12 },
+  restNext: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: '#94A3B8', textAlign: 'center', marginBottom: 32 },
+  restCountdownWrap: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 24, borderWidth: 2, borderColor: Colors.primary },
+  restCountdown: { fontFamily: FontFamily.heading, fontSize: 42, color: Colors.primary },
+  restCountdownLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8' },
+  restSkipBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: Radius.lg, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  restSkipText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#fff' },
 
   header: {
     flexDirection: 'row-reverse',
