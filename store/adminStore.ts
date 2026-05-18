@@ -370,6 +370,31 @@ export interface AdminActivityLog {
   category: 'question' | 'user' | 'promo' | 'notification' | 'system';
 }
 
+// ── AI Generation Sessions ─────────────────────────────────────────────────
+export interface GenerationSession {
+  id: string;
+  createdAt: string;
+  topicId: string;
+  topicName: string;
+  questionType: string;
+  difficulty: number;
+  count: number;
+  customPrompt: string;
+  savedCount: number;
+  discardedCount: number;
+}
+
+// ── AI Generation Presets ──────────────────────────────────────────────────
+export interface GenerationPreset {
+  id: string;
+  name: string;
+  topicId: string;
+  questionType: string;
+  difficulty: number;
+  count: number;
+  customPrompt: string;
+}
+
 // ── Seed data ──────────────────────────────────────────────────────────────
 const SEED_PROMO_CODES: PromoCode[] = [
   {
@@ -469,6 +494,66 @@ const SEED_ACTIVITY_LOG: AdminActivityLog[] = [
   { id: 'log_008', action: 'הפעיל מצב תחזוקה לבדיקה', timestamp: '2025-05-15T09:30:00Z', category: 'system' },
 ];
 
+const SEED_GENERATION_SESSIONS: GenerationSession[] = [
+  {
+    id: 'gen_001',
+    createdAt: '2025-05-17T14:22:00Z',
+    topicId: 'topic_quantitative',
+    topicName: 'כמותי',
+    questionType: 'quantitative',
+    difficulty: 6,
+    count: 10,
+    customPrompt: 'שאלות הסתברות עם תנאי',
+    savedCount: 8,
+    discardedCount: 2,
+  },
+  {
+    id: 'gen_002',
+    createdAt: '2025-05-16T10:05:00Z',
+    topicId: 'topic_verbal',
+    topicName: 'מילולי',
+    questionType: 'verbal',
+    difficulty: 5,
+    count: 5,
+    customPrompt: '',
+    savedCount: 5,
+    discardedCount: 0,
+  },
+  {
+    id: 'gen_003',
+    createdAt: '2025-05-15T09:30:00Z',
+    topicId: 'topic_logic',
+    topicName: 'היגיון',
+    questionType: 'logic',
+    difficulty: 7,
+    count: 3,
+    customPrompt: 'סדרות מספריות מורכבות',
+    savedCount: 1,
+    discardedCount: 2,
+  },
+];
+
+const SEED_GENERATION_PRESETS: GenerationPreset[] = [
+  {
+    id: 'preset_001',
+    name: 'כמותי קשה',
+    topicId: 'topic_quantitative',
+    questionType: 'quantitative',
+    difficulty: 8,
+    count: 5,
+    customPrompt: 'שאלות אלגברה ואנליזה ברמה גבוהה',
+  },
+  {
+    id: 'preset_002',
+    name: 'מילולי — אנלוגיות',
+    topicId: 'topic_verbal',
+    questionType: 'verbal',
+    difficulty: 5,
+    count: 10,
+    customPrompt: 'שאלות אנלוגיה בלבד',
+  },
+];
+
 interface AdminState {
   isAdmin: boolean;
   freePracticeLimit: number;
@@ -559,6 +644,13 @@ interface AdminState {
   // Actions — activity log
   logActivity: (action: string, category: AdminActivityLog['category']) => void;
 
+  // AI Generation sessions + presets
+  generationSessions: GenerationSession[];
+  generationPresets: GenerationPreset[];
+  addGenerationSession: (s: Omit<GenerationSession, 'id' | 'createdAt'>) => void;
+  addGenerationPreset: (p: Omit<GenerationPreset, 'id'>) => GenerationPreset;
+  deleteGenerationPreset: (id: string) => void;
+
   // Supabase sync
   loadQuestionsFromSupabase: () => Promise<void>;
   seedToSupabase: () => Promise<{ ok: boolean; message: string }>;
@@ -621,6 +713,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   pushNotifications: SEED_PUSH_NOTIFICATIONS,
   revenueSnapshots: SEED_REVENUE_SNAPSHOTS,
   activityLog: SEED_ACTIVITY_LOG,
+  generationSessions: SEED_GENERATION_SESSIONS,
+  generationPresets: SEED_GENERATION_PRESETS,
 
   setAppConfig: (updates) =>
     set(s => ({ appConfig: { ...s.appConfig, ...updates } })),
@@ -959,6 +1053,30 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       ),
     }));
     if (notif) get().logActivity(`שלח הודעת Push לכלל המשתמשים: ${notif.title}`, 'notification');
+  },
+
+  addGenerationSession: (s) => {
+    const newSession: GenerationSession = {
+      ...s,
+      id: `gen_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: new Date().toISOString(),
+    };
+    set(state => ({
+      generationSessions: [newSession, ...state.generationSessions].slice(0, 20),
+    }));
+  },
+
+  addGenerationPreset: (p) => {
+    const newPreset: GenerationPreset = {
+      ...p,
+      id: `preset_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    };
+    set(state => ({ generationPresets: [...state.generationPresets, newPreset] }));
+    return newPreset;
+  },
+
+  deleteGenerationPreset: (id) => {
+    set(state => ({ generationPresets: state.generationPresets.filter(p => p.id !== id) }));
   },
 
   getStats: () => {
