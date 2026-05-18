@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Alert, Switch,
@@ -12,120 +12,208 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 export default function SimulationBuilder() {
-  const { templates, addTemplate, updateTemplate, deleteTemplate } = useAdminStore();
+  const { templates, addTemplate, updateTemplate, deleteTemplate, questions } = useAdminStore();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [search, setSearch] = useState('');
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [targetId, setTargetId] = useState(TARGETS[0]?.id ?? '');
   const [timeLimitMinutes, setTimeLimitMinutes] = useState('45');
   const [passingScore, setPassingScore] = useState('65');
+  const [isActive, setIsActive] = useState(true);
   const [rules, setRules] = useState<SimulationRule[]>([]);
+  const [customCounts, setCustomCounts] = useState<Record<string, string>>({});
+
+  const markDirty = () => setIsDirty(true);
 
   const resetForm = () => {
-    setName('');
-    setDescription('');
+    setName(''); setDescription('');
     setTargetId(TARGETS[0]?.id ?? '');
-    setTimeLimitMinutes('45');
-    setPassingScore('65');
-    setRules([]);
-    setEditId(null);
+    setTimeLimitMinutes('45'); setPassingScore('65');
+    setIsActive(true); setRules([]);
+    setEditId(null); setIsDirty(false);
+    setCustomCounts({});
   };
 
-  const openNew = () => {
-    resetForm();
-    setShowForm(true);
-  };
+  const openNew = () => { resetForm(); setShowForm(true); };
 
   const openEdit = (t: SmartExamTemplate) => {
-    setName(t.name);
-    setDescription(t.description);
+    setName(t.name); setDescription(t.description);
     setTargetId(t.targetId);
     setTimeLimitMinutes(String(t.timeLimitMinutes));
     setPassingScore(String(t.passingScore));
-    setRules([...t.rules]);
-    setEditId(t.id);
-    setShowForm(true);
+    setIsActive(t.isActive); setRules([...t.rules]);
+    setEditId(t.id); setIsDirty(false); setShowForm(true);
+    setCustomCounts({});
+  };
+
+  const handleCancel = () => {
+    if (isDirty) {
+      Alert.alert('ביטול עריכה', 'יש שינויים שלא נשמרו. לבטל?', [
+        { text: 'המשך עריכה', style: 'cancel' },
+        { text: 'בטל', style: 'destructive', onPress: () => { setShowForm(false); resetForm(); } },
+      ]);
+    } else {
+      setShowForm(false); resetForm();
+    }
+  };
+
+  const cloneTemplate = (t: SmartExamTemplate) => {
+    const data = {
+      name: `${t.name} (עותק)`,
+      description: t.description,
+      targetId: t.targetId,
+      totalQuestions: t.totalQuestions,
+      timeLimitMinutes: t.timeLimitMinutes,
+      passingScore: t.passingScore,
+      rules: t.rules.map(r => ({ ...r, id: `rule_${Date.now()}_${Math.random().toString(36).slice(2,5)}` })),
+      isActive: false,
+    };
+    addTemplate(data);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert('שוכפל!', `"${t.name} (עותק)" נוצר`);
   };
 
   const addRule = () => {
-    const topic = TOPICS.find(t => !rules.map(r => r.topicId).includes(t.id));
-    if (!topic) return;
-    setRules(prev => [
-      ...prev,
-      {
-        id: `rule_${Date.now()}`,
-        topicId: topic.id,
-        count: 5,
-        minDifficulty: 3,
-        maxDifficulty: 7,
-        useAdaptive: false,
-      },
-    ]);
+    const usedTopics = new Set(rules.map(r => r.topicId));
+    const topic = TOPICS.find(t => !usedTopics.has(t.id));
+    if (!topic) {
+      Alert.alert('כל הנושאים כבר נוספו', 'לא ניתן להוסיף כלל נוסף - כל הנושאים כבר קיימים ברשימה');
+      return;
+    }
+    const newRule: SimulationRule = {
+      id: `rule_${Date.now()}`,
+      topicId: topic.id,
+      count: 5,
+      minDifficulty: 3,
+      maxDifficulty: 7,
+      useAdaptive: false,
+    };
+    setRules(prev => [...prev, newRule]);
+    markDirty();
   };
 
   const updateRule = (id: string, updates: Partial<SimulationRule>) => {
-    setRules(prev => prev.map(r => (r.id === id ? { ...r, ...updates } : r)));
+    setRules(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const merged = { ...r, ...updates };
+      // enforce min ≤ max
+      if (updates.minDifficulty !== undefined && merged.minDifficulty > merged.maxDifficulty) {
+        merged.maxDifficulty = merged.minDifficulty;
+      }
+      if (updates.maxDifficulty !== undefined && merged.maxDifficulty < merged.minDifficulty) {
+        merged.minDifficulty = merged.maxDifficulty;
+      }
+      return merged;
+    }));
+    markDirty();
+  };
+
+  const changeRuleTopic = (ruleId: string, newTopicId: string) => {
+    const alreadyUsed = rules.some(r => r.id !== ruleId && r.topicId === newTopicId);
+    if (alreadyUsed) {
+      Alert.alert('נושא כפול', 'נושא זה כבר קיים בכלל אחר. כל נושא יכול להופיע פעם אחת בלבד.');
+      return;
+    }
+    updateRule(ruleId, { topicId: newTopicId });
   };
 
   const removeRule = (id: string) => {
     setRules(prev => prev.filter(r => r.id !== id));
+    setCustomCounts(prev => { const c = { ...prev }; delete c[id]; return c; });
+    markDirty();
   };
 
   const totalQ = rules.reduce((s, r) => s + r.count, 0);
 
+  const questionsPerTopic = useMemo(() => {
+    const map: Record<string, number> = {};
+    questions.filter(q => q.validationStatus === 'validated').forEach(q => {
+      if (q.topicId) { map[q.topicId] = (map[q.topicId] ?? 0) + 1; }
+    });
+    return map;
+  }, [questions]);
+
   const handleSave = () => {
-    if (!name.trim()) { Alert.alert('שגיאה', 'נא להזין שם'); return; }
-    if (rules.length === 0) { Alert.alert('שגיאה', 'הוסף לפחות כלל אחד'); return; }
+    const trimName = name.trim();
+    if (!trimName) { Alert.alert('שגיאה', 'נא להזין שם לתבנית'); return; }
+    if (trimName.length < 3) { Alert.alert('שגיאה', 'שם חייב להכיל לפחות 3 תווים'); return; }
+    if (rules.length === 0) { Alert.alert('שגיאה', 'הוסף לפחות כלל שאלה אחד'); return; }
+
+    const time = parseInt(timeLimitMinutes) || 45;
+    const pass = parseInt(passingScore) || 65;
+    if (time < 5 || time > 300) { Alert.alert('שגיאה', 'זמן חייב להיות בין 5 ל-300 דקות'); return; }
+    if (pass < 0 || pass > 100) { Alert.alert('שגיאה', 'ציון מעבר חייב להיות בין 0 ל-100%'); return; }
 
     const data = {
-      name: name.trim(),
+      name: trimName,
       description: description.trim(),
       targetId,
       totalQuestions: totalQ,
-      timeLimitMinutes: parseInt(timeLimitMinutes) || 45,
-      passingScore: parseInt(passingScore) || 65,
+      timeLimitMinutes: time,
+      passingScore: pass,
+      isActive,
       rules,
-      isActive: true,
     };
 
     if (editId) {
       updateTemplate(editId, data);
-      Alert.alert('עודכן!', 'תבנית הסימולציה עודכנה');
+      Alert.alert('עודכן!', 'תבנית הסימולציה עודכנה בהצלחה');
     } else {
       addTemplate(data);
-      Alert.alert('נוסף!', 'תבנית הסימולציה נוצרה בהצלחה');
+      Alert.alert('נוצר!', 'תבנית הסימולציה נוצרה בהצלחה');
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowForm(false);
-    resetForm();
+    setShowForm(false); resetForm();
   };
+
+  const filteredTemplates = useMemo(() => {
+    if (!search.trim()) return templates;
+    const q = search.toLowerCase();
+    return templates.filter(t =>
+      t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)
+    );
+  }, [templates, search]);
 
   if (showForm) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
           <View style={styles.formHeader}>
             <Text style={styles.formTitle}>{editId ? '✏️ עריכת תבנית' : '🏗️ תבנית חדשה'}</Text>
-            <Pressable onPress={() => { setShowForm(false); resetForm(); }} style={styles.cancelBtn}>
+            <Pressable onPress={handleCancel} style={styles.cancelBtn}>
               <Text style={styles.cancelText}>ביטול</Text>
             </Pressable>
           </View>
 
           <FormSection title="📋 פרטי הסימולציה">
-            <Text style={styles.label}>שם התבנית</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} textAlign="right" placeholder="לדוגמה: סימולציה פסיכומטרית מלאה" placeholderTextColor={Colors.textTertiary} />
+            <Text style={styles.label}>שם התבנית *</Text>
+            <TextInput
+              style={styles.input} value={name}
+              onChangeText={v => { setName(v); markDirty(); }}
+              textAlign="right" placeholder="לדוגמה: סימולציה פסיכומטרית מלאה"
+              placeholderTextColor={Colors.textTertiary}
+            />
+            <Text style={styles.charCount}>{name.length} / 60</Text>
 
             <Text style={[styles.label, { marginTop: 12 }]}>תיאור</Text>
-            <TextInput style={[styles.input, { minHeight: 60 }]} value={description} onChangeText={setDescription} multiline textAlign="right" placeholder="תיאור קצר של הסימולציה" placeholderTextColor={Colors.textTertiary} textAlignVertical="top" />
+            <TextInput
+              style={[styles.input, { minHeight: 60 }]} value={description}
+              onChangeText={v => { setDescription(v); markDirty(); }}
+              multiline textAlign="right" placeholder="תיאור קצר של הסימולציה"
+              placeholderTextColor={Colors.textTertiary} textAlignVertical="top"
+            />
 
             <Text style={[styles.label, { marginTop: 12 }]}>מסלול</Text>
             <View style={styles.chipRow}>
               {TARGETS.filter(t => !t.comingSoon).map(t => (
                 <Pressable
                   key={t.id}
-                  onPress={() => setTargetId(t.id)}
+                  onPress={() => { setTargetId(t.id); markDirty(); }}
                   style={[styles.chip, targetId === t.id && { backgroundColor: t.color, borderColor: t.color }]}
                 >
                   <Text style={[styles.chipText, targetId === t.id && { color: '#fff' }]}>{t.icon} {t.name}</Text>
@@ -136,12 +224,29 @@ export default function SimulationBuilder() {
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>זמן (דקות)</Text>
-                <TextInput style={styles.input} value={timeLimitMinutes} onChangeText={setTimeLimitMinutes} keyboardType="number-pad" textAlign="right" />
+                <TextInput
+                  style={styles.input} value={timeLimitMinutes}
+                  onChangeText={v => { setTimeLimitMinutes(v); markDirty(); }}
+                  keyboardType="number-pad" textAlign="right"
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>ציון מעבר (%)</Text>
-                <TextInput style={styles.input} value={passingScore} onChangeText={setPassingScore} keyboardType="number-pad" textAlign="right" />
+                <TextInput
+                  style={styles.input} value={passingScore}
+                  onChangeText={v => { setPassingScore(v); markDirty(); }}
+                  keyboardType="number-pad" textAlign="right"
+                />
               </View>
+            </View>
+
+            <View style={[styles.switchRow, { marginTop: 12 }]}>
+              <Text style={styles.switchLabel}>תבנית פעילה</Text>
+              <Switch
+                value={isActive}
+                onValueChange={v => { setIsActive(v); markDirty(); }}
+                trackColor={{ true: Colors.success, false: Colors.border }}
+              />
             </View>
           </FormSection>
 
@@ -155,6 +260,8 @@ export default function SimulationBuilder() {
 
             {rules.map(rule => {
               const topic = TOPICS.find(t => t.id === rule.topicId);
+              const available = questionsPerTopic[rule.topicId] ?? 0;
+              const customVal = customCounts[rule.id] ?? '';
               return (
                 <View key={rule.id} style={styles.ruleCard}>
                   <View style={styles.ruleHeader}>
@@ -163,60 +270,96 @@ export default function SimulationBuilder() {
                     </Pressable>
                     <View style={styles.ruleHeaderRight}>
                       <Text style={styles.ruleTopicLabel}>{topic?.icon} {topic?.name}</Text>
+                      <Text style={styles.ruleAvail}>({available} שאלות זמינות)</Text>
                     </View>
                   </View>
 
-                  {/* Topic picker */}
+                  {/* Topic picker — exclude already-used topics */}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
                     <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
-                      {TOPICS.map(t => (
-                        <Pressable
-                          key={t.id}
-                          onPress={() => updateRule(rule.id, { topicId: t.id })}
-                          style={[styles.miniChip, rule.topicId === t.id && { backgroundColor: t.color }]}
-                        >
-                          <Text style={[styles.miniChipText, rule.topicId === t.id && { color: '#fff' }]}>
-                            {t.icon} {t.name}
-                          </Text>
-                        </Pressable>
-                      ))}
+                      {TOPICS.map(t => {
+                        const usedElsewhere = rules.some(r => r.id !== rule.id && r.topicId === t.id);
+                        return (
+                          <Pressable
+                            key={t.id}
+                            onPress={() => changeRuleTopic(rule.id, t.id)}
+                            style={[
+                              styles.miniChip,
+                              rule.topicId === t.id && { backgroundColor: t.color },
+                              usedElsewhere && { opacity: 0.35 },
+                            ]}
+                          >
+                            <Text style={[styles.miniChipText, rule.topicId === t.id && { color: '#fff' }]}>
+                              {t.icon} {t.name}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
                     </View>
                   </ScrollView>
 
-                  {/* Count */}
+                  {/* Count — presets + custom */}
                   <Text style={styles.ruleLabel}>כמות שאלות: {rule.count}</Text>
                   <View style={styles.ruleCountRow}>
                     {[3, 5, 8, 10, 15, 20].map(n => (
                       <Pressable
                         key={n}
-                        onPress={() => updateRule(rule.id, { count: n })}
-                        style={[styles.countChip, rule.count === n && { backgroundColor: Colors.primary }]}
+                        onPress={() => {
+                          updateRule(rule.id, { count: n });
+                          setCustomCounts(prev => { const c = { ...prev }; delete c[rule.id]; return c; });
+                        }}
+                        style={[styles.countChip, rule.count === n && !customCounts[rule.id] && { backgroundColor: Colors.primary }]}
                       >
-                        <Text style={[styles.countChipText, rule.count === n && { color: '#fff' }]}>{n}</Text>
+                        <Text style={[styles.countChipText, rule.count === n && !customCounts[rule.id] && { color: '#fff' }]}>{n}</Text>
                       </Pressable>
                     ))}
+                    <TextInput
+                      style={[styles.countInput, customCounts[rule.id] ? { borderColor: Colors.primary, color: Colors.primary } : {}]}
+                      value={customVal}
+                      onChangeText={v => {
+                        setCustomCounts(prev => ({ ...prev, [rule.id]: v }));
+                        const parsed = parseInt(v);
+                        if (!isNaN(parsed) && parsed > 0 && parsed <= 50) {
+                          updateRule(rule.id, { count: parsed });
+                        }
+                      }}
+                      keyboardType="number-pad"
+                      placeholder="אחר"
+                      placeholderTextColor={Colors.textTertiary}
+                      textAlign="center"
+                    />
                   </View>
 
-                  {/* Difficulty range */}
+                  {/* Difficulty range — full 1-10 with smart enforcement */}
                   <Text style={styles.ruleLabel}>קושי: {rule.minDifficulty} – {rule.maxDifficulty}</Text>
                   <View style={styles.diffRangeRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.diffRangeLabel}>מינימום</Text>
                       <View style={styles.diffBtns}>
-                        {[1, 2, 3, 4, 5].map(n => (
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                           <Pressable key={n} onPress={() => updateRule(rule.id, { minDifficulty: n })}
-                            style={[styles.diffSmall, rule.minDifficulty === n && { backgroundColor: Colors.success }]}>
+                            style={[
+                              styles.diffSmall,
+                              rule.minDifficulty === n && { backgroundColor: Colors.success },
+                              n > rule.maxDifficulty && { opacity: 0.3 },
+                            ]}>
                             <Text style={[styles.diffSmallText, rule.minDifficulty === n && { color: '#fff' }]}>{n}</Text>
                           </Pressable>
                         ))}
                       </View>
                     </View>
+                  </View>
+                  <View style={styles.diffRangeRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.diffRangeLabel}>מקסימום</Text>
                       <View style={styles.diffBtns}>
-                        {[6, 7, 8, 9, 10].map(n => (
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                           <Pressable key={n} onPress={() => updateRule(rule.id, { maxDifficulty: n })}
-                            style={[styles.diffSmall, rule.maxDifficulty === n && { backgroundColor: Colors.danger }]}>
+                            style={[
+                              styles.diffSmall,
+                              rule.maxDifficulty === n && { backgroundColor: Colors.danger },
+                              n < rule.minDifficulty && { opacity: 0.3 },
+                            ]}>
                             <Text style={[styles.diffSmallText, rule.maxDifficulty === n && { color: '#fff' }]}>{n}</Text>
                           </Pressable>
                         ))}
@@ -226,7 +369,7 @@ export default function SimulationBuilder() {
 
                   {/* Adaptive */}
                   <View style={styles.switchRow}>
-                    <Text style={styles.switchLabel}>הגרלה אדפטיבית</Text>
+                    <Text style={styles.switchLabel}>הגרלה אדפטיבית 🧠</Text>
                     <Switch
                       value={rule.useAdaptive}
                       onValueChange={v => updateRule(rule.id, { useAdaptive: v })}
@@ -239,10 +382,32 @@ export default function SimulationBuilder() {
 
             {rules.length === 0 && (
               <View style={styles.emptyRules}>
-                <Text style={styles.emptyRulesText}>לחץ "הוסף כלל" להגדרת שאלות</Text>
+                <Text style={styles.emptyRulesIcon}>📋</Text>
+                <Text style={styles.emptyRulesText}>לחץ "הוסף כלל" להגדרת שאלות לפי נושא</Text>
               </View>
             )}
           </FormSection>
+
+          {/* Summary preview */}
+          {rules.length > 0 && (
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryTitle}>📊 סיכום תבנית</Text>
+              <Text style={styles.summaryLine}>שאלות: {totalQ} | זמן: {timeLimitMinutes} דקות | מעבר: {passingScore}%</Text>
+              <Text style={styles.summaryLine}>
+                זמן ממוצע לשאלה: ~{totalQ > 0 ? Math.round((parseInt(timeLimitMinutes) || 45) * 60 / totalQ) : 0} שניות
+              </Text>
+              {rules.map(r => {
+                const t = TOPICS.find(x => x.id === r.topicId);
+                const avail = questionsPerTopic[r.topicId] ?? 0;
+                const shortage = r.count > avail;
+                return (
+                  <Text key={r.id} style={[styles.summaryLine, shortage && { color: Colors.danger }]}>
+                    {t?.icon} {t?.name}: {r.count} שאלות (ניתן: {avail}){shortage ? ' ⚠️ חסר' : ''}
+                  </Text>
+                );
+              })}
+            </View>
+          )}
 
           <Pressable onPress={handleSave} style={styles.saveBtn}>
             <LinearGradient colors={Colors.gradients.primary} style={styles.saveBtnGrad}>
@@ -268,21 +433,52 @@ export default function SimulationBuilder() {
           </Text>
         </LinearGradient>
 
+        {/* Stats row */}
+        <View style={styles.statsRow}>
+          <StatPill icon="📋" label="סה״כ תבניות" value={templates.length} />
+          <StatPill icon="✅" label="פעילות" value={templates.filter(t => t.isActive).length} />
+          <StatPill icon="⏸" label="מושבתות" value={templates.filter(t => !t.isActive).length} />
+        </View>
+
         <View style={styles.listHeader}>
-          <Text style={styles.listTitle}>תבניות קיימות ({templates.length})</Text>
+          <Text style={styles.listTitle}>תבניות קיימות</Text>
           <Pressable onPress={openNew} style={styles.newBtn}>
             <Text style={styles.newBtnText}>+ תבנית חדשה</Text>
           </Pressable>
         </View>
 
-        {templates.map(t => {
+        {/* Search */}
+        <View style={styles.searchWrap}>
+          <TextInput
+            style={styles.searchInput} value={search}
+            onChangeText={setSearch} textAlign="right"
+            placeholder="🔍 חיפוש תבנית..."
+            placeholderTextColor={Colors.textTertiary}
+          />
+          {search.length > 0 && (
+            <Pressable onPress={() => setSearch('')} style={styles.searchClear}>
+              <Text style={{ color: Colors.textSecondary }}>✕</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {filteredTemplates.length === 0 && (
+          <View style={styles.emptyRules}>
+            <Text style={styles.emptyRulesIcon}>🏗️</Text>
+            <Text style={styles.emptyRulesText}>
+              {search.length > 0 ? 'לא נמצאו תבניות' : 'לא קיימות תבניות עדיין. לחץ "+ תבנית חדשה"'}
+            </Text>
+          </View>
+        )}
+
+        {filteredTemplates.map(t => {
           const target = TARGETS.find(x => x.id === t.targetId);
           return (
             <View key={t.id} style={styles.templateCard}>
               <View style={styles.templateHeader}>
                 <View style={styles.templateMeta}>
                   <Text style={[styles.templateActive, { color: t.isActive ? Colors.success : Colors.danger }]}>
-                    {t.isActive ? '● פעיל' : '● לא פעיל'}
+                    {t.isActive ? '● פעיל' : '● מושבת'}
                   </Text>
                 </View>
                 <View style={styles.templateTitleWrap}>
@@ -296,7 +492,7 @@ export default function SimulationBuilder() {
               <View style={styles.templateStats}>
                 <StatPill icon="❓" label="שאלות" value={t.totalQuestions} />
                 <StatPill icon="⏱️" label="דקות" value={t.timeLimitMinutes} />
-                <StatPill icon="📊" label="מעבר %" value={t.passingScore} />
+                <StatPill icon="📊" label="מעבר%" value={t.passingScore} />
                 <StatPill icon="📋" label="כללים" value={t.rules.length} />
               </View>
 
@@ -304,10 +500,12 @@ export default function SimulationBuilder() {
               <View style={styles.rulesSummary}>
                 {t.rules.map(r => {
                   const topic = TOPICS.find(x => x.id === r.topicId);
+                  const avail = questionsPerTopic[r.topicId] ?? 0;
+                  const shortage = r.count > avail;
                   return (
-                    <Text key={r.id} style={styles.ruleSummaryText}>
+                    <Text key={r.id} style={[styles.ruleSummaryText, shortage && { color: Colors.warning }]}>
                       {topic?.icon} {topic?.name}: {r.count} שאלות (רמה {r.minDifficulty}-{r.maxDifficulty})
-                      {r.useAdaptive ? ' 🧠' : ''}
+                      {r.useAdaptive ? ' 🧠' : ''}{shortage ? ' ⚠️' : ''}
                     </Text>
                   );
                 })}
@@ -315,15 +513,19 @@ export default function SimulationBuilder() {
 
               <View style={styles.templateActions}>
                 <Pressable
-                  onPress={() => {
-                    Alert.alert('מחיקה', `למחוק את "${t.name}"?`, [
-                      { text: 'ביטול', style: 'cancel' },
-                      { text: 'מחק', style: 'destructive', onPress: () => deleteTemplate(t.id) },
-                    ]);
-                  }}
+                  onPress={() => Alert.alert('מחיקה', `למחוק את "${t.name}"?`, [
+                    { text: 'ביטול', style: 'cancel' },
+                    { text: 'מחק', style: 'destructive', onPress: () => deleteTemplate(t.id) },
+                  ])}
                   style={[styles.tAction, { backgroundColor: Colors.dangerLight }]}
                 >
                   <Text style={[styles.tActionText, { color: Colors.danger }]}>🗑️ מחק</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => cloneTemplate(t)}
+                  style={[styles.tAction, { backgroundColor: Colors.successLight }]}
+                >
+                  <Text style={[styles.tActionText, { color: Colors.success }]}>📋 שכפל</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => updateTemplate(t.id, { isActive: !t.isActive })}
@@ -376,7 +578,7 @@ const spStyles = StyleSheet.create({
   pill: { flex: 1, alignItems: 'center', backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 8 },
   icon: { fontSize: 14 },
   value: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
-  label: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
+  label: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'center' },
 });
 
 const styles = StyleSheet.create({
@@ -388,10 +590,16 @@ const styles = StyleSheet.create({
   heroTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
   heroDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.85)', textAlign: 'right', lineHeight: 20, marginTop: 6 },
 
-  listHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
+  statsRow: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+
+  listHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
   listTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text },
   newBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 8, ...Shadow.primary },
   newBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
+
+  searchWrap: { flexDirection: 'row-reverse', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
+  searchInput: { flex: 1, padding: 10, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text },
+  searchClear: { padding: 10 },
 
   templateCard: { backgroundColor: Colors.surface, marginHorizontal: 16, borderRadius: Radius.xl, padding: 16, marginBottom: 12, ...Shadow.md, borderWidth: 1, borderColor: Colors.border },
   templateHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 6 },
@@ -404,8 +612,8 @@ const styles = StyleSheet.create({
   templateStats: { flexDirection: 'row-reverse', gap: 6, marginBottom: 10 },
   rulesSummary: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 10, marginBottom: 10 },
   ruleSummaryText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', lineHeight: 18 },
-  templateActions: { flexDirection: 'row-reverse', gap: 8 },
-  tAction: { borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center' },
+  templateActions: { flexDirection: 'row-reverse', gap: 6, flexWrap: 'wrap' },
+  tAction: { borderRadius: Radius.lg, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center' },
   tActionText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs },
 
   // Form styles
@@ -415,6 +623,7 @@ const styles = StyleSheet.create({
   cancelText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
 
   label: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', marginBottom: 8 },
+  charCount: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'left', marginTop: 2 },
   input: {
     backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 12,
     fontFamily: FontFamily.regular, fontSize: FontSize.base, color: Colors.text,
@@ -424,6 +633,8 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full, backgroundColor: Colors.surfaceSecondary, borderWidth: 1.5, borderColor: Colors.border },
   chipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
   row: { flexDirection: 'row-reverse', gap: 12, marginTop: 12 },
+  switchRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  switchLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text },
 
   rulesHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   totalQ: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.primary },
@@ -432,26 +643,31 @@ const styles = StyleSheet.create({
 
   ruleCard: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: Colors.border },
   ruleHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 8 },
-  ruleHeaderRight: {},
+  ruleHeaderRight: { alignItems: 'flex-end' },
   ruleTopicLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text },
+  ruleAvail: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
   ruleLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginBottom: 6 },
-  ruleCountRow: { flexDirection: 'row-reverse', gap: 6, marginBottom: 10 },
+  ruleCountRow: { flexDirection: 'row-reverse', gap: 6, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' },
   countChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: Radius.full, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   countChipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
+  countInput: { width: 50, height: 32, borderRadius: Radius.lg, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, textAlign: 'center', fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.text, paddingHorizontal: 4 },
   diffRangeRow: { flexDirection: 'row-reverse', gap: 12, marginBottom: 8 },
   diffRangeLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginBottom: 4 },
-  diffBtns: { flexDirection: 'row-reverse', gap: 4 },
-  diffSmall: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
-  diffSmallText: { fontFamily: FontFamily.bold, fontSize: 11, color: Colors.textSecondary },
-  switchRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  switchLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text },
+  diffBtns: { flexDirection: 'row-reverse', gap: 4, flexWrap: 'wrap' },
+  diffSmall: { width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
+  diffSmallText: { fontFamily: FontFamily.bold, fontSize: 10, color: Colors.textSecondary },
   miniChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.full, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   miniChipText: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textSecondary },
 
-  emptyRules: { alignItems: 'center', padding: 20 },
-  emptyRulesText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textTertiary },
+  summaryBox: { backgroundColor: Colors.primaryLighter, borderRadius: Radius.xl, padding: 14, marginHorizontal: 0, marginBottom: 12, borderWidth: 1, borderColor: Colors.primaryLight },
+  summaryTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primary, textAlign: 'right', marginBottom: 6 },
+  summaryLine: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', lineHeight: 18 },
 
-  saveBtn: { marginHorizontal: 16, marginTop: 8, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
+  emptyRules: { alignItems: 'center', padding: 24 },
+  emptyRulesIcon: { fontSize: 36, marginBottom: 8 },
+  emptyRulesText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textTertiary, textAlign: 'center' },
+
+  saveBtn: { marginHorizontal: 0, marginTop: 8, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
   saveBtnGrad: { padding: 18, alignItems: 'center' },
   saveBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 });
