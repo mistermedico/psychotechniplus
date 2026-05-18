@@ -270,6 +270,46 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
 };
 
+export interface PremiumConfig {
+  premiumFeatures: {
+    speedMode: boolean;
+    streakMode: boolean;
+    simulations: boolean;
+    unlimitedQuestions: boolean;
+    adaptiveAlgorithm: boolean;
+    detailedAnalytics: boolean;
+    dailyChallenge: boolean;
+    allTopics: boolean;
+  };
+  freeUserDailyQuestionLimit: number;  // default: 30
+  freeUserMaxDifficulty: number;       // default: 6 (out of 10)
+  freeUserSessionLimit: number;        // default: 3 sessions/day
+  freePremiumTopics: string[];         // topic IDs accessible to free users (empty = all)
+  trialDays: number;                   // default: 7
+  paywallTitle: string;
+  paywallSubtitle: string;
+}
+
+export const DEFAULT_PREMIUM_CONFIG: PremiumConfig = {
+  premiumFeatures: {
+    speedMode: false,
+    streakMode: false,
+    simulations: true,
+    unlimitedQuestions: true,
+    adaptiveAlgorithm: true,
+    detailedAnalytics: true,
+    dailyChallenge: true,
+    allTopics: false,
+  },
+  freeUserDailyQuestionLimit: 30,
+  freeUserMaxDifficulty: 6,
+  freeUserSessionLimit: 3,
+  freePremiumTopics: [],
+  trialDays: 7,
+  paywallTitle: 'שדרג לפרמיום',
+  paywallSubtitle: 'קבל גישה מלאה לכל הכלים',
+};
+
 interface AdminStats {
   totalQuestions: number;
   validatedCount: number;

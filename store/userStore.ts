@@ -48,6 +48,7 @@ interface UserState {
   earnBadge: (type: BadgeType) => UserBadge;
   recordSession: (correct: number, total: number) => void;
   getTopicElo: (topicId: string) => number;
+  setPremium: (val: boolean) => void;
   reset: () => void;
 }
 
@@ -239,6 +240,8 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   getTopicElo: (topicId) => get().topicElos[topicId]?.elo ?? DEFAULT_ELO,
+
+  setPremium: (val) => set({ isPremium: val }),
 
   reset: () => {
     const { userId } = get();
