@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Alert, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
+import { useAdminStore } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -288,6 +289,10 @@ export default function UsersAdmin() {
               <Text style={[styles.actionBtnText, { color: Colors.danger }]}>🗑️ אפס כל ההתקדמות</Text>
             </Pressable>
           </View>
+
+          {/* Session History */}
+          <UserSessionHistory userId={u.id} />
+
         </ScrollView>
       </SafeAreaView>
     );
@@ -555,4 +560,181 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
   },
   actionBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base },
+});
+
+// ── Session History ────────────────────────────────────────────────────────
+
+function UserSessionHistory({ userId }: { userId: string }) {
+  const { sessionHistory, loadSessionHistory } = useAdminStore();
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const sessions = sessionHistory.filter(r => r.userId === userId);
+
+  useEffect(() => {
+    setLoading(true);
+    loadSessionHistory(userId).finally(() => setLoading(false));
+  }, [userId]);
+
+  const modeLabel = (mode: string) => {
+    const map: Record<string, string> = {
+      practice: 'תרגול', speed: 'מהירות ⚡', simulation: 'סימולציה 🏆',
+      review: 'חזרה', adaptive: 'אדפטיבי 🧠',
+    };
+    return map[mode] ?? mode;
+  };
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}ש׳`;
+  };
+
+  const formatDate = (iso: string) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      return `${d.getDate()}/${d.getMonth() + 1} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    } catch { return iso.slice(0, 10); }
+  };
+
+  return (
+    <View style={{ marginBottom: 24 }}>
+      <Text style={histStyles.title}>היסטוריית תרגול ({sessions.length})</Text>
+
+      {loading && sessions.length === 0 && (
+        <Text style={histStyles.loading}>טוען היסטוריה...</Text>
+      )}
+
+      {!loading && sessions.length === 0 && (
+        <View style={histStyles.empty}>
+          <Text style={histStyles.emptyText}>אין היסטוריה זמינה עדיין</Text>
+          <Text style={histStyles.emptyHint}>היסטוריה תיצבר מסשנים שיתבצעו מכאן ואילך</Text>
+        </View>
+      )}
+
+      {sessions.slice(0, 30).map(s => {
+        const accuracy = s.totalQuestions > 0
+          ? Math.round((s.correctAnswers / s.totalQuestions) * 100)
+          : 0;
+        const isOpen = expanded === s.id;
+        const scoreColor = accuracy >= 80 ? Colors.success : accuracy >= 60 ? Colors.warning : Colors.danger;
+        return (
+          <Pressable
+            key={s.id}
+            onPress={() => setExpanded(isOpen ? null : s.id)}
+            style={histStyles.sessionCard}
+          >
+            <View style={histStyles.sessionHeader}>
+              <View style={histStyles.sessionLeft}>
+                <Text style={histStyles.sessionMode}>{modeLabel(s.mode)}</Text>
+                {s.templateName ? (
+                  <Text style={histStyles.sessionTemplate} numberOfLines={1}>{s.templateName}</Text>
+                ) : null}
+                <Text style={histStyles.sessionDate}>{formatDate(s.completedAt)}</Text>
+              </View>
+              <View style={histStyles.sessionRight}>
+                <View style={[histStyles.scoreBadge, { backgroundColor: scoreColor + '25' }]}>
+                  <Text style={[histStyles.scoreText, { color: scoreColor }]}>{accuracy}%</Text>
+                </View>
+                <Text style={histStyles.sessionStats}>
+                  {s.correctAnswers}/{s.totalQuestions} ✓{'  '}{formatTime(s.timeSpentSeconds)}
+                </Text>
+                {s.skippedQuestions > 0 && (
+                  <Text style={histStyles.skipped}>{s.skippedQuestions} דולגו</Text>
+                )}
+              </View>
+            </View>
+
+            {isOpen && s.answers.length > 0 && (
+              <View style={histStyles.answersSection}>
+                <View style={histStyles.answersGrid}>
+                  {s.answers.map((a, idx) => (
+                    <View
+                      key={`${a.questionId}_${idx}`}
+                      style={[
+                        histStyles.answerDot,
+                        {
+                          backgroundColor: a.isSkipped
+                            ? Colors.textTertiary
+                            : a.isCorrect
+                            ? Colors.success
+                            : Colors.danger,
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+                <View style={histStyles.legendRow}>
+                  <View style={histStyles.legendItem}>
+                    <View style={[histStyles.legendDot, { backgroundColor: Colors.success }]} />
+                    <Text style={histStyles.legendText}>נכון</Text>
+                  </View>
+                  <View style={histStyles.legendItem}>
+                    <View style={[histStyles.legendDot, { backgroundColor: Colors.danger }]} />
+                    <Text style={histStyles.legendText}>שגוי</Text>
+                  </View>
+                  <View style={histStyles.legendItem}>
+                    <View style={[histStyles.legendDot, { backgroundColor: Colors.textTertiary }]} />
+                    <Text style={histStyles.legendText}>דולג</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const histStyles = StyleSheet.create({
+  title: {
+    fontFamily: FontFamily.heading, fontSize: FontSize.lg, color: Colors.text,
+    textAlign: 'right', marginBottom: 10, marginTop: 4,
+  },
+  loading: {
+    fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary,
+    textAlign: 'right', paddingVertical: 12,
+  },
+  empty: {
+    backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 16,
+    alignItems: 'flex-end', borderWidth: 1, borderColor: Colors.border,
+    marginBottom: 24,
+  },
+  emptyText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text },
+  emptyHint: {
+    fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary,
+    marginTop: 4, textAlign: 'right',
+  },
+  sessionCard: {
+    backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 12,
+    marginBottom: 8, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm,
+  },
+  sessionHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start' },
+  sessionLeft: { alignItems: 'flex-end', flex: 1, gap: 2 },
+  sessionRight: { alignItems: 'flex-end', gap: 3 },
+  sessionMode: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text },
+  sessionTemplate: {
+    fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.primary,
+    maxWidth: 160, textAlign: 'right',
+  },
+  sessionDate: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
+  scoreBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: Radius.full },
+  scoreText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
+  sessionStats: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary },
+  skipped: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.warning },
+
+  answersSection: {
+    marginTop: 10, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  answersGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 5 },
+  answerDot: { width: 13, height: 13, borderRadius: 7 },
+  legendRow: {
+    flexDirection: 'row-reverse', gap: 14, marginTop: 8,
+  },
+  legendItem: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
 });
