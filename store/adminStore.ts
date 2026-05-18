@@ -218,6 +218,58 @@ export const DEFAULT_EXAM_SETTINGS: ExamSessionSettings = {
 
 export type { SessionRecord };
 
+export interface AppConfig {
+  maintenanceMode: boolean;
+  announcementText: string;
+  announcementEnabled: boolean;
+  announcementLevel: 'info' | 'warning' | 'critical';
+  registrationOpen: boolean;
+  freeSessionsPerDay: number;
+  sessionCooldownMinutes: number;
+  leaderboardVisible: boolean;
+  featureFlags: {
+    speedMode: boolean;
+    streakMode: boolean;
+    simulations: boolean;
+    leaderboard: boolean;
+    socialSharing: boolean;
+    dailyChallenge: boolean;
+  };
+}
+
+export interface DailyChallenge {
+  id: string;
+  date: string; // YYYY-MM-DD
+  questionId: string;
+  title: string;
+  bonusXp: number;
+}
+
+export interface UserNote {
+  userId: string;
+  note: string;
+  updatedAt: string;
+}
+
+export const DEFAULT_APP_CONFIG: AppConfig = {
+  maintenanceMode: false,
+  announcementText: '',
+  announcementEnabled: false,
+  announcementLevel: 'info',
+  registrationOpen: true,
+  freeSessionsPerDay: 10,
+  sessionCooldownMinutes: 0,
+  leaderboardVisible: true,
+  featureFlags: {
+    speedMode: true,
+    streakMode: true,
+    simulations: true,
+    leaderboard: true,
+    socialSharing: false,
+    dailyChallenge: false,
+  },
+};
+
 interface AdminStats {
   totalQuestions: number;
   validatedCount: number;
@@ -243,6 +295,22 @@ interface AdminState {
   practiceSettings: PracticeSessionSettings;
   examSettings: ExamSessionSettings;
   sessionHistory: SessionRecord[];
+  appConfig: AppConfig;
+  dailyChallenges: DailyChallenge[];
+  userNotes: UserNote[];
+
+  // Actions — app config
+  setAppConfig: (updates: Partial<AppConfig>) => void;
+  setFeatureFlag: (flag: keyof AppConfig['featureFlags'], value: boolean) => void;
+
+  // Actions — daily challenges
+  addDailyChallenge: (challenge: Omit<DailyChallenge, 'id'>) => DailyChallenge;
+  updateDailyChallenge: (id: string, updates: Partial<Omit<DailyChallenge, 'id'>>) => void;
+  removeDailyChallenge: (id: string) => void;
+
+  // Actions — user notes
+  setUserNote: (userId: string, note: string) => void;
+  getUserNote: (userId: string) => string;
 
   // Actions — auth
   setIsAdmin: (val: boolean) => void;
@@ -340,6 +408,44 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   practiceSettings: DEFAULT_PRACTICE_SETTINGS,
   examSettings: DEFAULT_EXAM_SETTINGS,
   sessionHistory: [],
+  appConfig: DEFAULT_APP_CONFIG,
+  dailyChallenges: [],
+  userNotes: [],
+
+  setAppConfig: (updates) =>
+    set(s => ({ appConfig: { ...s.appConfig, ...updates } })),
+
+  setFeatureFlag: (flag, value) =>
+    set(s => ({
+      appConfig: {
+        ...s.appConfig,
+        featureFlags: { ...s.appConfig.featureFlags, [flag]: value },
+      },
+    })),
+
+  addDailyChallenge: (challenge) => {
+    const newC: DailyChallenge = { ...challenge, id: `dc_${Date.now()}` };
+    set(s => ({ dailyChallenges: [...s.dailyChallenges, newC] }));
+    return newC;
+  },
+
+  updateDailyChallenge: (id, updates) =>
+    set(s => ({
+      dailyChallenges: s.dailyChallenges.map(c => c.id === id ? { ...c, ...updates } : c),
+    })),
+
+  removeDailyChallenge: (id) =>
+    set(s => ({ dailyChallenges: s.dailyChallenges.filter(c => c.id !== id) })),
+
+  setUserNote: (userId, note) =>
+    set(s => ({
+      userNotes: [
+        ...s.userNotes.filter(n => n.userId !== userId),
+        { userId, note, updatedAt: new Date().toISOString() },
+      ],
+    })),
+
+  getUserNote: (userId) => get().userNotes.find(n => n.userId === userId)?.note ?? '',
 
   setIsAdmin: (val) => set({ isAdmin: val }),
   setFreePracticeLimit: (n) => set({ freePracticeLimit: Math.max(5, Math.min(200, n)) }),

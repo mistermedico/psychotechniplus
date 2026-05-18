@@ -25,6 +25,9 @@ const ADMIN_SECTIONS = [
   { id: 'users',               icon: '👥', label: 'ניהול משתמשים',     desc: 'צפייה, השהייה, שדרוג תוכניות',            color: '#0EA5E9',       gradient: ['#0EA5E9', '#0284C7'] as [string, string],        route: '/admin/users' },
   { id: 'question-assignment', icon: '🔗', label: 'שיוך שאלות',         desc: 'שייך שאלות לנושאים, מבחנים, גישה',        color: '#A855F7',       gradient: ['#A855F7', '#7C3AED'] as [string, string],        route: '/admin/question-assignment' },
   { id: 'topic-exam-map',      icon: '🗺️', label: 'מפת נושאים–מבחנים', desc: 'ניהול ויזואלי שיוכי נושא↔מבחן',           color: '#EC4899',       gradient: ['#EC4899', '#BE185D'] as [string, string],        route: '/admin/topic-exam-map' },
+  { id: 'app-control',         icon: '🎮', label: 'מרכז שליטה',         desc: 'תחזוקה, הכרזות, דגלי פיצ׳ר, מגבלות',     color: '#EF4444',       gradient: Colors.gradients.danger,                           route: '/admin/app-control' },
+  { id: 'daily-challenge',     icon: '🎯', label: 'אתגרים יומיים',       desc: 'ניהול שאלת אתגר יומית ובונוס XP',          color: '#F59E0B',       gradient: Colors.gradients.gold,                             route: '/admin/daily-challenge' },
+  { id: 'leaderboard-admin',   icon: '🏅', label: 'לוח מובילים',         desc: 'ניהול דירוג, הסרת משתמשים, איפוס',         color: '#0EA5E9',       gradient: ['#0EA5E9', '#0284C7'] as [string, string],        route: '/admin/leaderboard-admin' },
   { id: 'export',              icon: '📤', label: 'ייצוא שאלות',        desc: 'ייצוא מאגר השאלות כ-JSON',                 color: '#10B981',       gradient: Colors.gradients.success,                          route: '/admin/export' },
   { id: 'app-settings',        icon: '⚙️', label: 'הגדרות אפליקציה',   desc: 'תחזוקה, ניסיון, פרמטרים גלובליים',        color: '#6366F1',       gradient: ['#6366F1', '#4F46E5'] as [string, string],        route: '/admin/app-settings' },
 ];

@@ -123,6 +123,7 @@ const TOPIC_NAMES: Record<string, string> = {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function UsersAdmin() {
+  const { getUserNote, setUserNote } = useAdminStore();
   const [users, setUsers] = useState<MockUser[]>(INITIAL_USERS);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | UserStatus>('all');
@@ -289,6 +290,10 @@ export default function UsersAdmin() {
               <Text style={[styles.actionBtnText, { color: Colors.danger }]}>🗑️ אפס כל ההתקדמות</Text>
             </Pressable>
           </View>
+
+          {/* Admin note */}
+          <Text style={styles.sectionTitle}>📝 הערת מנהל</Text>
+          <NoteEditor userId={u.id} />
 
           {/* Session History */}
           <UserSessionHistory userId={u.id} />
@@ -560,6 +565,85 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
   },
   actionBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base },
+});
+
+// ── Note Editor ───────────────────────────────────────────────────────────
+
+function NoteEditor({ userId }: { userId: string }) {
+  const { getUserNote, setUserNote } = useAdminStore();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(getUserNote(userId));
+  const note = getUserNote(userId);
+
+  const handleSave = () => {
+    setUserNote(userId, draft.trim());
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setEditing(false);
+  };
+
+  return (
+    <View style={noteStyles.container}>
+      {editing ? (
+        <>
+          <TextInput
+            style={noteStyles.input}
+            value={draft}
+            onChangeText={setDraft}
+            multiline
+            textAlign="right"
+            textAlignVertical="top"
+            placeholder="כתוב הערה על המשתמש..."
+            placeholderTextColor={Colors.textTertiary}
+            numberOfLines={4}
+            autoFocus
+          />
+          <View style={noteStyles.btnRow}>
+            <Pressable onPress={() => setEditing(false)} style={noteStyles.cancelBtn}>
+              <Text style={noteStyles.cancelText}>ביטול</Text>
+            </Pressable>
+            <Pressable onPress={handleSave} style={noteStyles.saveBtn}>
+              <Text style={noteStyles.saveText}>שמור</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : (
+        <Pressable onPress={() => { setDraft(note); setEditing(true); }} style={noteStyles.noteDisplay}>
+          {note ? (
+            <Text style={noteStyles.noteText}>{note}</Text>
+          ) : (
+            <Text style={noteStyles.notePlaceholder}>לחץ להוספת הערה...</Text>
+          )}
+          <Text style={noteStyles.editHint}>✏️ עריכה</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+const noteStyles = StyleSheet.create({
+  container: { marginBottom: 24 },
+  noteDisplay: {
+    backgroundColor: Colors.surface, borderRadius: Radius.xl,
+    padding: 16, borderWidth: 1, borderColor: Colors.border,
+    flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10,
+    ...Shadow.sm,
+  },
+  noteText: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', lineHeight: 20 },
+  notePlaceholder: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textTertiary, textAlign: 'right' },
+  editHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
+  input: {
+    backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.primary,
+    padding: 14, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text,
+    minHeight: 100, marginBottom: 8,
+  },
+  btnRow: { flexDirection: 'row-reverse', gap: 10 },
+  cancelBtn: {
+    flex: 1, padding: 12, borderRadius: Radius.xl, alignItems: 'center',
+    backgroundColor: Colors.surfaceSecondary, borderWidth: 1, borderColor: Colors.border,
+  },
+  cancelText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.textSecondary },
+  saveBtn: { flex: 2, padding: 12, borderRadius: Radius.xl, alignItems: 'center', backgroundColor: Colors.primary },
+  saveText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 });
 
 // ── Session History ────────────────────────────────────────────────────────
