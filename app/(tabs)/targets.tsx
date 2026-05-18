@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Animated, RefreshControl, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { TARGETS, TOPICS } from '../../data/mockData';
@@ -70,6 +70,7 @@ function AnimatedTopicsContainer({
 }
 
 export default function TargetsTab() {
+  const insets = useSafeAreaInsets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { getTopicElo, totalSessions } = useUserStore();
@@ -100,7 +101,7 @@ export default function TargetsTab() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
         bounces={Platform.OS === 'ios'}
         decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   scroll: { flex: 1 },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
+  content: { padding: 16, gap: 12 },
 
   // Wrapper for TargetCard + overlays
   cardWrapper: {

@@ -4,7 +4,7 @@ import {
   TextInput, Alert, Modal, FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
@@ -50,6 +50,7 @@ export default function QuestionAssignmentScreen() {
 // ── Tab 1: Assign questions to topics ─────────────────────────────────────
 
 function TopicAssignmentTab() {
+  const insets = useSafeAreaInsets();
   const { questions, topics, assignQuestionsToTopic } = useAdminStore();
   const [sourceTopicId, setSourceTopicId] = useState<string>('');
   const [search, setSearch] = useState('');
@@ -188,9 +189,9 @@ function TopicAssignmentTab() {
       {/* Target topic modal */}
       <Modal visible={showTargetModal} transparent animationType="slide" onRequestClose={() => setShowTargetModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(20, insets.bottom) }]}>
             <Text style={styles.modalTitle}>בחר נושא יעד</Text>
-            <ScrollView>
+            <ScrollView keyboardShouldPersistTaps="handled">
               {topics.map(t => (
                 <Pressable key={t.id} onPress={() => handleAssign(t.id)} style={styles.modalOption}>
                   <View style={styles.modalOptionLeft}>
@@ -216,6 +217,7 @@ function TopicAssignmentTab() {
 // ── Tab 2: Assign questions to exam templates ──────────────────────────────
 
 function ExamAssignmentTab() {
+  const insets = useSafeAreaInsets();
   const {
     questions, topics, templates,
     pinQuestionToTemplate, unpinQuestionFromTemplate,
@@ -349,7 +351,7 @@ function ExamAssignmentTab() {
       {/* Topic rule modal */}
       <Modal visible={showTopicRuleModal} transparent animationType="slide" onRequestClose={() => setShowTopicRuleModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(20, insets.bottom) }]}>
             <Text style={styles.modalTitle}>הוסף נושא למבחן</Text>
             <Text style={styles.modalLabel}>בחר נושא:</Text>
             <ScrollView style={{ maxHeight: 160 }}>
@@ -394,7 +396,7 @@ function ExamAssignmentTab() {
       {/* Question picker modal */}
       <Modal visible={showQuestionPicker} transparent animationType="slide" onRequestClose={() => setShowQuestionPicker(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxHeight: '80%' }]}>
+          <View style={[styles.modalSheet, { maxHeight: '80%', paddingBottom: Math.max(20, insets.bottom) }]}>
             <Text style={styles.modalTitle}>הצמד שאלה למבחן</Text>
             <TextInput
               style={styles.searchBar}
@@ -434,6 +436,7 @@ function ExamAssignmentTab() {
 // ── Tab 3: Access control (free/premium per question) ─────────────────────
 
 function AccessControlTab() {
+  const insets = useSafeAreaInsets();
   const { questions, topics, setQuestionsAccessLevel, updateTopic } = useAdminStore();
   const [filterTopic, setFilterTopic] = useState('');
   const [filterAccess, setFilterAccess] = useState<'all' | 'free' | 'premium'>('all');

@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
@@ -37,6 +37,7 @@ const ALL_BADGES = Object.entries(BADGE_INFO).map(([type, info]) => ({ type, ...
 const DAY_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 
 export default function ProgressTab() {
+  const insets = useSafeAreaInsets();
   const {
     name, level, xp, streak, longestStreak,
     totalSessions, totalCorrect, totalAnswered,
@@ -97,7 +98,7 @@ export default function ProgressTab() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
         bounces={Platform.OS === 'ios'}
         decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
@@ -288,7 +289,7 @@ export default function ProgressTab() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  content: { padding: 20, paddingBottom: 100 },
+  content: { padding: 20 },
 
   // ── Empty state (no sessions) ─────────────────────────────────────────────
   emptyStateContainer: {

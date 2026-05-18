@@ -4,7 +4,7 @@ import {
   Alert, Modal, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, SimulationRule } from '../../store/adminStore';
@@ -12,6 +12,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 export default function TopicExamMapScreen() {
+  const insets = useSafeAreaInsets();
   const {
     topics, templates, questions,
     addTopicRuleToTemplate, removeTopicRuleFromTemplate,
@@ -189,7 +190,7 @@ export default function TopicExamMapScreen() {
       {/* Rule config modal */}
       <Modal visible={showRuleModal} transparent animationType="slide" onRequestClose={() => setShowRuleModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(24, insets.bottom) }]}>
             <Text style={styles.modalTitle}>הוסף שיוך</Text>
             <Text style={styles.modalSubtitle}>
               {pendingTopic?.icon} {pendingTopic?.name}  →  {pendingTemplate?.name}

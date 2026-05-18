@@ -4,7 +4,7 @@ import {
   Animated, Platform, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { TARGETS, TOPICS } from '../../data/mockData';
@@ -170,11 +170,12 @@ function FreePracticePane({
   isPremium: boolean; freePracticeLimit: number;
   canStart: boolean; onStart: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
         bounces={Platform.OS === 'ios'}
       >
@@ -278,7 +279,7 @@ function FreePracticePane({
       </ScrollView>
 
       {/* Sticky start button */}
-      <View style={styles.stickyBar}>
+      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <Pressable
           onPress={onStart}
           disabled={!canStart}
@@ -313,6 +314,7 @@ function SimulationsPane({
   onStart: (id: string) => void;
   isPremium: boolean;
 }) {
+  const insets = useSafeAreaInsets();
   if (templates.length === 0) {
     return (
       <View style={styles.emptySimulations}>
@@ -326,7 +328,7 @@ function SimulationsPane({
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingBottom: 40 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.simHeader}>
@@ -509,7 +511,7 @@ const styles = StyleSheet.create({
   stickyBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: Colors.glassStrong, borderTopWidth: 1, borderTopColor: Colors.border,
-    padding: 16, paddingBottom: Platform.OS === 'ios' ? 20 : 16,
+    padding: 16,
   },
   startBtn: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
   startBtnDisabled: { shadowOpacity: 0, elevation: 0 },

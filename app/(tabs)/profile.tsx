@@ -4,7 +4,7 @@ import {
   Alert, ActionSheetIOS, Platform, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
@@ -56,6 +56,7 @@ function AvatarWithRing({ emoji }: { emoji: string }) {
 }
 
 export default function ProfileTab() {
+  const insets = useSafeAreaInsets();
   const {
     name, level, xp, streak, selectedTargetId,
     totalSessions, totalCorrect, totalAnswered,
@@ -152,7 +153,7 @@ export default function ProfileTab() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
@@ -346,7 +347,7 @@ export default function ProfileTab() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  content: { paddingBottom: 40 },
+  content: {},
 
   profileHero: {
     padding: 24,
