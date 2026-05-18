@@ -125,7 +125,7 @@ export default function Dashboard() {
             </Animated.View>
             <View style={styles.heroGreeting}>
               <Text style={styles.heroName}>שלום, {name || 'מתאמן'}! 👋</Text>
-              <Text style={styles.heroTitle}>{title} · ELO {currentElo}</Text>
+              <Text style={styles.heroTitle}>{title}</Text>
             </View>
           </View>
 
@@ -239,14 +239,14 @@ export default function Dashboard() {
           </View>
         )}
 
-        {/* Target cards — horizontal scroll */}
-        <Text style={styles.sectionTitle}>המסלולים שלי</Text>
+        {/* Target card — only psychometric */}
+        <Text style={styles.sectionTitle}>המסלול שלי</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.targetsScroll}
         >
-          {TARGETS.filter(t => t.isActive).map(t => (
+          {TARGETS.filter(t => t.id === 'target_psychometric').map(t => (
             <View key={t.id} style={styles.targetCardWrap}>
               <TargetCard
                 target={t}

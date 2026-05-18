@@ -94,8 +94,8 @@ export default function TargetsTab() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>מסלולי הכנה</Text>
-        <Text style={styles.subtitle}>בחר מסלול להתחיל לתרגל</Text>
+        <Text style={styles.title}>הכנה לפסיכוטכני</Text>
+        <Text style={styles.subtitle}>בחר נושא ותרגל לפי רמה אישית</Text>
       </View>
 
       <ScrollView
@@ -112,7 +112,7 @@ export default function TargetsTab() {
           />
         }
       >
-        {TARGETS.map(target => {
+        {TARGETS.filter(t => t.id === 'target_psychometric').map(target => {
           const topics = TOPICS.filter(t => t.targetId === target.id);
           const avgElo = topics.length > 0
             ? topics.reduce((s, t) => s + getTopicElo(t.id), 0) / topics.length
@@ -174,7 +174,7 @@ export default function TargetsTab() {
                             <View style={styles.topicTextBlock}>
                               <Text style={styles.topicName}>{topic.name}</Text>
                               <Text style={styles.topicElo}>
-                                {eloToTitle(elo)} · ELO {elo}
+                                {eloToTitle(elo)}
                               </Text>
                               <View style={styles.topicProgressRow}>
                                 <View style={styles.topicProgressWrap}>

@@ -20,7 +20,8 @@ const hapticSuccess = () => Haptics.notificationAsync(Haptics.NotificationFeedba
 export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
-  const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
+  const psychometricTarget = TARGETS.find(t => t.id === 'target_psychometric') ?? TARGETS[0];
+  const [selectedTarget, setSelectedTarget] = useState<Target | null>(psychometricTarget);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const completeOnboarding = useUserStore(s => s.completeOnboarding);
@@ -136,7 +137,7 @@ function StepSelectTarget({
   onSelect: (t: Target) => void;
   onFinish: () => void;
 }) {
-  const activeTargets = TARGETS.filter(t => !t.comingSoon);
+  const activeTargets = TARGETS.filter(t => t.id === 'target_psychometric');
 
   return (
     <View style={styles.stepContainer}>

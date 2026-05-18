@@ -1,13 +1,14 @@
 import React, { useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Alert, ActionSheetIOS, Platform,
+  Alert, ActionSheetIOS, Platform, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
+import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
 import { TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -79,6 +80,14 @@ export default function ProfileTab() {
   const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const mainElo = getTopicElo('topic_quantitative');
+
+  const { isAdmin, setIsAdmin } = useAdminStore();
+  const email = useUserStore(s => s.email);
+  // Auto-grant admin access if email matches
+  React.useEffect(() => {
+    if (email.toLowerCase() === ADMIN_EMAIL && !isAdmin) setIsAdmin(true);
+  }, [email]);
+  const showAdmin = isAdmin || email.toLowerCase() === ADMIN_EMAIL;
 
   const avatarEmoji = ['🧠', '🎯', '🚀', '💎', '🌟'][Math.min(level - 1, 4)];
 
@@ -157,8 +166,6 @@ export default function ProfileTab() {
           <AvatarWithRing emoji={avatarEmoji} />
           <Text style={styles.profileName}>{name || 'מתאמן'}</Text>
           <Text style={styles.profileLevel}>רמה {level} · {eloToTitle(mainElo)}</Text>
-          {/* ELO prominently displayed */}
-          <Text style={styles.profileElo}>{mainElo} ELO</Text>
 
           <View style={styles.profileStats}>
             <View style={styles.profileStat}>
@@ -177,6 +184,23 @@ export default function ProfileTab() {
             </View>
           </View>
         </LinearGradient>
+
+        {/* Admin panel shortcut — only visible for admin user */}
+        {showAdmin && (
+          <Pressable
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/admin'); }}
+            style={({ pressed }) => [styles.adminCard, pressed && { opacity: 0.85 }]}
+          >
+            <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.adminCardGrad}>
+              <Text style={styles.adminCardArrow}>←</Text>
+              <View style={styles.adminCardText}>
+                <Text style={styles.adminCardTitle}>🛠️ פאנל ניהול</Text>
+                <Text style={styles.adminCardSub}>גישה מלאה לניהול המערכת</Text>
+              </View>
+              <Text style={styles.adminBadge}>מנהל</Text>
+            </LinearGradient>
+          </Pressable>
+        )}
 
         {/* Subscription card */}
         <View style={styles.subCard}>
@@ -235,7 +259,11 @@ export default function ProfileTab() {
             value="אוטומטי"
             onPress={() => {
               Haptics.selectionAsync();
-              Alert.alert('קושי', 'הקושי מחושב אוטומטית על בסיס ה-ELO שלך');
+              if (showAdmin) {
+                router.push('/admin/display-settings');
+              } else {
+                Alert.alert('קושי', 'הקושי מחושב אוטומטית על בסיס ה-ELO שלך');
+              }
             }}
           />
           <SettingRow
@@ -247,6 +275,16 @@ export default function ProfileTab() {
               Alert.alert('קול והפטיקה', 'ניהול קול יהיה זמין בקרוב');
             }}
           />
+          {showAdmin && (
+            <SettingRow
+              icon="🖥️"
+              label="הגדרות תצוגה"
+              onPress={() => {
+                Haptics.selectionAsync();
+                router.push('/admin/display-settings');
+              }}
+            />
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>חשבון</Text>
@@ -264,7 +302,7 @@ export default function ProfileTab() {
             label="ההיסטוריה שלי"
             onPress={() => {
               Haptics.selectionAsync();
-              Alert.alert('היסטוריה', 'היסטוריית סשנים תהיה זמינה בקרוב');
+              router.push('/(tabs)/progress');
             }}
           />
           <SettingRow
@@ -272,7 +310,7 @@ export default function ProfileTab() {
             label="צור קשר ותמיכה"
             onPress={() => {
               Haptics.selectionAsync();
-              Alert.alert('תמיכה', 'שלח אימייל: support@psychotechniplus.com');
+              Linking.openURL('mailto:support@psychotechniplus.com');
             }}
           />
           <SettingRow
@@ -347,14 +385,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: 'rgba(255,255,255,0.8)',
     marginBottom: 6,
-  },
-  // Prominent ELO number
-  profileElo: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize['3xl'],
-    color: '#fff',
-    marginBottom: 18,
-    letterSpacing: 1,
   },
 
   profileStats: {
@@ -478,4 +508,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 8,
   },
+
+  adminCard: { marginHorizontal: 16, marginBottom: 8, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.lg },
+  adminCardGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 16, gap: 12 },
+  adminCardArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: '#64748B' },
+  adminCardText: { flex: 1, alignItems: 'flex-end' },
+  adminCardTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+  adminCardSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8', marginTop: 2 },
+  adminBadge: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.full },
 });
