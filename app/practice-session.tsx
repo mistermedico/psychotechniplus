@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView,
-  Animated, Alert, Dimensions,
+  Animated, Alert, Dimensions, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,6 +55,12 @@ export default function PracticeSession() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [timer, setTimer] = useState(SPEED_LIMIT);
   const [isFinished, setIsFinished] = useState(false);
+
+  // Favorite & note features
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState('');
 
   // Simulation state
   const [examSections, setExamSections] = useState<GeneratedExamSection[]>([]);
@@ -317,6 +323,74 @@ export default function PracticeSession() {
     ]);
   };
 
+  const handleToggleFavorite = (questionId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      return next;
+    });
+  };
+
+  const handleOpenNote = (questionId: string) => {
+    setNoteText(notes[questionId] ?? '');
+    setShowNoteModal(true);
+  };
+
+  const handleSaveNote = (questionId: string) => {
+    if (noteText.trim()) {
+      setNotes(prev => ({ ...prev, [questionId]: noteText.trim() }));
+    } else {
+      setNotes(prev => { const n = { ...prev }; delete n[questionId]; return n; });
+    }
+    setShowNoteModal(false);
+  };
+
+  // NOTE MODAL
+  const noteModal = (
+    <Modal
+      visible={showNoteModal}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowNoteModal(false)}
+    >
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.noteModal}>
+          <Text style={styles.noteModalTitle}>📝 הערה לשאלה</Text>
+          <TextInput
+            style={styles.noteInput}
+            value={noteText}
+            onChangeText={setNoteText}
+            placeholder="כתוב הערה..."
+            placeholderTextColor="#475569"
+            multiline
+            numberOfLines={4}
+            textAlign="right"
+            autoFocus
+          />
+          <View style={styles.noteModalActions}>
+            <Pressable
+              onPress={() => setShowNoteModal(false)}
+              style={styles.noteCancelBtn}
+            >
+              <Text style={styles.noteCancelText}>ביטול</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => question && handleSaveNote(question.id)}
+              style={styles.noteSaveBtn}
+            >
+              <Text style={styles.noteSaveText}>שמור</Text>
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
   // REST SCREEN between simulation sections
   if (showRestScreen) {
     const template = templates.find(t => t.id === templateId);
@@ -379,6 +453,7 @@ export default function PracticeSession() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {noteModal}
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={handleQuit} style={styles.quitBtn}>
@@ -430,6 +505,36 @@ export default function PracticeSession() {
           revealed={revealed}
           onSelect={handleSelect}
         />
+
+        {/* Favorite & note quick actions */}
+        <View style={styles.quickActions}>
+          <Pressable
+            onPress={() => handleOpenNote(question.id)}
+            style={[styles.quickBtn, notes[question.id] ? styles.quickBtnActive : null]}
+          >
+            <Text style={styles.quickBtnIcon}>📝</Text>
+            <Text style={[styles.quickBtnLabel, notes[question.id] ? { color: Colors.primary } : null]}>
+              {notes[question.id] ? 'עריכת הערה' : 'הוסף הערה'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => handleToggleFavorite(question.id)}
+            style={[styles.quickBtn, favorites.has(question.id) ? styles.quickBtnFav : null]}
+          >
+            <Text style={styles.quickBtnIcon}>{favorites.has(question.id) ? '⭐' : '☆'}</Text>
+            <Text style={[styles.quickBtnLabel, favorites.has(question.id) ? { color: '#F59E0B' } : null]}>
+              {favorites.has(question.id) ? 'מסומן' : 'מועדף'}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Show existing note inline */}
+        {notes[question.id] ? (
+          <View style={styles.noteDisplay}>
+            <Text style={styles.noteDisplayLabel}>📝 ההערה שלך:</Text>
+            <Text style={styles.noteDisplayText}>{notes[question.id]}</Text>
+          </View>
+        ) : null}
 
         {/* Explanation panel — either auto or manual */}
         {revealed && !showExplanation && !showExplanationAuto && (
@@ -668,4 +773,121 @@ const styles = StyleSheet.create({
   nextBtn: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
   nextBtnGrad: { paddingVertical: 18, alignItems: 'center' },
   nextText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+
+  quickActions: {
+    flexDirection: 'row-reverse',
+    gap: 10,
+  },
+  quickBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  quickBtnActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLighter,
+  },
+  quickBtnFav: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#FEF3C7',
+  },
+  quickBtnIcon: { fontSize: 16 },
+  quickBtnLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+  },
+
+  noteDisplay: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.primary + '40',
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+  },
+  noteDisplayLabel: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: Colors.primary,
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  noteDisplayText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    textAlign: 'right',
+    lineHeight: 20,
+  },
+
+  // Note modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  noteModal: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius['2xl'],
+    borderTopRightRadius: Radius['2xl'],
+    padding: 24,
+    gap: 16,
+  },
+  noteModalTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.text,
+    textAlign: 'right',
+  },
+  noteInput: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.base,
+    color: Colors.text,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  noteModalActions: {
+    flexDirection: 'row-reverse',
+    gap: 12,
+  },
+  noteCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  noteCancelText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.base,
+    color: Colors.textSecondary,
+  },
+  noteSaveBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+  },
+  noteSaveText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: '#fff',
+  },
 });

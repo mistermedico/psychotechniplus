@@ -12,11 +12,12 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 export default function AppSettingsScreen() {
-  const { questions, seedToSupabase, loadQuestionsFromSupabase } = useAdminStore();
+  const { questions, seedToSupabase, loadQuestionsFromSupabase, freePracticeLimit, setFreePracticeLimit } = useAdminStore();
 
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [freeTrialDays, setFreeTrialDays] = useState('7');
   const [maxSessionQuestions, setMaxSessionQuestions] = useState('20');
+  const [freeLimitInput, setFreeLimitInput] = useState(String(freePracticeLimit));
   const [aiEnabled, setAiEnabled] = useState(true);
   const [newUserBonusXp, setNewUserBonusXp] = useState('50');
   const [syncing, setSyncing] = useState(false);
@@ -56,12 +57,15 @@ export default function AppSettingsScreen() {
     const maxQ = parseInt(maxSessionQuestions, 10);
     const bonusXp = parseInt(newUserBonusXp, 10);
 
+    const freeLimit = parseInt(freeLimitInput, 10);
     if (isNaN(days) || days < 0) { Alert.alert('שגיאה', 'ימי ניסיון חייבים להיות מספר חיובי'); return; }
     if (isNaN(maxQ) || maxQ < 5 || maxQ > 100) { Alert.alert('שגיאה', 'מקסימום שאלות לסשן חייב להיות 5–100'); return; }
     if (isNaN(bonusXp) || bonusXp < 0) { Alert.alert('שגיאה', 'XP בונוס חייב להיות מספר חיובי'); return; }
+    if (isNaN(freeLimit) || freeLimit < 5 || freeLimit > 200) { Alert.alert('שגיאה', 'מגבלת תרגול חינמי חייבת להיות 5–200'); return; }
 
+    setFreePracticeLimit(freeLimit);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('✅ נשמר', 'ההגדרות נשמרו (מקומית — יש לחבר ל-Supabase config לאחסון קבוע)');
+    Alert.alert('✅ נשמר', 'ההגדרות נשמרו');
   };
 
   return (
@@ -125,6 +129,14 @@ export default function AppSettingsScreen() {
             label="מקסימום שאלות לסשן"
             value={maxSessionQuestions}
             onChange={setMaxSessionQuestions}
+            keyboardType="numeric"
+            suffix="שאלות"
+          />
+          <View style={styles.divider} />
+          <SettingInput
+            label="מגבלת תרגול חינמי"
+            value={freeLimitInput}
+            onChange={setFreeLimitInput}
             keyboardType="numeric"
             suffix="שאלות"
           />
