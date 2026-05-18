@@ -12,35 +12,84 @@ import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
-const ADMIN_SECTIONS = [
-  { id: 'questions',           icon: '📋', label: 'מאגר שאלות',      desc: 'CRUD, סינון, חיפוש, bulk actions',        color: Colors.primary,  gradient: Colors.gradients.primary,                          route: '/admin/questions' },
-  { id: 'validate',            icon: '✅', label: 'תור ולידציה',      desc: 'אישור/דחיית שאלות ממתינות',               color: Colors.success,  gradient: Colors.gradients.success,                          route: '/admin/validate' },
-  { id: 'json-import',         icon: '📥', label: 'ייבוא JSON',        desc: 'העלאת שאלות מקובץ JSON',                   color: '#F59E0B',       gradient: Colors.gradients.gold,                             route: '/admin/json-import' },
-  { id: 'ai-generator',        icon: '🤖', label: 'מחולל AI',          desc: 'יצירת שאלות חדשות עם AI',                  color: Colors.accent,   gradient: ['#8B5CF6', '#6D28D9'] as [string, string],        route: '/admin/ai-generator' },
-  { id: 'simulation-builder',  icon: '🏗️', label: 'בניית סימולציה',   desc: 'תבניות מבחן חכמות עם כללים',              color: Colors.warning,  gradient: Colors.gradients.gold,                             route: '/admin/simulation-builder' },
-  { id: 'analytics',           icon: '📊', label: 'אנליטיקס',          desc: 'גרפים, התפלגויות, מגמות',                  color: '#0EA5E9',       gradient: ['#0EA5E9', '#0284C7'] as [string, string],        route: '/admin/analytics' },
-  { id: 'session-settings', icon: '🎛️', label: 'הגדרות סשן', desc: 'תרגול, מבחנים, פרמיום, זמנים', color: '#8B5CF6', gradient: ['#8B5CF6', '#6D28D9'] as [string, string], route: '/admin/session-settings' },
-  { id: 'topics-admin',        icon: '📚', label: 'ניהול נושאים',      desc: 'הוספה, עריכה, מחיקת Topics',              color: '#10B981',       gradient: Colors.gradients.success,                          route: '/admin/topics-admin' },
-  { id: 'display-settings',    icon: '🎨', label: 'הגדרות תצוגה',      desc: 'שליטה בממשק שאלות למשתמש',                color: '#EC4899',       gradient: ['#EC4899', '#BE185D'] as [string, string],        route: '/admin/display-settings' },
-  { id: 'users',               icon: '👥', label: 'ניהול משתמשים',     desc: 'צפייה, השהייה, שדרוג תוכניות',            color: '#0EA5E9',       gradient: ['#0EA5E9', '#0284C7'] as [string, string],        route: '/admin/users' },
-  { id: 'question-assignment', icon: '🔗', label: 'שיוך שאלות',         desc: 'שייך שאלות לנושאים, מבחנים, גישה',        color: '#A855F7',       gradient: ['#A855F7', '#7C3AED'] as [string, string],        route: '/admin/question-assignment' },
-  { id: 'topic-exam-map',      icon: '🗺️', label: 'מפת נושאים–מבחנים', desc: 'ניהול ויזואלי שיוכי נושא↔מבחן',           color: '#EC4899',       gradient: ['#EC4899', '#BE185D'] as [string, string],        route: '/admin/topic-exam-map' },
-  { id: 'app-control',         icon: '🎮', label: 'מרכז שליטה',         desc: 'תחזוקה, הכרזות, דגלי פיצ׳ר, מגבלות',     color: '#EF4444',       gradient: Colors.gradients.danger,                           route: '/admin/app-control' },
-  { id: 'daily-challenge',     icon: '🎯', label: 'אתגרים יומיים',       desc: 'ניהול שאלת אתגר יומית ובונוס XP',          color: '#F59E0B',       gradient: Colors.gradients.gold,                             route: '/admin/daily-challenge' },
-  { id: 'leaderboard-admin',   icon: '🏅', label: 'לוח מובילים',         desc: 'ניהול דירוג, הסרת משתמשים, איפוס',         color: '#0EA5E9',       gradient: ['#0EA5E9', '#0284C7'] as [string, string],        route: '/admin/leaderboard-admin' },
-  { id: 'export',              icon: '📤', label: 'ייצוא שאלות',        desc: 'ייצוא מאגר השאלות כ-JSON',                 color: '#10B981',       gradient: Colors.gradients.success,                          route: '/admin/export' },
-  { id: 'app-settings',        icon: '⚙️', label: 'הגדרות אפליקציה',   desc: 'תחזוקה, ניסיון, פרמטרים גלובליים',        color: '#6366F1',       gradient: ['#6366F1', '#4F46E5'] as [string, string],        route: '/admin/app-settings' },
+// ── Navigation sections ────────────────────────────────────────────────────
+
+type NavCategory = 'content' | 'exams' | 'users' | 'business' | 'system';
+
+interface NavSection {
+  id: string;
+  icon: string;
+  label: string;
+  desc: string;
+  route: string;
+  category: NavCategory;
+}
+
+const ADMIN_SECTIONS: NavSection[] = [
+  // Content
+  { id: 'questions',          icon: '📋', label: 'שאלות',          desc: 'CRUD ופילטרים',        route: '/admin/questions',           category: 'content' },
+  { id: 'validate',           icon: '✅', label: 'ולידציה',         desc: 'אישור שאלות',           route: '/admin/validate',            category: 'content' },
+  { id: 'json-import',        icon: '📥', label: 'ייבוא JSON',      desc: 'העלאת שאלות',           route: '/admin/json-import',         category: 'content' },
+  { id: 'ai-generator',       icon: '🤖', label: 'מחולל AI',        desc: 'שאלות עם AI',           route: '/admin/ai-generator',        category: 'content' },
+  { id: 'export',             icon: '📤', label: 'ייצוא',            desc: 'ייצוא JSON',             route: '/admin/export',              category: 'content' },
+  { id: 'topics-admin',       icon: '📚', label: 'נושאים',          desc: 'ניהול Topics',           route: '/admin/topics-admin',        category: 'content' },
+  // Exams
+  { id: 'simulation-builder', icon: '🏗️', label: 'סימולציה',        desc: 'תבניות מבחן',           route: '/admin/simulation-builder',  category: 'exams' },
+  { id: 'topic-exam-map',     icon: '🗺️', label: 'מפת נושאים',     desc: 'שיוך נושא↔מבחן',        route: '/admin/topic-exam-map',      category: 'exams' },
+  { id: 'question-assignment',icon: '🔗', label: 'שיוך שאלות',      desc: 'שייך לנושאים',          route: '/admin/question-assignment', category: 'exams' },
+  { id: 'display-settings',  icon: '🎨', label: 'תצוגה',            desc: 'ממשק שאלות',             route: '/admin/display-settings',    category: 'exams' },
+  // Users
+  { id: 'users',              icon: '👥', label: 'משתמשים',         desc: 'צפייה, שדרוג',           route: '/admin/users',               category: 'users' },
+  { id: 'leaderboard-admin',  icon: '🏅', label: 'לוח מובילים',     desc: 'ניהול דירוג',            route: '/admin/leaderboard-admin',   category: 'users' },
+  // Business
+  { id: 'revenue',            icon: '📈', label: 'הכנסות',           desc: 'MRR ומנויים',            route: '/admin/revenue',             category: 'business' },
+  { id: 'promo-codes',        icon: '🎟️', label: 'קודי קופון',      desc: 'הנחות וגישה',            route: '/admin/promo-codes',         category: 'business' },
+  { id: 'notifications',      icon: '🔔', label: 'הודעות Push',     desc: 'שליחת התראות',           route: '/admin/notifications',       category: 'business' },
+  { id: 'app-settings',       icon: '⚙️', label: 'הגדרות אפליקציה',desc: 'פרמטרים גלובליים',       route: '/admin/app-settings',        category: 'business' },
+  // System
+  { id: 'analytics',          icon: '📊', label: 'אנליטיקס',         desc: 'גרפים ומגמות',           route: '/admin/analytics',           category: 'system' },
+  { id: 'app-control',        icon: '🎮', label: 'מרכז שליטה',       desc: 'תחזוקה, דגלים',          route: '/admin/app-control',         category: 'system' },
+  { id: 'session-settings',   icon: '🎛️', label: 'הגדרות סשן',      desc: 'תרגול ומבחנים',          route: '/admin/session-settings',    category: 'system' },
+  { id: 'daily-challenge',    icon: '🎯', label: 'אתגרים יומיים',    desc: 'בונוס XP',               route: '/admin/daily-challenge',     category: 'system' },
+  { id: 'activity-log',       icon: '📋', label: 'יומן פעילות',      desc: 'תיעוד פעולות',           route: '/admin/activity-log',        category: 'system' },
+];
+
+const CATEGORY_COLORS: Record<NavCategory, [string, string]> = {
+  content:  ['#4F46E5', '#7C3AED'],
+  exams:    ['#7C3AED', '#6D28D9'],
+  users:    ['#10B981', '#059669'],
+  business: ['#D97706', '#B45309'],
+  system:   ['#475569', '#334155'],
+};
+
+const CATEGORY_LABELS: Record<NavCategory, string> = {
+  content:  'תוכן 📚',
+  exams:    'מבחנים 🏆',
+  users:    'משתמשים 👥',
+  business: 'עסקי 💼',
+  system:   'מערכת ⚙️',
+};
+
+const QUICK_ACTIONS = [
+  { icon: '✅', label: 'אמת שאלות', route: '/admin/validate' },
+  { icon: '➕', label: 'הוסף שאלה', route: '/admin/question-editor?mode=add' },
+  { icon: '📤', label: 'ייצא',        route: '/admin/export' },
+  { icon: '🔔', label: 'שלח הודעה',  route: '/admin/notifications' },
 ];
 
 export default function AdminDashboard() {
-  const { isAdmin, login, logout, setIsAdmin, getStats, getPendingQuestions, seedToSupabase, loadQuestionsFromSupabase } = useAdminStore();
+  const {
+    isAdmin, login, logout, setIsAdmin, getStats, getPendingQuestions,
+    seedToSupabase, loadQuestionsFromSupabase,
+    revenueSnapshots, activityLog,
+  } = useAdminStore();
+
   const [email, setEmail] = useState('mrmedico111@gmail.com');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
-  // Auto-login if already authenticated as admin via regular auth
   useEffect(() => {
     if (isAdmin) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -75,66 +124,167 @@ export default function AdminDashboard() {
 
   const stats = getStats();
   const pendingCount = getPendingQuestions().length;
+  const latestRevenue = revenueSnapshots[revenueSnapshots.length - 1];
+  const prevRevenue = revenueSnapshots[revenueSnapshots.length - 2];
+  const approvedPct = stats.totalQuestions > 0
+    ? Math.round((stats.validatedCount / stats.totalQuestions) * 100)
+    : 0;
+
+  const today = new Date().toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const recentActivity = activityLog.slice(0, 5);
+
+  const categorized = (['content', 'exams', 'users', 'business', 'system'] as NavCategory[]).map(cat => ({
+    cat,
+    sections: ADMIN_SECTIONS.filter(s => s.category === cat),
+  }));
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Header */}
-        <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
-          <Text style={styles.headerTitle}>🛠️ פאנל ניהול</Text>
-          <Text style={styles.headerSub}>PsychoTechniPlus Admin v1.0</Text>
-          <Pressable onPress={async () => { await logout(); router.replace('/auth'); }} style={styles.logoutBtn}>
+        {/* Hero Header */}
+        <LinearGradient colors={['#0A0F1E', '#0F172A', '#1E293B']} style={styles.hero}>
+          <View style={styles.heroTop}>
+            {/* Avatar */}
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>MA</Text>
+            </View>
+            <View style={styles.heroInfo}>
+              <Text style={styles.heroDate}>{today}</Text>
+              <Text style={styles.heroStatus}>מצב מערכת: תקין ✅</Text>
+            </View>
+          </View>
+          <Text style={styles.heroTitle}>🛠️ פאנל ניהול</Text>
+          <Text style={styles.heroSub}>PsychoTechniPlus Admin</Text>
+          <Pressable
+            onPress={async () => { await logout(); router.replace('/auth'); }}
+            style={styles.logoutBtn}
+          >
             <Text style={styles.logoutText}>יציאה →</Text>
           </Pressable>
         </LinearGradient>
 
-        {/* Stats */}
-        <View style={styles.statsGrid}>
-          <MiniStat label="שאלות סה״כ" value={stats.totalQuestions} icon="❓" color={Colors.primary} />
-          <MiniStat label="ממתינות" value={stats.pendingCount} icon="⏳" color={Colors.warning} alert={pendingCount > 0} />
-          <MiniStat label="מאושרות" value={stats.validatedCount} icon="✅" color={Colors.success} />
-          <MiniStat label="טיוטות" value={stats.draftCount} icon="📝" color={Colors.textTertiary} />
-        </View>
-        <View style={styles.statsGrid}>
-          <MiniStat label="נושאים" value={stats.totalTopics} icon="📚" color={Colors.accent} />
-          <MiniStat label="מסלולים" value={stats.totalTargets} icon="🎯" color='#0EA5E9' />
-          <MiniStat label="קושי ממוצע" value={stats.avgDifficulty} icon="⚖️" color={Colors.warning} />
-          <MiniStat label="נדחו" value={stats.rejectedCount} icon="❌" color={Colors.danger} />
-        </View>
-
-        {/* Pending alert */}
+        {/* Alert Banner */}
         {pendingCount > 0 && (
-          <Pressable onPress={() => router.push('/admin/validate')} style={({ pressed }) => [styles.alertBanner, pressed && { opacity: 0.85 }]}>
-            <LinearGradient colors={Colors.gradients.gold} style={styles.alertBannerGrad}>
-              <Text style={styles.alertIcon}>⚠️</Text>
-              <Text style={styles.alertText}>{pendingCount} שאלות ממתינות לאישור — לחץ לאישור</Text>
+          <Pressable
+            onPress={() => router.push('/admin/validate')}
+            style={({ pressed }) => [styles.alertBanner, pressed && { opacity: 0.85 }]}
+          >
+            <LinearGradient colors={['#D97706', '#B45309']} style={styles.alertGrad}>
+              <Text style={styles.alertText}>⚠️  {pendingCount} שאלות ממתינות לאישור</Text>
               <Text style={styles.alertArrow}>←</Text>
             </LinearGradient>
           </Pressable>
         )}
 
-        {/* Nav sections */}
-        <Text style={styles.sectionTitle}>פעולות ניהול</Text>
-        <View style={styles.sectionsGrid}>
-          {ADMIN_SECTIONS.map(section => (
+        {/* Quick Stats Grid 2x2 */}
+        <Text style={styles.sectionTitle}>סקירה כללית</Text>
+        <View style={styles.statsGrid}>
+          {/* Questions */}
+          <View style={[styles.glassCard, { borderColor: Colors.primary + '40' }]}>
+            <Text style={styles.glassCardTitle}>📋 שאלות</Text>
+            <Text style={[styles.glassCardValue, { color: Colors.primary }]}>{stats.totalQuestions}</Text>
+            <Text style={styles.glassCardSub}>✅ {stats.validatedCount} מאושרות · ⏳ {stats.pendingCount} ממתינות</Text>
+          </View>
+          {/* Users */}
+          <View style={[styles.glassCard, { borderColor: Colors.success + '40' }]}>
+            <Text style={styles.glassCardTitle}>👥 משתמשים</Text>
+            <Text style={[styles.glassCardValue, { color: Colors.success }]}>
+              {latestRevenue ? latestRevenue.totalPremiumUsers : '—'}
+            </Text>
+            <Text style={styles.glassCardSub}>
+              💎 פרמיום · 📈 {latestRevenue ? (latestRevenue.conversionRate * 100).toFixed(1) : '—'}% המרה
+            </Text>
+          </View>
+          {/* Revenue */}
+          <View style={[styles.glassCard, { borderColor: '#D97706' + '40' }]}>
+            <Text style={styles.glassCardTitle}>💰 הכנסות</Text>
+            <Text style={[styles.glassCardValue, { color: '#F59E0B' }]}>
+              {latestRevenue ? `₪${latestRevenue.mrr.toLocaleString()}` : '—'}
+            </Text>
+            <Text style={styles.glassCardSub}>
+              חודש קודם: {prevRevenue ? `₪${prevRevenue.mrr.toLocaleString()}` : '—'}
+            </Text>
+          </View>
+          {/* Quality */}
+          <View style={[styles.glassCard, { borderColor: Colors.accent + '40' }]}>
+            <Text style={styles.glassCardTitle}>⚖️ איכות</Text>
+            <Text style={[styles.glassCardValue, { color: Colors.accent }]}>{approvedPct}%</Text>
+            <Text style={styles.glassCardSub}>קושי ממוצע: {stats.avgDifficulty}</Text>
+          </View>
+        </View>
+
+        {/* Quick Actions */}
+        <Text style={styles.sectionTitle}>פעולות מהירות</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsRow}>
+          {QUICK_ACTIONS.map((a, i) => (
             <Pressable
-              key={section.id}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(section.route as any); }}
-              style={({ pressed }) => [styles.sectionCard, pressed && { transform: [{ scale: 0.96 }] }]}
+              key={i}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(a.route as any);
+              }}
+              style={({ pressed }) => [styles.quickActionChip, pressed && { opacity: 0.75 }]}
             >
-              <LinearGradient colors={section.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]} />
-              {section.id === 'validate' && pendingCount > 0 && (
-                <View style={styles.badge}><Text style={styles.badgeText}>{pendingCount}</Text></View>
-              )}
-              <Text style={styles.sectionIcon}>{section.icon}</Text>
-              <Text style={styles.sectionLabel}>{section.label}</Text>
-              <Text style={styles.sectionDesc}>{section.desc}</Text>
+              <Text style={styles.quickActionIcon}>{a.icon}</Text>
+              <Text style={styles.quickActionLabel}>{a.label}</Text>
             </Pressable>
+          ))}
+        </ScrollView>
+
+        {/* Recent Activity */}
+        <View style={styles.activitySection}>
+          <View style={styles.activityHeader}>
+            <Pressable onPress={() => router.push('/admin/activity-log' as any)}>
+              <Text style={styles.seeAllLink}>ראה הכל ←</Text>
+            </Pressable>
+            <Text style={styles.sectionTitle}>פעילות אחרונה</Text>
+          </View>
+          {recentActivity.map(log => (
+            <View key={log.id} style={styles.activityRow}>
+              <Text style={styles.activityTime}>{relativeTime(log.timestamp)}</Text>
+              <Text style={styles.activityText}>{log.action}</Text>
+              <View style={[styles.activityDot, { backgroundColor: CATEGORY_ICON_COLORS[log.category] }]} />
+            </View>
           ))}
         </View>
 
-        {/* Supabase seed / reload */}
+        {/* Navigation Grid — by category */}
+        <Text style={styles.sectionTitle}>ניווט</Text>
+        {categorized.map(({ cat, sections }) => (
+          <View key={cat} style={styles.categoryBlock}>
+            <Text style={styles.categoryLabel}>{CATEGORY_LABELS[cat]}</Text>
+            <View style={styles.navGrid}>
+              {sections.map(section => (
+                <Pressable
+                  key={section.id}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(section.route as any);
+                  }}
+                  style={({ pressed }) => [styles.navCard, pressed && { transform: [{ scale: 0.95 }] }]}
+                >
+                  <LinearGradient
+                    colors={CATEGORY_COLORS[section.category]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
+                  />
+                  {section.id === 'validate' && pendingCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{pendingCount}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.navIcon}>{section.icon}</Text>
+                  <Text style={styles.navLabel}>{section.label}</Text>
+                  <Text style={styles.navDesc}>{section.desc}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))}
+
+        {/* Supabase actions */}
         <View style={styles.seedRow}>
           <Pressable
             onPress={async () => {
@@ -152,18 +302,41 @@ export default function AdminDashboard() {
               {seeding ? <ActivityIndicator color="#fff" /> : <Text style={styles.seedBtnText}>☁️ זרע ל-Supabase</Text>}
             </LinearGradient>
           </Pressable>
-          <Pressable onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await loadQuestionsFromSupabase(); Alert.alert('✅ עודכן', 'שאלות נטענו מ-Supabase'); }} style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.85 }]}>
+          <Pressable
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              await loadQuestionsFromSupabase();
+              Alert.alert('✅ עודכן', 'שאלות נטענו מ-Supabase');
+            }}
+            style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.85 }]}
+          >
             <Text style={styles.refreshBtnText}>🔄 טען</Text>
           </Pressable>
         </View>
 
-        {/* Quick add */}
-        <Pressable onPress={() => router.push({ pathname: '/admin/question-editor', params: { mode: 'add' } })} style={({ pressed }) => [styles.quickAdd, pressed && { opacity: 0.9 }]}>
-          <Text style={styles.quickAddText}>+ הוסף שאלה חדשה</Text>
-        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+const CATEGORY_ICON_COLORS: Record<string, string> = {
+  question: Colors.primary,
+  user: '#A855F7',
+  promo: Colors.success,
+  notification: '#F59E0B',
+  system: Colors.textTertiary,
+};
+
+function relativeTime(isoString: string): string {
+  const now = new Date();
+  const then = new Date(isoString);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'עכשיו';
+  if (diffMins < 60) return `לפני ${diffMins}ד׳`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `לפני ${diffHours}ש׳`;
+  return `לפני ${Math.floor(diffHours / 24)} ימים`;
 }
 
 // ── Login Screen ───────────────────────────────────────────────────────────
@@ -213,7 +386,19 @@ function LoginScreen({ email, setEmail, password, setPassword, error, loading, o
           </Text>
         )}
 
-        <Pressable onPress={onSubmit} disabled={loading} style={({ pressed }) => [{ backgroundColor: Colors.primary, borderRadius: Radius.lg, padding: 16, width: '100%', alignItems: 'center', marginTop: 20, opacity: pressed || loading ? 0.85 : 1 }]}>
+        <Pressable
+          onPress={onSubmit}
+          disabled={loading}
+          style={({ pressed }) => [{
+            backgroundColor: Colors.primary,
+            borderRadius: Radius.lg,
+            padding: 16,
+            width: '100%',
+            alignItems: 'center' as const,
+            marginTop: 20,
+            opacity: pressed || loading ? 0.85 : 1,
+          }]}
+        >
           {loading
             ? <ActivityIndicator color="#fff" />
             : <Text style={{ fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' }}>כניסה</Text>
@@ -242,61 +427,173 @@ const inputStyle = (hasError: boolean) => ({
   borderColor: Colors.danger,
 });
 
-// ── MiniStat ───────────────────────────────────────────────────────────────
-
-function MiniStat({ label, value, icon, color, alert }: { label: string; value: number | string; icon: string; color: string; alert?: boolean }) {
-  return (
-    <View style={[miniStyles.card, alert && { borderColor: Colors.warning, borderWidth: 2 }]}>
-      <Text style={miniStyles.icon}>{icon}</Text>
-      <Text style={[miniStyles.value, { color }]}>{value}</Text>
-      <Text style={miniStyles.label}>{label}</Text>
-    </View>
-  );
-}
-
-const miniStyles = StyleSheet.create({
-  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 12, alignItems: 'center', ...Shadow.sm, borderWidth: 1, borderColor: Colors.border },
-  icon: { fontSize: 18, marginBottom: 4 },
-  value: { fontFamily: FontFamily.bold, fontSize: FontSize.xl },
-  label: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'center', marginTop: 2 },
-});
-
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1, backgroundColor: '#0A0F1E' },
   content: { paddingBottom: 40 },
 
-  header: { padding: 24, paddingTop: 32, paddingBottom: 28, alignItems: 'flex-end' },
-  headerTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
-  headerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: '#94A3B8', marginTop: 4 },
-  logoutBtn: { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 6 },
-  logoutText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#fff' },
+  // Hero
+  hero: {
+    padding: 24,
+    paddingTop: 28,
+    paddingBottom: 32,
+    alignItems: 'flex-end',
+  },
+  heroTop: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    width: '100%',
+  },
+  avatar: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: Colors.primaryLight,
+  },
+  avatarText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+  heroInfo: { flex: 1, alignItems: 'flex-end' },
+  heroDate: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#64748B' },
+  heroStatus: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#10B981', marginTop: 2 },
+  heroTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
+  heroSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: '#64748B', marginTop: 2 },
+  logoutBtn: {
+    marginTop: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  logoutText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#94A3B8' },
 
-  statsGrid: { flexDirection: 'row-reverse', paddingHorizontal: 16, gap: 8, marginTop: 12 },
-
+  // Alert Banner
   alertBanner: { marginHorizontal: 16, marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden' },
-  alertBannerGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 14, gap: 10 },
-  alertIcon: { fontSize: 18 },
-  alertText: { flex: 1, fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#fff', textAlign: 'right' },
+  alertGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 14, gap: 10 },
+  alertText: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff', textAlign: 'right' },
   alertArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
 
-  sectionTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text, textAlign: 'right', paddingHorizontal: 16, marginTop: 20, marginBottom: 12 },
-  sectionsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', paddingHorizontal: 16, gap: 12 },
-  sectionCard: { width: '47%', borderRadius: Radius.xl, padding: 18, overflow: 'hidden', minHeight: 120, justifyContent: 'space-between', ...Shadow.lg, position: 'relative' },
-  badge: { position: 'absolute', top: 10, left: 10, backgroundColor: Colors.danger, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, zIndex: 10 },
-  badgeText: { fontFamily: FontFamily.bold, fontSize: 11, color: '#fff' },
-  sectionIcon: { fontSize: 28, textAlign: 'right' },
-  sectionLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff', textAlign: 'right', marginTop: 6 },
-  sectionDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.75)', textAlign: 'right' },
+  sectionTitle: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize.xl,
+    color: '#E2E8F0',
+    textAlign: 'right',
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 10,
+  },
 
+  // Quick Stats 2x2
+  statsGrid: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  glassCard: {
+    width: '47.5%',
+    backgroundColor: '#1E293B',
+    borderRadius: Radius.xl,
+    padding: 14,
+    borderWidth: 1.5,
+    ...Shadow.md,
+    gap: 4,
+  },
+  glassCardTitle: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: '#94A3B8', textAlign: 'right' },
+  glassCardValue: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], textAlign: 'right' },
+  glassCardSub: { fontFamily: FontFamily.regular, fontSize: 10, color: '#64748B', textAlign: 'right' },
+
+  // Quick Actions
+  quickActionsRow: { paddingHorizontal: 16, gap: 10, flexDirection: 'row-reverse' },
+  quickActionChip: {
+    backgroundColor: '#1E293B',
+    borderRadius: Radius.xl,
+    paddingHorizontal: 16, paddingVertical: 12,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1, borderColor: '#334155',
+    ...Shadow.sm,
+  },
+  quickActionIcon: { fontSize: 18 },
+  quickActionLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#E2E8F0' },
+
+  // Recent Activity
+  activitySection: {
+    marginHorizontal: 16,
+    backgroundColor: '#1E293B',
+    borderRadius: Radius.xl,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginTop: 4,
+    ...Shadow.md,
+  },
+  activityHeader: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  seeAllLink: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
+  activityRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#0F172A',
+  },
+  activityDot: { width: 8, height: 8, borderRadius: 4 },
+  activityText: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#E2E8F0', textAlign: 'right' },
+  activityTime: { fontFamily: FontFamily.regular, fontSize: 10, color: '#64748B' },
+
+  // Navigation Grid
+  categoryBlock: { marginBottom: 4 },
+  categoryLabel: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: '#64748B',
+    textAlign: 'right',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  navGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 },
+  navCard: {
+    width: '30.5%',
+    borderRadius: Radius.xl,
+    padding: 12,
+    overflow: 'hidden',
+    minHeight: 100,
+    justifyContent: 'space-between',
+    position: 'relative',
+    ...Shadow.md,
+  },
+  badge: {
+    position: 'absolute', top: 6, left: 6,
+    backgroundColor: Colors.danger,
+    borderRadius: 10, minWidth: 18, height: 18,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3, zIndex: 10,
+  },
+  badgeText: { fontFamily: FontFamily.bold, fontSize: 10, color: '#fff' },
+  navIcon: { fontSize: 22, textAlign: 'right' },
+  navLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff', textAlign: 'right', marginTop: 4 },
+  navDesc: { fontFamily: FontFamily.regular, fontSize: 9, color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
+
+  // Supabase
   seedRow: { flexDirection: 'row-reverse', marginHorizontal: 16, marginTop: 20, gap: 10 },
   seedBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
   seedBtnGrad: { paddingVertical: 16, alignItems: 'center' },
   seedBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
-  refreshBtn: { backgroundColor: Colors.surface, borderRadius: Radius.xl, paddingHorizontal: 18, paddingVertical: 16, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
-  refreshBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
-
-  quickAdd: { margin: 16, marginTop: 8, backgroundColor: Colors.primary, borderRadius: Radius.xl, padding: 18, alignItems: 'center', ...Shadow.primary },
-  quickAddText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+  refreshBtn: {
+    backgroundColor: '#1E293B',
+    borderRadius: Radius.xl,
+    paddingHorizontal: 18, paddingVertical: 16,
+    borderWidth: 1, borderColor: '#334155',
+    ...Shadow.sm,
+  },
+  refreshBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#E2E8F0' },
 });

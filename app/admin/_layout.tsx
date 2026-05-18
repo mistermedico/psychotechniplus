@@ -39,18 +39,28 @@ export default function AdminLayout() {
           <Text style={styles.backText}>→ יציאה</Text>
         </Pressable>
       )}} />
-      <Stack.Screen name="questions"          options={{ title: '📋 מאגר שאלות' }} />
-      <Stack.Screen name="question-editor"    options={{ title: '✏️ עריכת שאלה' }} />
-      <Stack.Screen name="validate"           options={{ title: '✅ תור ולידציה' }} />
-      <Stack.Screen name="analytics"          options={{ title: '📊 אנליטיקס' }} />
-      <Stack.Screen name="ai-generator"       options={{ title: '🤖 מחולל AI' }} />
-      <Stack.Screen name="simulation-builder" options={{ title: '🏗️ בניית סימולציה' }} />
-      <Stack.Screen name="topics-admin"       options={{ title: '📚 ניהול נושאים' }} />
-      <Stack.Screen name="display-settings"   options={{ title: '🎨 הגדרות תצוגה' }} />
-      <Stack.Screen name="users"              options={{ title: '👥 ניהול משתמשים' }} />
-      <Stack.Screen name="json-import"        options={{ title: '📥 ייבוא JSON' }} />
-      <Stack.Screen name="export"            options={{ title: '📤 ייצוא שאלות' }} />
-      <Stack.Screen name="app-settings"      options={{ title: '⚙️ הגדרות אפליקציה' }} />
+      <Stack.Screen name="questions"           options={{ title: '📋 מאגר שאלות' }} />
+      <Stack.Screen name="question-editor"     options={{ title: '✏️ עריכת שאלה' }} />
+      <Stack.Screen name="validate"            options={{ title: '✅ תור ולידציה' }} />
+      <Stack.Screen name="analytics"           options={{ title: '📊 אנליטיקס' }} />
+      <Stack.Screen name="ai-generator"        options={{ title: '🤖 מחולל AI' }} />
+      <Stack.Screen name="simulation-builder"  options={{ title: '🏗️ בניית סימולציה' }} />
+      <Stack.Screen name="topics-admin"        options={{ title: '📚 ניהול נושאים' }} />
+      <Stack.Screen name="display-settings"    options={{ title: '🎨 הגדרות תצוגה' }} />
+      <Stack.Screen name="users"               options={{ title: '👥 ניהול משתמשים' }} />
+      <Stack.Screen name="json-import"         options={{ title: '📥 ייבוא JSON' }} />
+      <Stack.Screen name="export"              options={{ title: '📤 ייצוא שאלות' }} />
+      <Stack.Screen name="app-settings"        options={{ title: '⚙️ הגדרות אפליקציה' }} />
+      <Stack.Screen name="session-settings"    options={{ title: '🎛️ הגדרות סשן' }} />
+      <Stack.Screen name="app-control"         options={{ title: '🎮 מרכז שליטה' }} />
+      <Stack.Screen name="daily-challenge"     options={{ title: '🎯 אתגרים יומיים' }} />
+      <Stack.Screen name="leaderboard-admin"   options={{ title: '🏅 לוח מובילים' }} />
+      <Stack.Screen name="topic-exam-map"      options={{ title: '🗺️ מפת נושאים–מבחנים' }} />
+      <Stack.Screen name="question-assignment" options={{ title: '🔗 שיוך שאלות' }} />
+      <Stack.Screen name="revenue"             options={{ title: '📈 הכנסות ומנויים' }} />
+      <Stack.Screen name="notifications"       options={{ title: '🔔 הודעות Push' }} />
+      <Stack.Screen name="promo-codes"         options={{ title: '🎟️ קודי קופון' }} />
+      <Stack.Screen name="activity-log"        options={{ title: '📋 יומן פעילות' }} />
     </Stack>
   );
 }

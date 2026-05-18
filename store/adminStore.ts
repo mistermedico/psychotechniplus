@@ -324,6 +324,151 @@ interface AdminStats {
   totalTopics: number;
 }
 
+// ── Promo Codes ────────────────────────────────────────────────────────────
+export interface PromoCode {
+  id: string;
+  code: string;
+  discountType: 'percent' | 'days_free' | 'full_access';
+  discountValue: number;
+  maxUses: number;
+  usedCount: number;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  description: string;
+}
+
+// ── Push Notifications ─────────────────────────────────────────────────────
+export interface PushNotification {
+  id: string;
+  title: string;
+  body: string;
+  targetSegment: 'all' | 'free' | 'premium' | 'inactive_7d' | 'inactive_30d';
+  status: 'draft' | 'scheduled' | 'sent' | 'failed';
+  scheduledAt: string | null;
+  sentAt: string | null;
+  estimatedReach: number;
+  openRate: number | null;
+  createdAt: string;
+}
+
+// ── Revenue Snapshots ──────────────────────────────────────────────────────
+export interface RevenueSnapshot {
+  month: string;
+  mrr: number;
+  newSubscribers: number;
+  churnedSubscribers: number;
+  totalPremiumUsers: number;
+  conversionRate: number;
+}
+
+// ── Activity Log ───────────────────────────────────────────────────────────
+export interface AdminActivityLog {
+  id: string;
+  action: string;
+  timestamp: string;
+  category: 'question' | 'user' | 'promo' | 'notification' | 'system';
+}
+
+// ── Seed data ──────────────────────────────────────────────────────────────
+const SEED_PROMO_CODES: PromoCode[] = [
+  {
+    id: 'promo_001',
+    code: 'STUDENT2025',
+    discountType: 'percent',
+    discountValue: 50,
+    maxUses: 100,
+    usedCount: 34,
+    expiresAt: '2025-09-01',
+    isActive: true,
+    createdAt: '2025-01-15T10:00:00Z',
+    description: 'הנחה לסטודנטים — 50% הנחה על מנוי',
+  },
+  {
+    id: 'promo_002',
+    code: 'TRIAL7',
+    discountType: 'days_free',
+    discountValue: 7,
+    maxUses: 0,
+    usedCount: 127,
+    expiresAt: null,
+    isActive: true,
+    createdAt: '2025-02-01T10:00:00Z',
+    description: '7 ימי ניסיון חינמי ללא הגבלת שימוש',
+  },
+  {
+    id: 'promo_003',
+    code: 'BETA',
+    discountType: 'full_access',
+    discountValue: 100,
+    maxUses: 50,
+    usedCount: 48,
+    expiresAt: '2025-06-30',
+    isActive: false,
+    createdAt: '2025-03-01T10:00:00Z',
+    description: 'גישה מלאה למשתמשי בטא',
+  },
+];
+
+const SEED_PUSH_NOTIFICATIONS: PushNotification[] = [
+  {
+    id: 'notif_001',
+    title: 'אל תפספסו — מבחן קרב!',
+    body: 'יש לך סימולציה שמחכה. לחץ לתרגול עכשיו ושפר את הציון שלך.',
+    targetSegment: 'all',
+    status: 'sent',
+    scheduledAt: null,
+    sentAt: '2025-05-10T09:00:00Z',
+    estimatedReach: 2612,
+    openRate: 0.31,
+    createdAt: '2025-05-09T14:00:00Z',
+  },
+  {
+    id: 'notif_002',
+    title: 'תזכורת למשתמשי פרמיום',
+    body: 'שבוע חדש, אתגרים חדשים! האתגר היומי שלך מחכה.',
+    targetSegment: 'premium',
+    status: 'scheduled',
+    scheduledAt: '2025-06-01T08:00:00Z',
+    sentAt: null,
+    estimatedReach: 167,
+    openRate: null,
+    createdAt: '2025-05-18T10:00:00Z',
+  },
+  {
+    id: 'notif_003',
+    title: 'חדש: מסלול קצינות מורחב',
+    body: 'הוספנו 50 שאלות חדשות למסלול קצינות. זמינות עכשיו!',
+    targetSegment: 'inactive_7d',
+    status: 'draft',
+    scheduledAt: null,
+    sentAt: null,
+    estimatedReach: 340,
+    openRate: null,
+    createdAt: '2025-05-17T16:00:00Z',
+  },
+];
+
+const SEED_REVENUE_SNAPSHOTS: RevenueSnapshot[] = [
+  { month: '2025-01', mrr: 890, newSubscribers: 12, churnedSubscribers: 2, totalPremiumUsers: 45, conversionRate: 0.031 },
+  { month: '2025-02', mrr: 1180, newSubscribers: 18, churnedSubscribers: 3, totalPremiumUsers: 60, conversionRate: 0.038 },
+  { month: '2025-03', mrr: 1540, newSubscribers: 24, churnedSubscribers: 4, totalPremiumUsers: 80, conversionRate: 0.042 },
+  { month: '2025-04', mrr: 1920, newSubscribers: 30, churnedSubscribers: 5, totalPremiumUsers: 105, conversionRate: 0.051 },
+  { month: '2025-05', mrr: 2310, newSubscribers: 35, churnedSubscribers: 6, totalPremiumUsers: 134, conversionRate: 0.058 },
+  { month: '2025-06', mrr: 2780, newSubscribers: 40, churnedSubscribers: 7, totalPremiumUsers: 167, conversionRate: 0.064 },
+];
+
+const SEED_ACTIVITY_LOG: AdminActivityLog[] = [
+  { id: 'log_001', action: 'אישר שאלה #q_pending_001', timestamp: '2025-05-18T11:30:00Z', category: 'question' },
+  { id: 'log_002', action: 'הוסיף קוד קופון STUDENT2025', timestamp: '2025-05-18T10:15:00Z', category: 'promo' },
+  { id: 'log_003', action: 'שלח הודעת Push לכלל המשתמשים', timestamp: '2025-05-18T09:00:00Z', category: 'notification' },
+  { id: 'log_004', action: 'עדכן הגדרות אפליקציה — מגבלת שאלות חינמיות', timestamp: '2025-05-17T17:45:00Z', category: 'system' },
+  { id: 'log_005', action: 'הסתיר קוד קופון BETA', timestamp: '2025-05-17T16:20:00Z', category: 'promo' },
+  { id: 'log_006', action: 'שדרג משתמש user_042 לפרמיום', timestamp: '2025-05-17T14:00:00Z', category: 'user' },
+  { id: 'log_007', action: 'ייבא 12 שאלות חדשות מ-JSON', timestamp: '2025-05-16T11:00:00Z', category: 'question' },
+  { id: 'log_008', action: 'הפעיל מצב תחזוקה לבדיקה', timestamp: '2025-05-15T09:30:00Z', category: 'system' },
+];
+
 interface AdminState {
   isAdmin: boolean;
   freePracticeLimit: number;
@@ -338,6 +483,12 @@ interface AdminState {
   appConfig: AppConfig;
   dailyChallenges: DailyChallenge[];
   userNotes: UserNote[];
+
+  // New fields
+  promoCodes: PromoCode[];
+  pushNotifications: PushNotification[];
+  revenueSnapshots: RevenueSnapshot[];
+  activityLog: AdminActivityLog[];
 
   // Actions — app config
   setAppConfig: (updates: Partial<AppConfig>) => void;
@@ -392,6 +543,21 @@ interface AdminState {
   removeTopicRuleFromTemplate: (templateId: string, ruleId: string) => void;
   pinQuestionToTemplate: (templateId: string, questionId: string) => void;
   unpinQuestionFromTemplate: (templateId: string, questionId: string) => void;
+
+  // Actions — promo codes
+  addPromoCode: (code: Omit<PromoCode, 'id' | 'createdAt' | 'usedCount'>) => PromoCode;
+  updatePromoCode: (id: string, updates: Partial<PromoCode>) => void;
+  deletePromoCode: (id: string) => void;
+  togglePromoCode: (id: string) => void;
+
+  // Actions — push notifications
+  addPushNotification: (notif: Omit<PushNotification, 'id' | 'createdAt' | 'sentAt' | 'openRate'>) => PushNotification;
+  updatePushNotification: (id: string, updates: Partial<PushNotification>) => void;
+  deletePushNotification: (id: string) => void;
+  sendPushNotification: (id: string) => void;
+
+  // Actions — activity log
+  logActivity: (action: string, category: AdminActivityLog['category']) => void;
 
   // Supabase sync
   loadQuestionsFromSupabase: () => Promise<void>;
@@ -451,6 +617,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   appConfig: DEFAULT_APP_CONFIG,
   dailyChallenges: [],
   userNotes: [],
+  promoCodes: SEED_PROMO_CODES,
+  pushNotifications: SEED_PUSH_NOTIFICATIONS,
+  revenueSnapshots: SEED_REVENUE_SNAPSHOTS,
+  activityLog: SEED_ACTIVITY_LOG,
 
   setAppConfig: (updates) =>
     set(s => ({ appConfig: { ...s.appConfig, ...updates } })),
@@ -713,6 +883,82 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           : t
       ),
     }));
+  },
+
+  // ── Activity Log ──────────────────────────────────────────────────────────
+  logActivity: (action, category) => {
+    const entry: AdminActivityLog = {
+      id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      action,
+      category,
+      timestamp: new Date().toISOString(),
+    };
+    set(s => ({ activityLog: [entry, ...s.activityLog].slice(0, 100) }));
+  },
+
+  // ── Promo Codes ────────────────────────────────────────────────────────────
+  addPromoCode: (code) => {
+    const newCode: PromoCode = {
+      ...code,
+      id: `promo_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      usedCount: 0,
+    };
+    set(s => ({ promoCodes: [...s.promoCodes, newCode] }));
+    get().logActivity(`הוסיף קוד קופון ${newCode.code}`, 'promo');
+    return newCode;
+  },
+
+  updatePromoCode: (id, updates) =>
+    set(s => ({ promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, ...updates } : c) })),
+
+  deletePromoCode: (id) => {
+    const code = get().promoCodes.find(c => c.id === id);
+    set(s => ({ promoCodes: s.promoCodes.filter(c => c.id !== id) }));
+    if (code) get().logActivity(`מחק קוד קופון ${code.code}`, 'promo');
+  },
+
+  togglePromoCode: (id) => {
+    const code = get().promoCodes.find(c => c.id === id);
+    set(s => ({
+      promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, isActive: !c.isActive } : c),
+    }));
+    if (code) get().logActivity(`${code.isActive ? 'הסתיר' : 'הפעיל'} קוד קופון ${code.code}`, 'promo');
+  },
+
+  // ── Push Notifications ─────────────────────────────────────────────────────
+  addPushNotification: (notif) => {
+    const newNotif: PushNotification = {
+      ...notif,
+      id: `notif_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      sentAt: null,
+      openRate: null,
+    };
+    set(s => ({ pushNotifications: [...s.pushNotifications, newNotif] }));
+    get().logActivity(`יצר הודעת Push: ${newNotif.title}`, 'notification');
+    return newNotif;
+  },
+
+  updatePushNotification: (id, updates) =>
+    set(s => ({ pushNotifications: s.pushNotifications.map(n => n.id === id ? { ...n, ...updates } : n) })),
+
+  deletePushNotification: (id) => {
+    const notif = get().pushNotifications.find(n => n.id === id);
+    set(s => ({ pushNotifications: s.pushNotifications.filter(n => n.id !== id) }));
+    if (notif) get().logActivity(`מחק הודעת Push: ${notif.title}`, 'notification');
+  },
+
+  sendPushNotification: (id) => {
+    const notif = get().pushNotifications.find(n => n.id === id);
+    set(s => ({
+      pushNotifications: s.pushNotifications.map(n =>
+        n.id === id
+          ? { ...n, status: 'sent', sentAt: new Date().toISOString(), openRate: Math.random() * 0.3 + 0.1 }
+          : n
+      ),
+    }));
+    if (notif) get().logActivity(`שלח הודעת Push לכלל המשתמשים: ${notif.title}`, 'notification');
   },
 
   getStats: () => {
