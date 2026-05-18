@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
-import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase } from '../lib/db';
+import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord } from '../lib/db';
 import { supabase } from '../lib/supabase';
 
 export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
@@ -175,6 +175,44 @@ export interface SmartExamTemplate {
   isActive: boolean;
 }
 
+export interface PracticeSessionSettings {
+  speedModeSecondsPerQuestion: number;   // default: 60
+  showExplanationsAuto: boolean;          // default: false
+  autoAdvanceDelaySeconds: number;        // default: 0 (off)
+  shuffleAnswerOptions: boolean;          // default: false
+  showTimerAlways: boolean;               // default: false
+  premiumOnlyModes: string[];             // default: []
+}
+
+export interface ExamSessionSettings {
+  defaultPassingScore: number;            // default: 65
+  allowSkipInExam: boolean;              // default: true
+  defaultRestTimeBetweenRules: number;   // default: 30 (seconds)
+  showPercentileRankInResults: boolean;  // default: true
+  showDetailedScoreBreakdown: boolean;   // default: true
+  showCorrectAnswersAfterExam: boolean;  // default: true
+}
+
+export const DEFAULT_PRACTICE_SETTINGS: PracticeSessionSettings = {
+  speedModeSecondsPerQuestion: 60,
+  showExplanationsAuto: false,
+  autoAdvanceDelaySeconds: 0,
+  shuffleAnswerOptions: false,
+  showTimerAlways: false,
+  premiumOnlyModes: [],
+};
+
+export const DEFAULT_EXAM_SETTINGS: ExamSessionSettings = {
+  defaultPassingScore: 65,
+  allowSkipInExam: true,
+  defaultRestTimeBetweenRules: 30,
+  showPercentileRankInResults: true,
+  showDetailedScoreBreakdown: true,
+  showCorrectAnswersAfterExam: true,
+};
+
+export type { SessionRecord };
+
 interface AdminStats {
   totalQuestions: number;
   validatedCount: number;
@@ -197,10 +235,18 @@ interface AdminState {
   targets: Target[];
   templates: SmartExamTemplate[];
   selectedQuestionIds: string[];
+  practiceSettings: PracticeSessionSettings;
+  examSettings: ExamSessionSettings;
+  sessionHistory: SessionRecord[];
 
   // Actions — auth
   setIsAdmin: (val: boolean) => void;
   setFreePracticeLimit: (n: number) => void;
+  setPracticeSettings: (updates: Partial<PracticeSessionSettings>) => void;
+  setExamSettings: (updates: Partial<ExamSessionSettings>) => void;
+  addSessionRecord: (record: SessionRecord) => void;
+  loadSessionHistory: (userId?: string) => Promise<void>;
+  getSessionsByUser: (userId: string) => SessionRecord[];
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
 
@@ -280,9 +326,31 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   targets: [...TARGETS],
   templates: SEED_TEMPLATES,
   selectedQuestionIds: [],
+  practiceSettings: DEFAULT_PRACTICE_SETTINGS,
+  examSettings: DEFAULT_EXAM_SETTINGS,
+  sessionHistory: [],
 
   setIsAdmin: (val) => set({ isAdmin: val }),
   setFreePracticeLimit: (n) => set({ freePracticeLimit: Math.max(5, Math.min(200, n)) }),
+  setPracticeSettings: (updates) =>
+    set(s => ({ practiceSettings: { ...s.practiceSettings, ...updates } })),
+  setExamSettings: (updates) =>
+    set(s => ({ examSettings: { ...s.examSettings, ...updates } })),
+  addSessionRecord: (record) => {
+    set(s => ({ sessionHistory: [record, ...s.sessionHistory.slice(0, 499)] }));
+    saveSessionRecord(record); // fire-and-forget to Supabase
+  },
+  loadSessionHistory: async (userId) => {
+    const records = userId
+      ? await loadUserSessionHistory(userId)
+      : await loadAllSessionHistory();
+    set(s => {
+      const existingIds = new Set(s.sessionHistory.map(r => r.id));
+      const fresh = records.filter(r => !existingIds.has(r.id));
+      return { sessionHistory: [...s.sessionHistory, ...fresh] };
+    });
+  },
+  getSessionsByUser: (userId) => get().sessionHistory.filter(r => r.userId === userId),
 
   login: async (email, password) => {
     // Try sign in first

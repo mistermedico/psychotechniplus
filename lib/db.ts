@@ -276,3 +276,101 @@ function fallbackQuestions(opts?: { topicId?: string; targetId?: string }): Ques
   if (opts?.targetId) q = q.filter(x => x.targetIds.includes(opts.targetId!));
   return q;
 }
+
+// ── Session Records ────────────────────────────────────────────────────────
+
+export interface SessionRecord {
+  id: string;
+  userId: string;
+  userName?: string;
+  targetId: string;
+  topicId: string;
+  mode: string;
+  templateId?: string;
+  templateName?: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  skippedQuestions: number;
+  score: number;
+  timeSpentSeconds: number;
+  startedAt: string;
+  completedAt: string;
+  answers: Array<{
+    questionId: string;
+    isCorrect: boolean;
+    isSkipped: boolean;
+    timeSpent: number;
+    difficulty: number;
+  }>;
+}
+
+export async function saveSessionRecord(record: SessionRecord): Promise<void> {
+  try {
+    await supabase.from('practice_sessions').upsert({
+      id: record.id,
+      user_id: record.userId,
+      user_name: record.userName ?? null,
+      target_id: record.targetId,
+      topic_id: record.topicId,
+      mode: record.mode,
+      template_id: record.templateId ?? null,
+      template_name: record.templateName ?? null,
+      total_questions: record.totalQuestions,
+      correct_answers: record.correctAnswers,
+      skipped_questions: record.skippedQuestions,
+      score: record.score,
+      time_spent_seconds: record.timeSpentSeconds,
+      started_at: record.startedAt,
+      completed_at: record.completedAt,
+      answers: record.answers,
+    });
+  } catch {}
+}
+
+export async function loadUserSessionHistory(userId: string, limit = 50): Promise<SessionRecord[]> {
+  try {
+    const { data } = await supabase
+      .from('practice_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('completed_at', { ascending: false })
+      .limit(limit);
+    return (data ?? []).map(rowToSessionRecord);
+  } catch {
+    return [];
+  }
+}
+
+export async function loadAllSessionHistory(limit = 200): Promise<SessionRecord[]> {
+  try {
+    const { data } = await supabase
+      .from('practice_sessions')
+      .select('*')
+      .order('completed_at', { ascending: false })
+      .limit(limit);
+    return (data ?? []).map(rowToSessionRecord);
+  } catch {
+    return [];
+  }
+}
+
+function rowToSessionRecord(row: any): SessionRecord {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userName: row.user_name ?? undefined,
+    targetId: row.target_id,
+    topicId: row.topic_id,
+    mode: row.mode,
+    templateId: row.template_id ?? undefined,
+    templateName: row.template_name ?? undefined,
+    totalQuestions: row.total_questions ?? 0,
+    correctAnswers: row.correct_answers ?? 0,
+    skippedQuestions: row.skipped_questions ?? 0,
+    score: row.score ?? 0,
+    timeSpentSeconds: row.time_spent_seconds ?? 0,
+    startedAt: row.started_at ?? '',
+    completedAt: row.completed_at ?? '',
+    answers: row.answers ?? [],
+  };
+}
