@@ -12,6 +12,7 @@ import { Question, QuestionOption, QuestionType, AccessLevel, ValidationStatus }
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
+import { AdminImagePicker } from '../../components/AdminImagePicker';
 
 const QUESTION_TYPES: QuestionType[] = [
   'multiple_choice', 'true_false', 'logic', 'verbal', 'quantitative', 'shapes', 'reading_comprehension',
@@ -28,7 +29,12 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   fill_in_the_blank: 'השלמת חסר',
 };
 
-const DEFAULT_OPTIONS: QuestionOption[] = [
+// Local option type that extends QuestionOption with imageUrl tracking
+interface AdminOption extends QuestionOption {
+  imageUrl?: string;
+}
+
+const DEFAULT_OPTIONS: AdminOption[] = [
   { id: 'a', text: '', isCorrect: true },
   { id: 'b', text: '', isCorrect: false },
   { id: 'c', text: '', isCorrect: false },
@@ -51,9 +57,16 @@ export default function QuestionEditor() {
   const [accessLevel, setAccessLevel] = useState<AccessLevel>(existing?.accessLevel ?? 'free');
   const [validationStatus, setValidationStatus] = useState<ValidationStatus>(existing?.validationStatus ?? 'draft');
   const [targetIds, setTargetIds] = useState<string[]>(existing?.targetIds ?? [TARGETS[0]?.id ?? '']);
-  const [options, setOptions] = useState<QuestionOption[]>(existing?.options ?? DEFAULT_OPTIONS.map(o => ({ ...o })));
+  const [options, setOptions] = useState<AdminOption[]>(
+    existing?.options.map(o => ({ ...o })) ?? DEFAULT_OPTIONS.map(o => ({ ...o }))
+  );
   const [eloOverride, setEloOverride] = useState(String(existing?.psychometricStats.elo ?? 1200));
   const [isDirty, setIsDirty] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState(existing?.mediaUrl ?? '');
+  const [mediaType, setMediaType] = useState<'image' | undefined>(
+    existing?.mediaType === 'image' ? 'image' : undefined
+  );
+  const [imageOnlyMode, setImageOnlyMode] = useState(false);
 
   const markDirty = () => { if (!isDirty) setIsDirty(true); };
 
@@ -74,6 +87,11 @@ export default function QuestionEditor() {
 
   const updateOptionText = (id: string, text: string) => {
     setOptions(prev => prev.map(o => (o.id === id ? { ...o, text } : o)));
+  };
+
+  const updateOptionImage = (id: string, imageUrl: string) => {
+    setOptions(prev => prev.map(o => (o.id === id ? { ...o, imageUrl: imageUrl || undefined } : o)));
+    markDirty();
   };
 
   const addOption = () => {
@@ -102,7 +120,9 @@ export default function QuestionEditor() {
       Alert.alert('שגיאה', 'טקסט השאלה קצר מדי (מינימום 10 תווים)');
       return;
     }
-    if (options.some(o => !o.text.trim())) {
+    // In image-only mode, options can be empty text if they have images
+    const optionsNeedText = !imageOnlyMode && !options.every(o => !!o.imageUrl);
+    if (optionsNeedText && options.some(o => !o.text.trim())) {
       Alert.alert('שגיאה', 'נא למלא את כל האפשרויות');
       return;
     }
@@ -128,7 +148,15 @@ export default function QuestionEditor() {
       questionType,
       questionText: questionText.trim(),
       readingPassage: readingPassage.trim() || undefined,
-      options,
+      mediaUrl: mediaUrl || undefined,
+      mediaType: mediaUrl ? 'image' : undefined,
+      options: options.map(o => ({
+        id: o.id,
+        text: o.text,
+        isCorrect: o.isCorrect,
+        analysisTag: o.analysisTag,
+        imageUrl: o.imageUrl || undefined,
+      })),
       correctAnswer: correctOpt.id,
       explanation: explanation.trim(),
       difficulty,
@@ -177,6 +205,33 @@ export default function QuestionEditor() {
               numberOfLines={4}
             />
             <Text style={styles.charCount}>{questionText.length} תווים</Text>
+          </Section>
+
+          {/* Section: question image */}
+          <Section title="🖼️ תמונה לשאלה (אופציונלי)">
+            {imageOnlyMode && (
+              <Text style={styles.altTextHint}>
+                מצב תמונה בלבד — הטקסט משמש כ-alt text בלבד
+              </Text>
+            )}
+            <AdminImagePicker
+              imageUri={mediaUrl}
+              onImageChange={uri => {
+                setMediaUrl(uri);
+                setMediaType(uri ? 'image' : undefined);
+                markDirty();
+              }}
+              placeholder="תמונה לשאלה"
+              compact={false}
+            />
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>שאלת תמונה בלבד — הטקסט יוסתר מהמשתמש</Text>
+              <Switch
+                value={imageOnlyMode}
+                onValueChange={v => { setImageOnlyMode(v); markDirty(); }}
+                trackColor={{ true: Colors.primary, false: Colors.border }}
+              />
+            </View>
           </Section>
 
           {/* Reading passage — shown always for reading_comprehension, optional otherwise */}
@@ -250,26 +305,34 @@ export default function QuestionEditor() {
           <Section title="🔘 אפשרויות תשובה">
             <Text style={styles.fieldLabel}>לחץ על לחצן ○ לסמן תשובה נכונה</Text>
             {options.map((opt, idx) => (
-              <View key={opt.id} style={styles.optionRow}>
-                <Pressable onPress={() => setCorrectOption(opt.id)} style={styles.radioWrap}>
-                  <View style={[styles.radio, opt.isCorrect && styles.radioActive]}>
-                    {opt.isCorrect && <View style={styles.radioDot} />}
-                  </View>
-                </Pressable>
-                <Text style={styles.optionLabel}>{opt.id.toUpperCase()}.</Text>
-                <TextInput
-                  style={[styles.optionInput, opt.isCorrect && { borderColor: Colors.success }, { writingDirection: detectDir(opt.text) }]}
-                  value={opt.text}
-                  onChangeText={t => updateOptionText(opt.id, t)}
-                  placeholder={`אפשרות ${opt.id.toUpperCase()}...`}
-                  placeholderTextColor={Colors.textTertiary}
-                  textAlign={ta(opt.text)}
-                />
-                {options.length > 2 && (
-                  <Pressable onPress={() => removeOption(opt.id)}>
-                    <Text style={{ fontSize: 18, color: Colors.danger }}>✕</Text>
+              <View key={opt.id} style={styles.optionBlock}>
+                <View style={styles.optionRow}>
+                  <Pressable onPress={() => setCorrectOption(opt.id)} style={styles.radioWrap}>
+                    <View style={[styles.radio, opt.isCorrect && styles.radioActive]}>
+                      {opt.isCorrect && <View style={styles.radioDot} />}
+                    </View>
                   </Pressable>
-                )}
+                  <Text style={styles.optionLabel}>{opt.id.toUpperCase()}.</Text>
+                  <TextInput
+                    style={[styles.optionInput, opt.isCorrect && { borderColor: Colors.success }, { writingDirection: detectDir(opt.text) }]}
+                    value={opt.text}
+                    onChangeText={t => updateOptionText(opt.id, t)}
+                    placeholder={`אפשרות ${opt.id.toUpperCase()}...`}
+                    placeholderTextColor={Colors.textTertiary}
+                    textAlign={ta(opt.text)}
+                  />
+                  {options.length > 2 && (
+                    <Pressable onPress={() => removeOption(opt.id)}>
+                      <Text style={{ fontSize: 18, color: Colors.danger }}>✕</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <AdminImagePicker
+                  imageUri={opt.imageUrl ?? ''}
+                  onImageChange={uri => updateOptionImage(opt.id, uri)}
+                  placeholder={`תמונה לאפשרות ${opt.id.toUpperCase()}`}
+                  compact
+                />
               </View>
             ))}
             {options.length < 6 && (
@@ -461,7 +524,19 @@ const styles = StyleSheet.create({
   },
   diffBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
 
-  optionRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
+  optionBlock: { marginBottom: 14 },
+  optionRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
+
+  altTextHint: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.warning,
+    textAlign: 'right',
+    marginBottom: 8,
+    backgroundColor: Colors.warningLight,
+    borderRadius: Radius.md,
+    padding: 8,
+  },
   radioWrap: { padding: 4 },
   radio: {
     width: 22, height: 22, borderRadius: 11,

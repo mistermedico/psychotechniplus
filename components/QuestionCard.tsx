@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, Animated,
+  View, Text, StyleSheet, Pressable, ScrollView, Animated, Image,
 } from 'react-native';
 import { Question } from '../data/types';
 import { Colors } from '../constants/colors';
@@ -155,35 +155,93 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
         <Text style={[styles.questionText, { fontSize: questionFontSize_, textAlign: textAlign(question.questionText), writingDirection: questionDir }]}>
           {question.questionText}
         </Text>
+        {/* Question image */}
+        {question.mediaUrl && question.mediaType === 'image' && (
+          <Image
+            source={{ uri: question.mediaUrl }}
+            style={styles.questionImage}
+            resizeMode="contain"
+          />
+        )}
       </View>
 
       {/* Options */}
-      <View style={styles.optionsContainer}>
-        {displayOptions.map(opt => {
-          const optDir = detectDir(opt.text);
+      {(() => {
+        const allOptionsHaveImages = displayOptions.every(o => !!o.imageUrl);
+        if (allOptionsHaveImages) {
+          // 2×2 grid layout
           return (
-            <Pressable
-              key={opt.id}
-              onPress={() => !revealed && onSelect(opt.id)}
-              disabled={revealed}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              style={({ pressed }) => [
-                styles.optionBase,
-                getOptionStyle(opt.id),
-                { flexDirection: optDir === 'rtl' ? 'row-reverse' : 'row' },
-                pressed && !revealed && { transform: [{ scale: 0.98 }] },
-              ]}
-            >
-              <View style={[styles.optionIconBox, getOptionStyle(opt.id)]}>
-                <Text style={getOptionTextStyle(opt.id)}>{getOptionIcon(opt.id)}</Text>
-              </View>
-              <Text style={[styles.optionTextBase, getOptionTextStyle(opt.id), { textAlign: textAlign(opt.text), writingDirection: optDir }]}>
-                {opt.text}
-              </Text>
-            </Pressable>
+            <View style={styles.optionsGrid}>
+              {displayOptions.map(opt => {
+                const isTextEmpty = !opt.text || !opt.text.trim();
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => !revealed && onSelect(opt.id)}
+                    disabled={revealed}
+                    style={({ pressed }) => [
+                      styles.optionGridCell,
+                      getOptionStyle(opt.id),
+                      pressed && !revealed && { opacity: 0.85 },
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: opt.imageUrl! }}
+                      style={styles.optionGridImage}
+                      resizeMode="contain"
+                    />
+                    {!isTextEmpty && (
+                      <Text style={[styles.optionGridText, getOptionTextStyle(opt.id)]}>
+                        {opt.text}
+                      </Text>
+                    )}
+                    <Text style={[styles.optionGridIcon, getOptionTextStyle(opt.id)]}>
+                      {getOptionIcon(opt.id)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           );
-        })}
-      </View>
+        }
+
+        // Normal list layout (with optional thumbnail)
+        return (
+          <View style={styles.optionsContainer}>
+            {displayOptions.map(opt => {
+              const optDir = detectDir(opt.text);
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => !revealed && onSelect(opt.id)}
+                  disabled={revealed}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={({ pressed }) => [
+                    styles.optionBase,
+                    getOptionStyle(opt.id),
+                    { flexDirection: optDir === 'rtl' ? 'row-reverse' : 'row' },
+                    pressed && !revealed && { transform: [{ scale: 0.98 }] },
+                  ]}
+                >
+                  <View style={[styles.optionIconBox, getOptionStyle(opt.id)]}>
+                    <Text style={getOptionTextStyle(opt.id)}>{getOptionIcon(opt.id)}</Text>
+                  </View>
+                  <Text style={[styles.optionTextBase, getOptionTextStyle(opt.id), { textAlign: textAlign(opt.text), writingDirection: optDir }]}>
+                    {opt.text}
+                  </Text>
+                  {opt.imageUrl && (
+                    <Image
+                      source={{ uri: opt.imageUrl }}
+                      style={styles.optionThumbnail}
+                      resizeMode="cover"
+                    />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        );
+      })()}
     </Animated.View>
   );
 }
@@ -273,7 +331,51 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
 
+  questionImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+
   optionsContainer: { gap: 10 },
+
+  // 2×2 grid for image options
+  optionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionGridCell: {
+    width: '48%',
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    padding: 8,
+    alignItems: 'center',
+  },
+  optionGridImage: {
+    width: '100%',
+    height: 110,
+    borderRadius: Radius.md,
+    marginBottom: 4,
+  },
+  optionGridText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  optionGridIcon: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    marginTop: 4,
+  },
+
+  optionThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: Radius.sm,
+  },
 
   optionBase: {
     flexDirection: 'row-reverse',

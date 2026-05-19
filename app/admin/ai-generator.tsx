@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, ActivityIndicator, Alert, Animated,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Image, Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +28,8 @@ interface GeneratedQuestion {
   explanation: string;
   difficulty: number;
   questionType: QuestionType;
+  mediaUrl?: string;
+  imageOnly?: boolean;
 }
 
 interface EditableQuestion extends GeneratedQuestion {
@@ -520,6 +522,12 @@ export default function AiGenerator() {
     ));
   }, []);
 
+  const toggleImageOnly = useCallback((localId: string, value: boolean) => {
+    setQuestions(prev => prev.map(q =>
+      q.localId === localId ? { ...q, imageOnly: value } : q
+    ));
+  }, []);
+
   const setCorrectOption = useCallback((localId: string, optId: string) => {
     setQuestions(prev => prev.map(q =>
       q.localId === localId
@@ -840,6 +848,7 @@ export default function AiGenerator() {
                 onUpdateExplanation={(v) => updateQuestionField(eq.localId, 'explanation', v)}
                 onUpdateOptionText={(optId, text) => updateOptionText(eq.localId, optId, text)}
                 onSetCorrect={(optId) => setCorrectOption(eq.localId, optId)}
+                onToggleImageOnly={(v) => toggleImageOnly(eq.localId, v)}
               />
             ))}
 
@@ -989,9 +998,10 @@ interface QuestionCardProps {
   onUpdateExplanation: (v: string) => void;
   onUpdateOptionText: (optId: string, text: string) => void;
   onSetCorrect: (optId: string) => void;
+  onToggleImageOnly: (v: boolean) => void;
 }
 
-function QuestionCard({ question, index, onSave, onDiscard, onUpdateText, onUpdateExplanation, onUpdateOptionText, onSetCorrect }: QuestionCardProps) {
+function QuestionCard({ question, index, onSave, onDiscard, onUpdateText, onUpdateExplanation, onUpdateOptionText, onSetCorrect, onToggleImageOnly }: QuestionCardProps) {
   const typeConfig = QUESTION_TYPES.find(t => t.type === question.questionType);
 
   return (
@@ -1006,7 +1016,31 @@ function QuestionCard({ question, index, onSave, onDiscard, onUpdateText, onUpda
           <View style={[styles.badge, { backgroundColor: difficultyBg(question.difficulty) }]}>
             <Text style={[styles.badgeText, { color: difficultyColor(question.difficulty) }]}>קושי {question.difficulty}</Text>
           </View>
+          {question.mediaUrl && (
+            <View style={[styles.badge, { backgroundColor: Colors.warningLight }]}>
+              <Text style={[styles.badgeText, { color: Colors.warning }]}>🖼️ תמונה</Text>
+            </View>
+          )}
         </View>
+      </View>
+
+      {/* Question image preview */}
+      {question.mediaUrl && (
+        <Image
+          source={{ uri: question.mediaUrl }}
+          style={styles.qImagePreview}
+          resizeMode="contain"
+        />
+      )}
+
+      {/* Image-only toggle */}
+      <View style={styles.qImageOnlyRow}>
+        <Text style={styles.qImageOnlyLabel}>שאלת תמונה בלבד</Text>
+        <Switch
+          value={!!question.imageOnly}
+          onValueChange={onToggleImageOnly}
+          trackColor={{ true: Colors.primary, false: Colors.border }}
+        />
       </View>
 
       {/* Question text */}
@@ -1202,6 +1236,25 @@ const styles = StyleSheet.create({
   qCardNum: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.primary },
   qCardBadges: { flexDirection: 'row-reverse', gap: 6 },
 
+  qImagePreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  qImageOnlyRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingVertical: 4,
+  },
+  qImageOnlyLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+  },
   qTextInput: {
     fontFamily: FontFamily.semiBold, fontSize: FontSize.base, color: Colors.text,
     textAlign: 'right', lineHeight: 24,

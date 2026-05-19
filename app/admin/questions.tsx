@@ -139,7 +139,10 @@ export default function QuestionsAdmin() {
         </View>
 
         {/* Question text */}
-        <Text style={[styles.questionText, { textAlign: ta(item.questionText), writingDirection: detectDir(item.questionText) }]} numberOfLines={2}>{item.questionText}</Text>
+        <View style={styles.questionTextRow}>
+          <Text style={[styles.questionText, { flex: 1, textAlign: ta(item.questionText), writingDirection: detectDir(item.questionText) }]} numberOfLines={2}>{item.questionText}</Text>
+          {item.mediaUrl && <Text style={styles.imageBadge}>🖼️</Text>}
+        </View>
 
         {/* Topic + type */}
         <View style={styles.cardFooter}>
@@ -407,12 +410,20 @@ const styles = StyleSheet.create({
   },
   checkCircleActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   checkMark: { fontFamily: FontFamily.bold, fontSize: 12, color: '#fff' },
+  questionTextRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    gap: 6,
+  },
   questionText: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
     color: Colors.text,
     lineHeight: 20,
-    marginBottom: 8,
+  },
+  imageBadge: {
+    fontSize: 14,
   },
   cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between' },
   footerTopic: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary },

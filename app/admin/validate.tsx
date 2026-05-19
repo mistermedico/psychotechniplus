@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Animated, Alert, ScrollView,
+  View, Text, StyleSheet, Pressable, Animated, Alert, ScrollView, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -274,6 +274,15 @@ function QuestionPreviewCard({ question }: { question: Question }) {
         {question.questionText}
       </Text>
 
+      {/* Question image */}
+      {question.mediaUrl && question.mediaType === 'image' && (
+        <Image
+          source={{ uri: question.mediaUrl }}
+          style={{ width: '100%', height: 160, borderRadius: 8, marginBottom: 8 }}
+          resizeMode="contain"
+        />
+      )}
+
       {/* Options */}
       <View style={cardStyles.options}>
         {question.options.map(opt => {
@@ -291,6 +300,9 @@ function QuestionPreviewCard({ question }: { question: Question }) {
               {opt.id.toUpperCase()}
             </Text>
             <Text style={[cardStyles.optionText, { textAlign: ta(opt.text), writingDirection: optDir }]}>{opt.text}</Text>
+            {opt.imageUrl && (
+              <Image source={{ uri: opt.imageUrl }} style={{ width: 50, height: 50, borderRadius: 6 }} />
+            )}
             {opt.isCorrect && <Text style={cardStyles.correctMark}>✓</Text>}
           </View>);
         })}
