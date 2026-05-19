@@ -1190,12 +1190,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     try {
       const settings = await loadAdminSettings();
       if (settings) {
-        const updates: Partial<typeof get()> = {};
-        if (settings.practiceSettings) (updates as any).practiceSettings = { ...get().practiceSettings, ...settings.practiceSettings };
-        if (settings.examSettings) (updates as any).examSettings = { ...get().examSettings, ...settings.examSettings };
-        if (typeof settings.freePracticeLimit === 'number') (updates as any).freePracticeLimit = settings.freePracticeLimit;
-        if (settings.appConfig) (updates as any).appConfig = { ...get().appConfig, ...settings.appConfig };
-        if (Object.keys(updates).length > 0) set(updates as any);
+        if (settings.practiceSettings) set(s => ({ practiceSettings: { ...s.practiceSettings, ...settings.practiceSettings } }));
+        if (settings.examSettings) set(s => ({ examSettings: { ...s.examSettings, ...settings.examSettings } }));
+        if (typeof settings.freePracticeLimit === 'number') set({ freePracticeLimit: settings.freePracticeLimit });
+        if (settings.appConfig) set(s => ({ appConfig: { ...s.appConfig, ...settings.appConfig } }));
       }
     } catch {}
   },
