@@ -288,10 +288,11 @@ function rowToTopic(row: any): Topic {
   };
 }
 
-function fallbackQuestions(opts?: { topicId?: string; targetId?: string }): Question[] {
+function fallbackQuestions(opts?: { topicId?: string; targetId?: string; status?: string }): Question[] {
   let q = QUESTIONS;
   if (opts?.topicId) q = q.filter(x => x.topicId === opts.topicId);
   if (opts?.targetId) q = q.filter(x => x.targetIds.includes(opts.targetId!));
+  if (opts?.status) q = q.filter(x => x.validationStatus === opts.status);
   return q;
 }
 

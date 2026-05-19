@@ -121,7 +121,7 @@ export default function PracticeSession() {
 
     // FREE PRACTICE MODE
     const limit = questionLimit ? parseInt(questionLimit) : 10;
-    fetchQuestions({ topicId: topicId ?? '' }).then(questions => {
+    fetchQuestions({ topicId: topicId ?? '', status: 'validated' }).then(questions => {
       if (cancelled) return;
       if (questions.length === 0) {
         Alert.alert('שגיאה', 'לא נמצאו שאלות לנושא זה');

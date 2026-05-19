@@ -652,6 +652,12 @@ interface AdminState {
   addGenerationPreset: (p: Omit<GenerationPreset, 'id'>) => GenerationPreset;
   deleteGenerationPreset: (id: string) => void;
 
+  // Background bulk generator state
+  bgGenRunning: boolean;
+  bgGenProgress: { done: number; total: number; currentTopic: string; currentType: string; log: string[] } | null;
+  setBgGenRunning: (val: boolean) => void;
+  setBgGenProgress: (p: { done: number; total: number; currentTopic: string; currentType: string; log: string[] } | null) => void;
+
   // Supabase sync
   loadQuestionsFromSupabase: () => Promise<void>;
   seedToSupabase: () => Promise<{ ok: boolean; message: string }>;
@@ -717,6 +723,11 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   activityLog: SEED_ACTIVITY_LOG,
   generationSessions: SEED_GENERATION_SESSIONS,
   generationPresets: SEED_GENERATION_PRESETS,
+  bgGenRunning: false,
+  bgGenProgress: null,
+
+  setBgGenRunning: (val) => set({ bgGenRunning: val }),
+  setBgGenProgress: (p) => set({ bgGenProgress: p }),
 
   setAppConfig: (updates) => {
     set(s => {
