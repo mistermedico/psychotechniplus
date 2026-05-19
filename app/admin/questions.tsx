@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
-  TextInput, Alert,
+  TextInput, Alert, ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
@@ -30,6 +30,7 @@ const STATUS_LABELS: Record<ValidationStatus, string> = {
 const SORT_OPTIONS = ['חדש → ישן', 'ישן → חדש', 'קושי ↑', 'קושי ↓', 'ELO ↑', 'ELO ↓'];
 
 export default function QuestionsAdmin() {
+  const insets = useSafeAreaInsets();
   const { questions, topics, selectedQuestionIds, toggleSelectQuestion, clearSelection,
     selectAll, deleteQuestions, bulkValidate, deleteQuestion, addQuestion } = useAdminStore();
 
@@ -51,7 +52,7 @@ export default function QuestionsAdmin() {
 
     switch (sortIdx) {
       case 0: q = q.slice().reverse(); break;
-      case 1: /* natural order = oldest first, no sort */ break;
+      case 1: /* natural order = oldest first */ break;
       case 2: q = q.slice().sort((a, b) => a.difficulty - b.difficulty); break;
       case 3: q = q.slice().sort((a, b) => b.difficulty - a.difficulty); break;
       case 4: q = q.slice().sort((a, b) => a.psychometricStats.elo - b.psychometricStats.elo); break;
@@ -124,8 +125,16 @@ export default function QuestionsAdmin() {
           <Text style={[styles.statusText, { color: STATUS_COLORS[item.validationStatus] }]}>
             {STATUS_LABELS[item.validationStatus]}
           </Text>
-          <View style={styles.diffBadge}>
-            <Text style={styles.diffText}>רמה {item.difficulty}</Text>
+          <View style={[styles.diffBadge, {
+            backgroundColor: item.difficulty <= 3 ? Colors.successLight :
+              item.difficulty <= 6 ? Colors.warningLight : Colors.dangerLight,
+          }]}>
+            <Text style={[styles.diffText, {
+              color: item.difficulty <= 3 ? Colors.success :
+                item.difficulty <= 6 ? Colors.warning : Colors.danger,
+            }]}>
+              רמה {item.difficulty}
+            </Text>
           </View>
           <Text style={styles.eloText}>ELO {item.psychometricStats.elo}</Text>
           <Text style={[styles.accessBadge, { color: item.accessLevel === 'premium' ? Colors.warning : Colors.success }]}>
@@ -140,26 +149,42 @@ export default function QuestionsAdmin() {
 
         {/* Question text */}
         <View style={styles.questionTextRow}>
-          <Text style={[styles.questionText, { flex: 1, textAlign: ta(item.questionText), writingDirection: detectDir(item.questionText) }]} numberOfLines={2}>{item.questionText}</Text>
+          <Text
+            style={[styles.questionText, { flex: 1, textAlign: ta(item.questionText), writingDirection: detectDir(item.questionText) }]}
+            numberOfLines={2}
+          >
+            {item.questionText}
+          </Text>
           {item.mediaUrl && <Text style={styles.imageBadge}>🖼️</Text>}
         </View>
 
         {/* Topic + type */}
         <View style={styles.cardFooter}>
           <Text style={styles.footerMeta}>{item.questionType}</Text>
-          <Text style={styles.footerTopic}>{topic?.icon ?? '📝'} {topic?.name ?? item.topicId}</Text>
+          {topic && (
+            <View style={[styles.topicPill, { backgroundColor: topic.color + '18', borderColor: topic.color + '40' }]}>
+              <Text style={[styles.topicPillText, { color: topic.color }]}>
+                {topic.icon} {topic.name}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Quick actions */}
+        {/* Quick actions — horizontal scroll so they never wrap */}
         {!bulkMode && (
-          <View style={styles.quickActions}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.quickActionsScroll}
+            contentContainerStyle={styles.quickActionsContent}
+          >
             <Pressable
               onPress={() => router.push({ pathname: '/admin/question-editor', params: { questionId: item.id, mode: 'edit' } })}
               style={[styles.qaBtn, { backgroundColor: Colors.primaryLighter }]}
             >
               <Text style={[styles.qaBtnText, { color: Colors.primary }]}>✏️ ערוך</Text>
             </Pressable>
-            {item.validationStatus === 'pending' && (
+            {item.validationStatus !== 'validated' && (
               <Pressable
                 onPress={() => {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -196,9 +221,9 @@ export default function QuestionsAdmin() {
               }}
               style={[styles.qaBtn, { backgroundColor: Colors.dangerLight }]}
             >
-              <Text style={[styles.qaBtnText, { color: Colors.danger }]}>🗑️</Text>
+              <Text style={[styles.qaBtnText, { color: Colors.danger }]}>🗑️ מחק</Text>
             </Pressable>
-          </View>
+          </ScrollView>
         )}
       </Pressable>
     );
@@ -221,13 +246,23 @@ export default function QuestionsAdmin() {
         />
       </View>
 
-      {/* Filters */}
-      <View style={styles.filterRow}>
+      {/* Status filter — horizontal scroll */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScrollWrap}
+        contentContainerStyle={styles.filterRow}
+      >
         {(['all', 'validated', 'pending', 'draft', 'rejected'] as const).map(s => (
           <Pressable
             key={s}
             onPress={() => setFilterStatus(s)}
-            style={[styles.filterChip, filterStatus === s && styles.filterChipActive]}
+            style={[
+              styles.filterChip,
+              filterStatus === s && (s === 'all'
+                ? styles.filterChipActive
+                : { backgroundColor: STATUS_COLORS[s], borderColor: STATUS_COLORS[s] }),
+            ]}
           >
             <Text style={[styles.filterChipText, filterStatus === s && { color: '#fff' }]}>
               {s === 'all' ? 'הכל' : STATUS_LABELS[s]}
@@ -235,39 +270,55 @@ export default function QuestionsAdmin() {
             </Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
 
-      {/* Topic filter + sort */}
-      <View style={styles.secondRow}>
+      {/* Topic filter + sort — horizontal scroll */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScrollWrap}
+        contentContainerStyle={styles.filterRow}
+      >
         <Pressable
-          onPress={() => {
-            const topicIds = ['all', ...TOPICS.map(t => t.id)];
-            const idx = topicIds.indexOf(filterTopicId);
-            setFilterTopicId(topicIds[(idx + 1) % topicIds.length]);
-          }}
-          style={styles.topicFilter}
+          onPress={() => setFilterTopicId('all')}
+          style={[styles.filterChip, filterTopicId === 'all' && styles.filterChipActive]}
         >
-          <Text style={styles.topicFilterText}>
-            {filterTopicId === 'all' ? '📚 כל הנושאים' :
-              (TOPICS.find(t => t.id === filterTopicId)?.icon ?? '') + ' ' +
-              (TOPICS.find(t => t.id === filterTopicId)?.name ?? filterTopicId)}
-            {' ▾'}
+          <Text style={[styles.filterChipText, filterTopicId === 'all' && { color: '#fff' }]}>
+            📚 כל הנושאים
           </Text>
         </Pressable>
-
+        {TOPICS.map(t => (
+          <Pressable
+            key={t.id}
+            onPress={() => setFilterTopicId(filterTopicId === t.id ? 'all' : t.id)}
+            style={[
+              styles.filterChip,
+              filterTopicId === t.id && { backgroundColor: t.color, borderColor: t.color },
+            ]}
+          >
+            <Text style={[styles.filterChipText, filterTopicId === t.id && { color: '#fff' }]}>
+              {t.icon} {t.name}
+            </Text>
+          </Pressable>
+        ))}
         <Pressable
           onPress={() => setSortIdx(i => (i + 1) % SORT_OPTIONS.length)}
-          style={styles.sortBtn}
+          style={styles.sortChip}
         >
-          <Text style={styles.sortBtnText}>⇅ {SORT_OPTIONS[sortIdx]}</Text>
+          <Text style={styles.filterChipText}>⇅ {SORT_OPTIONS[sortIdx]}</Text>
         </Pressable>
-      </View>
+      </ScrollView>
 
-      {/* Bulk mode bar */}
+      {/* Bulk mode bar — horizontal scroll */}
       {bulkMode && (
-        <View style={styles.bulkBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.bulkBarWrap}
+          contentContainerStyle={styles.bulkBar}
+        >
           <Pressable onPress={() => { clearSelection(); setBulkMode(false); }} style={styles.bulkCancel}>
-            <Text style={styles.bulkCancelText}>ביטול</Text>
+            <Text style={styles.bulkCancelText}>✕ ביטול</Text>
           </Pressable>
           <Text style={styles.bulkCount}>{selectedQuestionIds.length} נבחרו</Text>
           <Pressable onPress={() => selectAll()} style={styles.bulkAction}>
@@ -280,28 +331,33 @@ export default function QuestionsAdmin() {
             <Text style={[styles.bulkActionText, { color: Colors.danger }]}>❌ דחה</Text>
           </Pressable>
           <Pressable onPress={() => handleBulkAction('delete')} style={[styles.bulkAction, { backgroundColor: Colors.dangerLight }]}>
-            <Text style={[styles.bulkActionText, { color: Colors.danger }]}>🗑️</Text>
+            <Text style={[styles.bulkActionText, { color: Colors.danger }]}>🗑️ מחק</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       )}
 
-      {/* Count */}
-      <Text style={styles.resultCount}>{filtered.length} שאלות מתוך {questions.length}</Text>
+      {/* Count + pending indicator */}
+      <View style={styles.summaryRow}>
+        <Text style={styles.resultCount}>{filtered.length} מתוך {questions.length} שאלות</Text>
+        {pendingCount > 0 && (
+          <Text style={styles.pendingIndicator}>⏳ {pendingCount} ממתינות לאישור</Text>
+        )}
+      </View>
 
       <FlatList
         data={filtered}
         keyExtractor={item => item.id}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
       />
 
-      {/* FAB */}
+      {/* FAB — respects safe area */}
       {!bulkMode && (
         <Pressable
           onPress={() => router.push({ pathname: '/admin/question-editor', params: { mode: 'add' } })}
-          style={styles.fab}
+          style={[styles.fab, { bottom: Math.max(24, insets.bottom + 16) }]}
         >
           <Text style={styles.fabText}>+</Text>
         </Pressable>
@@ -312,7 +368,8 @@ export default function QuestionsAdmin() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  searchBar: { padding: 12, paddingBottom: 0 },
+
+  searchBar: { padding: 12, paddingBottom: 8 },
   searchInput: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
@@ -323,10 +380,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  filterRow: { flexDirection: 'row-reverse', paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
+
+  filterScrollWrap: { maxHeight: 44 },
+  filterRow: { paddingHorizontal: 12, paddingVertical: 6, gap: 6, flexDirection: 'row-reverse' },
+
   filterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: Radius.full,
     backgroundColor: Colors.surfaceSecondary,
     borderWidth: 1,
@@ -334,53 +394,34 @@ const styles = StyleSheet.create({
   },
   filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   filterChipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
-  secondRow: { flexDirection: 'row-reverse', paddingHorizontal: 12, paddingBottom: 8, gap: 8 },
-  topicFilter: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  topicFilterText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
-  sortBtn: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    justifyContent: 'center',
-  },
-  sortBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
 
-  bulkBar: {
-    flexDirection: 'row-reverse',
-    backgroundColor: '#0F172A',
-    padding: 10,
-    alignItems: 'center',
-    gap: 6,
+  sortChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  bulkCancel: { paddingHorizontal: 8 },
+
+  bulkBarWrap: { backgroundColor: '#0F172A', maxHeight: 52 },
+  bulkBar: { paddingHorizontal: 10, paddingVertical: 10, gap: 8, flexDirection: 'row-reverse', alignItems: 'center' },
+  bulkCancel: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.md, backgroundColor: 'rgba(255,255,255,0.1)' },
   bulkCancelText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#94A3B8' },
-  bulkCount: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff', textAlign: 'center' },
+  bulkCount: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff', paddingHorizontal: 6 },
   bulkAction: {
     backgroundColor: Colors.primaryLighter,
     borderRadius: Radius.md,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
   },
   bulkActionText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
 
-  resultCount: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'right',
-    paddingHorizontal: 16,
-    marginBottom: 4,
-  },
-  list: { paddingHorizontal: 12, paddingBottom: 80 },
+  summaryRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 4 },
+  resultCount: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
+  pendingIndicator: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.warning },
+
+  list: { paddingHorizontal: 12 },
 
   card: {
     backgroundColor: Colors.surface,
@@ -391,50 +432,38 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   cardSelected: { borderColor: Colors.primary, borderWidth: 2, backgroundColor: Colors.primaryLighter },
+
   cardHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 8 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs },
-  diffBadge: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: Radius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  diffText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
+  diffBadge: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 2 },
+  diffText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
   eloText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, flex: 1, textAlign: 'left' },
   accessBadge: { fontSize: 12 },
   checkCircle: {
-    width: 22, height: 22, borderRadius: 11,
+    width: 24, height: 24, borderRadius: 12,
     borderWidth: 2, borderColor: Colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
   checkCircleActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   checkMark: { fontFamily: FontFamily.bold, fontSize: 12, color: '#fff' },
-  questionTextRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-    gap: 6,
-  },
-  questionText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: Colors.text,
-    lineHeight: 20,
-  },
-  imageBadge: {
-    fontSize: 14,
-  },
-  cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between' },
-  footerTopic: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary },
+
+  questionTextRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', marginBottom: 8, gap: 6 },
+  questionText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, lineHeight: 20 },
+  imageBadge: { fontSize: 14 },
+
+  cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   footerMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
-  quickActions: { flexDirection: 'row-reverse', gap: 6, marginTop: 8, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8, flexWrap: 'wrap' },
-  qaBtn: { borderRadius: Radius.md, paddingHorizontal: 10, paddingVertical: 5 },
+  topicPill: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  topicPillText: { fontFamily: FontFamily.medium, fontSize: 11 },
+
+  quickActionsScroll: { marginTop: 8, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8 },
+  quickActionsContent: { flexDirection: 'row-reverse', gap: 6 },
+  qaBtn: { borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 7 },
   qaBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs },
 
   fab: {
     position: 'absolute',
-    bottom: 24,
     left: 20,
     width: 56,
     height: 56,

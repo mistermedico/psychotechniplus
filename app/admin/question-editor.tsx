@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, KeyboardAvoidingView, Platform, Alert, Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
@@ -15,7 +15,8 @@ import { detectDir, textAlign as ta } from '../../utils/textDirection';
 import { AdminImagePicker } from '../../components/AdminImagePicker';
 
 const QUESTION_TYPES: QuestionType[] = [
-  'multiple_choice', 'true_false', 'logic', 'verbal', 'quantitative', 'shapes', 'reading_comprehension',
+  'multiple_choice', 'true_false', 'logic', 'verbal', 'quantitative', 'shapes',
+  'reading_comprehension', 'fill_in_the_blank',
 ];
 
 const TYPE_LABELS: Record<QuestionType, string> = {
@@ -29,7 +30,9 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   fill_in_the_blank: 'השלמת חסר',
 };
 
-// Local option type that extends QuestionOption with imageUrl tracking
+// difficulty (1-10) → suggested ELO
+const difficultyToElo = (d: number) => Math.round(700 + (d / 10) * 1300);
+
 interface AdminOption extends QuestionOption {
   imageUrl?: string;
 }
@@ -42,6 +45,7 @@ const DEFAULT_OPTIONS: AdminOption[] = [
 ];
 
 export default function QuestionEditor() {
+  const insets = useSafeAreaInsets();
   const { questionId, mode } = useLocalSearchParams<{ questionId?: string; mode: string }>();
   const { questions, addQuestion, updateQuestion } = useAdminStore();
 
@@ -60,7 +64,8 @@ export default function QuestionEditor() {
   const [options, setOptions] = useState<AdminOption[]>(
     existing?.options.map(o => ({ ...o })) ?? DEFAULT_OPTIONS.map(o => ({ ...o }))
   );
-  const [eloOverride, setEloOverride] = useState(String(existing?.psychometricStats.elo ?? 1200));
+  const [eloOverride, setEloOverride] = useState(String(existing?.psychometricStats.elo ?? difficultyToElo(5)));
+  const eloManuallyEdited = useRef(!!existing);
   const [isDirty, setIsDirty] = useState(false);
   const [mediaUrl, setMediaUrl] = useState(existing?.mediaUrl ?? '');
   const [mediaType, setMediaType] = useState<'image' | undefined>(
@@ -69,6 +74,22 @@ export default function QuestionEditor() {
   const [imageOnlyMode, setImageOnlyMode] = useState(false);
 
   const markDirty = () => { if (!isDirty) setIsDirty(true); };
+
+  // Auto-assign target when topic changes
+  useEffect(() => {
+    const topic = TOPICS.find(t => t.id === topicId);
+    if (topic?.targetId && !targetIds.includes(topic.targetId)) {
+      setTargetIds(prev => [...prev, topic.targetId]);
+      markDirty();
+    }
+  }, [topicId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-suggest ELO when difficulty changes (unless user manually edited)
+  useEffect(() => {
+    if (!eloManuallyEdited.current) {
+      setEloOverride(String(difficultyToElo(difficulty)));
+    }
+  }, [difficulty]);
 
   const handleBack = () => {
     if (isDirty) {
@@ -83,10 +104,12 @@ export default function QuestionEditor() {
 
   const setCorrectOption = (id: string) => {
     setOptions(prev => prev.map(o => ({ ...o, isCorrect: o.id === id })));
+    markDirty();
   };
 
   const updateOptionText = (id: string, text: string) => {
     setOptions(prev => prev.map(o => (o.id === id ? { ...o, text } : o)));
+    markDirty();
   };
 
   const updateOptionImage = (id: string, imageUrl: string) => {
@@ -98,17 +121,30 @@ export default function QuestionEditor() {
     if (options.length >= 6) return;
     const nextId = String.fromCharCode(97 + options.length);
     setOptions(prev => [...prev, { id: nextId, text: '', isCorrect: false }]);
+    markDirty();
   };
 
   const removeOption = (id: string) => {
     if (options.length <= 2) return;
     setOptions(prev => prev.filter(o => o.id !== id));
+    markDirty();
   };
 
   const toggleTarget = (tId: string) => {
     setTargetIds(prev =>
       prev.includes(tId) ? prev.filter(x => x !== tId) : [...prev, tId]
     );
+    markDirty();
+  };
+
+  const handleTopicChange = (tId: string) => {
+    setTopicId(tId);
+    // Auto-assign the topic's parent target
+    const topic = TOPICS.find(t => t.id === tId);
+    if (topic?.targetId) {
+      setTargetIds(prev => prev.includes(topic.targetId) ? prev : [...prev, topic.targetId]);
+    }
+    markDirty();
   };
 
   const handleSave = () => {
@@ -120,7 +156,6 @@ export default function QuestionEditor() {
       Alert.alert('שגיאה', 'טקסט השאלה קצר מדי (מינימום 10 תווים)');
       return;
     }
-    // In image-only mode, options can be empty text if they have images
     const optionsNeedText = !imageOnlyMode && !options.every(o => !!o.imageUrl);
     if (optionsNeedText && options.some(o => !o.text.trim())) {
       Alert.alert('שגיאה', 'נא למלא את כל האפשרויות');
@@ -141,7 +176,7 @@ export default function QuestionEditor() {
     }
 
     const rawElo = parseInt(eloOverride);
-    const elo = isNaN(rawElo) ? 1200 : Math.max(800, Math.min(2000, rawElo));
+    const elo = isNaN(rawElo) ? difficultyToElo(difficulty) : Math.max(800, Math.min(2000, rawElo));
     const q: Omit<Question, 'id'> = {
       targetIds,
       topicId,
@@ -174,9 +209,22 @@ export default function QuestionEditor() {
     } else {
       addQuestion(q);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('נוסף!', 'השאלה נוספה למאגר', [{ text: 'חזרה', onPress: () => router.back() }]);
+      Alert.alert('נוסף!', 'השאלה נוספה למאגר', [
+        { text: 'הוסף עוד', onPress: () => {
+          setQuestionText('');
+          setExplanation('');
+          setOptions(DEFAULT_OPTIONS.map(o => ({ ...o })));
+          setDifficulty(5);
+          setEloOverride(String(difficultyToElo(5)));
+          eloManuallyEdited.current = false;
+          setIsDirty(false);
+        }},
+        { text: 'חזרה לרשימה', onPress: () => router.back() },
+      ]);
     }
   };
+
+  const diffColor = difficulty <= 3 ? Colors.success : difficulty <= 6 ? Colors.warning : Colors.danger;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -184,12 +232,21 @@ export default function QuestionEditor() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Back button */}
-          <Pressable onPress={handleBack} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>→ חזרה{isDirty ? ' (שינויים לא שמורים)' : ''}</Text>
+          <Pressable onPress={handleBack} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.backBtnText}>→ חזרה{isDirty ? ' •' : ''}</Text>
           </Pressable>
+
+          {/* Header */}
+          <View style={styles.pageHeader}>
+            <Text style={styles.pageTitle}>{isEdit ? '✏️ עריכת שאלה' : '➕ שאלה חדשה'}</Text>
+            {isDirty && <Text style={styles.dirtyBadge}>לא נשמר</Text>}
+          </View>
 
           {/* Section: question text */}
           <Section title="📝 טקסט השאלה">
@@ -225,7 +282,7 @@ export default function QuestionEditor() {
               compact={false}
             />
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>שאלת תמונה בלבד — הטקסט יוסתר מהמשתמש</Text>
+              <Text style={styles.switchLabel}>שאלת תמונה בלבד</Text>
               <Switch
                 value={imageOnlyMode}
                 onValueChange={v => { setImageOnlyMode(v); markDirty(); }}
@@ -234,10 +291,14 @@ export default function QuestionEditor() {
             </View>
           </Section>
 
-          {/* Reading passage — shown always for reading_comprehension, optional otherwise */}
+          {/* Reading passage */}
           <Section title={`📖 קטע קריאה${questionType === 'reading_comprehension' ? ' (נדרש)' : ' (אופציונלי)'}`}>
             <TextInput
-              style={[styles.textArea, { minHeight: 80, writingDirection: detectDir(readingPassage) }, questionType === 'reading_comprehension' && { borderColor: Colors.primary }]}
+              style={[
+                styles.textArea,
+                { minHeight: 80, writingDirection: detectDir(readingPassage) },
+                questionType === 'reading_comprehension' && { borderColor: Colors.primary },
+              ]}
               multiline
               value={readingPassage}
               onChangeText={v => { setReadingPassage(v); markDirty(); }}
@@ -256,7 +317,7 @@ export default function QuestionEditor() {
                 {QUESTION_TYPES.map(t => (
                   <Pressable
                     key={t}
-                    onPress={() => setQuestionType(t)}
+                    onPress={() => { setQuestionType(t); markDirty(); }}
                     style={[styles.chip, questionType === t && styles.chipActive]}
                   >
                     <Text style={[styles.chipText, questionType === t && { color: '#fff' }]}>
@@ -267,54 +328,123 @@ export default function QuestionEditor() {
               </View>
             </ScrollView>
 
-            <Text style={styles.fieldLabel}>רמת קושי: {difficulty}/10</Text>
-            <View style={styles.diffRow}>
-              {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
-                <Pressable
-                  key={n}
-                  onPress={() => setDifficulty(n)}
-                  style={[
-                    styles.diffBtn,
-                    {
-                      backgroundColor: n <= difficulty
-                        ? (difficulty <= 3 ? Colors.success : difficulty <= 6 ? Colors.warning : Colors.danger)
-                        : Colors.surfaceSecondary,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.diffBtnText, { color: n <= difficulty ? '#fff' : Colors.textTertiary }]}>
-                    {n}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={styles.diffHeader}>
+              <Text style={styles.fieldLabel}>רמת קושי</Text>
+              <View style={[styles.diffValueBadge, { backgroundColor: diffColor }]}>
+                <Text style={styles.diffValueText}>{difficulty}/10</Text>
+              </View>
             </View>
+            {/* Difficulty slider — horizontal scroll, all 10 levels */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+              <View style={styles.diffRow}>
+                {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
+                  const btnColor = n <= difficulty
+                    ? (n <= 3 ? Colors.success : n <= 6 ? Colors.warning : Colors.danger)
+                    : Colors.surfaceSecondary;
+                  return (
+                    <Pressable
+                      key={n}
+                      onPress={() => { setDifficulty(n); markDirty(); }}
+                      style={[styles.diffBtn, { backgroundColor: btnColor }]}
+                    >
+                      <Text style={[styles.diffBtnText, { color: n <= difficulty ? '#fff' : Colors.textTertiary }]}>
+                        {n}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <Text style={styles.diffHint}>
+              {difficulty <= 3 ? '🟢 קל — מתאים למתחילים' :
+               difficulty <= 6 ? '🟡 בינוני — רמה ממוצעת' :
+               '🔴 קשה — למתקדמים'}
+            </Text>
 
-            <Text style={styles.fieldLabel}>ELO שאלה (800 – 2000)</Text>
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>ELO שאלה (800 – 2000)</Text>
             <TextInput
               style={styles.input}
               value={eloOverride}
-              onChangeText={v => { setEloOverride(v); markDirty(); }}
+              onChangeText={v => {
+                setEloOverride(v);
+                eloManuallyEdited.current = true;
+                markDirty();
+              }}
               keyboardType="number-pad"
               textAlign="right"
               placeholder="1200"
               placeholderTextColor={Colors.textTertiary}
             />
+            <Text style={styles.eloHint}>
+              ELO מוצע לרמה {difficulty}: {difficultyToElo(difficulty)}
+            </Text>
+          </Section>
+
+          {/* Section: topic + targets — auto-assignment */}
+          <Section title="📚 נושא ומסלולים">
+            <Text style={styles.fieldLabel}>נושא (בחירה אחת — המסלול יוגדר אוטומטית)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+                {TOPICS.map(t => (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => handleTopicChange(t.id)}
+                    style={[styles.topicChip, topicId === t.id && { backgroundColor: t.color, borderColor: t.color }]}
+                  >
+                    <Text style={styles.topicChipIcon}>{t.icon}</Text>
+                    <Text style={[styles.chipText, topicId === t.id && { color: '#fff' }]}>
+                      {t.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+
+            <Text style={[styles.fieldLabel, { marginTop: 4 }]}>מסלולים (ניתן לבחור כמה)</Text>
+            <View style={styles.chipRow}>
+              {TARGETS.map(t => {
+                const isSelected = targetIds.includes(t.id);
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => toggleTarget(t.id)}
+                    style={[styles.chip, isSelected && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, isSelected && { color: '#fff' }]}>
+                      {t.icon} {t.name}
+                    </Text>
+                    {isSelected && <Text style={styles.chipCheck}>✓</Text>}
+                  </Pressable>
+                );
+              })}
+            </View>
+            {targetIds.length === 0 && (
+              <Text style={styles.warningText}>⚠️ יש לבחור לפחות מסלול אחד</Text>
+            )}
           </Section>
 
           {/* Section: options */}
           <Section title="🔘 אפשרויות תשובה">
-            <Text style={styles.fieldLabel}>לחץ על לחצן ○ לסמן תשובה נכונה</Text>
-            {options.map((opt, idx) => (
+            <Text style={styles.fieldLabel}>לחץ על ○ לסמן תשובה נכונה</Text>
+            {options.map((opt) => (
               <View key={opt.id} style={styles.optionBlock}>
                 <View style={styles.optionRow}>
-                  <Pressable onPress={() => setCorrectOption(opt.id)} style={styles.radioWrap}>
+                  <Pressable
+                    onPress={() => setCorrectOption(opt.id)}
+                    style={styles.radioWrap}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
                     <View style={[styles.radio, opt.isCorrect && styles.radioActive]}>
                       {opt.isCorrect && <View style={styles.radioDot} />}
                     </View>
                   </Pressable>
                   <Text style={styles.optionLabel}>{opt.id.toUpperCase()}.</Text>
                   <TextInput
-                    style={[styles.optionInput, opt.isCorrect && { borderColor: Colors.success }, { writingDirection: detectDir(opt.text) }]}
+                    style={[
+                      styles.optionInput,
+                      opt.isCorrect && { borderColor: Colors.success },
+                      { writingDirection: detectDir(opt.text) },
+                    ]}
                     value={opt.text}
                     onChangeText={t => updateOptionText(opt.id, t)}
                     placeholder={`אפשרות ${opt.id.toUpperCase()}...`}
@@ -322,8 +452,12 @@ export default function QuestionEditor() {
                     textAlign={ta(opt.text)}
                   />
                   {options.length > 2 && (
-                    <Pressable onPress={() => removeOption(opt.id)}>
-                      <Text style={{ fontSize: 18, color: Colors.danger }}>✕</Text>
+                    <Pressable
+                      onPress={() => removeOption(opt.id)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      style={styles.removeOptBtn}
+                    >
+                      <Text style={{ fontSize: 16, color: Colors.danger }}>✕</Text>
                     </Pressable>
                   )}
                 </View>
@@ -348,7 +482,7 @@ export default function QuestionEditor() {
               style={[styles.textArea, { minHeight: 80, writingDirection: detectDir(explanation) }]}
               multiline
               value={explanation}
-              onChangeText={setExplanation}
+              onChangeText={v => { setExplanation(v); markDirty(); }}
               placeholder="הסבר מפורט לפתרון..."
               placeholderTextColor={Colors.textTertiary}
               textAlign={ta(explanation)}
@@ -356,70 +490,49 @@ export default function QuestionEditor() {
             />
           </Section>
 
-          {/* Topic + Targets */}
-          <Section title="📚 נושא ומסלולים">
-            <Text style={styles.fieldLabel}>נושא</Text>
-            <View style={styles.chipRow}>
-              {TOPICS.map(t => (
-                <Pressable
-                  key={t.id}
-                  onPress={() => setTopicId(t.id)}
-                  style={[styles.chip, topicId === t.id && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, topicId === t.id && { color: '#fff' }]}>
-                    {t.icon} {t.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>מסלולים (ניתן לבחור כמה)</Text>
-            <View style={styles.chipRow}>
-              {TARGETS.map(t => (
-                <Pressable
-                  key={t.id}
-                  onPress={() => toggleTarget(t.id)}
-                  style={[styles.chip, targetIds.includes(t.id) && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, targetIds.includes(t.id) && { color: '#fff' }]}>
-                    {t.icon} {t.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </Section>
-
           {/* Access + Status */}
-          <Section title="⚙️ הגדרות גישה">
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>גישה חינמית</Text>
-              <Switch
-                value={accessLevel === 'free'}
-                onValueChange={v => setAccessLevel(v ? 'free' : 'premium')}
-                trackColor={{ true: Colors.success, false: Colors.border }}
-              />
+          <Section title="⚙️ הגדרות גישה וסטטוס">
+            <View style={styles.accessRow}>
+              <View style={styles.accessToggle}>
+                <Text style={styles.switchLabel}>גישה חינמית</Text>
+                <Switch
+                  value={accessLevel === 'free'}
+                  onValueChange={v => { setAccessLevel(v ? 'free' : 'premium'); markDirty(); }}
+                  trackColor={{ true: Colors.success, false: Colors.warning }}
+                />
+              </View>
+              <Text style={styles.accessHint}>
+                {accessLevel === 'free' ? '🆓 כל המשתמשים' : '💎 פרמיום בלבד'}
+              </Text>
             </View>
+
             <Text style={styles.fieldLabel}>סטטוס ולידציה</Text>
             <View style={styles.chipRow}>
               {(['draft', 'pending', 'validated', 'rejected'] as ValidationStatus[]).map(s => (
                 <Pressable
                   key={s}
-                  onPress={() => setValidationStatus(s)}
+                  onPress={() => { setValidationStatus(s); markDirty(); }}
                   style={[
                     styles.chip,
                     validationStatus === s && { backgroundColor: STATUS_BG[s], borderColor: STATUS_BG[s] },
                   ]}
                 >
                   <Text style={[styles.chipText, validationStatus === s && { color: '#fff' }]}>
-                    {s === 'draft' ? 'טיוטה' : s === 'pending' ? 'ממתין' : s === 'validated' ? 'מאושר' : 'נדחה'}
+                    {s === 'draft' ? 'טיוטה' : s === 'pending' ? 'ממתין' : s === 'validated' ? '✅ מאושר' : '❌ נדחה'}
                   </Text>
                 </Pressable>
               ))}
             </View>
+            {validationStatus === 'validated' && (
+              <Text style={styles.validatedHint}>✅ שאלה מאושרת תופיע בתרגול</Text>
+            )}
           </Section>
 
           {/* Save */}
-          <Pressable onPress={() => { handleSave(); }} style={styles.saveBtn}>
+          <Pressable
+            onPress={handleSave}
+            style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.9 }]}
+          >
             <Text style={styles.saveBtnText}>{isEdit ? '💾 שמור שינויים' : '➕ הוסף שאלה'}</Text>
           </Pressable>
 
@@ -468,7 +581,22 @@ const sectionStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { padding: 16 },
+
+  backBtn: { paddingVertical: 12, marginBottom: 4, alignSelf: 'flex-end' },
+  backBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary, textAlign: 'right' },
+
+  pageHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  pageTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text },
+  dirtyBadge: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.warning,
+    backgroundColor: Colors.warningLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+  },
 
   fieldLabel: {
     fontFamily: FontFamily.medium,
@@ -502,10 +630,34 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
 
+  charCount: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'left', marginTop: 4 },
+  eloHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 4 },
+  warningText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.danger, textAlign: 'right', marginTop: 6 },
+  validatedHint: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.success, textAlign: 'right', marginTop: 6 },
+
+  // Difficulty
+  diffHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  diffValueBadge: { borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 3 },
+  diffValueText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
+  diffRow: { flexDirection: 'row-reverse', gap: 6, paddingHorizontal: 2, paddingBottom: 4 },
+  diffBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diffBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
+  diffHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 4 },
+
+  // Chips
   chipRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
   chip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: Radius.full,
     backgroundColor: Colors.surfaceSecondary,
     borderWidth: 1,
@@ -513,39 +665,34 @@ const styles = StyleSheet.create({
   },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
+  chipCheck: { fontFamily: FontFamily.bold, fontSize: 10, color: '#fff' },
 
-  diffRow: { flexDirection: 'row-reverse', gap: 4, marginBottom: 12 },
-  diffBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  // Topic chip (wider, shows icon prominently)
+  topicChip: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
   },
-  diffBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
+  topicChipIcon: { fontSize: 16 },
 
+  // Options
   optionBlock: { marginBottom: 14 },
   optionRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
-
-  altTextHint: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.warning,
-    textAlign: 'right',
-    marginBottom: 8,
-    backgroundColor: Colors.warningLight,
-    borderRadius: Radius.md,
-    padding: 8,
-  },
-  radioWrap: { padding: 4 },
+  radioWrap: { padding: 6 },
   radio: {
-    width: 22, height: 22, borderRadius: 11,
+    width: 24, height: 24, borderRadius: 12,
     borderWidth: 2, borderColor: Colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
   radioActive: { borderColor: Colors.success },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.success },
-  optionLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.textSecondary, width: 20 },
+  radioDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: Colors.success },
+  optionLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.textSecondary, width: 22 },
   optionInput: {
     flex: 1,
     backgroundColor: Colors.surfaceSecondary,
@@ -557,29 +704,41 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.border,
   },
+  removeOptBtn: { padding: 6 },
 
   addOptionBtn: {
     borderRadius: Radius.lg,
     borderWidth: 1.5,
     borderColor: Colors.primary,
     borderStyle: 'dashed',
-    padding: 10,
+    padding: 12,
     alignItems: 'center',
     marginTop: 4,
   },
   addOptionText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
 
+  // Access row
+  accessRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  accessToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  accessHint: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
   switchRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginTop: 10,
   },
-  switchLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.text },
+  switchLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.text, flex: 1, textAlign: 'right' },
 
-  backBtn: { paddingVertical: 8, marginBottom: 4 },
-  backBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary, textAlign: 'right' },
-  charCount: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'left', marginTop: 4 },
+  altTextHint: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.warning,
+    textAlign: 'right',
+    marginBottom: 8,
+    backgroundColor: Colors.warningLight,
+    borderRadius: Radius.md,
+    padding: 8,
+  },
 
   saveBtn: {
     backgroundColor: Colors.primary,
@@ -598,6 +757,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+    marginBottom: 8,
   },
   previewBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.textSecondary },
 });
