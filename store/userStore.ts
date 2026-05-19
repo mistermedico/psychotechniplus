@@ -221,6 +221,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   recordSession: (correct, total) => {
+    const wasFirstSession = get().totalSessions === 0;
     set(state => {
       const updates = {
         totalSessions: state.totalSessions + 1,
@@ -236,7 +237,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     });
     get().updateStreak();
     get().addXp(correct * 10 + 20);
-    if (get().totalSessions === 1) get().earnBadge('first_session');
+    if (wasFirstSession) get().earnBadge('first_session');
   },
 
   getTopicElo: (topicId) => get().topicElos[topicId]?.elo ?? DEFAULT_ELO,

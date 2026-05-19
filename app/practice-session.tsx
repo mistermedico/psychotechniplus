@@ -61,6 +61,7 @@ export default function PracticeSession() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [noteTargetId, setNoteTargetId] = useState<string | null>(null);
 
   // Simulation state
   const [examSections, setExamSections] = useState<GeneratedExamSection[]>([]);
@@ -96,7 +97,7 @@ export default function PracticeSession() {
       }
       const userElos: Record<string, number> = {};
       Object.entries(topicElos).forEach(([tid, data]) => {
-        userElos[tid] = (data as any).elo ?? 1200;
+        userElos[tid] = (data as { elo: number }).elo ?? 1200;
       });
       const generated = generateSmartExamQuestions(
         template, adminQuestions.filter(q => q.validationStatus === 'validated'), userElos
@@ -363,17 +364,20 @@ export default function PracticeSession() {
   };
 
   const handleOpenNote = (questionId: string) => {
+    setNoteTargetId(questionId);
     setNoteText(notes[questionId] ?? '');
     setShowNoteModal(true);
   };
 
-  const handleSaveNote = (questionId: string) => {
+  const handleSaveNote = () => {
+    if (!noteTargetId) return;
     if (noteText.trim()) {
-      setNotes(prev => ({ ...prev, [questionId]: noteText.trim() }));
+      setNotes(prev => ({ ...prev, [noteTargetId]: noteText.trim() }));
     } else {
-      setNotes(prev => { const n = { ...prev }; delete n[questionId]; return n; });
+      setNotes(prev => { const n = { ...prev }; delete n[noteTargetId]; return n; });
     }
     setShowNoteModal(false);
+    setNoteTargetId(null);
   };
 
   // NOTE MODAL
@@ -409,7 +413,7 @@ export default function PracticeSession() {
               <Text style={styles.noteCancelText}>ביטול</Text>
             </Pressable>
             <Pressable
-              onPress={() => question && handleSaveNote(question.id)}
+              onPress={handleSaveNote}
               style={styles.noteSaveBtn}
             >
               <Text style={styles.noteSaveText}>שמור</Text>

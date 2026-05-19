@@ -1,20 +1,57 @@
 import { Stack, router, usePathname } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/theme';
 import { useAdminStore } from '../../store/adminStore';
 
-export default function AdminLayout() {
-  const { isAdmin } = useAdminStore();
-  const pathname = usePathname();
+// Map path → human-readable page name for the activity log
+const PAGE_NAMES: Record<string, string> = {
+  '/admin': 'כניסה למרכז הניהול',
+  '/admin/questions': 'מאגר שאלות',
+  '/admin/question-editor': 'עורך שאלה',
+  '/admin/validate': 'תור ולידציה',
+  '/admin/analytics': 'אנליטיקס',
+  '/admin/ai-generator': 'מחולל AI',
+  '/admin/simulation-builder': 'בניית סימולציה',
+  '/admin/topics-admin': 'ניהול נושאים',
+  '/admin/display-settings': 'הגדרות תצוגה',
+  '/admin/users': 'ניהול משתמשים',
+  '/admin/json-import': 'ייבוא JSON',
+  '/admin/export': 'ייצוא שאלות',
+  '/admin/app-settings': 'הגדרות אפליקציה',
+  '/admin/session-settings': 'הגדרות סשן',
+  '/admin/app-control': 'מרכז שליטה',
+  '/admin/daily-challenge': 'אתגרים יומיים',
+  '/admin/leaderboard-admin': 'לוח מובילים',
+  '/admin/topic-exam-map': 'מפת נושאים–מבחנים',
+  '/admin/question-assignment': 'שיוך שאלות',
+  '/admin/revenue': 'הכנסות ומנויים',
+  '/admin/notifications': 'הודעות Push',
+  '/admin/promo-codes': 'קודי קופון',
+  '/admin/activity-log': 'יומן פעילות',
+};
 
-  // Auth guard — redirect to PIN screen for any protected admin route
+export default function AdminLayout() {
+  const { isAdmin, logActivity } = useAdminStore();
+  const pathname = usePathname();
+  const lastLoggedPath = useRef<string | null>(null);
+
+  // Auth guard
   useEffect(() => {
     if (!isAdmin && pathname !== '/admin') {
       router.replace('/admin');
     }
   }, [isAdmin, pathname]);
+
+  // Page visit logging — only when path actually changes and admin is logged in
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (pathname === lastLoggedPath.current) return;
+    lastLoggedPath.current = pathname;
+    const pageName = PAGE_NAMES[pathname] ?? pathname.replace('/admin/', '');
+    logActivity(`ביקור בעמוד: ${pageName}`, 'page');
+  }, [isAdmin, pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Stack

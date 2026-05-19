@@ -367,7 +367,7 @@ export interface AdminActivityLog {
   id: string;
   action: string;
   timestamp: string;
-  category: 'question' | 'user' | 'promo' | 'notification' | 'system';
+  category: 'question' | 'user' | 'promo' | 'notification' | 'system' | 'page';
 }
 
 // ── AI Generation Sessions ─────────────────────────────────────────────────
@@ -643,6 +643,7 @@ interface AdminState {
 
   // Actions — activity log
   logActivity: (action: string, category: AdminActivityLog['category']) => void;
+  clearActivityLog: () => void;
 
   // AI Generation sessions + presets
   generationSessions: GenerationSession[];
@@ -987,8 +988,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       category,
       timestamp: new Date().toISOString(),
     };
-    set(s => ({ activityLog: [entry, ...s.activityLog].slice(0, 100) }));
+    set(s => ({ activityLog: [entry, ...s.activityLog].slice(0, 500) }));
   },
+
+  clearActivityLog: () => set({ activityLog: [] }),
 
   // ── Promo Codes ────────────────────────────────────────────────────────────
   addPromoCode: (code) => {
@@ -1014,10 +1017,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   togglePromoCode: (id) => {
     const code = get().promoCodes.find(c => c.id === id);
+    if (!code) return;
+    const newIsActive = !code.isActive;
     set(s => ({
-      promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, isActive: !c.isActive } : c),
+      promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, isActive: newIsActive } : c),
     }));
-    if (code) get().logActivity(`${code.isActive ? 'הסתיר' : 'הפעיל'} קוד קופון ${code.code}`, 'promo');
+    get().logActivity(`${newIsActive ? 'הפעיל' : 'הסתיר'} קוד קופון ${code.code}`, 'promo');
   },
 
   // ── Push Notifications ─────────────────────────────────────────────────────
