@@ -431,7 +431,7 @@ export default function PracticeSession() {
     const nextTopic = nextSection ? TOPICS.find(t => t.id === nextSection.topicId) : null;
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.restScreen}>
+        <LinearGradient colors={['#060912', '#1E1B4B', '#312E81']} style={styles.restScreen}>
           <Text style={styles.restIcon}>😴</Text>
           <Text style={styles.restTitle}>
             {template?.restScreenMessage ?? 'כל הכבוד! מנוחה קצרה לפני החלק הבא'}

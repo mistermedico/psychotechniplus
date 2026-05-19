@@ -124,6 +124,7 @@ export default function ProfileTab() {
   };
 
   return (
+    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
@@ -132,14 +133,9 @@ export default function ProfileTab() {
         bounces={true}
       >
         {/* ── Profile Hero ── */}
-        <LinearGradient
-          colors={['#0F172A', '#1E1B4B', '#312E81']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.profileHero}
-        >
+        <View style={styles.profileHero}>
           <View style={styles.avatarWrap}>
-            <LinearGradient colors={['#818CF8', '#A78BFA']} style={styles.avatarGradient}>
+            <LinearGradient colors={['#6366F1', '#A855F7']} style={styles.avatarGradient}>
               <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
             </LinearGradient>
             <View style={styles.levelBadge}>
@@ -150,9 +146,20 @@ export default function ProfileTab() {
           <Text style={styles.profileName}>{name || 'מתאמן'}</Text>
           <Text style={styles.profileElo}>{eloToTitle(mainElo)}</Text>
 
-          <View style={[styles.membershipBadge, isPremium ? styles.membershipPremium : styles.membershipFree]}>
-            <Text style={styles.membershipText}>{isPremium ? '💎 פרמיום' : '⭐ חינמי'}</Text>
-          </View>
+          {isPremium ? (
+            <LinearGradient
+              colors={['#D97706', '#F59E0B', '#FCD34D']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.premiumPill}
+            >
+              <Text style={styles.premiumPillText}>💎 פרמיום</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.freePill}>
+              <Text style={styles.freePillText}>⭐ חינמי</Text>
+            </View>
+          )}
 
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
@@ -175,7 +182,7 @@ export default function ProfileTab() {
               <Text style={styles.heroStatLbl}>סשנים</Text>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* ── Admin shortcut ── */}
         {showAdmin && (
@@ -183,7 +190,7 @@ export default function ProfileTab() {
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/admin'); }}
             style={({ pressed }) => [styles.adminCard, { opacity: pressed ? 0.85 : 1 }]}
           >
-            <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.adminCardGrad}>
+            <LinearGradient colors={['rgba(99,102,241,0.25)', 'rgba(168,85,247,0.15)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.adminCardGrad}>
               <Text style={styles.adminCardArrow}>←</Text>
               <View style={styles.adminCardText}>
                 <Text style={styles.adminCardTitle}>🛠️ פאנל ניהול</Text>
@@ -214,7 +221,7 @@ export default function ProfileTab() {
               <View style={[styles.achievementIconWrap, badge.earned ? styles.achievementIconEarned : styles.achievementIconLocked]}>
                 <Text style={[styles.achievementIcon, !badge.earned && { opacity: 0.4 }]}>{badge.icon}</Text>
               </View>
-              <Text style={[styles.achievementLabel, !badge.earned && { color: Colors.textTertiary }]}>
+              <Text style={[styles.achievementLabel, !badge.earned && { color: 'rgba(255,255,255,0.35)' }]}>
                 {badge.label}
               </Text>
               {!badge.earned && <Text style={styles.achievementLock}>🔒</Text>}
@@ -294,84 +301,230 @@ export default function ProfileTab() {
         </Pressable>
       </ScrollView>
     </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   content: {},
 
-  profileHero: { padding: 28, paddingBottom: 32, alignItems: 'center' },
+  profileHero: {
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    paddingBottom: 28,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.07)',
+    marginBottom: 4,
+  },
 
   avatarWrap: { position: 'relative', marginBottom: 16 },
-  avatarGradient: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },
+  avatarGradient: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
   avatarEmoji: { fontSize: 38 },
-  levelBadge: { position: 'absolute', bottom: -4, right: -4, backgroundColor: Colors.warning, borderRadius: Radius.full, width: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  levelBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: Colors.warning,
+    borderRadius: Radius.full,
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(6,9,18,0.9)',
+  },
   levelBadgeText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
 
-  profileName: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff', marginBottom: 4 },
-  profileElo: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)', marginBottom: 12 },
+  profileName: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#F1F5F9', marginBottom: 4 },
+  profileElo: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.6)', marginBottom: 14 },
 
-  membershipBadge: { borderRadius: Radius.full, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 20, borderWidth: 1 },
-  membershipFree: { backgroundColor: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)' },
-  membershipPremium: { backgroundColor: 'rgba(245,158,11,0.2)', borderColor: '#F59E0B' },
-  membershipText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
+  premiumPill: { borderRadius: Radius.full, paddingHorizontal: 18, paddingVertical: 7, marginBottom: 20 },
+  premiumPillText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#1C1917' },
+  freePill: {
+    borderRadius: Radius.full,
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+    marginBottom: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  freePillText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.6)' },
 
-  heroStats: { flexDirection: 'row-reverse', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: Radius.xl, padding: 16, width: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  heroStats: {
+    flexDirection: 'row-reverse',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: Radius.xl,
+    padding: 16,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.13)',
+  },
   heroStat: { flex: 1, alignItems: 'center' },
-  heroStatVal: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
-  heroStatLbl: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
-  heroStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)' },
+  heroStatVal: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#F1F5F9' },
+  heroStatLbl: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
+  heroStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)' },
 
   sectionHeaderRow: { paddingHorizontal: 20, marginTop: 28, marginBottom: 12, alignItems: 'flex-end' },
-  sectionSub: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'right', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 },
-  sectionTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text, textAlign: 'right' },
+  sectionSub: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: '#818CF8',
+    textAlign: 'right',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 3,
+  },
+  sectionTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: '#F1F5F9', textAlign: 'right' },
 
-  adminCard: { marginHorizontal: 20, marginTop: 16, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.lg },
+  adminCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.3)',
+  },
   adminCardGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 18, gap: 12 },
-  adminCardArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: '#64748B' },
+  adminCardArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: 'rgba(255,255,255,0.4)' },
   adminCardText: { flex: 1, alignItems: 'flex-end' },
-  adminCardTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
-  adminCardSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8', marginTop: 2 },
-  adminBadgeWrap: { backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)' },
+  adminCardTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#F1F5F9' },
+  adminCardSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
+  adminBadgeWrap: {
+    backgroundColor: 'rgba(245,158,11,0.15)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.4)',
+  },
   adminBadge: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#F59E0B' },
 
   badgesScrollOuter: { marginHorizontal: -20 },
   badgesScroll: { paddingHorizontal: 20, flexDirection: 'row-reverse', gap: 12, paddingBottom: 4 },
   achievementBadge: { alignItems: 'center', gap: 8, position: 'relative' },
   achievementIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
-  achievementIconEarned: { backgroundColor: '#FEF3C7', borderWidth: 2, borderColor: '#F59E0B' },
-  achievementIconLocked: { backgroundColor: Colors.surfaceSecondary, borderWidth: 2, borderColor: Colors.border },
+  achievementIconEarned: {
+    backgroundColor: 'rgba(245,158,11,0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(245,158,11,0.5)',
+  },
+  achievementIconLocked: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
   achievementIcon: { fontSize: 26 },
-  achievementLabel: { fontFamily: FontFamily.medium, fontSize: 11, color: Colors.textSecondary, textAlign: 'center', maxWidth: 60 },
+  achievementLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    maxWidth: 60,
+  },
   achievementLock: { fontSize: 12, position: 'absolute', bottom: 22, right: -2 },
 
-  targetRow: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: Colors.surface, marginHorizontal: 20, borderRadius: Radius.xl, padding: 16, gap: 12, ...Shadow.sm, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
-  targetIconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
+  targetRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginHorizontal: 20,
+    borderRadius: Radius.xl,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.13)',
+  },
+  targetIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   targetIcon: { fontSize: 24 },
   targetInfo: { flex: 1, alignItems: 'flex-end' },
-  targetName: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
-  targetDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
+  targetName: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#F1F5F9', textAlign: 'right' },
+  targetDesc: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.35)',
+    textAlign: 'right',
+    marginTop: 2,
+  },
 
-  settingsCard: { backgroundColor: Colors.surface, marginHorizontal: 20, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.sm, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
-  settingRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
+  settingsCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginHorizontal: 20,
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.13)',
+  },
+  settingRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    gap: 12,
+  },
   settingRowLast: { borderBottomWidth: 0 },
-  settingIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
+  settingIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   settingIconCircleDanger: { backgroundColor: Colors.dangerLight },
   settingIcon: { fontSize: 17 },
   settingLabelWrap: { flex: 1, alignItems: 'flex-end' },
-  settingLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
-  settingValue: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 1 },
-  settingChevron: { color: Colors.textTertiary, fontSize: FontSize.base },
+  settingLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: '#F1F5F9', textAlign: 'right' },
+  settingValue: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'right',
+    marginTop: 1,
+  },
+  settingChevron: { color: 'rgba(255,255,255,0.4)', fontSize: FontSize.base },
 
-  premiumBanner: { marginHorizontal: 20, marginTop: 28, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.lg },
+  premiumBanner: { marginHorizontal: 20, marginTop: 28, borderRadius: Radius.xl, overflow: 'hidden' },
   premiumBannerGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 20, gap: 14 },
   premiumBannerEmoji: { fontSize: 36 },
   premiumBannerText: { flex: 1, alignItems: 'flex-end' },
   premiumBannerTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#1C1917', textAlign: 'right' },
-  premiumBannerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#44403C', textAlign: 'right', marginTop: 2, lineHeight: 18 },
+  premiumBannerSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: '#44403C',
+    textAlign: 'right',
+    marginTop: 2,
+    lineHeight: 18,
+  },
   premiumBannerArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: '#1C1917' },
 
-  version: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'center', marginTop: 24, marginBottom: 8 },
+  version: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.35)',
+    textAlign: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+  },
 });

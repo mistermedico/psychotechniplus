@@ -5,7 +5,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { supabase } from '../lib/supabase';
@@ -126,35 +125,35 @@ export default function AuthScreen() {
   // Email confirmation pending screen
   if (emailPending) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <LinearGradient colors={['#0F172A', '#1E293B']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
         <View style={styles.pendingContainer}>
-          <Text style={styles.pendingEmoji}>📧</Text>
-          <Text style={styles.pendingTitle}>בדוק את המייל שלך</Text>
-          <Text style={styles.pendingBody}>
-            שלחנו לך קישור אישור ל-{'\n'}
-            <Text style={styles.pendingEmail}>{email}</Text>
-            {'\n\n'}לחץ על הקישור ואז חזור לכאן להתחברות.
-          </Text>
-          <Pressable
-            onPress={() => { setEmailPending(false); setMode('login'); }}
-            style={styles.pendingBtn}
-          >
-            <LinearGradient colors={Colors.gradients.primary} style={styles.pendingBtnGrad}>
-              <Text style={styles.pendingBtnText}>עבור להתחברות ←</Text>
-            </LinearGradient>
-          </Pressable>
-          <Pressable onPress={() => setEmailPending(false)} style={styles.pendingBack}>
-            <Text style={styles.pendingBackText}>שלח שוב / שנה מייל</Text>
-          </Pressable>
+          <View style={styles.pendingCard}>
+            <Text style={styles.pendingEmoji}>📧</Text>
+            <Text style={styles.pendingTitle}>בדוק את המייל שלך</Text>
+            <Text style={styles.pendingBody}>
+              שלחנו לך קישור אישור ל-{'\n'}
+              <Text style={styles.pendingEmail}>{email}</Text>
+              {'\n\n'}לחץ על הקישור ואז חזור לכאן להתחברות.
+            </Text>
+            <Pressable
+              onPress={() => { setEmailPending(false); setMode('login'); }}
+              style={styles.pendingBtn}
+            >
+              <LinearGradient colors={['#6366F1', '#A855F7']} style={styles.pendingBtnGrad}>
+                <Text style={styles.pendingBtnText}>עבור להתחברות ←</Text>
+              </LinearGradient>
+            </Pressable>
+            <Pressable onPress={() => setEmailPending(false)} style={styles.pendingBack}>
+              <Text style={styles.pendingBackText}>שלח שוב / שנה מייל</Text>
+            </Pressable>
+          </View>
         </View>
-      </SafeAreaView>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <LinearGradient colors={['#0F172A', '#1E293B']} style={StyleSheet.absoluteFill} />
+    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
       <KeyboardAvoidingView style={styles.kav} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.content}
@@ -164,126 +163,163 @@ export default function AuthScreen() {
           {/* Logo */}
           <View style={styles.logo}>
             <Text style={styles.logoEmoji}>🧠</Text>
-            <Text style={styles.logoTitle}>PsychoTechniPlus</Text>
+            <LinearGradient
+              colors={['#818CF8', '#C4B5FD']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.logoTitleGrad}
+            >
+              <Text style={styles.logoTitle}>PsychoTechniPlus</Text>
+            </LinearGradient>
             <Text style={styles.logoSub}>הכנה חכמה למבחנים פסיכוטכניים ופסיכומטריים</Text>
           </View>
 
-          {/* Mode tabs */}
-          <View style={styles.tabs}>
-            <Pressable
-              onPress={() => switchMode('login')}
-              style={[styles.tab, mode === 'login' && styles.tabActive]}
-            >
-              <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>התחברות</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => switchMode('register')}
-              style={[styles.tab, mode === 'register' && styles.tabActive]}
-            >
-              <Text style={[styles.tabText, mode === 'register' && styles.tabTextActive]}>הרשמה</Text>
-            </Pressable>
-          </View>
+          {/* Form card */}
+          <View style={styles.formCard}>
+            {/* Mode tabs */}
+            <View style={styles.tabs}>
+              <Pressable
+                onPress={() => switchMode('login')}
+                style={[styles.tab, mode === 'login' && styles.tabActive]}
+              >
+                <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>התחברות</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => switchMode('register')}
+                style={[styles.tab, mode === 'register' && styles.tabActive]}
+              >
+                <Text style={[styles.tabText, mode === 'register' && styles.tabTextActive]}>הרשמה</Text>
+              </Pressable>
+            </View>
 
-          {/* Form */}
-          <View style={styles.form}>
-            {mode === 'register' && (
+            {/* Form */}
+            <View style={styles.form}>
+              {mode === 'register' && (
+                <TextInput
+                  style={styles.input}
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                  placeholder="שם מלא (אופציונלי)"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  textAlign="right"
+                  autoCorrect={false}
+                  autoCapitalize="words"
+                  textContentType="name"
+                  autoComplete="name"
+                  returnKeyType="next"
+                />
+              )}
               <TextInput
                 style={styles.input}
-                value={displayName}
-                onChangeText={setDisplayName}
-                placeholder="שם מלא (אופציונלי)"
-                placeholderTextColor="#475569"
-                textAlign="right"
+                value={email}
+                onChangeText={v => { setEmail(v); setError(''); }}
+                placeholder="כתובת מייל"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                keyboardType="email-address"
+                autoCapitalize="none"
                 autoCorrect={false}
-                autoCapitalize="words"
-                textContentType="name"
-                autoComplete="name"
-                returnKeyType="next"
+                textAlign="right"
+                textContentType="emailAddress"
+                autoComplete="email"
               />
-            )}
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={v => { setEmail(v); setError(''); }}
-              placeholder="כתובת מייל"
-              placeholderTextColor="#475569"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              textAlign="right"
-              textContentType="emailAddress"
-              autoComplete="email"
-            />
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={v => { setPassword(v); setError(''); }}
-              placeholder="סיסמה (מינימום 6 תווים)"
-              placeholderTextColor="#475569"
-              secureTextEntry
-              textAlign="right"
-              onSubmitEditing={mode === 'login' ? handleSubmit : undefined}
-              textContentType={mode === 'login' ? 'password' : 'newPassword'}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              returnKeyType={mode === 'login' ? 'go' : 'next'}
-            />
-            {mode === 'register' && (
               <TextInput
                 style={styles.input}
-                value={confirmPassword}
-                onChangeText={v => { setConfirmPassword(v); setError(''); }}
-                placeholder="אימות סיסמה"
-                placeholderTextColor="#475569"
+                value={password}
+                onChangeText={v => { setPassword(v); setError(''); }}
+                placeholder="סיסמה (מינימום 6 תווים)"
+                placeholderTextColor="rgba(255,255,255,0.35)"
                 secureTextEntry
                 textAlign="right"
-                onSubmitEditing={handleSubmit}
-                textContentType="newPassword"
-                autoComplete="new-password"
-                returnKeyType="go"
+                onSubmitEditing={mode === 'login' ? handleSubmit : undefined}
+                textContentType={mode === 'login' ? 'password' : 'newPassword'}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                returnKeyType={mode === 'login' ? 'go' : 'next'}
               />
-            )}
+              {mode === 'register' && (
+                <TextInput
+                  style={styles.input}
+                  value={confirmPassword}
+                  onChangeText={v => { setConfirmPassword(v); setError(''); }}
+                  placeholder="אימות סיסמה"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  secureTextEntry
+                  textAlign="right"
+                  onSubmitEditing={handleSubmit}
+                  textContentType="newPassword"
+                  autoComplete="new-password"
+                  returnKeyType="go"
+                />
+              )}
 
-            {!!error && (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>⚠️ {error}</Text>
-              </View>
-            )}
+              {!!error && (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>⚠️ {error}</Text>
+                </View>
+              )}
 
-            <Pressable
-              onPress={handleSubmit}
-              disabled={loading}
-              style={({ pressed }) => [styles.submitBtn, (pressed || loading) && { opacity: 0.85 }]}
-            >
-              <LinearGradient colors={Colors.gradients.primary} style={styles.submitGrad}>
-                {loading
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={styles.submitText}>{mode === 'login' ? 'כניסה ←' : 'יצירת חשבון ←'}</Text>
+              <Pressable
+                onPress={handleSubmit}
+                disabled={loading}
+                style={({ pressed }) => [styles.submitBtn, (pressed || loading) && { opacity: 0.85 }]}
+              >
+                <LinearGradient colors={['#6366F1', '#A855F7']} style={styles.submitGrad}>
+                  {loading
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={styles.submitText}>{mode === 'login' ? 'כניסה ←' : 'יצירת חשבון ←'}</Text>
+                  }
+                </LinearGradient>
+              </Pressable>
+
+              <Text style={styles.hint}>
+                {mode === 'login'
+                  ? 'אין לך חשבון? לחץ על "הרשמה" למעלה'
+                  : 'יש לך חשבון? לחץ על "התחברות" למעלה'
                 }
-              </LinearGradient>
-            </Pressable>
-
-            <Text style={styles.hint}>
-              {mode === 'login'
-                ? 'אין לך חשבון? לחץ על "הרשמה" למעלה'
-                : 'יש לך חשבון? לחץ על "התחברות" למעלה'
-              }
-            </Text>
+              </Text>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
   kav: { flex: 1 },
-  content: { padding: 24, paddingTop: 48, paddingBottom: 60 },
+  content: { padding: 24, paddingTop: 64, paddingBottom: 60 },
 
-  logo: { alignItems: 'center', marginBottom: 40 },
+  logo: { alignItems: 'center', marginBottom: 36 },
   logoEmoji: { fontSize: 72, marginBottom: 14 },
-  logoTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff', marginBottom: 8 },
-  logoSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
+  logoTitleGrad: {
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  logoTitle: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize['2xl'],
+    color: '#fff',
+    paddingHorizontal: 2,
+  },
+  logoSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.65)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+
+  formCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+  },
 
   tabs: {
     flexDirection: 'row-reverse',
@@ -292,23 +328,27 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 28,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: 'rgba(255,255,255,0.13)',
   },
   tab: { flex: 1, paddingVertical: 13, alignItems: 'center', borderRadius: Radius.lg },
-  tabActive: { backgroundColor: Colors.primary },
-  tabText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: '#64748B' },
-  tabTextActive: { color: '#fff' },
+  tabActive: {
+    backgroundColor: 'rgba(99,102,241,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.5)',
+  },
+  tabText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: 'rgba(255,255,255,0.35)' },
+  tabTextActive: { color: '#F1F5F9' },
 
   form: { gap: 14 },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    color: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    color: '#F1F5F9',
     fontFamily: FontFamily.regular,
     fontSize: FontSize.base,
-    borderRadius: Radius.lg,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
 
   errorBox: {
@@ -320,21 +360,35 @@ const styles = StyleSheet.create({
   },
   errorText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.danger, textAlign: 'right' },
 
-  submitBtn: { borderRadius: Radius.xl, overflow: 'hidden', marginTop: 4, ...Shadow.primary },
-  submitGrad: { paddingVertical: 18, alignItems: 'center' },
+  submitBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 8 },
+  submitGrad: { paddingVertical: 18, alignItems: 'center', borderRadius: 14 },
   submitText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
 
-  hint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#475569', textAlign: 'center', marginTop: 4 },
+  hint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 4 },
 
   // Email pending state
   pendingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  pendingCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+  },
   pendingEmoji: { fontSize: 72, marginBottom: 20 },
-  pendingTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff', marginBottom: 16, textAlign: 'center' },
-  pendingBody: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: '#94A3B8', textAlign: 'center', lineHeight: 26, marginBottom: 32 },
-  pendingEmail: { fontFamily: FontFamily.bold, color: Colors.primaryLight },
-  pendingBtn: { width: '100%', borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary, marginBottom: 16 },
+  pendingTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#F1F5F9', marginBottom: 16, textAlign: 'center' },
+  pendingBody: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 26, marginBottom: 32 },
+  pendingEmail: { fontFamily: FontFamily.bold, color: '#818CF8' },
+  pendingBtn: { width: '100%', borderRadius: Radius.xl, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 8, marginBottom: 16 },
   pendingBtnGrad: { paddingVertical: 18, alignItems: 'center' },
   pendingBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
   pendingBack: { padding: 12 },
-  pendingBackText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#475569' },
+  pendingBackText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.35)' },
 });

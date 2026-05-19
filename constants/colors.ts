@@ -1,67 +1,80 @@
 export const Colors = {
-  primary: '#4F46E5',
+  primary: '#6366F1',
   primaryLight: '#818CF8',
-  primaryLighter: '#EEF2FF',
-  primaryDark: '#3730A3',
+  primaryLighter: 'rgba(99,102,241,0.15)',
+  primaryDark: '#4338CA',
 
-  accent: '#9333EA',
-  accentLight: '#E9D5FF',
+  accent: '#A855F7',
+  accentLight: 'rgba(168,85,247,0.15)',
 
   success: '#10B981',
-  successLight: '#D1FAE5',
+  successLight: 'rgba(16,185,129,0.15)',
 
   danger: '#EF4444',
-  dangerLight: '#FEE2E2',
+  dangerLight: 'rgba(239,68,68,0.15)',
 
   warning: '#F59E0B',
-  warningLight: '#FEF3C7',
+  warningLight: 'rgba(245,158,11,0.15)',
 
   gold: '#F59E0B',
   silver: '#94A3B8',
 
-  // Background
-  background: '#F8FAFC',
-  backgroundDark: '#020617',
+  // Dark glassmorphism backgrounds
+  background: '#060912',
+  backgroundDark: '#02040A',
+  background2: '#0D1425',
+  background3: '#1A0F2E',
 
-  // Surfaces
-  surface: '#FFFFFF',
-  surfaceSecondary: '#F1F5F9',
-  surfaceTertiary: '#E2E8F0',
+  // Glass surfaces
+  surface: 'rgba(255,255,255,0.07)',
+  surfaceSecondary: 'rgba(255,255,255,0.04)',
+  surfaceTertiary: 'rgba(255,255,255,0.02)',
+  surfaceStrong: 'rgba(255,255,255,0.12)',
+  surfaceCard: 'rgba(255,255,255,0.08)',
 
-  // Text
-  text: '#0F172A',
-  textSecondary: '#475569',
-  textTertiary: '#94A3B8',
-  textInverse: '#FFFFFF',
+  // Glass borders
+  border: 'rgba(255,255,255,0.12)',
+  borderStrong: 'rgba(255,255,255,0.25)',
+  borderFocus: 'rgba(99,102,241,0.6)',
 
-  // Borders
-  border: '#E2E8F0',
-  borderFocus: '#4F46E5',
+  // Text (on dark)
+  text: '#F1F5F9',
+  textSecondary: 'rgba(255,255,255,0.65)',
+  textTertiary: 'rgba(255,255,255,0.35)',
+  textInverse: '#0F172A',
 
-  // Glass
+  // Legacy light surface (used in admin)
   glass: 'rgba(255,255,255,0.85)',
   glassStrong: 'rgba(255,255,255,0.95)',
 
   // Target colors
   targets: {
-    ktzina: '#3B82F6',     // כחול — קצונה
-    tayyas: '#0EA5E9',     // שמים — טייס
-    psychometric: '#8B5CF6', // סגול — פסיכומטרי
-    hightech: '#10B981',   // ירוק — הייטק
-    modiin: '#F59E0B',     // כתום — מודיעין
-    shabas: '#EF4444',     // אדום — שב"ס
+    ktzina: '#3B82F6',
+    tayyas: '#0EA5E9',
+    psychometric: '#8B5CF6',
+    hightech: '#10B981',
+    modiin: '#F59E0B',
+    shabas: '#EF4444',
   },
 
   // Gradient pairs [from, to]
   gradients: {
-    primary: ['#4F46E5', '#7C3AED'] as [string, string],
+    primary: ['#6366F1', '#A855F7'] as [string, string],
     success: ['#10B981', '#059669'] as [string, string],
     danger: ['#EF4444', '#DC2626'] as [string, string],
     gold: ['#F59E0B', '#D97706'] as [string, string],
+    bg: ['#060912', '#0D1425', '#1A0F2E'] as unknown as [string, string],
     ktzina: ['#3B82F6', '#1D4ED8'] as [string, string],
     tayyas: ['#0EA5E9', '#0284C7'] as [string, string],
     psychometric: ['#8B5CF6', '#6D28D9'] as [string, string],
     hightech: ['#10B981', '#047857'] as [string, string],
     modiin: ['#F59E0B', '#B45309'] as [string, string],
   },
+
+  // Glass helpers
+  glass10: 'rgba(255,255,255,0.10)',
+  glass15: 'rgba(255,255,255,0.15)',
+  glass20: 'rgba(255,255,255,0.20)',
+  glass05: 'rgba(255,255,255,0.05)',
 };
+

@@ -94,6 +94,7 @@ export default function TargetsTab() {
   };
 
   return (
+    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe} edges={['top']}>
       <LinearGradient
         colors={Colors.gradients.primary}
@@ -270,11 +271,12 @@ export default function TargetsTab() {
         })}
       </ScrollView>
     </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   hero: {
     paddingHorizontal: 20,
     paddingTop: 20,
@@ -356,13 +358,13 @@ const styles = StyleSheet.create({
 
   // Expanded topics container
   topicsContainer: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: Radius.xl,
     padding: 18,
     marginTop: 4,
     ...Shadow.sm,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.13)',
     borderTopWidth: 3,
     borderTopColor: Colors.primary,
   },

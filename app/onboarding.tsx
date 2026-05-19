@@ -57,6 +57,7 @@ export default function Onboarding() {
   });
 
   return (
+    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.progressTrack}>
         <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
@@ -71,6 +72,7 @@ export default function Onboarding() {
         />
       )}
     </SafeAreaView>
+    </LinearGradient>
   );
 }
 
@@ -85,7 +87,7 @@ function StepWelcome({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <LinearGradient
-        colors={[Colors.primaryLighter, '#fff']}
+        colors={['rgba(99,102,241,0.15)', 'transparent']}
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.heroEmoji}>
@@ -161,7 +163,7 @@ function StepSelectTarget({
             ]}
           >
             <LinearGradient
-              colors={selected?.id === t.id ? t.gradientColors : ['#fff', '#fff']}
+              colors={selected?.id === t.id ? t.gradientColors : ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.03)']}
               style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
             />
             <Text style={styles.targetOptionIcon}>{t.icon}</Text>
@@ -206,11 +208,11 @@ function StepSelectTarget({
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
 
   progressTrack: {
     height: 4,
-    backgroundColor: Colors.surfaceTertiary,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   progressFill: {
     height: 4,
@@ -253,14 +255,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: Radius.lg,
     padding: 16,
     fontFamily: FontFamily.regular,
     fontSize: FontSize.base,
-    color: Colors.text,
+    color: '#F1F5F9',
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
 
   primaryBtn: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },

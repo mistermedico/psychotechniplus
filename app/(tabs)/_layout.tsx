@@ -4,7 +4,6 @@ import { Platform, StyleSheet, View, Text } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
-import { Colors } from '../../constants/colors';
 import { FontFamily } from '../../constants/theme';
 
 interface TabIconProps {
@@ -26,9 +25,9 @@ function TabBarBackground() {
   if (Platform.OS === 'ios') {
     return (
       <BlurView
-        tint="light"
-        intensity={80}
-        style={StyleSheet.absoluteFill}
+        tint="dark"
+        intensity={60}
+        style={[StyleSheet.absoluteFill, styles.blurBase]}
       />
     );
   }
@@ -46,17 +45,17 @@ export default function TabLayout() {
         tabBarBackground: () => <TabBarBackground />,
         tabBarStyle: {
           position: 'absolute',
-          borderTopWidth: 0.5,
-          borderTopColor: 'rgba(0,0,0,0.1)',
-          height: 60 + insets.bottom,
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(255,255,255,0.1)',
+          height: 62 + insets.bottom,
           paddingBottom: insets.bottom || 8,
           paddingTop: 8,
-          backgroundColor: Platform.OS === 'android' ? '#fff' : 'transparent',
-          elevation: Platform.OS === 'android' ? 8 : 0,
+          backgroundColor: Platform.OS === 'android' ? 'rgba(10,14,28,0.97)' : 'transparent',
+          elevation: 0,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.4,
+          shadowRadius: 20,
         },
       }}
     >
@@ -67,9 +66,7 @@ export default function TabLayout() {
             <TabIcon icon="🏠" label="בית" focused={focused} />
           ),
         }}
-        listeners={{
-          tabPress: () => Haptics.selectionAsync(),
-        }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="targets"
@@ -78,9 +75,7 @@ export default function TabLayout() {
             <TabIcon icon="🎯" label="מסלולים" focused={focused} />
           ),
         }}
-        listeners={{
-          tabPress: () => Haptics.selectionAsync(),
-        }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="practice"
@@ -89,9 +84,7 @@ export default function TabLayout() {
             <TabIcon icon="✏️" label="תרגול" focused={focused} />
           ),
         }}
-        listeners={{
-          tabPress: () => Haptics.selectionAsync(),
-        }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="progress"
@@ -100,9 +93,7 @@ export default function TabLayout() {
             <TabIcon icon="📈" label="התקדמות" focused={focused} />
           ),
         }}
-        listeners={{
-          tabPress: () => Haptics.selectionAsync(),
-        }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="profile"
@@ -111,45 +102,51 @@ export default function TabLayout() {
             <TabIcon icon="👤" label="פרופיל" focused={focused} />
           ),
         }}
-        listeners={{
-          tabPress: () => Haptics.selectionAsync(),
-        }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
+  blurBase: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
   androidBackground: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(10,14,28,0.97)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 2,
   },
   tabItemFocused: {
-    backgroundColor: Colors.primaryLighter,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(99,102,241,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.35)',
   },
   tabIcon: {
     fontSize: 20,
+    opacity: 0.5,
   },
   tabIconFocused: {
-    fontSize: 24,
+    fontSize: 22,
+    opacity: 1,
   },
   tabLabel: {
     fontFamily: FontFamily.regular,
     fontSize: 10,
-    color: Colors.textTertiary,
+    color: 'rgba(255,255,255,0.35)',
   },
   tabLabelFocused: {
     fontFamily: FontFamily.medium,
     fontSize: 10,
-    color: Colors.primary,
+    color: '#818CF8',
   },
 });

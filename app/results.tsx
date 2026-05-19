@@ -91,6 +91,7 @@ export default function Results() {
   };
 
   return (
+    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
@@ -100,7 +101,7 @@ export default function Results() {
       >
         {/* ── Score Hero ── */}
         <LinearGradient
-          colors={['#0F172A', '#1E1B4B', '#312E81']}
+          colors={['#1E1B4B', '#312E81', '#4C1D95']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -188,7 +189,7 @@ export default function Results() {
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.bottomCtas, { paddingBottom: Math.max(insets.bottom + 4, 20) }]}>
+      <View style={[styles.bottomCtas, { paddingBottom: Math.max(insets.bottom + 4, 20), backgroundColor: 'rgba(10,14,28,0.95)' }]}>
         <Pressable
           onPress={() => router.replace('/(tabs)')}
           style={({ pressed }) => [styles.homeBtn, { opacity: pressed ? 0.75 : 1 }]}
@@ -208,6 +209,7 @@ export default function Results() {
         </Pressable>
       </View>
     </SafeAreaView>
+    </LinearGradient>
   );
 }
 
@@ -271,11 +273,11 @@ const recStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   content: {},
 
-  hero: { padding: 32, paddingTop: 44, paddingBottom: 36, alignItems: 'center' },
+  hero: { padding: 32, paddingTop: 44, paddingBottom: 36, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   heroLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: 'rgba(255,255,255,0.75)', marginBottom: 24 },
 
   scoreBadge: { marginBottom: 16, ...Shadow.primary },
@@ -296,7 +298,7 @@ const styles = StyleSheet.create({
   sectionSub: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'right', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 },
   sectionTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text, textAlign: 'right' },
 
-  advancedCard: { backgroundColor: Colors.surface, marginHorizontal: 20, borderRadius: Radius.xl, paddingHorizontal: 16, ...Shadow.md, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
+  advancedCard: { backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 20, borderRadius: Radius.xl, paddingHorizontal: 16, ...Shadow.md, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)' },
 
   percentileCard: { backgroundColor: Colors.primaryLighter, marginHorizontal: 20, borderRadius: Radius.xl, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: Colors.primary + '30' },
   percentileTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.primary, textAlign: 'right', marginBottom: 6 },
@@ -309,8 +311,8 @@ const styles = StyleSheet.create({
   recsContainer: { paddingHorizontal: 20, marginBottom: 8 },
 
   bottomCtas: { flexDirection: 'row-reverse', paddingHorizontal: 20, paddingTop: 14, gap: 12, backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border },
-  homeBtn: { paddingVertical: 17, paddingHorizontal: 20, borderRadius: Radius.xl, backgroundColor: Colors.surfaceSecondary, borderWidth: 1.5, borderColor: Colors.border, justifyContent: 'center' },
-  homeBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.textSecondary },
+  homeBtn: { paddingVertical: 17, paddingHorizontal: 20, borderRadius: Radius.xl, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)', justifyContent: 'center' },
+  homeBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: 'rgba(255,255,255,0.65)' },
   againBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
   againBtnGrad: { paddingVertical: 17, alignItems: 'center' },
   againBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
