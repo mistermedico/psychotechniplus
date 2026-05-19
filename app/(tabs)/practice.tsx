@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Animated, Platform, Alert,
@@ -14,10 +14,8 @@ import { useUserStore } from '../../store/userStore';
 import { useAdminStore, SmartExamTemplate } from '../../store/adminStore';
 import { eloToTitle } from '../../utils/elo';
 
-// ── Tab IDs ──────────────────────────────────────────────────────────────────
 type PracticeTab = 'free' | 'simulations';
 
-// ── Free practice mode options ────────────────────────────────────────────────
 const FREE_MODES = [
   {
     id: 'practice',
@@ -50,6 +48,7 @@ export default function PracticeTab() {
   const [selectedMode, setSelectedMode] = useState('practice');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const tabAnim = useRef(new Animated.Value(0)).current;
+  const indicatorLeft = tabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '50%'] });
 
   const { selectedTargetId, getTopicElo, isPremium } = useUserStore();
   const { freePracticeLimit, templates } = useAdminStore();
@@ -57,7 +56,6 @@ export default function PracticeTab() {
   const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const topics = TOPICS.filter(t => t.targetId === target.id);
 
-  // Only show active templates for this target
   const activeTemplates = useMemo(
     () => templates.filter(t => t.isActive && t.targetId === target.id),
     [templates, target.id]
@@ -106,29 +104,27 @@ export default function PracticeTab() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Tab bar */}
-      <View style={styles.tabBar}>
-        <Pressable
-          onPress={() => switchTab('free')}
-          style={[styles.tabBtn, activeTab === 'free' && styles.tabBtnActive]}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'free' && styles.tabBtnTextActive]}>
-            📖 תרגול חופשי
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => switchTab('simulations')}
-          style={[styles.tabBtn, activeTab === 'simulations' && styles.tabBtnActive]}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'simulations' && styles.tabBtnTextActive]}>
-            🏗️ מבחנים חכמים
-          </Text>
-          {activeTemplates.length > 0 && (
-            <View style={styles.tabCount}>
-              <Text style={styles.tabCountText}>{activeTemplates.length}</Text>
+      <View style={styles.tabBarWrap}>
+        <View style={styles.tabBar}>
+          <Animated.View style={[styles.tabIndicator, { left: indicatorLeft }]} />
+          <Pressable onPress={() => switchTab('free')} style={styles.tabBtn}>
+            <Text style={[styles.tabBtnText, activeTab === 'free' && styles.tabBtnTextActive]}>
+              📖 תרגול חופשי
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => switchTab('simulations')} style={styles.tabBtn}>
+            <View style={styles.tabBtnInner}>
+              <Text style={[styles.tabBtnText, activeTab === 'simulations' && styles.tabBtnTextActive]}>
+                🏗️ מבחנים חכמים
+              </Text>
+              {activeTemplates.length > 0 && (
+                <View style={styles.tabCount}>
+                  <Text style={styles.tabCountText}>{activeTemplates.length}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </Pressable>
+          </Pressable>
+        </View>
       </View>
 
       {activeTab === 'free' ? (
@@ -156,8 +152,6 @@ export default function PracticeTab() {
   );
 }
 
-// ── Free Practice Pane ────────────────────────────────────────────────────────
-
 function FreePracticePane({
   topics, selectedMode, setSelectedMode,
   selectedTopicId, setSelectedTopicId, getTopicElo,
@@ -175,11 +169,10 @@ function FreePracticePane({
     <>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
-        bounces={Platform.OS === 'ios'}
+        bounces={true}
       >
-        {/* Premium / Free badge */}
         <View style={styles.accessRow}>
           <View style={[styles.accessBadge, isPremium ? styles.accessPremium : styles.accessFree]}>
             <Text style={styles.accessBadgeText}>
@@ -189,35 +182,45 @@ function FreePracticePane({
           {!isPremium && (
             <Pressable
               onPress={() => Alert.alert('שדרג לפרמיום', 'פרמיום מאפשר תרגול ללא הגבלה 💎')}
-              style={styles.upgradeLink}
+              style={({ pressed }) => [styles.upgradeChip, { opacity: pressed ? 0.75 : 1 }]}
             >
-              <Text style={styles.upgradeLinkText}>שדרג ←</Text>
+              <LinearGradient colors={Colors.gradients.primary} style={styles.upgradeChipGrad}>
+                <Text style={styles.upgradeChipText}>שדרג 💎</Text>
+              </LinearGradient>
             </Pressable>
           )}
         </View>
 
-        {/* Mode selector */}
         <Text style={styles.sectionLabel}>מצב תרגול</Text>
-        <View style={styles.modesGrid}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.modesRow}
+          directionalLockEnabled
+          style={styles.modesRowOuter}
+        >
           {FREE_MODES.map(mode => (
-            <ModeCard
+            <ModeChip
               key={mode.id}
               mode={mode}
               isSelected={selectedMode === mode.id}
               onPress={() => { Haptics.selectionAsync(); setSelectedMode(mode.id); }}
             />
           ))}
-        </View>
+        </ScrollView>
 
-        {/* Topic selector */}
+        {FREE_MODES.filter(m => m.id === selectedMode).map(mode => (
+          <View key={mode.id} style={styles.modeDetailCard}>
+            <Text style={styles.modeDetailIcon}>{mode.icon}</Text>
+            <View style={styles.modeDetailText}>
+              <Text style={[styles.modeDetailLabel, { color: mode.color }]}>{mode.label}</Text>
+              <Text style={styles.modeDetailDesc}>{mode.desc}</Text>
+            </View>
+          </View>
+        ))}
+
         <Text style={styles.sectionLabel}>בחר נושא</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.topicsHScroll}
-          style={styles.topicsHScrollOuter}
-          directionalLockEnabled
-        >
+        <View style={styles.topicsGrid}>
           {topics.map(topic => {
             const elo = getTopicElo(topic.id);
             const isSelected = selectedTopicId === topic.id;
@@ -236,21 +239,31 @@ function FreePracticePane({
                 }}
                 style={({ pressed }) => [
                   styles.topicCard,
-                  isSelected && { borderColor: topic.color, backgroundColor: topic.color + '12' },
+                  isSelected && { borderColor: topic.color, borderWidth: 2 },
                   isLocked && styles.topicCardLocked,
-                  pressed && !isLocked && { transform: [{ scale: 0.96 }] },
+                  { opacity: pressed && !isLocked ? 0.75 : 1 },
                 ]}
               >
-                {isLocked && <View style={styles.premiumBadge}><Text style={styles.premiumBadgeText}>💎</Text></View>}
-                {isSelected && !isLocked && (
-                  <View style={[styles.topicCheck, { backgroundColor: topic.color }]}>
-                    <Text style={styles.topicCheckText}>✓</Text>
+                {isSelected && (
+                  <LinearGradient
+                    colors={[topic.color + '18', topic.color + '08']}
+                    style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
+                  />
+                )}
+                {isLocked && (
+                  <View style={styles.lockBadge}>
+                    <Text style={styles.lockBadgeText}>💎</Text>
                   </View>
                 )}
-                <Text style={styles.topicIcon}>{topic.icon}</Text>
+                {isSelected && !isLocked && (
+                  <View style={[styles.checkBadge, { backgroundColor: topic.color }]}>
+                    <Text style={styles.checkBadgeText}>✓</Text>
+                  </View>
+                )}
+                <Text style={styles.topicCardIcon}>{topic.icon}</Text>
                 <Text
                   style={[
-                    styles.topicName,
+                    styles.topicCardName,
                     isSelected && !isLocked && { color: topic.color },
                     isLocked && { color: Colors.textTertiary },
                   ]}
@@ -258,15 +271,14 @@ function FreePracticePane({
                 >
                   {topic.name}
                 </Text>
-                <Text style={[styles.topicTitle, { color: isLocked ? Colors.textTertiary : topic.color }]}>
+                <Text style={[styles.topicCardElo, { color: isLocked ? Colors.textTertiary : topic.color }]}>
                   {eloToTitle(elo)}
                 </Text>
               </Pressable>
             );
           })}
-        </ScrollView>
+        </View>
 
-        {/* Question count info */}
         {canStart && !isPremium && (
           <View style={styles.limitInfo}>
             <Text style={styles.limitInfoText}>
@@ -275,27 +287,30 @@ function FreePracticePane({
           </View>
         )}
 
-        <View style={{ height: 100 }} />
+        {topics.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateEmoji}>📚</Text>
+            <Text style={styles.emptyStateTitle}>אין נושאים זמינים</Text>
+            <Text style={styles.emptyStateSub}>נושאים יתווספו בקרוב למסלול זה</Text>
+          </View>
+        )}
       </ScrollView>
 
-      {/* Sticky start button */}
-      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom + 4, 20) }]}>
         <Pressable
           onPress={onStart}
           disabled={!canStart}
-          style={({ pressed }) => [
-            styles.startBtn,
-            !canStart && styles.startBtnDisabled,
-            pressed && canStart && { transform: [{ scale: 0.98 }] },
-          ]}
+          style={({ pressed }) => [{ opacity: pressed && canStart ? 0.75 : 1 }]}
         >
           <LinearGradient
             colors={canStart ? Colors.gradients.primary : ['#CBD5E1', '#94A3B8']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.startBtnGrad}
+            style={[styles.startBtn, !canStart && { shadowOpacity: 0 }]}
           >
-            <Text style={[styles.startBtnText, !canStart && styles.startBtnTextDisabled]}>
-              {canStart ? `התחל תרגול ← (${isPremium ? 'ללא הגבלה' : `עד ${freePracticeLimit}`})` : 'בחר נושא'}
+            <Text style={[styles.startBtnText, !canStart && { color: 'rgba(255,255,255,0.7)' }]}>
+              {canStart
+                ? `התחל תרגול ← (${isPremium ? 'ללא הגבלה' : `עד ${freePracticeLimit}`})`
+                : 'בחר נושא להתחלה'}
             </Text>
           </LinearGradient>
         </Pressable>
@@ -304,10 +319,36 @@ function FreePracticePane({
   );
 }
 
-// ── Simulations Pane ──────────────────────────────────────────────────────────
+function ModeChip({
+  mode, isSelected, onPress,
+}: { mode: typeof FREE_MODES[0]; isSelected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
+    >
+      {isSelected ? (
+        <LinearGradient
+          colors={mode.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.modeChip}
+        >
+          <Text style={styles.modeChipIcon}>{mode.icon}</Text>
+          <Text style={[styles.modeChipLabel, { color: '#fff' }]}>{mode.label}</Text>
+        </LinearGradient>
+      ) : (
+        <View style={[styles.modeChip, styles.modeChipInactive]}>
+          <Text style={styles.modeChipIcon}>{mode.icon}</Text>
+          <Text style={[styles.modeChipLabel, { color: Colors.textSecondary }]}>{mode.label}</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
 
 function SimulationsPane({
-  templates, target, onStart, isPremium,
+  templates, target, onStart,
 }: {
   templates: SmartExamTemplate[];
   target: typeof TARGETS[0];
@@ -317,10 +358,10 @@ function SimulationsPane({
   const insets = useSafeAreaInsets();
   if (templates.length === 0) {
     return (
-      <View style={styles.emptySimulations}>
-        <Text style={styles.emptySimIcon}>🏗️</Text>
-        <Text style={styles.emptySimTitle}>אין מבחנים חכמים זמינים</Text>
-        <Text style={styles.emptySimDesc}>המנהל טרם הגדיר מבחנים חכמים עבור מסלול זה</Text>
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyStateEmoji}>🏗️</Text>
+        <Text style={styles.emptyStateTitle}>אין מבחנים חכמים זמינים</Text>
+        <Text style={styles.emptyStateSub}>המנהל טרם הגדיר מבחנים חכמים עבור מסלול זה</Text>
       </View>
     );
   }
@@ -342,10 +383,7 @@ function SimulationsPane({
 
         return (
           <View key={tmpl.id} style={styles.simCard}>
-            <LinearGradient
-              colors={['#0F172A', '#1E293B']}
-              style={styles.simCardHeader}
-            >
+            <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.simCardHeader}>
               <View style={styles.simCardHeaderRight}>
                 <Text style={styles.simCardName}>{tmpl.name}</Text>
                 {tmpl.description ? (
@@ -363,9 +401,8 @@ function SimulationsPane({
                 <SimStat icon="📋" label="חלקים" value={String(tmpl.rules.length)} />
               </View>
 
-              {/* Rules breakdown */}
               <View style={styles.simRulesBox}>
-                {(tmpl.smartRules ?? tmpl.rules).map((r, _i) => {
+                {(tmpl.smartRules ?? tmpl.rules).map((r) => {
                   const topic = TOPICS.find(t => t.id === r.topicId);
                   const count = r.count;
                   const minD = r.minDifficulty ?? 1;
@@ -391,7 +428,7 @@ function SimulationsPane({
 
               <Pressable
                 onPress={() => onStart(tmpl.id)}
-                style={({ pressed }) => [styles.simStartBtn, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
               >
                 <LinearGradient colors={Colors.gradients.primary} style={styles.simStartGrad}>
                   <Text style={styles.simStartText}>
@@ -417,134 +454,114 @@ function SimStat({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 const ssStyles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 8 },
+  wrap: { flex: 1, alignItems: 'center', backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 10 },
   icon: { fontSize: 14, marginBottom: 2 },
   value: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
   label: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
 });
 
-// ── Mode Card ─────────────────────────────────────────────────────────────────
-
-function ModeCard({
-  mode, isSelected, onPress,
-}: { mode: typeof FREE_MODES[0]; isSelected: boolean; onPress: () => void }) {
-  const scale = useRef(new Animated.Value(isSelected ? 1.01 : 1)).current;
-  const checkOpacity = useRef(new Animated.Value(isSelected ? 1 : 0)).current;
-  useEffect(() => {
-    Animated.spring(scale, { toValue: isSelected ? 1.01 : 1, useNativeDriver: true, tension: 180, friction: 12 }).start();
-    Animated.timing(checkOpacity, { toValue: isSelected ? 1 : 0, duration: 180, useNativeDriver: true }).start();
-  }, [isSelected]);
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.92 }]}>
-      <Animated.View style={[styles.modeCard, isSelected && styles.modeCardSelected, { borderColor: isSelected ? mode.color : Colors.border }, { transform: [{ scale }] }]}>
-        {isSelected && <LinearGradient colors={mode.gradient} style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]} />}
-        <Animated.View style={[styles.modeCheck, { opacity: checkOpacity }]}>
-          <Text style={styles.modeCheckText}>✓</Text>
-        </Animated.View>
-        <Text style={styles.modeIcon}>{mode.icon}</Text>
-        <Text style={[styles.modeLabel, { color: isSelected ? '#fff' : Colors.text }]}>{mode.label}</Text>
-        <Text style={[styles.modeDesc, { color: isSelected ? 'rgba(255,255,255,0.8)' : Colors.textTertiary }]}>{mode.desc}</Text>
-      </Animated.View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  content: { padding: 16, gap: 4 },
+  content: { padding: 20, gap: 4 },
 
-  // ── Tab bar ──────────────────────────────────────────────────────────────
-  tabBar: {
-    flexDirection: 'row-reverse',
+  tabBarWrap: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    gap: 4,
+  },
+  tabBar: {
+    flexDirection: 'row-reverse',
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: Radius.full,
+    padding: 4,
+    position: 'relative',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    width: '50%',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.full,
+    ...Shadow.sm,
   },
   tabBtn: {
-    flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 10, borderRadius: Radius.lg, gap: 6,
+    flex: 1,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
-  tabBtnActive: { backgroundColor: Colors.primaryLighter },
-  tabBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
-  tabBtnTextActive: { color: Colors.primary, fontFamily: FontFamily.bold },
+  tabBtnInner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  tabBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textTertiary },
+  tabBtnTextActive: { color: Colors.text, fontFamily: FontFamily.bold },
   tabCount: { backgroundColor: Colors.primary, borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   tabCountText: { fontFamily: FontFamily.bold, fontSize: 10, color: '#fff' },
 
-  // ── Free practice ─────────────────────────────────────────────────────────
-  accessRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 8 },
-  accessBadge: { borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 6 },
+  accessRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, marginTop: 4 },
+  accessBadge: { borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 8 },
   accessFree: { backgroundColor: Colors.surfaceSecondary, borderWidth: 1, borderColor: Colors.border },
   accessPremium: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B' },
   accessBadgeText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.text },
-  upgradeLink: { paddingHorizontal: 10 },
-  upgradeLinkText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primary },
+  upgradeChip: { borderRadius: Radius.full, overflow: 'hidden' },
+  upgradeChipGrad: { paddingHorizontal: 14, paddingVertical: 8 },
+  upgradeChipText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
 
-  sectionLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right', marginBottom: 10, marginTop: 12 },
-  modesGrid: { gap: 10, marginBottom: 8 },
-  modeCard: { borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.border, padding: 16, overflow: 'hidden', backgroundColor: Colors.surface, position: 'relative', ...Shadow.sm },
-  modeCardSelected: { ...Shadow.primary },
-  modeCheck: { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  modeCheckText: { fontFamily: FontFamily.bold, fontSize: 12, color: '#fff' },
-  modeIcon: { fontSize: 28, textAlign: 'right', marginBottom: 6 },
-  modeLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.base, textAlign: 'right', marginBottom: 3 },
-  modeDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, textAlign: 'right', lineHeight: 20 },
+  sectionLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', marginBottom: 12, marginTop: 8 },
 
-  topicsHScrollOuter: { marginHorizontal: -16 },
-  topicsHScroll: { paddingHorizontal: 16, gap: 10, flexDirection: 'row-reverse', paddingBottom: 4 },
-  topicCard: { width: 140, height: 115, backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.border, padding: 12, alignItems: 'flex-end', justifyContent: 'flex-start', ...Shadow.sm, position: 'relative', overflow: 'hidden' },
+  modesRowOuter: { marginHorizontal: -20 },
+  modesRow: { paddingHorizontal: 20, flexDirection: 'row-reverse', gap: 10, paddingBottom: 4 },
+  modeChip: { flexDirection: 'row-reverse', alignItems: 'center', borderRadius: Radius.full, paddingHorizontal: 18, paddingVertical: 12, gap: 7, ...Shadow.sm },
+  modeChipInactive: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  modeChipIcon: { fontSize: 16 },
+  modeChipLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
+
+  modeDetailCard: { flexDirection: 'row-reverse', backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: 16, marginBottom: 8, gap: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)', ...Shadow.sm },
+  modeDetailIcon: { fontSize: 32 },
+  modeDetailText: { flex: 1, alignItems: 'flex-end' },
+  modeDetailLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.base, textAlign: 'right', marginBottom: 3 },
+  modeDetailDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', lineHeight: 20 },
+
+  topicsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
+  topicCard: { width: '47%', backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.06)', padding: 16, alignItems: 'flex-end', justifyContent: 'flex-start', minHeight: 130, ...Shadow.sm, position: 'relative', overflow: 'hidden' },
   topicCardLocked: { opacity: 0.55 },
-  topicCheck: { position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  topicCheckText: { fontFamily: FontFamily.bold, fontSize: 11, color: '#fff' },
-  premiumBadge: { position: 'absolute', top: 8, left: 8 },
-  premiumBadgeText: { fontSize: 14 },
-  topicIcon: { fontSize: 36, marginBottom: 4 },
-  topicName: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.text, textAlign: 'right', marginBottom: 2 },
-  topicTitle: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, textAlign: 'right', marginTop: 2 },
+  lockBadge: { position: 'absolute', top: 10, left: 10 },
+  lockBadgeText: { fontSize: 16 },
+  checkBadge: { position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  checkBadgeText: { fontFamily: FontFamily.bold, fontSize: 11, color: '#fff' },
+  topicCardIcon: { fontSize: 36, marginBottom: 8 },
+  topicCardName: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', marginBottom: 4 },
+  topicCardElo: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, textAlign: 'right' },
 
-  limitInfo: { backgroundColor: '#FEF3C7', borderRadius: Radius.lg, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#F59E0B' },
+  limitInfo: { backgroundColor: '#FEF3C7', borderRadius: Radius.lg, padding: 12, marginTop: 8, borderWidth: 1, borderColor: '#F59E0B' },
   limitInfoText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#92400E', textAlign: 'right' },
 
-  stickyBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: Colors.glassStrong, borderTopWidth: 1, borderTopColor: Colors.border,
-    padding: 16,
-  },
-  startBtn: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
-  startBtnDisabled: { shadowOpacity: 0, elevation: 0 },
-  startBtnGrad: { padding: 18, alignItems: 'center' },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 48, marginTop: 60 },
+  emptyStateEmoji: { fontSize: 64, marginBottom: 16 },
+  emptyStateTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text, marginBottom: 8, textAlign: 'center' },
+  emptyStateSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textTertiary, textAlign: 'center', lineHeight: 20 },
+
+  stickyBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.glassStrong, borderTopWidth: 1, borderTopColor: Colors.border, paddingHorizontal: 20, paddingTop: 12 },
+  startBtn: { borderRadius: Radius.xl, paddingVertical: 18, alignItems: 'center', ...Shadow.primary },
   startBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
-  startBtnTextDisabled: { color: 'rgba(255,255,255,0.85)' },
 
-  // ── Simulations ───────────────────────────────────────────────────────────
-  emptySimulations: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptySimIcon: { fontSize: 52, marginBottom: 12 },
-  emptySimTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text, marginBottom: 6 },
-  emptySimDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textTertiary, textAlign: 'center', lineHeight: 20 },
-
-  simHeader: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', lineHeight: 20, marginBottom: 16, marginTop: 8 },
-
-  simCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.md, marginBottom: 16, borderWidth: 1, borderColor: Colors.border },
-  simCardHeader: { padding: 16, flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between' },
+  simHeader: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', lineHeight: 22, marginBottom: 16, marginTop: 8 },
+  simCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.md, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
+  simCardHeader: { padding: 18, flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between' },
   simCardHeaderRight: { flex: 1, alignItems: 'flex-end' },
   simCardName: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff', textAlign: 'right' },
   simCardDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8', textAlign: 'right', marginTop: 4, lineHeight: 16 },
-  simCardIcon: { fontSize: 28, marginRight: 8 },
+  simCardIcon: { fontSize: 28 },
   simCardBody: { padding: 16 },
-
-  simStats: { flexDirection: 'row-reverse', gap: 6, marginBottom: 12 },
-
-  simRulesBox: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 10, marginBottom: 10 },
-  simRuleRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  simStats: { flexDirection: 'row-reverse', gap: 8, marginBottom: 14 },
+  simRulesBox: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 12, marginBottom: 12 },
+  simRuleRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.border },
   simRuleText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.text },
   simRuleMeta: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
-
-  simRestNote: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginBottom: 10 },
-
-  simStartBtn: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
-  simStartGrad: { padding: 16, alignItems: 'center' },
+  simRestNote: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginBottom: 12 },
+  simStartGrad: { borderRadius: Radius.xl, paddingVertical: 16, alignItems: 'center', ...Shadow.primary },
   simStartText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 });
