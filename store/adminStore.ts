@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
-import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord } from '../lib/db';
+import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics } from '../lib/db';
 import { supabase } from '../lib/supabase';
 
 export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
@@ -655,6 +655,7 @@ interface AdminState {
   // Supabase sync
   loadQuestionsFromSupabase: () => Promise<void>;
   seedToSupabase: () => Promise<{ ok: boolean; message: string }>;
+  loadAdminData: () => Promise<void>;
 
   // Computed
   getStats: () => AdminStats;
@@ -717,16 +718,21 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   generationSessions: SEED_GENERATION_SESSIONS,
   generationPresets: SEED_GENERATION_PRESETS,
 
-  setAppConfig: (updates) =>
-    set(s => ({ appConfig: { ...s.appConfig, ...updates } })),
+  setAppConfig: (updates) => {
+    set(s => {
+      const next = { ...s.appConfig, ...updates };
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
+      return { appConfig: next };
+    });
+  },
 
-  setFeatureFlag: (flag, value) =>
-    set(s => ({
-      appConfig: {
-        ...s.appConfig,
-        featureFlags: { ...s.appConfig.featureFlags, [flag]: value },
-      },
-    })),
+  setFeatureFlag: (flag, value) => {
+    set(s => {
+      const next = { ...s.appConfig, featureFlags: { ...s.appConfig.featureFlags, [flag]: value } };
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
+      return { appConfig: next };
+    });
+  },
 
   addDailyChallenge: (challenge) => {
     const newC: DailyChallenge = { ...challenge, id: `dc_${Date.now()}` };
@@ -753,11 +759,29 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   getUserNote: (userId) => get().userNotes.find(n => n.userId === userId)?.note ?? '',
 
   setIsAdmin: (val) => set({ isAdmin: val }),
-  setFreePracticeLimit: (n) => set({ freePracticeLimit: Math.max(5, Math.min(200, n)) }),
-  setPracticeSettings: (updates) =>
-    set(s => ({ practiceSettings: { ...s.practiceSettings, ...updates } })),
-  setExamSettings: (updates) =>
-    set(s => ({ examSettings: { ...s.examSettings, ...updates } })),
+
+  setFreePracticeLimit: (n) => {
+    const val = Math.max(5, Math.min(200, n));
+    set({ freePracticeLimit: val });
+    const s = get();
+    saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: val, appConfig: s.appConfig });
+  },
+
+  setPracticeSettings: (updates) => {
+    set(s => {
+      const next = { ...s.practiceSettings, ...updates };
+      saveAdminSettings({ practiceSettings: next, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
+      return { practiceSettings: next };
+    });
+  },
+
+  setExamSettings: (updates) => {
+    set(s => {
+      const next = { ...s.examSettings, ...updates };
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: next, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
+      return { examSettings: next };
+    });
+  },
   addSessionRecord: (record) => {
     set(s => ({ sessionHistory: [record, ...s.sessionHistory.slice(0, 499)] }));
     saveSessionRecord(record); // fire-and-forget to Supabase
@@ -784,6 +808,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         return { ok: false, error: 'אין הרשאות מנהל' };
       }
       set({ isAdmin: true });
+      get().loadAdminData(); // fire-and-forget — restore all persisted data
       return { ok: true };
     }
     // If user doesn't exist, create them (first-time setup)
@@ -791,6 +816,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
       if (!signUpError && signUpData.user) {
         set({ isAdmin: true });
+        get().loadAdminData();
         return { ok: true };
       }
       return { ok: false, error: signUpError?.message ?? 'שגיאת הרשמה' };
@@ -901,17 +927,24 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   addTopic: (t) => {
     const newT: Topic = { ...t, id: `topic_admin_${Date.now()}` };
     set(s => ({ topics: [...s.topics, newT] }));
+    dbUpsertTopic(newT);
+    get().logActivity(`הוסיף נושא: ${newT.name}`, 'system');
     return newT;
   },
 
   updateTopic: (id, updates) => {
-    set(s => ({
-      topics: s.topics.map(t => (t.id === id ? { ...t, ...updates } : t)),
-    }));
+    set(s => {
+      const updated = s.topics.map(t => (t.id === id ? { ...t, ...updates } : t));
+      const t = updated.find(x => x.id === id);
+      if (t) dbUpsertTopic(t);
+      return { topics: updated };
+    });
   },
 
   deleteTopic: (id) => {
     set(s => ({ topics: s.topics.filter(t => t.id !== id) }));
+    deleteTopicFromDB(id);
+    get().logActivity(`מחק נושא ${id}`, 'system');
   },
 
   updateTarget: (id, updates) => {
@@ -926,18 +959,30 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       id: `tmpl_${Date.now()}`,
       createdAt: new Date(),
     };
-    set(s => ({ templates: [...s.templates, newT] }));
+    set(s => {
+      const next = [...s.templates, newT];
+      saveTemplates(next);
+      return { templates: next };
+    });
+    get().logActivity(`יצר תבנית סימולציה: ${newT.name}`, 'system');
     return newT;
   },
 
   updateTemplate: (id, updates) => {
-    set(s => ({
-      templates: s.templates.map(t => (t.id === id ? { ...t, ...updates } : t)),
-    }));
+    set(s => {
+      const next = s.templates.map(t => (t.id === id ? { ...t, ...updates } : t));
+      saveTemplates(next);
+      return { templates: next };
+    });
   },
 
   deleteTemplate: (id) => {
-    set(s => ({ templates: s.templates.filter(t => t.id !== id) }));
+    set(s => {
+      const next = s.templates.filter(t => t.id !== id);
+      saveTemplates(next);
+      return { templates: next };
+    });
+    get().logActivity(`מחק תבנית סימולציה ${id}`, 'system');
   },
 
   addTopicRuleToTemplate: (templateId, rule) => {
@@ -1117,10 +1162,43 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   loadQuestionsFromSupabase: async () => {
     const questions = await fetchAllQuestions();
-    set({ questions });
+    if (questions.length > 0) set({ questions });
   },
 
   seedToSupabase: () => seedDatabase(),
+
+  loadAdminData: async () => {
+    // 1. Load all questions from Supabase (includes any admin-created ones)
+    try {
+      const questions = await fetchAllQuestions();
+      if (questions.length > 0) set({ questions });
+    } catch {}
+
+    // 2. Load topics from Supabase (includes admin-created topics)
+    try {
+      const topics = await fetchTopics();
+      if (topics.length > 0) set({ topics });
+    } catch {}
+
+    // 3. Load simulation templates from AsyncStorage
+    try {
+      const templates = await loadTemplates();
+      if (templates && templates.length > 0) set({ templates });
+    } catch {}
+
+    // 4. Restore admin settings (practice/exam settings, app config, free limit)
+    try {
+      const settings = await loadAdminSettings();
+      if (settings) {
+        const updates: Partial<typeof get()> = {};
+        if (settings.practiceSettings) (updates as any).practiceSettings = { ...get().practiceSettings, ...settings.practiceSettings };
+        if (settings.examSettings) (updates as any).examSettings = { ...get().examSettings, ...settings.examSettings };
+        if (typeof settings.freePracticeLimit === 'number') (updates as any).freePracticeLimit = settings.freePracticeLimit;
+        if (settings.appConfig) (updates as any).appConfig = { ...get().appConfig, ...settings.appConfig };
+        if (Object.keys(updates).length > 0) set(updates as any);
+      }
+    } catch {}
+  },
 
   getPendingQuestions: () => get().questions.filter(q => q.validationStatus === 'pending'),
   getQuestionsByStatus: (status) => get().questions.filter(q => q.validationStatus === status),

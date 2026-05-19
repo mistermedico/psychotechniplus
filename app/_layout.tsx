@@ -29,6 +29,8 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
+  const loadAdminData = useAdminStore(s => s.loadAdminData);
+  const loadQuestionsFromSupabase = useAdminStore(s => s.loadQuestionsFromSupabase);
 
   const [fontsLoaded, fontError] = useFonts({
     Heebo_400Regular,
@@ -43,7 +45,14 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
       initialize().then(() => {
         const { email } = useUserStore.getState();
-        if (email.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
+        if (email.toLowerCase() === ADMIN_EMAIL) {
+          setIsAdmin(true);
+          loadAdminData(); // restore admin's questions, topics, templates and settings
+        } else {
+          // For regular users, load the latest validated questions from Supabase
+          // so they see questions the admin has created/validated
+          loadQuestionsFromSupabase();
+        }
       });
     }
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps

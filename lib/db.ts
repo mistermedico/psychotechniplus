@@ -4,6 +4,24 @@ import { supabase } from './supabase';
 import { Question, Topic, Target, UserBadge } from '../data/types';
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
 
+// ── Local storage helpers ──────────────────────────────────────────────────
+
+function localGet(key: string): string | null {
+  if (Platform.OS === 'web') return localStorage.getItem(key);
+  return null; // async path below
+}
+function localSet(key: string, val: string): void {
+  if (Platform.OS === 'web') localStorage.setItem(key, val);
+}
+async function asyncGet(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') return localStorage.getItem(key);
+  return AsyncStorage.getItem(key);
+}
+async function asyncSet(key: string, val: string): Promise<void> {
+  if (Platform.OS === 'web') { localStorage.setItem(key, val); return; }
+  return AsyncStorage.setItem(key, val);
+}
+
 const USER_ID_KEY = '@psychotechniplus/userId';
 
 // ── User identity ──────────────────────────────────────────────────────────
@@ -275,6 +293,75 @@ function fallbackQuestions(opts?: { topicId?: string; targetId?: string }): Ques
   if (opts?.topicId) q = q.filter(x => x.topicId === opts.topicId);
   if (opts?.targetId) q = q.filter(x => x.targetIds.includes(opts.targetId!));
   return q;
+}
+
+// ── Topic persistence ──────────────────────────────────────────────────────
+
+export async function upsertTopic(t: Topic): Promise<void> {
+  try {
+    await supabase.from('topics').upsert({
+      id: t.id,
+      target_id: t.targetId,
+      name: t.name,
+      slug: t.slug ?? t.id,
+      description: t.description ?? '',
+      icon: t.icon,
+      order_index: t.order ?? 99,
+      is_premium_only: t.isPremiumOnly ?? false,
+      color: t.color,
+    });
+  } catch {}
+}
+
+export async function deleteTopicFromDB(id: string): Promise<void> {
+  try {
+    await supabase.from('topics').delete().eq('id', id);
+  } catch {}
+}
+
+// ── Template persistence (AsyncStorage) ───────────────────────────────────
+
+const TEMPLATES_KEY = '@psychotechniplus/admin/templates';
+
+export async function saveTemplates(templates: any[]): Promise<void> {
+  try {
+    const serialized = JSON.stringify(templates.map(t => ({
+      ...t,
+      createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt,
+    })));
+    await asyncSet(TEMPLATES_KEY, serialized);
+  } catch {}
+}
+
+export async function loadTemplates(): Promise<any[] | null> {
+  try {
+    const raw = await asyncGet(TEMPLATES_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) }));
+  } catch {
+    return null;
+  }
+}
+
+// ── Admin settings persistence (AsyncStorage) ─────────────────────────────
+
+const ADMIN_SETTINGS_KEY = '@psychotechniplus/admin/settings';
+
+export async function saveAdminSettings(settings: Record<string, any>): Promise<void> {
+  try {
+    await asyncSet(ADMIN_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {}
+}
+
+export async function loadAdminSettings(): Promise<Record<string, any> | null> {
+  try {
+    const raw = await asyncGet(ADMIN_SETTINGS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 // ── Session Records ────────────────────────────────────────────────────────
