@@ -216,6 +216,9 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                   onPress={() => !revealed && onSelect(opt.id)}
                   disabled={revealed}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selectedId === opt.id, disabled: revealed }}
+                  accessibilityLabel={opt.text}
                   style={({ pressed }) => [
                     styles.optionBase,
                     getOptionStyle(opt.id),

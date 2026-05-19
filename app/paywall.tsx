@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -154,9 +154,21 @@ export default function PaywallScreen() {
             {restoring ? 'משחזר...' : 'שחזר רכישות קודמות'}
           </Text>
         </Pressable>
+
         <Text style={styles.legal}>
-          המנוי יחויב דרך Apple ID שלך. ביטול אפשרי בכל עת דרך הגדרות ה-App Store.
+          המנוי יחויב דרך ה-Apple ID שלך. חידוש אוטומטי יתבצע 24 שעות לפני תום התקופה אלא אם בוטל.
+          ניתן לבטל בכל עת דרך הגדרות → Apple ID → מנויים.
         </Text>
+
+        <View style={styles.legalLinks}>
+          <Pressable onPress={() => Linking.openURL('https://psychotechniplus.com/privacy')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.legalLink}>מדיניות פרטיות</Text>
+          </Pressable>
+          <Text style={styles.legalSep}> · </Text>
+          <Pressable onPress={() => Linking.openURL('https://psychotechniplus.com/terms')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.legalLink}>תנאי שימוש</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -230,6 +242,9 @@ const styles = StyleSheet.create({
   restoreBtnText: { fontFamily: 'Heebo_500Medium', fontSize: 13, color: 'rgba(255,255,255,0.5)' },
   legal: {
     fontFamily: 'Heebo_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.35)',
-    textAlign: 'center', lineHeight: 16,
+    textAlign: 'center', lineHeight: 16, paddingHorizontal: 8,
   },
+  legalLinks: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 10 },
+  legalLink: { fontFamily: 'Heebo_500Medium', fontSize: 11, color: 'rgba(255,255,255,0.5)', textDecorationLine: 'underline' },
+  legalSep: { fontFamily: 'Heebo_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.3)' },
 });

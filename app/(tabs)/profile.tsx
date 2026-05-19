@@ -59,7 +59,7 @@ export default function ProfileTab() {
   const {
     name, level, xp: _xp, streak, selectedTargetId,
     totalSessions, totalCorrect, totalAnswered,
-    getTopicElo, reset, signOut, isPremium,
+    getTopicElo, reset, signOut, deleteAccount, isPremium,
   } = useUserStore();
 
   const tapCount = useRef(0);
@@ -101,6 +101,28 @@ export default function ProfileTab() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'מחיקת חשבון לצמיתות',
+      'פעולה זו תמחק את כל הנתונים שלך לצמיתות ולא ניתן לבטלה. האם אתה בטוח?',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'מחק חשבון', style: 'destructive',
+          onPress: async () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            const result = await deleteAccount();
+            if (result.success) {
+              router.replace('/auth');
+            } else {
+              Alert.alert('שגיאה', 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleReset = () => {
@@ -274,9 +296,11 @@ export default function ProfileTab() {
           <SettingRow icon="⭐" label="שאלות מועדפות" onPress={() => { Haptics.selectionAsync(); Alert.alert('מועדפות', 'אפשרות זו תהיה זמינה בקרוב'); }} />
           <SettingRow icon="📝" label="ההיסטוריה שלי" onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/progress'); }} />
           <SettingRow icon="💬" label="צור קשר ותמיכה" onPress={() => { Haptics.selectionAsync(); Linking.openURL('mailto:support@psychotechniplus.com'); }} />
-          <SettingRow icon="📄" label="תנאי שימוש ופרטיות" onPress={() => { Haptics.selectionAsync(); Alert.alert('תנאי שימוש', 'תנאי השימוש זמינים באתר שלנו'); }} />
+          <SettingRow icon="🔒" label="מדיניות פרטיות" onPress={() => { Haptics.selectionAsync(); Linking.openURL('https://psychotechniplus.com/privacy'); }} />
+          <SettingRow icon="📄" label="תנאי שימוש" onPress={() => { Haptics.selectionAsync(); Linking.openURL('https://psychotechniplus.com/terms'); }} />
           <SettingRow icon="🚪" label="יציאה מהחשבון" onPress={handleSignOut} danger />
-          <SettingRow icon="🗑️" label="איפוס כל הנתונים" onPress={handleReset} danger isLast />
+          <SettingRow icon="🗑️" label="איפוס כל הנתונים" onPress={handleReset} danger />
+          <SettingRow icon="⛔" label="מחיקת חשבון לצמיתות" onPress={handleDeleteAccount} danger isLast />
         </View>
 
         {/* ── Premium upgrade banner ── */}

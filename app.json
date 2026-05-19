@@ -6,24 +6,74 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "psychotechniplus",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.psychotechniplus.app",
-      "userInterfaceStyle": "light",
+      "buildNumber": "1",
+      "userInterfaceStyle": "dark",
       "requireFullScreen": true,
+      "deploymentTarget": "15.1",
       "infoPlist": {
         "UIRequiresFullScreen": true,
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "לאימות מהיר לחשבונך",
-        "NSCameraUsageDescription": "לצילום תמונות לפרופיל"
+        "NSFaceIDUsageDescription": "Used for quick and secure authentication to your account",
+        "NSCameraUsageDescription": "Used to take a photo for your profile picture",
+        "NSPhotoLibraryUsageDescription": "Used to select a photo for your profile picture",
+        "NSPhotoLibraryAddUsageDescription": "Used to save images to your photo library",
+        "CFBundleAllowMixedLocalizations": true,
+        "UIBackgroundModes": [],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": ["35F9.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": ["E174.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ],
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeName",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          }
+        ],
+        "NSPrivacyTracking": false
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#4F46E5"
+        "backgroundColor": "#060912"
       },
       "package": "com.psychotechniplus.app"
     },
@@ -41,7 +91,14 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#4F46E5"
+          "backgroundColor": "#060912"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Used to select a photo for your profile picture",
+          "cameraPermission": "Used to take a photo for your profile picture"
         }
       ]
     ],

@@ -39,6 +39,7 @@ interface UserState {
   isAuthenticated: boolean;
   initialize: (overrideUserId?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
 
   // Actions
   completeOnboarding: (name: string, targetId: string, initialElos: Record<string, number>) => void;
@@ -144,6 +145,27 @@ export const useUserStore = create<UserState>((set, get) => ({
   signOut: async () => {
     await supabase.auth.signOut();
     set({ ...INITIAL_STATE, isLoaded: true });
+  },
+
+  deleteAccount: async () => {
+    const { userId } = get();
+    if (!userId) return { success: false, error: 'No user session' };
+    try {
+      // Delete all user data from Supabase tables
+      await Promise.all([
+        supabase.from('user_profiles').delete().eq('user_id', userId),
+        supabase.from('user_elos').delete().eq('user_id', userId),
+        supabase.from('user_badges').delete().eq('user_id', userId),
+        supabase.from('practice_sessions').delete().eq('user_id', userId),
+      ]);
+      // Sign out — the auth user record is removed via edge function if available
+      await supabase.functions.invoke('delete-user', { body: { userId } }).catch(() => null);
+      await supabase.auth.signOut();
+      set({ ...INITIAL_STATE, isLoaded: true });
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message ?? 'Unknown error' };
+    }
   },
 
   completeOnboarding: (name, targetId, initialElos) => {

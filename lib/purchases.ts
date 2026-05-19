@@ -56,7 +56,7 @@ const MOCK_PACKAGES: PurchasePackage[] = [
 export async function initializePurchases(userId: string): Promise<void> {
   // Real: await Purchases.configure({ apiKey: REVENUECAT_API_KEY_IOS });
   //       await Purchases.logIn(userId);
-  console.log('[Purchases] Mock initialized for user:', userId);
+  // no-op mock
 }
 
 export async function getOfferings(): Promise<PurchasePackage[]> {

@@ -28,7 +28,9 @@ export function BackButton({ onPress, toHome = false, label, style, color = '#ff
     <Pressable
       onPress={handlePress}
       style={({ pressed }) => [styles.btn, style, pressed && { opacity: 0.65 }]}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      accessibilityRole="button"
+      accessibilityLabel={label ?? (toHome ? 'חזור לדף הבית' : 'חזור')}
     >
       <View style={[styles.inner, { borderColor: 'rgba(255,255,255,0.2)' }]}>
         <Text style={[styles.arrow, { color }]}>{toHome ? '🏠' : '→'}</Text>
@@ -46,7 +48,9 @@ export function HomeButton({ style }: { style?: object }) {
         router.replace('/(tabs)');
       }}
       style={({ pressed }) => [styles.btn, style, pressed && { opacity: 0.65 }]}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      accessibilityRole="button"
+      accessibilityLabel="חזור לדף הבית"
     >
       <View style={[styles.inner, { borderColor: 'rgba(255,255,255,0.2)' }]}>
         <Text style={styles.arrow}>🏠</Text>
