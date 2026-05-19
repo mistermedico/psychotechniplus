@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Animated, RefreshControl, Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
@@ -94,10 +95,18 @@ export default function TargetsTab() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>הכנה לפסיכוטכני</Text>
-        <Text style={styles.subtitle}>בחר נושא ותרגל לפי רמה אישית</Text>
-      </View>
+      <LinearGradient
+        colors={Colors.gradients.primary}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <Text style={styles.heroTitle}>הכנה לפסיכוטכני</Text>
+        <Text style={styles.heroSubtitle}>בחר מסלול ותרגל לפי רמה אישית</Text>
+        <View style={styles.heroBadge}>
+          <Text style={styles.heroBadgeText}>🏆 {totalSessions} סשנים</Text>
+        </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scroll}
@@ -245,7 +254,14 @@ export default function TargetsTab() {
                       }
                     }}
                   >
-                    <Text style={styles.adaptiveBtnText}>⚡ תרגול אדפטיבי</Text>
+                    <LinearGradient
+                      colors={Colors.gradients.primary}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.adaptiveBtnGrad}
+                    >
+                      <Text style={styles.adaptiveBtnText}>⚡ תרגול אדפטיבי</Text>
+                    </LinearGradient>
                   </Pressable>
                 </View>
               </AnimatedTopicsContainer>
@@ -259,23 +275,37 @@ export default function TargetsTab() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  header: {
+  hero: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingTop: 20,
+    paddingBottom: 28,
   },
-  title: {
+  heroTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize['3xl'],
-    color: Colors.text,
+    color: '#fff',
     textAlign: 'right',
+    fontWeight: 'bold',
   },
-  subtitle: {
+  heroSubtitle: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.8)',
     textAlign: 'right',
     marginTop: 4,
+  },
+  heroBadge: {
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginTop: 10,
+  },
+  heroBadgeText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: '#fff',
   },
   scroll: { flex: 1 },
   content: { padding: 16, gap: 12 },
@@ -285,12 +315,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
-  // Progress percentage badge — top-left corner (RTL: visually top-right)
+  // Progress percentage badge — top-right corner (RTL: visually top-right)
   progressPctBadge: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    top: 14,
+    right: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -328,11 +358,13 @@ const styles = StyleSheet.create({
   topicsContainer: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
-    padding: 16,
+    padding: 18,
     marginTop: 4,
     ...Shadow.sm,
     borderWidth: 1,
     borderColor: Colors.border,
+    borderTopWidth: 3,
+    borderTopColor: Colors.primary,
   },
   topicsTitle: {
     fontFamily: FontFamily.bold,
@@ -405,9 +437,9 @@ const styles = StyleSheet.create({
   // "תרגל ←" chip button
   practiceChip: {
     borderWidth: 1.5,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -419,12 +451,14 @@ const styles = StyleSheet.create({
 
   // Adaptive practice button at bottom
   adaptiveBtn: {
-    backgroundColor: Colors.primary,
     borderRadius: Radius.lg,
+    marginTop: 12,
+    overflow: 'hidden',
+    ...Shadow.primary,
+  },
+  adaptiveBtnGrad: {
     padding: 14,
     alignItems: 'center',
-    marginTop: 12,
-    ...Shadow.primary,
   },
   adaptiveBtnText: {
     fontFamily: FontFamily.bold,
