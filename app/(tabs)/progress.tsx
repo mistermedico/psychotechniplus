@@ -54,17 +54,32 @@ export default function ProgressTab() {
   // XP bar animated entrance — 0 → actual value over 800ms
   const xpAnim = useRef(new Animated.Value(0)).current;
 
+  // Stats entrance animation — fade + translate up on mount
+  const statsAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     Animated.timing(xpAnim, {
       toValue: xpPercent,
       duration: 800,
       useNativeDriver: false,
     }).start();
-  }, [xpPercent]);
+
+    Animated.spring(statsAnim, {
+      toValue: 1,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  }, [xpPercent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const xpWidth = xpAnim.interpolate({
     inputRange: [0, 100],
     outputRange: ['0%', '100%'],
+  });
+
+  const statsOpacity = statsAnim;
+  const statsTranslateY = statsAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [24, 0],
   });
 
   // Empty state — no sessions yet
@@ -103,17 +118,33 @@ export default function ProgressTab() {
         bounces={Platform.OS === 'ios'}
         decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
       >
-        <Text style={styles.title}>ההתקדמות שלי</Text>
-
-        {/* Level card with animated XP bar */}
+        {/* ── Gradient Hero Banner ── */}
         <LinearGradient
-          colors={Colors.gradients.primary}
+          colors={['#0F172A', '#1E1B4B', '#312E81']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.levelCard}
+          style={styles.hero}
         >
-          <View style={styles.levelTop}>
-            <View style={styles.levelBadge}>
+          {/* Top row: streak badge + name/label */}
+          <View style={styles.heroTop}>
+            <View style={styles.streakBadge}>
+              <Text style={styles.streakBadgeText}>🔥 {streak} ימים</Text>
+            </View>
+            <View style={styles.heroGreeting}>
+              <Text style={styles.heroSubLabel}>ההתקדמות שלי</Text>
+              <Text style={styles.heroName}>{name || 'מתאמן'}</Text>
+            </View>
+          </View>
+
+          {/* Accuracy stat — prominent */}
+          <View style={styles.accuracyRow}>
+            <Text style={styles.accuracyValue}>{accuracy}%</Text>
+            <Text style={styles.accuracyLabel}>דיוק כולל</Text>
+          </View>
+
+          {/* Level info row */}
+          <View style={styles.levelRow}>
+            <View style={styles.levelBadgeCircle}>
               <Text style={styles.levelNum}>{level}</Text>
             </View>
             <View style={styles.levelInfo}>
@@ -121,29 +152,41 @@ export default function ProgressTab() {
               <Text style={styles.levelXp}>{xp} / {xpForNext} XP לרמה הבאה</Text>
             </View>
           </View>
+
+          {/* Animated XP bar */}
           <View style={styles.xpTrack}>
             <Animated.View style={[styles.xpFill, { width: xpWidth }]} />
           </View>
         </LinearGradient>
 
-        {/* Stats grid */}
-        <Text style={styles.sectionTitle}>סטטיסטיקות כלליות</Text>
-        <View style={styles.statsGrid}>
-          <StatCard icon="🎯" label="סשנים" value={totalSessions} color={Colors.primary} />
-          <StatCard icon="✅" label="נכון" value={totalCorrect} color={Colors.success} />
-        </View>
-        <View style={[styles.statsGrid, { marginTop: 10 }]}>
-          <StatCard icon="📊" label="דיוק" value={`${accuracy}%`} color={Colors.accent} />
-          <StatCard icon="🔥" label="רצף" value={`${streak} ימים`} color={Colors.warning} />
-        </View>
-        <View style={[styles.statsGrid, { marginTop: 10 }]}>
-          <StatCard icon="🏅" label="רצף שיא" value={`${longestStreak} ימים`} color={Colors.gold} />
-          <StatCard icon="📝" label="סה״כ שאלות" value={totalAnswered} color={Colors.textSecondary} />
+        {/* ── Stats grid ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionLabel}>סטטיסטיקות</Text>
+          <Text style={styles.sectionTitle}>סטטיסטיקות כלליות</Text>
         </View>
 
-        {/* 14-day streak calendar — 2 rows of 7 */}
-        <Text style={styles.sectionTitle}>🔥 הרצף שלי</Text>
+        <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTranslateY }] }}>
+          <View style={styles.statsGrid}>
+            <StatCard icon="🎯" label="סשנים" value={totalSessions} color={Colors.primary} />
+            <StatCard icon="✅" label="נכון" value={totalCorrect} color={Colors.success} />
+          </View>
+          <View style={[styles.statsGrid, { marginTop: 10 }]}>
+            <StatCard icon="📊" label="דיוק" value={`${accuracy}%`} color={Colors.accent} />
+            <StatCard icon="🔥" label="רצף" value={`${streak} ימים`} color={Colors.warning} />
+          </View>
+          <View style={[styles.statsGrid, { marginTop: 10 }]}>
+            <StatCard icon="🏅" label="רצף שיא" value={`${longestStreak} ימים`} color={Colors.gold} />
+            <StatCard icon="📝" label="סה״כ שאלות" value={totalAnswered} color={Colors.textSecondary} />
+          </View>
+        </Animated.View>
+
+        {/* ── 14-day streak calendar ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionLabel}>רצף יומי</Text>
+          <Text style={styles.sectionTitle}>🔥 הרצף שלי</Text>
+        </View>
         <View style={styles.streakCard}>
+          <View style={styles.streakAccentStripe} />
           {/* Row 1: days 1–7 (oldest) */}
           <View style={styles.streakRow}>
             {Array.from({ length: 7 }).map((_, i) => {
@@ -193,8 +236,11 @@ export default function ProgressTab() {
           </Text>
         </View>
 
-        {/* מגמה אחרונה — trend section before ELO */}
-        <Text style={styles.sectionTitle}>מגמה אחרונה</Text>
+        {/* ── מגמה אחרונה ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionLabel}>ביצועים</Text>
+          <Text style={styles.sectionTitle}>מגמה אחרונה</Text>
+        </View>
         <View style={styles.trendCard}>
           {totalAnswered > 0 ? (
             <Text style={styles.trendText}>
@@ -207,8 +253,11 @@ export default function ProgressTab() {
           )}
         </View>
 
-        {/* ELO per topic — with colored right border for visual hierarchy */}
-        <Text style={styles.sectionTitle}>ELO לפי נושא</Text>
+        {/* ── ELO per topic ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionLabel}>רמת שליטה</Text>
+          <Text style={styles.sectionTitle}>ELO לפי נושא</Text>
+        </View>
         <View style={styles.eloContainer}>
           {topics.map((topic, idx) => {
             const elo = getTopicElo(topic.id);
@@ -248,9 +297,12 @@ export default function ProgressTab() {
           )}
         </View>
 
-        {/* Badges grid with header count */}
-        <View style={styles.badgesSectionHeader}>
-          <Text style={styles.sectionTitle}>הישגים ועיטורים</Text>
+        {/* ── Badges grid ── */}
+        <View style={[styles.sectionHeader, styles.badgesSectionHeader]}>
+          <View style={styles.badgesHeaderLeft}>
+            <Text style={styles.sectionLabel}>הישגים</Text>
+            <Text style={styles.sectionTitle}>הישגים ועיטורים</Text>
+          </View>
           <Text style={styles.badgesCount}>
             {earnedCount} מתוך {ALL_BADGES.length} הושגו
           </Text>
@@ -261,7 +313,11 @@ export default function ProgressTab() {
             return (
               <View
                 key={badge.type}
-                style={[styles.badgeCard, !earned && styles.badgeCardLocked]}
+                style={[
+                  styles.badgeCard,
+                  !earned && styles.badgeCardLocked,
+                  earned && styles.badgeCardEarned,
+                ]}
               >
                 <Text style={[styles.badgeIcon, !earned && { opacity: 0.3 }]}>
                   {badge.icon}
@@ -289,7 +345,7 @@ export default function ProgressTab() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  content: { padding: 20 },
+  content: { paddingBottom: 20 },
 
   // ── Empty state (no sessions) ─────────────────────────────────────────────
   emptyStateContainer: {
@@ -331,51 +387,100 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── Page header ───────────────────────────────────────────────────────────
-  title: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['3xl'],
-    color: Colors.text,
-    textAlign: 'right',
-    marginBottom: 20,
-  },
-
-  // ── Level card ────────────────────────────────────────────────────────────
-  levelCard: {
-    borderRadius: Radius.xl,
-    padding: 20,
-    marginBottom: 24,
+  // ── Hero banner ───────────────────────────────────────────────────────────
+  hero: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: Radius['2xl'],
+    padding: 24,
     ...Shadow.primary,
   },
-  levelTop: {
+  heroTop: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  streakBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  streakBadgeText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: '#fff',
+  },
+  heroGreeting: { alignItems: 'flex-end' },
+  heroSubLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'right',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  heroName: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize['2xl'],
+    color: '#fff',
+    textAlign: 'right',
+  },
+
+  // Accuracy big stat
+  accuracyRow: {
+    alignItems: 'flex-end',
+    marginBottom: 20,
+  },
+  accuracyValue: {
+    fontFamily: FontFamily.heading,
+    fontSize: 52,
+    color: '#fff',
+    lineHeight: 56,
+    textAlign: 'right',
+  },
+  accuracyLabel: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.65)',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+
+  // Level row inside hero
+  levelRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 16,
     marginBottom: 14,
   },
-  levelBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  levelBadgeCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   levelNum: {
     fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
+    fontSize: FontSize.xl,
     color: '#fff',
   },
   levelInfo: { flex: 1, alignItems: 'flex-end' },
   levelTitle: {
     fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
+    fontSize: FontSize.base,
     color: '#fff',
   },
   levelXp: {
     fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
     textAlign: 'right',
   },
@@ -387,18 +492,31 @@ const styles = StyleSheet.create({
   },
   xpFill: { height: 8, backgroundColor: '#fff', borderRadius: 4 },
 
-  // ── Section title ─────────────────────────────────────────────────────────
+  // ── Section headers (two-line style) ─────────────────────────────────────
+  sectionHeader: {
+    paddingHorizontal: 20,
+    marginTop: 28,
+    marginBottom: 14,
+    alignItems: 'flex-end',
+  },
+  sectionLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.primary,
+    textAlign: 'right',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 3,
+  },
   sectionTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize.xl,
     color: Colors.text,
     textAlign: 'right',
-    marginBottom: 12,
-    marginTop: 8,
   },
 
   // ── Stats ─────────────────────────────────────────────────────────────────
-  statsGrid: { flexDirection: 'row-reverse', gap: 10 },
+  statsGrid: { flexDirection: 'row-reverse', gap: 10, paddingHorizontal: 20 },
 
   // ── 14-day streak calendar ────────────────────────────────────────────────
   streakCard: {
@@ -406,16 +524,29 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     padding: 16,
     marginBottom: 8,
+    marginHorizontal: 20,
     ...Shadow.md,
+    overflow: 'hidden',
+  },
+  streakAccentStripe: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: Colors.warning,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
   },
   streakRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   streakDay: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -443,6 +574,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     padding: 16,
     marginBottom: 8,
+    marginHorizontal: 20,
     ...Shadow.md,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -461,6 +593,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     padding: 4,
     marginBottom: 8,
+    marginHorizontal: 20,
     ...Shadow.md,
     overflow: 'hidden',
   },
@@ -500,22 +633,23 @@ const styles = StyleSheet.create({
   // ── Badges ────────────────────────────────────────────────────────────────
   badgesSectionHeader: {
     flexDirection: 'row-reverse',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginTop: 8,
-    marginBottom: 12,
   },
+  badgesHeaderLeft: { alignItems: 'flex-end' },
   badgesCount: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
     textAlign: 'left',
+    marginBottom: 4,
   },
   badgesGrid: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
     gap: 10,
     marginBottom: 8,
+    paddingHorizontal: 20,
   },
   badgeCard: {
     width: '47%',
@@ -530,6 +664,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   badgeCardLocked: { backgroundColor: Colors.surfaceSecondary },
+  badgeCardEarned: {
+    backgroundColor: Colors.success + '08',
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.success,
+    borderColor: Colors.border,
+  },
   badgeIcon: { fontSize: 32, marginBottom: 6 },
   badgeLabel: {
     fontFamily: FontFamily.bold,
