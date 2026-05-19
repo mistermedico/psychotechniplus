@@ -11,6 +11,7 @@ import { TOPICS, TARGETS } from '../../data/mockData';
 import { Question, QuestionOption, QuestionType, AccessLevel, ValidationStatus } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import { detectDir, textAlign as ta } from '../../utils/textDirection';
 
 const QUESTION_TYPES: QuestionType[] = [
   'multiple_choice', 'true_false', 'logic', 'verbal', 'quantitative', 'shapes', 'reading_comprehension',
@@ -165,13 +166,13 @@ export default function QuestionEditor() {
           {/* Section: question text */}
           <Section title="📝 טקסט השאלה">
             <TextInput
-              style={styles.textArea}
+              style={[styles.textArea, { writingDirection: detectDir(questionText) }]}
               multiline
               value={questionText}
               onChangeText={v => { setQuestionText(v); markDirty(); }}
               placeholder="הזן את נוסח השאלה..."
               placeholderTextColor={Colors.textTertiary}
-              textAlign="right"
+              textAlign={ta(questionText)}
               textAlignVertical="top"
               numberOfLines={4}
             />
@@ -181,13 +182,13 @@ export default function QuestionEditor() {
           {/* Reading passage — shown always for reading_comprehension, optional otherwise */}
           <Section title={`📖 קטע קריאה${questionType === 'reading_comprehension' ? ' (נדרש)' : ' (אופציונלי)'}`}>
             <TextInput
-              style={[styles.textArea, { minHeight: 80 }, questionType === 'reading_comprehension' && { borderColor: Colors.primary }]}
+              style={[styles.textArea, { minHeight: 80, writingDirection: detectDir(readingPassage) }, questionType === 'reading_comprehension' && { borderColor: Colors.primary }]}
               multiline
               value={readingPassage}
               onChangeText={v => { setReadingPassage(v); markDirty(); }}
               placeholder="להבנת הנקרא — הכנס קטע טקסט..."
               placeholderTextColor={Colors.textTertiary}
-              textAlign="right"
+              textAlign={ta(readingPassage)}
               textAlignVertical="top"
             />
           </Section>
@@ -257,12 +258,12 @@ export default function QuestionEditor() {
                 </Pressable>
                 <Text style={styles.optionLabel}>{opt.id.toUpperCase()}.</Text>
                 <TextInput
-                  style={[styles.optionInput, opt.isCorrect && { borderColor: Colors.success }]}
+                  style={[styles.optionInput, opt.isCorrect && { borderColor: Colors.success }, { writingDirection: detectDir(opt.text) }]}
                   value={opt.text}
                   onChangeText={t => updateOptionText(opt.id, t)}
                   placeholder={`אפשרות ${opt.id.toUpperCase()}...`}
                   placeholderTextColor={Colors.textTertiary}
-                  textAlign="right"
+                  textAlign={ta(opt.text)}
                 />
                 {options.length > 2 && (
                   <Pressable onPress={() => removeOption(opt.id)}>
@@ -281,13 +282,13 @@ export default function QuestionEditor() {
           {/* Explanation */}
           <Section title="💡 הסבר">
             <TextInput
-              style={[styles.textArea, { minHeight: 80 }]}
+              style={[styles.textArea, { minHeight: 80, writingDirection: detectDir(explanation) }]}
               multiline
               value={explanation}
               onChangeText={setExplanation}
               placeholder="הסבר מפורט לפתרון..."
               placeholderTextColor={Colors.textTertiary}
-              textAlign="right"
+              textAlign={ta(explanation)}
               textAlignVertical="top"
             />
           </Section>

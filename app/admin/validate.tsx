@@ -11,6 +11,7 @@ import { TOPICS } from '../../data/mockData';
 import { Question } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import { detectDir, textAlign as ta } from '../../utils/textDirection';
 
 export default function ValidateQueue() {
   const { getPendingQuestions, validateQuestion, getQuestionsByStatus, bulkValidate } = useAdminStore();
@@ -269,32 +270,39 @@ function QuestionPreviewCard({ question }: { question: Question }) {
       </View>
 
       {/* Question */}
-      <Text style={cardStyles.questionText}>{question.questionText}</Text>
+      <Text style={[cardStyles.questionText, { textAlign: ta(question.questionText), writingDirection: detectDir(question.questionText) }]}>
+        {question.questionText}
+      </Text>
 
       {/* Options */}
       <View style={cardStyles.options}>
-        {question.options.map(opt => (
+        {question.options.map(opt => {
+          const optDir = detectDir(opt.text);
+          return (
           <View
             key={opt.id}
             style={[
               cardStyles.optionRow,
+              { flexDirection: optDir === 'rtl' ? 'row-reverse' : 'row' },
               opt.isCorrect && { backgroundColor: Colors.successLight, borderColor: Colors.success },
             ]}
           >
             <Text style={[cardStyles.optionId, opt.isCorrect && { color: Colors.success }]}>
               {opt.id.toUpperCase()}
             </Text>
-            <Text style={cardStyles.optionText}>{opt.text}</Text>
+            <Text style={[cardStyles.optionText, { textAlign: ta(opt.text), writingDirection: optDir }]}>{opt.text}</Text>
             {opt.isCorrect && <Text style={cardStyles.correctMark}>✓</Text>}
-          </View>
-        ))}
+          </View>);
+        })}
       </View>
 
       {/* Explanation */}
       {question.explanation ? (
         <View style={cardStyles.explanation}>
           <Text style={cardStyles.explanationLabel}>💡 הסבר:</Text>
-          <Text style={cardStyles.explanationText}>{question.explanation}</Text>
+          <Text style={[cardStyles.explanationText, { textAlign: ta(question.explanation), writingDirection: detectDir(question.explanation) }]}>
+            {question.explanation}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -358,7 +366,6 @@ const cardStyles = StyleSheet.create({
     fontFamily: FontFamily.semiBold,
     fontSize: FontSize.base,
     color: Colors.text,
-    textAlign: 'right',
     lineHeight: 24,
     marginBottom: 12,
   },
@@ -374,7 +381,7 @@ const cardStyles = StyleSheet.create({
     backgroundColor: Colors.surfaceSecondary,
   },
   optionId: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textSecondary, width: 20, textAlign: 'center' },
-  optionText: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  optionText: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text },
   correctMark: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.success },
   explanation: {
     backgroundColor: Colors.primaryLighter,
@@ -382,7 +389,7 @@ const cardStyles = StyleSheet.create({
     padding: 10,
   },
   explanationLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'right', marginBottom: 4 },
-  explanationText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', lineHeight: 20 },
+  explanationText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, lineHeight: 20 },
 });
 
 const styles = StyleSheet.create({

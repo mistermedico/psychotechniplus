@@ -6,6 +6,7 @@ import { Question } from '../data/types';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../constants/theme';
 import { useSettingsStore, FontSizeOption } from '../store/settingsStore';
+import { detectDir, textAlign } from '../utils/textDirection';
 
 interface Props {
   question: Question;
@@ -98,6 +99,8 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
   };
 
   const questionFontSize_ = fontSizeMap[questionFontSize];
+  const questionDir = detectDir(question.questionText);
+  const passageDir = question.readingPassage ? detectDir(question.readingPassage) : 'rtl';
 
   return (
     <Animated.View
@@ -124,7 +127,9 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
           </View>
           {passageExpanded && (
             <ScrollView style={styles.passageScroll} nestedScrollEnabled>
-              <Text style={styles.passageText}>{question.readingPassage}</Text>
+              <Text style={[styles.passageText, { textAlign: textAlign(question.readingPassage ?? ''), writingDirection: passageDir }]}>
+                {question.readingPassage}
+              </Text>
             </ScrollView>
           )}
         </View>
@@ -147,33 +152,37 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
             )}
           </View>
         )}
-        <Text style={[styles.questionText, { fontSize: questionFontSize_ }]}>
+        <Text style={[styles.questionText, { fontSize: questionFontSize_, textAlign: textAlign(question.questionText), writingDirection: questionDir }]}>
           {question.questionText}
         </Text>
       </View>
 
       {/* Options */}
       <View style={styles.optionsContainer}>
-        {displayOptions.map(opt => (
-          <Pressable
-            key={opt.id}
-            onPress={() => !revealed && onSelect(opt.id)}
-            disabled={revealed}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            style={({ pressed }) => [
-              styles.optionBase,
-              getOptionStyle(opt.id),
-              pressed && !revealed && { transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <View style={[styles.optionIconBox, getOptionStyle(opt.id)]}>
-              <Text style={getOptionTextStyle(opt.id)}>{getOptionIcon(opt.id)}</Text>
-            </View>
-            <Text style={[styles.optionTextBase, getOptionTextStyle(opt.id)]}>
-              {opt.text}
-            </Text>
-          </Pressable>
-        ))}
+        {displayOptions.map(opt => {
+          const optDir = detectDir(opt.text);
+          return (
+            <Pressable
+              key={opt.id}
+              onPress={() => !revealed && onSelect(opt.id)}
+              disabled={revealed}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              style={({ pressed }) => [
+                styles.optionBase,
+                getOptionStyle(opt.id),
+                { flexDirection: optDir === 'rtl' ? 'row-reverse' : 'row' },
+                pressed && !revealed && { transform: [{ scale: 0.98 }] },
+              ]}
+            >
+              <View style={[styles.optionIconBox, getOptionStyle(opt.id)]}>
+                <Text style={getOptionTextStyle(opt.id)}>{getOptionIcon(opt.id)}</Text>
+              </View>
+              <Text style={[styles.optionTextBase, getOptionTextStyle(opt.id), { textAlign: textAlign(opt.text), writingDirection: optDir }]}>
+                {opt.text}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </Animated.View>
   );
@@ -219,7 +228,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.text,
     lineHeight: 22,
-    textAlign: 'right',
   },
 
   questionBox: {
@@ -263,7 +271,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.semiBold,
     color: Colors.text,
     lineHeight: 28,
-    textAlign: 'right',
   },
 
   optionsContainer: { gap: 10 },
@@ -308,7 +315,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: FontFamily.medium,
     fontSize: FontSize.base,
-    textAlign: 'right',
   },
   optionText: { color: Colors.text },
   optionTextSelected: { color: Colors.primary },

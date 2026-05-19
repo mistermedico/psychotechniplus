@@ -11,6 +11,7 @@ import { TOPICS } from '../../data/mockData';
 import { Question, ValidationStatus } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import { detectDir, textAlign as ta } from '../../utils/textDirection';
 
 const STATUS_COLORS: Record<ValidationStatus, string> = {
   validated: Colors.success,
@@ -138,7 +139,7 @@ export default function QuestionsAdmin() {
         </View>
 
         {/* Question text */}
-        <Text style={styles.questionText} numberOfLines={2}>{item.questionText}</Text>
+        <Text style={[styles.questionText, { textAlign: ta(item.questionText), writingDirection: detectDir(item.questionText) }]} numberOfLines={2}>{item.questionText}</Text>
 
         {/* Topic + type */}
         <View style={styles.cardFooter}>
@@ -410,7 +411,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
     color: Colors.text,
-    textAlign: 'right',
     lineHeight: 20,
     marginBottom: 8,
   },

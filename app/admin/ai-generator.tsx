@@ -15,6 +15,7 @@ import { Question, QuestionType, QuestionOption } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
+import { detectDir, textAlign as ta } from '../../utils/textDirection';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -1010,41 +1011,44 @@ function QuestionCard({ question, index, onSave, onDiscard, onUpdateText, onUpda
 
       {/* Question text */}
       <TextInput
-        style={styles.qTextInput}
+        style={[styles.qTextInput, { writingDirection: detectDir(question.questionText) }]}
         value={question.questionText}
         onChangeText={onUpdateText}
         multiline
-        textAlign="right"
+        textAlign={ta(question.questionText)}
         textAlignVertical="top"
       />
 
       {/* Options */}
       <View style={styles.qOptions}>
-        {question.options.map(opt => (
-          <View key={opt.id} style={[styles.qOptionRow, opt.isCorrect && styles.qOptionCorrect]}>
+        {question.options.map(opt => {
+          const optDir = detectDir(opt.text);
+          return (
+          <View key={opt.id} style={[styles.qOptionRow, { flexDirection: optDir === 'rtl' ? 'row-reverse' : 'row' }, opt.isCorrect && styles.qOptionCorrect]}>
             <Pressable onPress={() => onSetCorrect(opt.id)} style={styles.qRadio}>
               <View style={[styles.qRadioInner, opt.isCorrect && styles.qRadioCorrect]} />
             </Pressable>
             <TextInput
-              style={[styles.qOptionInput, opt.isCorrect && { color: Colors.success }]}
+              style={[styles.qOptionInput, opt.isCorrect && { color: Colors.success }, { writingDirection: optDir }]}
               value={opt.text}
               onChangeText={(t) => onUpdateOptionText(opt.id, t)}
-              textAlign="right"
+              textAlign={ta(opt.text)}
             />
             <Text style={styles.qOptionId}>{opt.id.toUpperCase()}</Text>
           </View>
-        ))}
+          );
+        })}
       </View>
 
       {/* Explanation */}
       <View style={styles.qExplanationBox}>
         <Text style={styles.qExplanationLabel}>💡 הסבר:</Text>
         <TextInput
-          style={styles.qExplanationInput}
+          style={[styles.qExplanationInput, { writingDirection: detectDir(question.explanation) }]}
           value={question.explanation}
           onChangeText={onUpdateExplanation}
           multiline
-          textAlign="right"
+          textAlign={ta(question.explanation)}
           textAlignVertical="top"
         />
       </View>
