@@ -280,11 +280,12 @@ export default function AuthScreen() {
 
             {/* Legal links */}
             <View style={styles.legalRow}>
-              <Pressable onPress={() => router.push('/terms')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.legalIntro}>בהרשמה אתה מסכים ל</Text>
+              <Pressable onPress={() => router.push('/terms')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Text style={styles.legalLink}>תנאי שימוש</Text>
               </Pressable>
-              <Text style={styles.legalSep}> · </Text>
-              <Pressable onPress={() => router.push('/privacy')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.legalSep}> ו</Text>
+              <Pressable onPress={() => router.push('/privacy')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Text style={styles.legalLink}>מדיניות פרטיות</Text>
               </Pressable>
             </View>
@@ -376,9 +377,10 @@ const styles = StyleSheet.create({
   submitText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
 
   hint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 4 },
-  legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
-  legalLink: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.4)', textDecorationLine: 'underline' },
-  legalSep: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.2)' },
+  legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', gap: 2 },
+  legalIntro: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.4)' },
+  legalLink: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#818CF8', textDecorationLine: 'underline' },
+  legalSep: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.4)' },
 
   // Email pending state
   pendingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },

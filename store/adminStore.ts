@@ -869,6 +869,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       selectedQuestionIds: s.selectedQuestionIds.filter(i => i !== id),
     }));
     dbDelete(id);
+    logger.info('adminStore:deleteQuestion', `שאלה נמחקה: ${id}`);
   },
 
   deleteQuestions: (ids) => {
@@ -878,6 +879,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       selectedQuestionIds: [],
     }));
     ids.forEach(id => dbDelete(id));
+    logger.info('adminStore:deleteQuestions', `${ids.length} שאלות נמחקו`);
   },
 
   validateQuestion: (id, status) => {
@@ -1230,10 +1232,19 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת שאלות', e?.message);
     }
 
-    // 2. Load topics from Supabase (includes admin-created topics)
+    // 2. Load topics from Supabase (includes admin-created topics), merge with local
     try {
-      const topics = await fetchTopics();
-      if (topics.length > 0) set({ topics });
+      const remoteTopics = await fetchTopics();
+      if (remoteTopics.length > 0) {
+        set(s => {
+          const remoteIds = new Set(remoteTopics.map(t => t.id));
+          const localOnly = s.topics.filter(t => !remoteIds.has(t.id));
+          if (localOnly.length > 0) {
+            logger.info('adminStore:loadAdminData', `${localOnly.length} נושאים מקומיים לא ב-Supabase עדיין`);
+          }
+          return { topics: [...remoteTopics, ...localOnly] };
+        });
+      }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת נושאים', e?.message);
     }

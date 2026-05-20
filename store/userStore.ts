@@ -146,6 +146,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   signOut: async () => {
+    logger.info('userStore:signOut', 'משתמש התנתק');
     await supabase.auth.signOut();
     set({ ...INITIAL_STATE, isLoaded: true });
   },
@@ -155,12 +156,14 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (!userId) return { success: false, error: 'No user session' };
     try {
       // Delete all user data from Supabase tables
+      logger.info('userStore:deleteAccount', `מוחק חשבון: ${userId}`);
       await Promise.all([
-        supabase.from('user_profiles').delete().eq('user_id', userId),
+        supabase.from('user_profiles').delete().eq('id', userId),
         supabase.from('user_elos').delete().eq('user_id', userId),
         supabase.from('user_badges').delete().eq('user_id', userId),
         supabase.from('practice_sessions').delete().eq('user_id', userId),
       ]);
+      logger.success('userStore:deleteAccount', 'נתוני משתמש נמחקו');
       // Sign out — the auth user record is removed via edge function if available
       await supabase.functions.invoke('delete-user', { body: { userId } }).catch(() => null);
       await supabase.auth.signOut();
@@ -185,6 +188,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     Object.entries(topicElos).forEach(([topicId, { elo, history }]) => {
       saveUserElo(userId, topicId, elo, history);
     });
+    logger.success('userStore:completeOnboarding', `אונבורדינג הושלם — ${name}, מסלול: ${targetId}`);
   },
 
   updateElo: (topicId, questionElo, isCorrect) => {
@@ -194,6 +198,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       const entry = { elo: newElo, date: new Date().toISOString() };
       const updated = { elo: newElo, history: [...current.history.slice(-29), entry] };
       saveUserElo(state.userId, topicId, newElo, updated.history);
+      logger.debug('userStore:updateElo', `ELO ${topicId}: ${current.elo} → ${newElo}`);
       return {
         topicElos: { ...state.topicElos, [topicId]: updated },
       };
@@ -247,22 +252,48 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   recordSession: (correct, total) => {
     const wasFirstSession = get().totalSessions === 0;
+    const xpGain = correct * 10 + 20;
     set(state => {
-      const updates = {
-        totalSessions: state.totalSessions + 1,
-        totalCorrect: state.totalCorrect + correct,
-        totalAnswered: state.totalAnswered + total,
-      };
+      // Session stats
+      const totalSessions = state.totalSessions + 1;
+      const totalCorrect = state.totalCorrect + correct;
+      const totalAnswered = state.totalAnswered + total;
+
+      // XP + level
+      let newXp = state.xp + xpGain;
+      let newLevel = state.level;
+      while (newXp >= xpForLevel(newLevel)) { newXp -= xpForLevel(newLevel); newLevel++; }
+
+      // Streak
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      const newStreak = state.lastPracticedDate === today
+        ? state.streak
+        : state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
+      const longestStreak = Math.max(newStreak, state.longestStreak);
+
+      // One atomic Supabase write
       saveUserProfile(state.userId, {
-        total_sessions: updates.totalSessions,
-        total_correct: updates.totalCorrect,
-        total_answered: updates.totalAnswered,
+        total_sessions: totalSessions,
+        total_correct: totalCorrect,
+        total_answered: totalAnswered,
+        xp: newXp,
+        level: newLevel,
+        streak: newStreak,
+        longest_streak: longestStreak,
+        last_practiced_date: today,
       });
-      return updates;
+
+      return {
+        totalSessions, totalCorrect, totalAnswered,
+        xp: newXp, level: newLevel,
+        streak: newStreak, longestStreak,
+        lastPracticedDate: today,
+      };
     });
-    get().updateStreak();
-    get().addXp(correct * 10 + 20);
+
     if (wasFirstSession) get().earnBadge('first_session');
+    logger.success('userStore:recordSession', `סשן הושלם — נכון: ${correct}/${total}, XP+${xpGain}`);
   },
 
   getTopicElo: (topicId) => get().topicElos[topicId]?.elo ?? DEFAULT_ELO,

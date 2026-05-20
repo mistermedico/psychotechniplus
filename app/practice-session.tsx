@@ -20,6 +20,7 @@ import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { calcAllScores } from '../utils/scoring';
 import { SessionMode } from '../data/types';
 import { generateSmartExamQuestions, GeneratedExamSection } from '../utils/smartExam';
+import { logger } from '../utils/logger';
 
 const { width: W } = Dimensions.get('window');
 const SPEED_LIMIT = 60; // seconds per question in speed mode
@@ -318,7 +319,7 @@ export default function PracticeSession() {
       })),
     };
     addSessionRecord(sessionRec);
-
+    logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
     recordSession(correct, finished.answers.filter(a => !a.isSkipped).length);
 
     router.replace({
