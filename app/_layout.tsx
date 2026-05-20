@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
+import { ensureDbSeeded } from '../lib/db';
 
 // Force RTL for Hebrew
 if (!I18nManager.isRTL) {
@@ -45,14 +46,15 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
       initialize().then(() => {
         const { email } = useUserStore.getState();
-        if (email.toLowerCase() === ADMIN_EMAIL) {
-          setIsAdmin(true);
-          loadAdminData(); // restore admin's questions, topics, templates and settings
-        } else {
-          // For regular users, load the latest validated questions from Supabase
-          // so they see questions the admin has created/validated
-          loadQuestionsFromSupabase();
-        }
+        // Ensure targets+topics exist in Supabase for all users (FK prerequisite)
+        ensureDbSeeded().then(() => {
+          if (email.toLowerCase() === ADMIN_EMAIL) {
+            setIsAdmin(true);
+            loadAdminData();
+          } else {
+            loadQuestionsFromSupabase();
+          }
+        });
       });
     }
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps

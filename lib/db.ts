@@ -37,6 +37,41 @@ export async function getOrCreateUserId(): Promise<string> {
   return id;
 }
 
+// ── DB bootstrap (runs once per session, ensures FK targets/topics exist) ──
+
+let _seeded = false;
+
+export async function ensureDbSeeded(): Promise<void> {
+  if (_seeded) return;
+  _seeded = true;
+  try {
+    const { data, error } = await supabase.from('topics').select('id').limit(1);
+    if (error || data?.length) return; // error = can't check (offline), data = already seeded
+    // Seed targets first (topics FK → targets)
+    const { TARGETS: T, TOPICS: TOP } = await import('../data/mockData');
+    await supabase.from('targets').upsert(
+      T.map(t => ({
+        id: t.id, name: t.name, slug: t.slug ?? t.id, description: t.description ?? '',
+        icon: t.icon, color: t.color, gradient_colors: t.gradientColors ?? [],
+        order_index: t.order ?? 0, total_questions: t.totalQuestions ?? 0,
+        free_questions_count: t.freeQuestionsCount ?? 0,
+        is_premium_only: t.isPremiumOnly ?? false,
+        is_active: t.isActive ?? true, coming_soon: t.comingSoon ?? false,
+        access_settings: t.accessSettings ?? {},
+      }))
+    );
+    await supabase.from('topics').upsert(
+      TOP.map(t => ({
+        id: t.id, target_id: t.targetId, name: t.name, slug: t.slug ?? t.id,
+        description: t.description ?? '', icon: t.icon,
+        order_index: t.order ?? 0, is_premium_only: t.isPremiumOnly ?? false, color: t.color ?? '',
+      }))
+    );
+  } catch {
+    _seeded = false; // allow retry if it fails
+  }
+}
+
 // ── Questions ──────────────────────────────────────────────────────────────
 
 export async function fetchQuestions(opts?: {
