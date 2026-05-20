@@ -88,7 +88,7 @@ ${isTrueFalse ? '\nלשאלות נכון/לא נכון: 2 אפשרויות בל�
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
     const message = await client.messages.create({
-      model: 'claude-opus-4-7',
+      model: 'claude-opus-4-5',
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],

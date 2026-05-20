@@ -60,7 +60,10 @@ export async function ensureDbSeeded(): Promise<void> {
         access_settings: t.accessSettings ?? {},
       }))
     );
-    if (te) { logger.error('db:seed', 'שגיאה בהזרעת מסלולים', te.message); }
+    if (te) {
+      _seeded = false;
+      logger.error('db:seed', 'שגיאה בהזרעת מסלולים', te.message);
+    }
 
     const { error: tope } = await supabase.from('topics').upsert(
       TOP.map(t => ({
@@ -69,13 +72,16 @@ export async function ensureDbSeeded(): Promise<void> {
         order_index: t.order ?? 0, is_premium_only: t.isPremiumOnly ?? false, color: t.color ?? '',
       }))
     );
-    if (tope) { logger.error('db:seed', 'שגיאה בהזרעת נושאים', tope.message); }
+    if (tope) {
+      _seeded = false;
+      logger.error('db:seed', 'שגיאה בהזרעת נושאים', tope.message);
+    }
 
     if (!te && !tope) {
       logger.success('db:seed', `הזרעה הושלמה: ${T.length} מסלולים, ${TOP.length} נושאים`);
     }
   } catch (e: any) {
-    _seeded = false; // allow retry if it fails
+    _seeded = false;
     logger.error('db:seed', 'שגיאה בהזרעת DB', e?.message);
   }
 }
@@ -175,47 +181,58 @@ export interface UserProfileRow {
 
 export async function loadUserProfile(userId: string): Promise<UserProfileRow | null> {
   try {
-    const { data } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
+    const { data, error } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
+    if (error && error.code !== 'PGRST116') logger.error('db:loadUserProfile', 'שגיאה בטעינת פרופיל', error.message);
     return data ?? null;
-  } catch {
+  } catch (e: any) {
+    logger.error('db:loadUserProfile', 'חריגה בטעינת פרופיל', e?.message);
     return null;
   }
 }
 
 export async function saveUserProfile(userId: string, profile: Partial<UserProfileRow>): Promise<void> {
   try {
-    await supabase.from('user_profiles').upsert({ id: userId, ...profile, updated_at: new Date().toISOString() });
-  } catch {}
+    const { error } = await supabase.from('user_profiles').upsert({ id: userId, ...profile, updated_at: new Date().toISOString() });
+    if (error) logger.error('db:saveUserProfile', 'שגיאה בשמירת פרופיל', error.message);
+  } catch (e: any) {
+    logger.error('db:saveUserProfile', 'חריגה בשמירת פרופיל', e?.message);
+  }
 }
 
 // ── User ELOs ──────────────────────────────────────────────────────────────
 
 export async function loadUserElos(userId: string): Promise<Record<string, { elo: number; history: { elo: number; date: string }[] }>> {
   try {
-    const { data } = await supabase.from('user_elos').select('*').eq('user_id', userId);
+    const { data, error } = await supabase.from('user_elos').select('*').eq('user_id', userId);
+    if (error) { logger.error('db:loadUserElos', 'שגיאה בטעינת ELO', error.message); return {}; }
     if (!data) return {};
     const result: Record<string, { elo: number; history: { elo: number; date: string }[] }> = {};
     data.forEach(row => { result[row.topic_id] = { elo: row.elo, history: row.history ?? [] }; });
     return result;
-  } catch {
+  } catch (e: any) {
+    logger.error('db:loadUserElos', 'חריגה בטעינת ELO', e?.message);
     return {};
   }
 }
 
 export async function saveUserElo(userId: string, topicId: string, elo: number, history: { elo: number; date: string }[]): Promise<void> {
   try {
-    await supabase.from('user_elos').upsert(
+    const { error } = await supabase.from('user_elos').upsert(
       { user_id: userId, topic_id: topicId, elo, history, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,topic_id' }
     );
-  } catch {}
+    if (error) logger.error('db:saveUserElo', `שגיאה בשמירת ELO ${topicId}`, error.message);
+  } catch (e: any) {
+    logger.error('db:saveUserElo', `חריגה בשמירת ELO ${topicId}`, e?.message);
+  }
 }
 
 // ── User Badges ────────────────────────────────────────────────────────────
 
 export async function loadUserBadges(userId: string): Promise<UserBadge[]> {
   try {
-    const { data } = await supabase.from('user_badges').select('*').eq('user_id', userId);
+    const { data, error } = await supabase.from('user_badges').select('*').eq('user_id', userId);
+    if (error) { logger.error('db:loadUserBadges', 'שגיאה בטעינת תגים', error.message); return []; }
     if (!data) return [];
     return data.map(row => ({
       id: row.id,
@@ -224,21 +241,25 @@ export async function loadUserBadges(userId: string): Promise<UserBadge[]> {
       earnedAt: new Date(row.earned_at),
       metadata: row.metadata,
     }));
-  } catch {
+  } catch (e: any) {
+    logger.error('db:loadUserBadges', 'חריגה בטעינת תגים', e?.message);
     return [];
   }
 }
 
 export async function saveUserBadge(badge: UserBadge): Promise<void> {
   try {
-    await supabase.from('user_badges').upsert({
+    const { error } = await supabase.from('user_badges').upsert({
       id: badge.id,
       user_id: badge.userId,
       badge_type: badge.badgeType,
       earned_at: badge.earnedAt.toISOString(),
       metadata: badge.metadata,
-    });
-  } catch {}
+    }, { onConflict: 'user_id,badge_type' });
+    if (error) logger.error('db:saveUserBadge', `שגיאה בשמירת תג ${badge.badgeType}`, error.message);
+  } catch (e: any) {
+    logger.error('db:saveUserBadge', `חריגה בשמירת תג ${badge.badgeType}`, e?.message);
+  }
 }
 
 // ── Database Seed (called once from Admin panel) ───────────────────────────
@@ -356,7 +377,7 @@ function fallbackQuestions(opts?: { topicId?: string; targetId?: string; status?
 
 export async function upsertTopic(t: Topic): Promise<void> {
   try {
-    await supabase.from('topics').upsert({
+    const { error } = await supabase.from('topics').upsert({
       id: t.id,
       target_id: t.targetId,
       name: t.name,
@@ -367,13 +388,19 @@ export async function upsertTopic(t: Topic): Promise<void> {
       is_premium_only: t.isPremiumOnly ?? false,
       color: t.color,
     });
-  } catch {}
+    if (error) logger.error('db:upsertTopic', `שגיאה בשמירת נושא ${t.id}`, error.message);
+  } catch (e: any) {
+    logger.error('db:upsertTopic', `חריגה בשמירת נושא ${t.id}`, e?.message);
+  }
 }
 
 export async function deleteTopicFromDB(id: string): Promise<void> {
   try {
-    await supabase.from('topics').delete().eq('id', id);
-  } catch {}
+    const { error } = await supabase.from('topics').delete().eq('id', id);
+    if (error) logger.error('db:deleteTopicFromDB', `שגיאה במחיקת נושא ${id}`, error.message);
+  } catch (e: any) {
+    logger.error('db:deleteTopicFromDB', `חריגה במחיקת נושא ${id}`, e?.message);
+  }
 }
 
 // ── Template persistence (AsyncStorage) ───────────────────────────────────
@@ -449,8 +476,9 @@ export interface SessionRecord {
 }
 
 export async function saveSessionRecord(record: SessionRecord): Promise<void> {
+  if (!record.userId) { logger.error('db:saveSessionRecord', 'userId חסר — סשן לא נשמר'); return; }
   try {
-    await supabase.from('practice_sessions').upsert({
+    const { error } = await supabase.from('practice_sessions').upsert({
       id: record.id,
       user_id: record.userId,
       user_name: record.userName ?? null,
@@ -468,7 +496,11 @@ export async function saveSessionRecord(record: SessionRecord): Promise<void> {
       completed_at: record.completedAt,
       answers: record.answers,
     });
-  } catch {}
+    if (error) logger.error('db:saveSessionRecord', 'שגיאה בשמירת סשן', error.message);
+    else logger.success('db:saveSessionRecord', `סשן נשמר: ${record.id}`);
+  } catch (e: any) {
+    logger.error('db:saveSessionRecord', 'חריגה בשמירת סשן', e?.message);
+  }
 }
 
 export async function loadUserSessionHistory(userId: string, limit = 50): Promise<SessionRecord[]> {

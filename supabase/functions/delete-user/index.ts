@@ -40,7 +40,7 @@ Deno.serve(async (req: Request) => {
 
     // Delete all user data
     await Promise.all([
-      supabaseAdmin.from('user_profiles').delete().eq('user_id', user.id),
+      supabaseAdmin.from('user_profiles').delete().eq('id', user.id),
       supabaseAdmin.from('user_elos').delete().eq('user_id', user.id),
       supabaseAdmin.from('user_badges').delete().eq('user_id', user.id),
       supabaseAdmin.from('practice_sessions').delete().eq('user_id', user.id),

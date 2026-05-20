@@ -239,6 +239,8 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   earnBadge: (type) => {
+    const existing = get().badges.find(b => b.badgeType === type);
+    if (existing) return existing;
     const badge: UserBadge = {
       id: `badge_${Date.now()}`,
       userId: get().userId,

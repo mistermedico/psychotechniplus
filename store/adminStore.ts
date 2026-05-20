@@ -900,15 +900,20 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   bulkValidate: (ids, status) => {
     const idSet = new Set(ids);
+    let toSync: Question[] = [];
     set(s => {
       const updated = s.questions.map(q =>
         idSet.has(q.id)
           ? { ...q, validationStatus: status, generalPracticeEligible: status === 'validated', smartPracticeEligible: status === 'validated' }
           : q
       );
-      updated.filter(q => idSet.has(q.id)).forEach(q => dbUpsert(q));
+      toSync = updated.filter(q => idSet.has(q.id));
       return { questions: updated, selectedQuestionIds: [] };
     });
+    toSync.forEach(q => dbUpsert(q).then(r => {
+      if (r.error) logger.error('adminStore:bulkValidate', `שגיאה בעדכון שאלה ${q.id}`, r.error);
+    }));
+    logger.info('adminStore:bulkValidate', `${ids.length} שאלות → ${status}`);
   },
 
   toggleSelectQuestion: (id) => {
@@ -927,24 +932,34 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   assignQuestionsToTopic: (questionIds, topicId) => {
     const idSet = new Set(questionIds);
+    let toSync: Question[] = [];
     set(s => {
       const updated = s.questions.map(q =>
         idSet.has(q.id) ? { ...q, topicId } : q
       );
-      updated.filter(q => idSet.has(q.id)).forEach(q => dbUpsert(q));
+      toSync = updated.filter(q => idSet.has(q.id));
       return { questions: updated };
     });
+    toSync.forEach(q => dbUpsert(q).then(r => {
+      if (r.error) logger.error('adminStore:assignQuestionsToTopic', `שגיאה בהקצאת שאלה ${q.id}`, r.error);
+    }));
+    logger.info('adminStore:assignQuestionsToTopic', `${questionIds.length} שאלות → נושא ${topicId}`);
   },
 
   setQuestionsAccessLevel: (questionIds, level) => {
     const idSet = new Set(questionIds);
+    let toSync: Question[] = [];
     set(s => {
       const updated = s.questions.map(q =>
         idSet.has(q.id) ? { ...q, accessLevel: level } : q
       );
-      updated.filter(q => idSet.has(q.id)).forEach(q => dbUpsert(q));
+      toSync = updated.filter(q => idSet.has(q.id));
       return { questions: updated };
     });
+    toSync.forEach(q => dbUpsert(q).then(r => {
+      if (r.error) logger.error('adminStore:setQuestionsAccessLevel', `שגיאה בעדכון גישה לשאלה ${q.id}`, r.error);
+    }));
+    logger.info('adminStore:setQuestionsAccessLevel', `${questionIds.length} שאלות → ${level}`);
   },
 
   addTopic: (t) => {

@@ -292,11 +292,11 @@ export default function PracticeSession() {
     const scores = calcAllScores(finished.answers);
     const correct = finished.answers.filter(a => a.isCorrect).length;
 
-    // Save session record to Supabase and admin store
+    // Save session record to Supabase and admin store (only for authenticated users)
     const template = isSimulation ? templates.find(t => t.id === templateId) : undefined;
     const sessionRec = {
       id: finished.id,
-      userId: userId ?? `anon_${Date.now()}`,
+      userId: userId,
       userName: userName || undefined,
       targetId: targetId ?? '',
       topicId: topicId ?? '',
@@ -318,7 +318,7 @@ export default function PracticeSession() {
         difficulty: a.questionDifficulty ?? 5,
       })),
     };
-    addSessionRecord(sessionRec);
+    if (userId) addSessionRecord(sessionRec);
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
     recordSession(correct, finished.answers.filter(a => !a.isSkipped).length);
 

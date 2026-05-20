@@ -38,7 +38,7 @@ create table if not exists topics (
 create table if not exists questions (
   id text primary key,
   target_ids text[] default '{}',
-  topic_id text references topics(id),
+  topic_id text references topics(id) on delete set null,
   subtopic_id text,
   question_type text default 'multiple_choice',
   question_text text not null,
@@ -110,7 +110,8 @@ create table if not exists user_badges (
   user_id text references user_profiles(id) on delete cascade,
   badge_type text not null,
   earned_at timestamptz default now(),
-  metadata jsonb
+  metadata jsonb,
+  unique(user_id, badge_type)
 );
 
 -- ── Practice Sessions ─────────────────────────────────────────────────────
@@ -151,3 +152,18 @@ create policy "allow_all_questions"     on questions     for all using (true) wi
 create policy "allow_all_user_profiles" on user_profiles for all using (true) with check (true);
 create policy "allow_all_user_elos"     on user_elos     for all using (true) with check (true);
 create policy "allow_all_user_badges"   on user_badges   for all using (true) with check (true);
+
+-- ── Migrations (safe to re-run on existing DB) ─────────────────────────────
+-- Fix questions.topic_id FK to SET NULL on topic delete (instead of blocking)
+do $$ begin
+  alter table questions drop constraint if exists questions_topic_id_fkey;
+  alter table questions
+    add constraint questions_topic_id_fkey
+    foreign key (topic_id) references topics(id) on delete set null;
+exception when others then null; end $$;
+
+-- Add unique constraint for user_badges (user_id, badge_type) — prevents duplicate badges
+do $$ begin
+  alter table user_badges add constraint user_badges_user_id_badge_type_key unique (user_id, badge_type);
+exception when duplicate_table then null;
+         when others then null; end $$;
