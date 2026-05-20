@@ -113,6 +113,30 @@ create table if not exists user_badges (
   metadata jsonb
 );
 
+-- ── Practice Sessions ─────────────────────────────────────────────────────
+create table if not exists practice_sessions (
+  id text primary key,
+  user_id text references user_profiles(id) on delete cascade,
+  user_name text,
+  target_id text,
+  topic_id text,
+  mode text default 'practice',
+  template_id text,
+  template_name text,
+  total_questions int default 0,
+  correct_answers int default 0,
+  skipped_questions int default 0,
+  score numeric(5,2) default 0,
+  time_spent_seconds int default 0,
+  answers jsonb default '[]',
+  started_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz default now()
+);
+
+alter table practice_sessions enable row level security;
+create policy "allow_all_practice_sessions" on practice_sessions for all using (true) with check (true);
+
 -- ── Row Level Security (open for dev — lock down before production) ────────
 alter table targets enable row level security;
 alter table topics enable row level security;
