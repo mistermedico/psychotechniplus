@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Question } from '../data/types';
+import { logger } from './logger';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -85,6 +86,7 @@ export async function startBulkGeneration(
   questionsPerBatch = 3,
 ): Promise<void> {
   cancelFlag = false;
+  logger.info('bgGenerator', `מתחיל יצירת שאלות בכמות — ${GENERATION_PLAN.length} עבודות, ${questionsPerBatch} שאלות לכל עבודה`);
 
   const total = GENERATION_PLAN.length;
   let done = 0;
@@ -117,6 +119,7 @@ export async function startBulkGeneration(
       if (error || !data) {
         const msg = `⚠️ ${job.topicName} / ${job.type} / רמה ${job.difficulty}: שגיאה בקריאה`;
         log.unshift(msg);
+        logger.error('bgGenerator', msg, error?.message ?? 'no data');
       } else {
         const generated: any[] = Array.isArray(data) ? data : (data.questions ?? []);
         let savedCount = 0;
@@ -144,17 +147,19 @@ export async function startBulkGeneration(
               generalPracticeEligible: false,
             });
             savedCount++;
-          } catch {
-            // skip individual question errors
+          } catch (e: any) {
+            logger.error('bgGenerator', `שגיאה בשמירת שאלה בודדת`, e?.message);
           }
         }
 
         const msg = `✅ ${job.topicName} / ${job.type} / רמה ${job.difficulty}: ${savedCount} שאלות נוצרו`;
         log.unshift(msg);
+        logger.success('bgGenerator', msg, { topicId: job.topicId, type: job.type, difficulty: job.difficulty, savedCount });
       }
-    } catch {
+    } catch (e: any) {
       const msg = `⚠️ ${job.topicName} / ${job.type} / רמה ${job.difficulty}: שגיאה לא צפויה`;
       log.unshift(msg);
+      logger.error('bgGenerator', msg, e?.message);
     }
 
     done++;
@@ -172,5 +177,6 @@ export async function startBulkGeneration(
     }
   }
 
+  logger.info('bgGenerator', `יצירת שאלות הסתיימה — ${done} עבודות בוצעו${cancelFlag ? ' (בוטל)' : ''}`);
   onComplete(done);
 }

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import { Question, Topic, Target, UserBadge } from '../data/types';
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
+import { logger } from '../utils/logger';
 
 // ── Local storage helpers ──────────────────────────────────────────────────
 
@@ -67,8 +68,10 @@ export async function ensureDbSeeded(): Promise<void> {
         order_index: t.order ?? 0, is_premium_only: t.isPremiumOnly ?? false, color: t.color ?? '',
       }))
     );
-  } catch {
+    logger.success('db:seed', `נזרעו ${T.length} מסלולים ו-${TOP.length} נושאים`);
+  } catch (e: any) {
     _seeded = false; // allow retry if it fails
+    logger.error('db:seed', 'שגיאה בהזרעת DB', e?.message);
   }
 }
 
@@ -95,21 +98,34 @@ export async function fetchQuestions(opts?: {
 export async function fetchAllQuestions(): Promise<Question[]> {
   try {
     const { data, error } = await supabase.from('questions').select('*').order('created_at', { ascending: false });
-    if (error || !data) return QUESTIONS;
+    if (error) { logger.error('db:fetchAllQuestions', 'שגיאה בטעינת שאלות', error.message); return QUESTIONS; }
+    if (!data) return QUESTIONS;
+    logger.info('db:fetchAllQuestions', `נטענו ${data.length} שאלות מסופאבייס`);
     return data.map(rowToQuestion);
-  } catch {
+  } catch (e: any) {
+    logger.error('db:fetchAllQuestions', 'חריגה בטעינת שאלות', e?.message);
     return QUESTIONS;
   }
 }
 
 export async function upsertQuestion(q: Question): Promise<{ error?: string }> {
   const { error } = await supabase.from('questions').upsert(questionToRow(q));
-  return error ? { error: error.message } : {};
+  if (error) {
+    logger.error('db:upsertQuestion', `שגיאה בשמירת שאלה ${q.id}`, error.message);
+    return { error: error.message };
+  }
+  logger.success('db:upsertQuestion', `שאלה נשמרה בסופאבייס: ${q.id}`, { status: q.validationStatus });
+  return {};
 }
 
 export async function deleteQuestion(id: string): Promise<{ error?: string }> {
   const { error } = await supabase.from('questions').delete().eq('id', id);
-  return error ? { error: error.message } : {};
+  if (error) {
+    logger.error('db:deleteQuestion', `שגיאה במחיקת שאלה ${id}`, error.message);
+    return { error: error.message };
+  }
+  logger.info('db:deleteQuestion', `שאלה נמחקה: ${id}`);
+  return {};
 }
 
 // ── Targets & Topics ───────────────────────────────────────────────────────

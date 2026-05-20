@@ -3,6 +3,7 @@ import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } 
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
 import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { logger } from '../utils/logger';
 
 export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
@@ -843,7 +844,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   addQuestion: (q) => {
     const newQ: Question = { ...q, id: `q_admin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` };
     set(s => ({ questions: [...s.questions, newQ] }));
-    dbUpsert(newQ);
+    dbUpsert(newQ).then(r => {
+      if (r.error) logger.error('adminStore:addQuestion', `שגיאה בשמירת שאלה חדשה`, r.error);
+      else logger.success('adminStore:addQuestion', `שאלה נוצרה: ${newQ.id}`);
+    });
     return newQ;
   },
 
@@ -851,7 +855,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => {
       const updated = s.questions.map(q => (q.id === id ? { ...q, ...updates } : q));
       const q = updated.find(x => x.id === id);
-      if (q) dbUpsert(q);
+      if (q) dbUpsert(q).then(r => {
+        if (r.error) logger.error('adminStore:updateQuestion', `שגיאה בעדכון שאלה ${id}`, r.error);
+        else logger.success('adminStore:updateQuestion', `שאלה עודכנה: ${id}`);
+      });
       return { questions: updated };
     });
   },
@@ -881,7 +888,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           : q
       );
       const q = updated.find(x => x.id === id);
-      if (q) dbUpsert(q);
+      if (q) dbUpsert(q).then(r => {
+        if (r.error) logger.error('adminStore:validateQuestion', `שגיאה באימות שאלה ${id} → ${status}`, r.error);
+        else logger.success('adminStore:validateQuestion', `שאלה ${id} → ${status}`);
+      });
       return { questions: updated };
     });
   },
@@ -1179,6 +1189,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   seedToSupabase: () => seedDatabase(),
 
   loadAdminData: async () => {
+    logger.info('adminStore:loadAdminData', 'טוען נתוני אדמין...');
+
     // 0. Seed PENDING_SEED questions to Supabase if they don't exist yet
     // (ensureDbSeeded in _layout.tsx already handles targets+topics)
     try {
@@ -1188,26 +1200,38 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         for (const q of PENDING_SEED) {
           await dbUpsert(q);
         }
+        logger.success('adminStore:loadAdminData', `נזרעו ${PENDING_SEED.length} שאלות ממתינות`);
       }
-    } catch {}
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בהזרעת שאלות ממתינות', e?.message);
+    }
 
     // 1. Load all questions from Supabase (includes any admin-created ones)
     try {
       const questions = await fetchAllQuestions();
-      if (questions.length > 0) set({ questions });
-    } catch {}
+      if (questions.length > 0) {
+        set({ questions });
+        logger.success('adminStore:loadAdminData', `נטענו ${questions.length} שאלות`);
+      }
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת שאלות', e?.message);
+    }
 
     // 2. Load topics from Supabase (includes admin-created topics)
     try {
       const topics = await fetchTopics();
       if (topics.length > 0) set({ topics });
-    } catch {}
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת נושאים', e?.message);
+    }
 
     // 3. Load simulation templates from AsyncStorage
     try {
       const templates = await loadTemplates();
       if (templates && templates.length > 0) set({ templates });
-    } catch {}
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת תבניות', e?.message);
+    }
 
     // 4. Load admin settings from AsyncStorage
     try {
@@ -1218,7 +1242,11 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         if (settings.freePracticeLimit) set({ freePracticeLimit: settings.freePracticeLimit });
         if (settings.appConfig) set({ appConfig: settings.appConfig });
       }
-    } catch {}
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הגדרות', e?.message);
+    }
+
+    logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');
   },
 
   getPendingQuestions: () => get().questions.filter(q => q.validationStatus === 'pending'),

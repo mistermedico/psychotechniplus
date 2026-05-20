@@ -52,6 +52,7 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'session-settings',   icon: '🎛️', label: 'הגדרות סשן',      desc: 'תרגול ומבחנים',          route: '/admin/session-settings',    category: 'system' },
   { id: 'daily-challenge',    icon: '🎯', label: 'אתגרים יומיים',    desc: 'בונוס XP',               route: '/admin/daily-challenge',     category: 'system' },
   { id: 'activity-log',       icon: '📋', label: 'יומן פעילות',      desc: 'תיעוד פעולות',           route: '/admin/activity-log',        category: 'system' },
+  { id: 'logs',               icon: '🪵', label: 'לוגים',             desc: 'שגיאות ואירועים',         route: '/admin/logs',                category: 'system' },
 ];
 
 const CATEGORY_COLORS: Record<NavCategory, [string, string]> = {

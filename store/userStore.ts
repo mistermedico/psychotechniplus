@@ -6,6 +6,7 @@ import {
   getOrCreateUserId, loadUserProfile, saveUserProfile,
   loadUserElos, saveUserElo, loadUserBadges, saveUserBadge,
 } from '../lib/db';
+import { logger } from '../utils/logger';
 
 interface TopicElo {
   elo: number;
@@ -95,12 +96,14 @@ export const useUserStore = create<UserState>((set, get) => ({
         if (session?.user?.id) {
           userId = session.user.id;
           sessionEmail = session.user.email ?? '';
+          logger.info('userStore:initialize', `משתמש מחובר: ${sessionEmail}`);
         } else {
           // Not authenticated — stop here, let index.tsx redirect to /auth
           set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
           return;
         }
-      } catch {
+      } catch (e: any) {
+        logger.error('userStore:initialize', 'שגיאה בבדיקת session', e?.message);
         set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
         return;
       }

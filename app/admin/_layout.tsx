@@ -98,6 +98,7 @@ export default function AdminLayout() {
       <Stack.Screen name="notifications"       options={{ title: '🔔 הודעות Push' }} />
       <Stack.Screen name="promo-codes"         options={{ title: '🎟️ קודי קופון' }} />
       <Stack.Screen name="activity-log"        options={{ title: '📋 יומן פעילות' }} />
+      <Stack.Screen name="logs"               options={{ title: '🪵 לוגים' }} />
     </Stack>
   );
 }
