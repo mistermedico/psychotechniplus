@@ -1179,6 +1179,35 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   seedToSupabase: () => seedDatabase(),
 
   loadAdminData: async () => {
+    // 0. Ensure targets + topics exist in Supabase (FK prerequisite for question writes)
+    try {
+      const { data: topicCheck, error: topicCheckErr } = await supabase.from('topics').select('id').limit(1);
+      if (!topicCheckErr && !topicCheck?.length) {
+        // First-time setup: seed targets (topics reference them)
+        const targetRows = TARGETS.map(t => ({
+          id: t.id, name: t.name, slug: t.slug ?? t.id, description: t.description ?? '',
+          icon: t.icon, color: t.color, gradient_colors: t.gradientColors ?? [],
+          order_index: t.order ?? 0, total_questions: t.totalQuestions ?? 0,
+          free_questions_count: t.freeQuestionsCount ?? 0,
+          is_premium_only: t.isPremiumOnly ?? false,
+          is_active: t.isActive ?? true, coming_soon: t.comingSoon ?? false,
+          access_settings: t.accessSettings ?? {},
+        }));
+        await supabase.from('targets').upsert(targetRows);
+        // Then seed topics
+        const topicRows = TOPICS.map(t => ({
+          id: t.id, target_id: t.targetId, name: t.name, slug: t.slug ?? t.id,
+          description: t.description ?? '', icon: t.icon,
+          order_index: t.order ?? 0, is_premium_only: t.isPremiumOnly ?? false, color: t.color ?? '',
+        }));
+        await supabase.from('topics').upsert(topicRows);
+        // Seed pending questions so they can be validated/read across devices
+        for (const q of PENDING_SEED) {
+          await dbUpsert(q);
+        }
+      }
+    } catch {}
+
     // 1. Load all questions from Supabase (includes any admin-created ones)
     try {
       const questions = await fetchAllQuestions();
@@ -1197,14 +1226,14 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       if (templates && templates.length > 0) set({ templates });
     } catch {}
 
-    // 4. Restore admin settings (practice/exam settings, app config, free limit)
+    // 4. Load admin settings from AsyncStorage
     try {
       const settings = await loadAdminSettings();
       if (settings) {
-        if (settings.practiceSettings) set(s => ({ practiceSettings: { ...s.practiceSettings, ...settings.practiceSettings } }));
-        if (settings.examSettings) set(s => ({ examSettings: { ...s.examSettings, ...settings.examSettings } }));
-        if (typeof settings.freePracticeLimit === 'number') set({ freePracticeLimit: settings.freePracticeLimit });
-        if (settings.appConfig) set(s => ({ appConfig: { ...s.appConfig, ...settings.appConfig } }));
+        if (settings.practiceSettings) set({ practiceSettings: settings.practiceSettings });
+        if (settings.examSettings) set({ examSettings: settings.examSettings });
+        if (settings.freePracticeLimit) set({ freePracticeLimit: settings.freePracticeLimit });
+        if (settings.appConfig) set({ appConfig: settings.appConfig });
       }
     } catch {}
   },

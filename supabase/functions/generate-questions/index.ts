@@ -1,7 +1,11 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.30.1';
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
-const MODEL = 'claude-opus-4-7';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface GenerateRequest {
   topicId: string;
@@ -10,38 +14,60 @@ interface GenerateRequest {
   difficulty: number;
   count: number;
   customPrompt?: string;
-  readingPassage?: string;  // for reading_comprehension type
+  readingPassage?: string;
   language: 'he';
+  mode?: 'varied' | 'uniform';
 }
 
-serve(async (req) => {
+const TYPE_INSTRUCTIONS: Record<string, string> = {
+  multiple_choice: 'שאלת בחירה מרובה קלאסית. 4 אפשרויות, תשובה אחת נכונה.',
+  verbal: 'שאלת מילולית: אנלוגיות, הפכים, השלמת משפט, או זיהוי מילה.',
+  logic: 'שאלת היגיון: סדרות, סילוגיזמים, חידות, אריתמטיקה מילולית.',
+  quantitative: 'שאלה כמותית: חשבון, אלגברה, הנדסה, הסתברות.',
+  shapes: 'שאלת מרחב/צורות: סימטריה, גיאומטריה, קורות מרחביות.',
+  reading_comprehension: 'שאלת הבנת הנקרא מתוך הקטע שסופק.',
+  true_false: 'שאלת נכון/לא נכון עם הסבר מלא. 2 אפשרויות בלבד.',
+  fill_in_the_blank: 'משפט עם מקום חסר — יש למלא את המילה הנכונה מבין 4 אפשרויות.',
+};
+
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } });
+    return new Response('ok', { headers: corsHeaders });
   }
 
-  const body: GenerateRequest = await req.json();
+  if (!ANTHROPIC_API_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
-  const typeInstructions: Record<string, string> = {
-    multiple_choice: 'שאלת בחירה מרובה קלאסית. 4 אפשרויות, תשובה אחת נכונה.',
-    verbal: 'שאלת מילולית: אנלוגיות, הפכים, השלמת משפט, או זיהוי מילה.',
-    logic: 'שאלת היגיון: סדרות, סילוגיזמים, חידות, אריתמטיקה מילולית.',
-    quantitative: 'שאלה כמותית: חשבון, אלגברה, הנדסה, הסתברות.',
-    shapes: 'שאלת מרחב/צורות: סימטריה, גיאומטריה, תמונות שנסברות מתוך תיאור.',
-    reading_comprehension: 'שאלת הבנת הנקרא מתוך הקטע שסופק.',
-    true_false: 'שאלת נכון/לא נכון עם הסבר מלא.',
-    fill_in_the_blank: 'משפט עם מקום חסר — יש למלא את המילה הנכונה מבין 4 אפשרויות.',
-  };
+  let body: GenerateRequest;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: 'Invalid JSON body' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const { topicName, questionType, difficulty, count, customPrompt, readingPassage } = body;
+
+  const typeInstruction = TYPE_INSTRUCTIONS[questionType] ?? TYPE_INSTRUCTIONS.multiple_choice;
+  const isTrueFalse = questionType === 'true_false';
 
   const systemPrompt = `אתה מחולל שאלות מקצועי לבחינות פסיכוטכניות בישראל (פסיכומטרי, קצינים, טייסים, וכו').
 צור שאלות בעברית ברמה גבוהה, מדויקות, עם הסבר מלא.
-החזר JSON בלבד — מערך של אובייקטי שאלה. אין להוסיף טקסט נוסף.`;
+החזר JSON בלבד — מערך של אובייקטי שאלה, ללא טקסט נוסף לפני או אחרי.`;
 
-  const userPrompt = `צור ${body.count} שאלות מסוג "${body.questionType}" בנושא "${body.topicName}" ברמת קושי ${body.difficulty}/10.
-${body.readingPassage ? `קטע קריאה:\n${body.readingPassage}\n` : ''}
-${body.customPrompt ? `הנחיות נוספות: ${body.customPrompt}` : ''}
-סוג שאלה: ${typeInstructions[body.questionType] ?? typeInstructions.multiple_choice}
+  const userPrompt = `צור ${count} שאלות מסוג "${questionType}" בנושא "${topicName}" ברמת קושי ${difficulty}/10.
+${readingPassage ? `קטע קריאה:\n${readingPassage}\n` : ''}
+${customPrompt ? `הנחיות נוספות: ${customPrompt}` : ''}
+סוג שאלה: ${typeInstruction}
+${isTrueFalse ? '\nלשאלות נכון/לא נכון: 2 אפשרויות בלבד.' : ''}
 
-החזר JSON במבנה הבא בדיוק:
+החזר JSON במבנה הבא בדיוק (מערך, ללא עטיפה):
 [
   {
     "questionText": "...",
@@ -52,36 +78,50 @@ ${body.customPrompt ? `הנחיות נוספות: ${body.customPrompt}` : ''}
       { "id": "d", "text": "...", "isCorrect": false }
     ],
     "correctAnswer": "b",
-    "explanation": "הסבר מפורט ומחנך...",
-    "difficulty": ${body.difficulty},
-    "questionType": "${body.questionType}"
+    "explanation": "הסבר מפורט...",
+    "difficulty": ${difficulty},
+    "questionType": "${questionType}"
   }
-]
-${body.questionType === 'true_false' ? 'לשאלות נכון/לא נכון: 2 אפשרויות בלבד: { id: "a", text: "נכון" } ו { id: "b", text: "לא נכון" }' : ''}`;
+]`;
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
+  try {
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+
+    const message = await client.messages.create({
+      model: 'claude-opus-4-7',
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-    }),
-  });
+    });
 
-  const data = await response.json();
-  const text = data.content?.[0]?.text ?? '[]';
+    const rawText = message.content[0].type === 'text' ? message.content[0].text : '';
 
-  // Extract JSON array from response
-  const match = text.match(/\[[\s\S]*\]/);
-  const questions = match ? JSON.parse(match[0]) : [];
+    // Robust JSON extraction: find outermost [...] array
+    let questions: unknown[] = [];
+    const match = rawText.match(/\[[\s\S]*\]/);
+    if (match) {
+      try {
+        questions = JSON.parse(match[0]);
+      } catch {
+        // Try extracting individual objects if array parse fails
+        const objMatches = rawText.match(/\{[\s\S]*?\}(?=\s*[,\]])/g);
+        if (objMatches) {
+          questions = objMatches.flatMap(s => {
+            try { return [JSON.parse(s)]; } catch { return []; }
+          });
+        }
+      }
+    }
 
-  return new Response(JSON.stringify({ questions }), {
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-  });
+    return new Response(
+      JSON.stringify({ questions }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return new Response(
+      JSON.stringify({ error: message, questions: [] }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 });

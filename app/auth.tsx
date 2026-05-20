@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, Pressable,
   KeyboardAvoidingView, Platform, ActivityIndicator,
-  ScrollView,
+  ScrollView, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -277,6 +277,17 @@ export default function AuthScreen() {
                 }
               </Text>
             </View>
+
+            {/* Legal links */}
+            <View style={styles.legalRow}>
+              <Pressable onPress={() => router.push('/terms')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={styles.legalLink}>תנאי שימוש</Text>
+              </Pressable>
+              <Text style={styles.legalSep}> · </Text>
+              <Pressable onPress={() => router.push('/privacy')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={styles.legalLink}>מדיניות פרטיות</Text>
+              </Pressable>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -365,6 +376,9 @@ const styles = StyleSheet.create({
   submitText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
 
   hint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 4 },
+  legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
+  legalLink: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.4)', textDecorationLine: 'underline' },
+  legalSep: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.2)' },
 
   // Email pending state
   pendingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
