@@ -1206,12 +1206,25 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       logger.error('adminStore:loadAdminData', 'שגיאה בהזרעת שאלות ממתינות', e?.message);
     }
 
-    // 1. Load all questions from Supabase (includes any admin-created ones)
+    // 1. Load all questions from Supabase (includes any admin-created ones).
+    // Merge with local state: local 'validated'/'rejected' questions take precedence
+    // over Supabase to avoid overwriting optimistic updates that haven't flushed yet.
     try {
-      const questions = await fetchAllQuestions();
-      if (questions.length > 0) {
-        set({ questions });
-        logger.success('adminStore:loadAdminData', `נטענו ${questions.length} שאלות`);
+      const remote = await fetchAllQuestions();
+      if (remote.length > 0) {
+        set(s => {
+          const localOverrides = new Map(
+            s.questions
+              .filter(q => q.validationStatus === 'validated' || q.validationStatus === 'rejected')
+              .map(q => [q.id, q])
+          );
+          const merged = remote.map(q => localOverrides.get(q.id) ?? q);
+          // Append any locally-created questions not yet in Supabase
+          const remoteIds = new Set(remote.map(q => q.id));
+          const localOnly = s.questions.filter(q => !remoteIds.has(q.id));
+          logger.success('adminStore:loadAdminData', `נטענו ${remote.length} שאלות (${localOnly.length} מקומיות בלבד)`);
+          return { questions: [...merged, ...localOnly] };
+        });
       }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת שאלות', e?.message);

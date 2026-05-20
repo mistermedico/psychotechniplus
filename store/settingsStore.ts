@@ -13,6 +13,7 @@ export interface DisplaySettings {
   autoAdvanceDelay: AutoAdvanceOption;
   questionFontSize: FontSizeOption;
   showExplanationAuto: boolean;
+  hapticsEnabled: boolean;
 }
 
 interface SettingsState extends DisplaySettings {
@@ -30,6 +31,7 @@ const DEFAULT_SETTINGS: DisplaySettings = {
   autoAdvanceDelay: 0,
   questionFontSize: 'medium',
   showExplanationAuto: true,
+  hapticsEnabled: true,
 };
 
 export const useSettingsStore = create<SettingsState>((set) => ({

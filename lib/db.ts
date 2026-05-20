@@ -46,11 +46,10 @@ export async function ensureDbSeeded(): Promise<void> {
   if (_seeded) return;
   _seeded = true;
   try {
-    const { data, error } = await supabase.from('topics').select('id').limit(1);
-    if (error || data?.length) return; // error = can't check (offline), data = already seeded
-    // Seed targets first (topics FK → targets)
+    // Always upsert all targets + topics so FK constraints are always satisfied.
+    // Upsert is idempotent — safe to run every session.
     const { TARGETS: T, TOPICS: TOP } = await import('../data/mockData');
-    await supabase.from('targets').upsert(
+    const { error: te } = await supabase.from('targets').upsert(
       T.map(t => ({
         id: t.id, name: t.name, slug: t.slug ?? t.id, description: t.description ?? '',
         icon: t.icon, color: t.color, gradient_colors: t.gradientColors ?? [],
@@ -61,14 +60,20 @@ export async function ensureDbSeeded(): Promise<void> {
         access_settings: t.accessSettings ?? {},
       }))
     );
-    await supabase.from('topics').upsert(
+    if (te) { logger.error('db:seed', 'שגיאה בהזרעת מסלולים', te.message); }
+
+    const { error: tope } = await supabase.from('topics').upsert(
       TOP.map(t => ({
         id: t.id, target_id: t.targetId, name: t.name, slug: t.slug ?? t.id,
         description: t.description ?? '', icon: t.icon,
         order_index: t.order ?? 0, is_premium_only: t.isPremiumOnly ?? false, color: t.color ?? '',
       }))
     );
-    logger.success('db:seed', `נזרעו ${T.length} מסלולים ו-${TOP.length} נושאים`);
+    if (tope) { logger.error('db:seed', 'שגיאה בהזרעת נושאים', tope.message); }
+
+    if (!te && !tope) {
+      logger.success('db:seed', `הזרעה הושלמה: ${T.length} מסלולים, ${TOP.length} נושאים`);
+    }
   } catch (e: any) {
     _seeded = false; // allow retry if it fails
     logger.error('db:seed', 'שגיאה בהזרעת DB', e?.message);

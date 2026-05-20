@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Alert, ActionSheetIOS, Platform, Linking,
+  Alert, ActionSheetIOS, Platform, Linking, Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -21,19 +22,31 @@ interface SettingRowProps {
   onPress?: () => void;
   danger?: boolean;
   isLast?: boolean;
+  toggle?: boolean;
+  toggleValue?: boolean;
+  onToggle?: (val: boolean) => void;
 }
 
-function SettingRow({ icon, label, value, onPress, danger, isLast }: SettingRowProps) {
+function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggleValue, onToggle }: SettingRowProps) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={toggle ? undefined : onPress}
       style={({ pressed }) => [
         styles.settingRow,
         isLast && styles.settingRowLast,
-        { opacity: pressed ? 0.75 : 1 },
+        !toggle && { opacity: pressed ? 0.75 : 1 },
       ]}
     >
-      <Text style={[styles.settingChevron, danger && { color: Colors.danger }]}>←</Text>
+      {toggle ? (
+        <Switch
+          value={toggleValue}
+          onValueChange={v => { Haptics.selectionAsync(); onToggle?.(v); }}
+          trackColor={{ false: 'rgba(255,255,255,0.15)', true: Colors.primary }}
+          thumbColor="#fff"
+        />
+      ) : (
+        <Text style={[styles.settingChevron, danger && { color: Colors.danger }]}>←</Text>
+      )}
       <View style={styles.settingLabelWrap}>
         <Text style={[styles.settingLabel, danger && { color: Colors.danger }]}>{label}</Text>
         {value ? <Text style={styles.settingValue}>{value}</Text> : null}
@@ -61,6 +74,7 @@ export default function ProfileTab() {
     totalSessions, totalCorrect, totalAnswered,
     getTopicElo, reset, signOut, deleteAccount, isPremium,
   } = useUserStore();
+  const { hapticsEnabled, updateSetting } = useSettingsStore();
 
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -278,10 +292,31 @@ export default function ProfileTab() {
         </View>
 
         <View style={styles.settingsCard}>
-          <SettingRow icon="🔔" label="התראות" value="פעיל" onPress={() => { Haptics.selectionAsync(); Alert.alert('התראות', 'ניהול התראות יהיה זמין בקרוב'); }} />
-          <SettingRow icon="🌙" label="מצב לילה" value="כבוי" onPress={() => { Haptics.selectionAsync(); Alert.alert('מצב לילה', 'מצב לילה יהיה זמין בקרוב'); }} />
-          <SettingRow icon="📊" label="קושי ברירת מחדל" value="אוטומטי" onPress={() => { Haptics.selectionAsync(); if (showAdmin) router.push('/admin/display-settings'); else Alert.alert('קושי', 'הקושי מחושב אוטומטית על בסיס ה-ELO שלך'); }} />
-          <SettingRow icon="🔊" label="קול והפטיקה" value="פעיל" onPress={() => { Haptics.selectionAsync(); Alert.alert('קול והפטיקה', 'ניהול קול יהיה זמין בקרוב'); }} />
+          <SettingRow
+            icon="🔔"
+            label="התראות"
+            value="הגדרות מכשיר"
+            onPress={() => { Haptics.selectionAsync(); Linking.openSettings(); }}
+          />
+          <SettingRow
+            icon="🌙"
+            label="מצב כהה"
+            value="פעיל תמיד"
+            onPress={() => { Haptics.selectionAsync(); Alert.alert('מצב כהה', 'האפליקציה פועלת במצב כהה בלבד לחוויה אופטימלית.'); }}
+          />
+          <SettingRow
+            icon="📊"
+            label="קושי ברירת מחדל"
+            value="אוטומטי (ELO)"
+            onPress={() => { Haptics.selectionAsync(); if (showAdmin) router.push('/admin/display-settings'); else Alert.alert('קושי אדפטיבי', 'הקושי מחושב אוטומטית לפי ה-ELO שלך ומשתנה בזמן אמת.'); }}
+          />
+          <SettingRow
+            icon="🔊"
+            label="רטט והפטיקה"
+            toggle
+            toggleValue={hapticsEnabled}
+            onToggle={v => updateSetting('hapticsEnabled', v)}
+          />
           {showAdmin && (
             <SettingRow icon="🖥️" label="הגדרות תצוגה" onPress={() => { Haptics.selectionAsync(); router.push('/admin/display-settings'); }} isLast />
           )}
@@ -293,7 +328,12 @@ export default function ProfileTab() {
         </View>
 
         <View style={styles.settingsCard}>
-          <SettingRow icon="⭐" label="שאלות מועדפות" onPress={() => { Haptics.selectionAsync(); Alert.alert('מועדפות', 'אפשרות זו תהיה זמינה בקרוב'); }} />
+          <SettingRow
+            icon="⭐"
+            label="שאלות מועדפות"
+            value="בקרוב"
+            onPress={() => { Haptics.selectionAsync(); Alert.alert('שאלות מועדפות', 'סמן שאלות כמועדפות ותרגל אותן בנפרד — בקרוב!'); }}
+          />
           <SettingRow icon="📝" label="ההיסטוריה שלי" onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/progress'); }} />
           <SettingRow icon="💬" label="צור קשר ותמיכה" onPress={() => { Haptics.selectionAsync(); Linking.openURL('mailto:support@psychotechniplus.com'); }} />
           <SettingRow icon="🔒" label="מדיניות פרטיות" onPress={() => { Haptics.selectionAsync(); router.push('/privacy'); }} />
@@ -307,7 +347,7 @@ export default function ProfileTab() {
         {!isPremium && (
           <Pressable
             style={({ pressed }) => [styles.premiumBanner, { opacity: pressed ? 0.85 : 1 }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); Alert.alert('בקרוב!', 'מנוי פרמיום בקרוב 💎'); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/paywall'); }}
           >
             <LinearGradient colors={['#D97706', '#F59E0B', '#FCD34D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.premiumBannerGrad}>
               <Text style={styles.premiumBannerArrow}>←</Text>
