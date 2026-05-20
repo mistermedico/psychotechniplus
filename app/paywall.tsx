@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  ActivityIndicator, Alert, Linking,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -161,11 +161,11 @@ export default function PaywallScreen() {
         </Text>
 
         <View style={styles.legalLinks}>
-          <Pressable onPress={() => Linking.openURL('https://psychotechniplus.com/privacy')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Pressable onPress={() => router.push('/privacy')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={styles.legalLink}>מדיניות פרטיות</Text>
           </Pressable>
           <Text style={styles.legalSep}> · </Text>
-          <Pressable onPress={() => Linking.openURL('https://psychotechniplus.com/terms')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Pressable onPress={() => router.push('/terms')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={styles.legalLink}>תנאי שימוש</Text>
           </Pressable>
         </View>
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   purchaseBtnGrad: { paddingVertical: 18, alignItems: 'center' },
   purchaseBtnText: { fontFamily: 'Heebo_700Bold', fontSize: 18, color: '#fff' },
 
-  restoreBtn: { alignItems: 'center', paddingVertical: 16 },
+  restoreBtn: { alignItems: 'center', paddingVertical: 16, minHeight: 44, justifyContent: 'center' },
   restoreBtnText: { fontFamily: 'Heebo_500Medium', fontSize: 13, color: 'rgba(255,255,255,0.5)' },
   legal: {
     fontFamily: 'Heebo_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.35)',

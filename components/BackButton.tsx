@@ -70,6 +70,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 7,
+    minHeight: 44,
+    minWidth: 44,
   },
   arrow: {
     fontSize: 16,

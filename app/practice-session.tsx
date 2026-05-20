@@ -796,6 +796,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     justifyContent: 'center',
+    minHeight: 44,
   },
   skipText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.textSecondary },
   confirmBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
@@ -822,6 +823,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
+    minHeight: 44,
   },
   quickBtnActive: {
     borderColor: Colors.primary,

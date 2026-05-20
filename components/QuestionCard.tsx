@@ -355,6 +355,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     padding: 8,
     alignItems: 'center',
+    minHeight: 44,
   },
   optionGridImage: {
     width: '100%',

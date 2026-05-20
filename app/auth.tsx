@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.13)',
   },
-  tab: { flex: 1, paddingVertical: 13, alignItems: 'center', borderRadius: Radius.lg },
+  tab: { flex: 1, paddingVertical: 13, alignItems: 'center', borderRadius: Radius.lg, minHeight: 44 },
   tabActive: {
     backgroundColor: 'rgba(99,102,241,0.3)',
     borderWidth: 1,

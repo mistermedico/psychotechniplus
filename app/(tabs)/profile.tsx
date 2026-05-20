@@ -296,8 +296,8 @@ export default function ProfileTab() {
           <SettingRow icon="⭐" label="שאלות מועדפות" onPress={() => { Haptics.selectionAsync(); Alert.alert('מועדפות', 'אפשרות זו תהיה זמינה בקרוב'); }} />
           <SettingRow icon="📝" label="ההיסטוריה שלי" onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/progress'); }} />
           <SettingRow icon="💬" label="צור קשר ותמיכה" onPress={() => { Haptics.selectionAsync(); Linking.openURL('mailto:support@psychotechniplus.com'); }} />
-          <SettingRow icon="🔒" label="מדיניות פרטיות" onPress={() => { Haptics.selectionAsync(); Linking.openURL('https://psychotechniplus.com/privacy'); }} />
-          <SettingRow icon="📄" label="תנאי שימוש" onPress={() => { Haptics.selectionAsync(); Linking.openURL('https://psychotechniplus.com/terms'); }} />
+          <SettingRow icon="🔒" label="מדיניות פרטיות" onPress={() => { Haptics.selectionAsync(); router.push('/privacy'); }} />
+          <SettingRow icon="📄" label="תנאי שימוש" onPress={() => { Haptics.selectionAsync(); router.push('/terms'); }} />
           <SettingRow icon="🚪" label="יציאה מהחשבון" onPress={handleSignOut} danger />
           <SettingRow icon="🗑️" label="איפוס כל הנתונים" onPress={handleReset} danger />
           <SettingRow icon="⛔" label="מחיקת חשבון לצמיתות" onPress={handleDeleteAccount} danger isLast />
