@@ -30,7 +30,7 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'questions',          icon: '📋', label: 'שאלות',          desc: 'CRUD ופילטרים',        route: '/admin/questions',           category: 'content' },
   { id: 'validate',           icon: '✅', label: 'ולידציה',         desc: 'אישור שאלות',           route: '/admin/validate',            category: 'content' },
   { id: 'json-import',        icon: '📥', label: 'ייבוא JSON',      desc: 'העלאת שאלות',           route: '/admin/json-import',         category: 'content' },
-  { id: 'ai-generator',       icon: '🤖', label: 'מחולל AI',        desc: 'שאלות עם AI',           route: '/admin/ai-generator',        category: 'content' },
+  { id: 'ai-generator',       icon: '📝', label: 'מחולל שאלות',     desc: 'מבוסס תבניות',          route: '/admin/ai-generator',        category: 'content' },
   { id: 'export',             icon: '📤', label: 'ייצוא',            desc: 'ייצוא JSON',             route: '/admin/export',              category: 'content' },
   { id: 'topics-admin',       icon: '📚', label: 'נושאים',          desc: 'ניהול Topics',           route: '/admin/topics-admin',        category: 'content' },
   // Exams

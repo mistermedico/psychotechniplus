@@ -282,7 +282,7 @@ export default function JsonImportScreen() {
               עברו בהצלחה: {importResult.success}{'\n'}
               {importResult.skipped > 0 ? `דולגו כפולות: ${importResult.skipped}\n` : ''}
               {importResult.failed > 0 ? `נכשלו: ${importResult.failed}\n` : ''}
-              {'\n'}השאלות המיובאות יופיעו בתור ולידציה לאישור.
+              {'\n'}נשמרו ל-Supabase ויופיעו בתור ולידציה.
             </Text>
           </View>
         )}

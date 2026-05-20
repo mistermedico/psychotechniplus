@@ -14,7 +14,6 @@ import { TOPICS } from '../../data/mockData';
 import { Question, QuestionType, QuestionOption } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../../constants/theme';
-import { supabase } from '../../lib/supabase';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -305,40 +304,6 @@ function generateMockQuestions(params: {
   return result;
 }
 
-// ── API call ──────────────────────────────────────────────────────────────
-
-async function callGenerateAPI(params: {
-  topicId: string;
-  topicName: string;
-  questionType: QuestionType;
-  difficulty: number;
-  count: number;
-  customPrompt?: string;
-  readingPassage?: string;
-  mode: GenerationMode;
-}): Promise<GeneratedQuestion[]> {
-  try {
-    const { data, error } = await supabase.functions.invoke('generate-questions', {
-      body: {
-        topicId: params.topicId,
-        topicName: params.topicName,
-        questionType: params.questionType,
-        difficulty: params.difficulty,
-        count: params.count,
-        customPrompt: params.customPrompt,
-        readingPassage: params.readingPassage,
-        language: 'he',
-      },
-    });
-    if (!error && data?.questions?.length) {
-      return data.questions as GeneratedQuestion[];
-    }
-  } catch {
-    // fall through to mock
-  }
-  return generateMockQuestions(params);
-}
-
 // ── Difficulty colors ─────────────────────────────────────────────────────
 
 function difficultyColor(d: number): string {
@@ -397,16 +362,18 @@ export default function AiGenerator() {
     const effectiveCount = mode === 'quick' ? Math.min(count, 3) : count;
     const effectiveType = mode === 'passage' ? 'reading_comprehension' as QuestionType : selectedType;
 
-    const raw = await callGenerateAPI({
-      topicId: selectedTopicId,
-      topicName: topic?.name ?? '',
-      questionType: effectiveType,
-      difficulty,
-      count: effectiveCount,
-      customPrompt,
-      readingPassage: mode === 'passage' ? passage : undefined,
-      mode,
-    });
+    const raw = await new Promise<GeneratedQuestion[]>(resolve =>
+      setTimeout(() => resolve(generateMockQuestions({
+        topicId: selectedTopicId,
+        topicName: topic?.name ?? '',
+        questionType: effectiveType,
+        difficulty,
+        count: effectiveCount,
+        customPrompt,
+        readingPassage: mode === 'passage' ? passage : undefined,
+        mode,
+      })), 800)
+    );
 
     setIsGenerating(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -583,7 +550,7 @@ export default function AiGenerator() {
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <Text style={styles.backBtnText}>‹ חזור</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>🤖 מחולל AI</Text>
+          <Text style={styles.headerTitle}>📝 מחולל שאלות</Text>
         </View>
         {/* Tabs */}
         <View style={styles.tabRow}>
