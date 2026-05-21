@@ -19,7 +19,7 @@ export default function Index() {
     );
   }
 
-  if (!isAuthenticated) return <Redirect href="/auth" />;
+  if (!isAuthenticated) return <Redirect href={'/landing' as any} />;
   if (!hasCompletedOnboarding) return <Redirect href="/onboarding" />;
   return <Redirect href="/(tabs)" />;
 }
