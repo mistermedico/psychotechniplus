@@ -1,7 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Alert, ActionSheetIOS, Platform, Linking, Switch,
+  Alert, ActionSheetIOS, Platform, Linking, Switch, Appearance,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
-import { useSettingsStore } from '../../store/settingsStore';
+import { useSettingsStore, DifficultyOption } from '../../store/settingsStore';
 import { TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
@@ -77,7 +77,9 @@ export default function ProfileTab() {
     totalSessions, totalCorrect, totalAnswered,
     getTopicElo, reset, signOut, deleteAccount, isPremium,
   } = useUserStore();
-  const { hapticsEnabled, updateSetting } = useSettingsStore();
+  const { hapticsEnabled, theme, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
+  const [signingOut, setSigningOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -107,20 +109,29 @@ export default function ProfileTab() {
   const avatarEmoji = ['🧠', '🎯', '🚀', '💎', '🌟'][Math.min(level - 1, 4)];
 
   const handleSignOut = () => {
+    if (signingOut) return;
     Alert.alert('יציאה מהחשבון', 'האם אתה בטוח שברצונך לצאת?', [
       { text: 'ביטול', style: 'cancel' },
       {
         text: 'יציאה', style: 'destructive',
         onPress: async () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          await signOut();
-          router.replace('/auth');
+          setSigningOut(true);
+          try {
+            await signOut();
+          } catch (e) {
+            // signOut clears local state regardless — continue
+          } finally {
+            setSigningOut(false);
+          }
+          router.replace('/landing');
         },
       },
     ]);
   };
 
   const handleDeleteAccount = () => {
+    if (deletingAccount) return;
     Alert.alert(
       'מחיקת חשבון לצמיתות',
       'פעולה זו תמחק את כל הנתונים שלך לצמיתות ולא ניתן לבטלה. האם אתה בטוח?',
@@ -130,11 +141,18 @@ export default function ProfileTab() {
           text: 'מחק חשבון', style: 'destructive',
           onPress: async () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            const result = await deleteAccount();
-            if (result.success) {
-              router.replace('/auth');
-            } else {
-              Alert.alert('שגיאה', 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.');
+            setDeletingAccount(true);
+            try {
+              const result = await deleteAccount();
+              if (result.success) {
+                router.replace('/landing');
+              } else {
+                Alert.alert('שגיאה', result.error ?? 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.');
+              }
+            } catch {
+              Alert.alert('שגיאה', 'אירעה שגיאה. נסה שנית.');
+            } finally {
+              setDeletingAccount(false);
             }
           },
         },
@@ -193,6 +211,67 @@ export default function ProfileTab() {
       Linking.openSettings();
     } else {
       Alert.alert('התראות', 'לניהול התראות — פתח את הגדרות הדפדפן שלך.');
+    }
+  };
+
+  const handleThemeToggle = (isDark: boolean) => {
+    Haptics.selectionAsync();
+    const next: 'dark' | 'light' = isDark ? 'dark' : 'light';
+    updateSetting('theme', next);
+    Appearance.setColorScheme(next);
+  };
+
+  const DIFFICULTY_LABELS: Record<string, string> = {
+    auto: 'אוטומטי (ELO)',
+    easy: 'קל',
+    medium: 'בינוני',
+    hard: 'קשה',
+  };
+
+  const handleDifficulty = () => {
+    Haptics.selectionAsync();
+    const options = ['ביטול', 'אוטומטי (ELO)', 'קל', 'בינוני', 'קשה'];
+    const values: DifficultyOption[] = ['auto', 'auto', 'easy', 'medium', 'hard'];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: 'רמת קושי ברירת מחדל', options, cancelButtonIndex: 0 },
+        (idx) => {
+          if (idx === 0) return;
+          updateSetting('defaultDifficulty', values[idx]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      );
+    } else {
+      Alert.alert('רמת קושי', 'בחר רמת קושי ברירת מחדל:', [
+        { text: 'ביטול', style: 'cancel' },
+        { text: 'אוטומטי (ELO)', onPress: () => updateSetting('defaultDifficulty', 'auto') },
+        { text: 'קל', onPress: () => updateSetting('defaultDifficulty', 'easy') },
+        { text: 'בינוני', onPress: () => updateSetting('defaultDifficulty', 'medium') },
+        { text: 'קשה', onPress: () => updateSetting('defaultDifficulty', 'hard') },
+      ]);
+    }
+  };
+
+  const handleFontSize = () => {
+    Haptics.selectionAsync();
+    const options = ['ביטול', 'קטן', 'בינוני', 'גדול'];
+    const values = ['small', 'medium', 'large'] as const;
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: 'גודל טקסט שאלות', options, cancelButtonIndex: 0 },
+        (idx) => {
+          if (idx === 0) return;
+          updateSetting('questionFontSize', values[idx - 1]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      );
+    } else {
+      Alert.alert('גודל טקסט', 'בחר גודל טקסט:', [
+        { text: 'ביטול', style: 'cancel' },
+        { text: 'קטן', onPress: () => updateSetting('questionFontSize', 'small') },
+        { text: 'בינוני', onPress: () => updateSetting('questionFontSize', 'medium') },
+        { text: 'גדול', onPress: () => updateSetting('questionFontSize', 'large') },
+      ]);
     }
   };
 
@@ -345,23 +424,24 @@ export default function ProfileTab() {
               onPress={handleNotifications}
             />
             <SettingRow
-              icon="🌙"
-              label="מצב כהה"
-              value="פעיל תמיד"
-              onPress={() => { Haptics.selectionAsync(); Alert.alert('מצב כהה', 'האפליקציה פועלת במצב כהה בלבד לחוויה אופטימלית.'); }}
+              icon={theme === 'dark' ? '🌙' : '☀️'}
+              label="מצב תצוגה"
+              value={theme === 'dark' ? 'כהה' : 'בהיר'}
+              toggle
+              toggleValue={theme === 'dark'}
+              onToggle={handleThemeToggle}
             />
             <SettingRow
               icon="📊"
               label="קושי ברירת מחדל"
-              value="אוטומטי (ELO)"
-              onPress={() => {
-                Haptics.selectionAsync();
-                if (showAdmin) {
-                  router.push('/admin/display-settings');
-                } else {
-                  Alert.alert('קושי אדפטיבי', 'הקושי מחושב אוטומטית לפי ה-ELO שלך ומשתנה בזמן אמת.');
-                }
-              }}
+              value={DIFFICULTY_LABELS[defaultDifficulty]}
+              onPress={handleDifficulty}
+            />
+            <SettingRow
+              icon="🔡"
+              label="גודל טקסט שאלות"
+              value={{ small: 'קטן', medium: 'בינוני', large: 'גדול' }[questionFontSize]}
+              onPress={handleFontSize}
             />
             <SettingRow
               icon="🔊"
@@ -374,7 +454,7 @@ export default function ProfileTab() {
             {showAdmin && (
               <SettingRow
                 icon="🖥️"
-                label="הגדרות תצוגה"
+                label="הגדרות תצוגה מתקדמות"
                 onPress={() => { Haptics.selectionAsync(); router.push('/admin/display-settings'); }}
                 isLast
               />
@@ -392,8 +472,10 @@ export default function ProfileTab() {
               icon="⭐"
               label="שאלות מועדפות"
               value="בקרוב"
-              onPress={() => { Haptics.selectionAsync(); Alert.alert('שאלות מועדפות', 'סמן שאלות כמועדפות ותרגל אותן בנפרד — בקרוב!'); }}
-              disabled
+              onPress={() => {
+                Haptics.selectionAsync();
+                Alert.alert('שאלות מועדפות 🌟', 'פיצ\'ר זה בפיתוח.\n\nבקרוב תוכל לסמן שאלות כמועדפות ולתרגל אותן בנפרד.');
+              }}
             />
             <SettingRow
               icon="📝"
@@ -427,9 +509,10 @@ export default function ProfileTab() {
           <View style={styles.settingsCard}>
             <SettingRow
               icon="🚪"
-              label="יציאה מהחשבון"
+              label={signingOut ? 'יוצא...' : 'יציאה מהחשבון'}
               onPress={handleSignOut}
               danger
+              disabled={signingOut}
             />
             <SettingRow
               icon="🗑️"
@@ -439,9 +522,10 @@ export default function ProfileTab() {
             />
             <SettingRow
               icon="⛔"
-              label="מחיקת חשבון לצמיתות"
+              label={deletingAccount ? 'מוחק חשבון...' : 'מחיקת חשבון לצמיתות'}
               onPress={handleDeleteAccount}
               danger
+              disabled={deletingAccount}
               isLast
             />
           </View>
