@@ -7,6 +7,7 @@ import {
   loadUserElos, saveUserElo, loadUserBadges, saveUserBadge,
 } from '../lib/db';
 import { logger } from '../utils/logger';
+import { useAdminStore } from './adminStore';
 
 interface TopicElo {
   elo: number;
@@ -148,6 +149,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   signOut: async () => {
     logger.info('userStore:signOut', 'משתמש התנתק');
     await supabase.auth.signOut();
+    useAdminStore.getState().logActivity('משתמש התנתק', 'user');
     set({ ...INITIAL_STATE, isLoaded: true });
   },
 
@@ -189,6 +191,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       saveUserElo(userId, topicId, elo, history);
     });
     logger.success('userStore:completeOnboarding', `אונבורדינג הושלם — ${name}, מסלול: ${targetId}`);
+    useAdminStore.getState().logActivity(`${name} השלים אונבורדינג — מסלול: ${targetId}`, 'user');
   },
 
   updateElo: (topicId, questionElo, isCorrect) => {
@@ -249,6 +252,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     };
     set(state => ({ badges: [...state.badges, badge] }));
     saveUserBadge(badge);
+    useAdminStore.getState().logActivity(`תג הושג: ${type}`, 'user');
     return badge;
   },
 
@@ -296,6 +300,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     if (wasFirstSession) get().earnBadge('first_session');
     logger.success('userStore:recordSession', `סשן הושלם — נכון: ${correct}/${total}, XP+${xpGain}`);
+    useAdminStore.getState().logActivity(`סשן הושלם — ${correct}/${total} נכון, XP+${xpGain}`, 'session');
   },
 
   getTopicElo: (topicId) => get().topicElos[topicId]?.elo ?? DEFAULT_ELO,

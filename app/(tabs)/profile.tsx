@@ -296,7 +296,14 @@ export default function ProfileTab() {
             icon="🔔"
             label="התראות"
             value="הגדרות מכשיר"
-            onPress={() => { Haptics.selectionAsync(); Linking.openSettings(); }}
+            onPress={() => {
+                Haptics.selectionAsync();
+                if (Platform.OS !== 'web') {
+                  Linking.openSettings();
+                } else {
+                  Alert.alert('התראות', 'לניהול התראות — פתח את הגדרות הדפדפן שלך (⋮ → הגדרות → התראות)');
+                }
+              }}
           />
           <SettingRow
             icon="🌙"

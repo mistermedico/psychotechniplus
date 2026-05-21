@@ -4,6 +4,9 @@ import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
 import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
 
 export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
@@ -368,7 +371,7 @@ export interface AdminActivityLog {
   id: string;
   action: string;
   timestamp: string;
-  category: 'question' | 'user' | 'promo' | 'notification' | 'system' | 'page';
+  category: 'question' | 'user' | 'promo' | 'notification' | 'system' | 'page' | 'session' | 'import';
 }
 
 // ── AI Generation Sessions ─────────────────────────────────────────────────
@@ -848,6 +851,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       if (r.error) logger.error('adminStore:addQuestion', `שגיאה בשמירת שאלה חדשה`, r.error);
       else logger.success('adminStore:addQuestion', `שאלה נוצרה: ${newQ.id}`);
     });
+    get().logActivity(`הוסיף שאלה: "${newQ.questionText.slice(0, 40)}..."`, 'question');
     return newQ;
   },
 
@@ -861,6 +865,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       });
       return { questions: updated };
     });
+    get().logActivity(`עדכן שאלה ${id}`, 'question');
   },
 
   deleteQuestion: (id) => {
@@ -870,6 +875,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }));
     dbDelete(id);
     logger.info('adminStore:deleteQuestion', `שאלה נמחקה: ${id}`);
+    get().logActivity(`מחק שאלה ${id}`, 'question');
   },
 
   deleteQuestions: (ids) => {
@@ -880,6 +886,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }));
     ids.forEach(id => dbDelete(id));
     logger.info('adminStore:deleteQuestions', `${ids.length} שאלות נמחקו`);
+    get().logActivity(`מחק ${ids.length} שאלות`, 'question');
   },
 
   validateQuestion: (id, status) => {
@@ -896,6 +903,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       });
       return { questions: updated };
     });
+    get().logActivity(`אימת שאלה ${id} → ${status}`, 'question');
   },
 
   bulkValidate: (ids, status) => {
@@ -914,6 +922,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       if (r.error) logger.error('adminStore:bulkValidate', `שגיאה בעדכון שאלה ${q.id}`, r.error);
     }));
     logger.info('adminStore:bulkValidate', `${ids.length} שאלות → ${status}`);
+    get().logActivity(`אימות מרובה: ${ids.length} שאלות → ${status}`, 'question');
   },
 
   toggleSelectQuestion: (id) => {
@@ -1072,6 +1081,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       timestamp: new Date().toISOString(),
     };
     set(s => ({ activityLog: [entry, ...s.activityLog].slice(0, 500) }));
+    const updated = get().activityLog;
+    AsyncStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(updated)).catch(() => null);
   },
 
   clearActivityLog: () => set({ activityLog: [] }),
@@ -1284,6 +1295,21 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הגדרות', e?.message);
     }
+
+    // 5. Load persisted activityLog from AsyncStorage
+    try {
+      const saved = await AsyncStorage.getItem(ACTIVITY_LOG_KEY);
+      if (saved) {
+        const parsed: AdminActivityLog[] = JSON.parse(saved);
+        if (parsed.length > 0) {
+          set(s => {
+            const existingIds = new Set(s.activityLog.map(l => l.id));
+            const fresh = parsed.filter(l => !existingIds.has(l.id));
+            return { activityLog: [...s.activityLog, ...fresh].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 500) };
+          });
+        }
+      }
+    } catch {}
 
     logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');
   },

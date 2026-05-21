@@ -19,6 +19,8 @@ const FILTERS: { key: FilterKey; label: string; icon: string }[] = [
   { key: 'promo',        label: 'קופונים',   icon: '🎟️' },
   { key: 'notification', label: 'הודעות',    icon: '🔔' },
   { key: 'system',       label: 'מערכת',     icon: '⚙️' },
+  { key: 'session',      label: 'סשנים',     icon: '🎯' },
+  { key: 'import',       label: 'ייבוא',     icon: '📥' },
 ];
 
 const CATEGORY_COLORS: Record<AdminActivityLog['category'], string> = {
@@ -28,6 +30,8 @@ const CATEGORY_COLORS: Record<AdminActivityLog['category'], string> = {
   promo:        Colors.success,
   notification: '#F59E0B',
   system:       Colors.textTertiary,
+  session:      '#10B981',
+  import:       '#F59E0B',
 };
 
 const CATEGORY_BG: Record<AdminActivityLog['category'], string> = {
@@ -37,6 +41,8 @@ const CATEGORY_BG: Record<AdminActivityLog['category'], string> = {
   promo:        Colors.successLight,
   notification: '#FEF3C7',
   system:       Colors.surfaceSecondary,
+  session:      '#10B98115',
+  import:       '#F59E0B15',
 };
 
 const CATEGORY_ICONS: Record<AdminActivityLog['category'], string> = {
