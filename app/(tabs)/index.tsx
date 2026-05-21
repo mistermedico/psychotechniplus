@@ -1,12 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Dimensions,
-  Animated,
+  View, Text, StyleSheet, ScrollView, Pressable,
+  Dimensions, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,29 +9,28 @@ import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
 import { TARGETS, TOPICS } from '../../data/mockData';
-import { TargetCard } from '../../components/TargetCard';
 import { Colors } from '../../constants/colors';
-import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { eloToTitle } from '../../utils/elo';
 
 const { width: W } = Dimensions.get('window');
 
-const QUICK_ACTION_META: Record<string, { icon: string; color: string; gradient: [string, string] }> = {
-  topic_quantitative: { icon: '⚡', color: Colors.primary, gradient: ['#4F46E5', '#7C3AED'] },
-  topic_verbal: { icon: '📚', color: Colors.success, gradient: ['#10B981', '#059669'] },
-  topic_logic: { icon: '🧩', color: Colors.accent, gradient: ['#9333EA', '#7C3AED'] },
-  topic_spatial: { icon: '🔷', color: '#F59E0B', gradient: ['#F59E0B', '#D97706'] },
+const TOPIC_META: Record<string, { icon: string; gradient: [string, string]; glow: string }> = {
+  topic_quantitative: { icon: '⚡', gradient: ['#5A52D5', '#7C6FF7'], glow: '#7C6FF7' },
+  topic_verbal:       { icon: '📖', gradient: ['#10B981', '#34D399'], glow: '#34D399' },
+  topic_logic:        { icon: '🧩', gradient: ['#A855F7', '#C084FC'], glow: '#C084FC' },
+  topic_spatial:      { icon: '◈',  gradient: ['#F59E0B', '#FBBF24'], glow: '#FBBF24' },
 };
 
 const BADGE_INFO: Record<string, { icon: string; label: string }> = {
   first_session: { icon: '🌱', label: 'סשן ראשון' },
-  streak_7: { icon: '🔥', label: '7 ימים רצוף' },
-  streak_30: { icon: '🌟', label: '30 ימים!' },
-  perfect_score: { icon: '💯', label: 'ניקוד מושלם' },
-  speed_master: { icon: '⚡', label: 'מהירות בלייטנינג' },
-  topic_complete: { icon: '🏆', label: 'נושא הושלם' },
-  simulation_pass: { icon: '🎖️', label: 'עבר סימולציה' },
-  level_up: { icon: '⬆️', label: 'עלייה ברמה' },
+  streak_7: { icon: '🔥', label: '7 ימים' },
+  streak_30: { icon: '🌟', label: '30 ימים' },
+  perfect_score: { icon: '💯', label: 'מושלם' },
+  speed_master: { icon: '⚡', label: 'מהיר' },
+  topic_complete: { icon: '🏆', label: 'נושא' },
+  simulation_pass: { icon: '🎖️', label: 'סימולציה' },
+  level_up: { icon: '⬆️', label: 'רמה' },
 };
 
 export default function Dashboard() {
@@ -51,237 +45,248 @@ export default function Dashboard() {
   const targetTopics = TOPICS.filter(t => t.targetId === selectedTarget.id);
   const mainTopic = targetTopics[0] ?? null;
   const currentElo = mainTopic ? getTopicElo(mainTopic.id) : 1200;
-
-  const quickActions = targetTopics.slice(0, 3).map(t => ({
-    topicId: t.id,
-    label: t.name,
-    icon: QUICK_ACTION_META[t.id]?.icon ?? '📖',
-    color: QUICK_ACTION_META[t.id]?.color ?? Colors.primary,
-    gradient: QUICK_ACTION_META[t.id]?.gradient ?? Colors.gradients.primary,
-  }));
   const title = eloToTitle(currentElo);
-
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const xpPercent = Math.min(100, Math.round((xp / (level * 100)) * 100));
   const recentBadges = badges.slice(-3);
 
-  const streakPulse = useRef(new Animated.Value(1)).current;
-  const heroFade = useRef(new Animated.Value(0)).current;
-  const cardSlide = useRef(new Animated.Value(30)).current;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'בוקר טוב' : hour < 17 ? 'שלום' : 'ערב טוב';
+
+  // Animations
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  const slideUp = useRef(new Animated.Value(24)).current;
+  const streakScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(heroFade, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.spring(cardSlide, { toValue: 0, friction: 8, useNativeDriver: true }),
+      Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
     ]).start();
 
     if (streak > 0) {
       const pulse = Animated.loop(
         Animated.sequence([
-          Animated.timing(streakPulse, { toValue: 1.1, duration: 800, useNativeDriver: true }),
-          Animated.timing(streakPulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(streakScale, { toValue: 1.08, duration: 900, useNativeDriver: true }),
+          Animated.timing(streakScale, { toValue: 1, duration: 900, useNativeDriver: true }),
         ]),
       );
       pulse.start();
       return () => pulse.stop();
     }
-  }, [streak]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [streak]); // eslint-disable-line
 
-  const startQuickPractice = (topicId: string) => {
+  const go = (topicId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: '/practice-session',
-      params: { topicId, targetId: selectedTarget.id, mode: 'practice' },
-    });
+    router.push({ pathname: '/practice-session', params: { topicId, targetId: selectedTarget.id, mode: 'practice' } });
   };
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'בוקר טוב' : hour < 17 ? 'צהריים טובים' : 'ערב טוב';
-
   return (
-    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#080A12', '#0D1020', '#14102A']}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Ambient glow orbs */}
+      <View style={[styles.orb, styles.orbTop]} />
+      <View style={[styles.orb, styles.orbBottom]} />
+
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
-          bounces={true}
-          decelerationRate="normal"
         >
-          {/* ── Hero ── */}
-          <Animated.View style={{ opacity: heroFade }}>
+          {/* ── Header ── */}
+          <Animated.View style={[styles.header, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+            <Animated.View style={[styles.streakPill, { transform: [{ scale: streakScale }] }]}>
+              <Text style={styles.streakPillText}>🔥 {streak}</Text>
+            </Animated.View>
+            <View style={styles.headerText}>
+              <Text style={styles.greetingText}>{greeting}</Text>
+              <Text style={styles.nameText}>{name || 'מתאמן'}</Text>
+            </View>
+          </Animated.View>
+
+          {/* ── Hero Card ── */}
+          <Animated.View style={[styles.heroWrap, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
             <LinearGradient
-              colors={['#1E1B4B', '#312E81', '#4C1D95']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.hero}
+              colors={['#1E1A4A', '#150F38', '#0E0B2A']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.heroCard}
             >
-              {/* Glass shimmer layer */}
-              <View style={styles.heroShimmer} />
+              {/* Glow overlay */}
+              <View style={styles.heroGlowOverlay} />
+              {/* Grid texture */}
+              <View style={styles.heroGrid} />
 
               <View style={styles.heroTop}>
-                <Animated.View style={[styles.streakBadge, { transform: [{ scale: streakPulse }] }]}>
-                  <Text style={styles.streakText}>🔥 {streak} ימים</Text>
-                </Animated.View>
-                <View style={styles.heroGreeting}>
-                  <Text style={styles.heroSub}>{greeting} 👋</Text>
-                  <Text style={styles.heroName}>{name || 'מתאמן'}</Text>
-                  <Text style={styles.heroTitle}>{title}</Text>
+                <View style={styles.heroBadge}>
+                  <Text style={styles.heroBadgeText}>{title}</Text>
                 </View>
+                <Text style={styles.heroElo}>{currentElo}</Text>
               </View>
 
-              <View style={styles.glassRow}>
-                <View style={styles.glassStat}>
-                  <Text style={styles.glassStatValue}>{xp}</Text>
-                  <Text style={styles.glassStatLabel}>XP</Text>
-                </View>
-                <View style={styles.glassDivider} />
-                <View style={styles.glassStat}>
-                  <Text style={styles.glassStatValue}>{streak}</Text>
-                  <Text style={styles.glassStatLabel}>רצף</Text>
-                </View>
-                <View style={styles.glassDivider} />
-                <View style={styles.glassStat}>
-                  <Text style={styles.glassStatValue}>{accuracy}%</Text>
-                  <Text style={styles.glassStatLabel}>דיוק</Text>
-                </View>
-                <View style={styles.glassDivider} />
-                <View style={styles.glassStat}>
-                  <Text style={styles.glassStatValue}>{level}</Text>
-                  <Text style={styles.glassStatLabel}>רמה</Text>
-                </View>
-              </View>
+              <Text style={styles.heroLabel}>דירוג ELO נוכחי</Text>
 
-              <View style={styles.xpContainer}>
-                <View style={styles.xpLabelRow}>
-                  <Text style={styles.xpPercent}>{xpPercent}%</Text>
-                  <Text style={styles.xpLabel}>התקדמות לרמה {level + 1}</Text>
+              {/* XP progress */}
+              <View style={styles.xpSection}>
+                <View style={styles.xpHeader}>
+                  <Text style={styles.xpPct}>{xpPercent}%</Text>
+                  <Text style={styles.xpHint}>רמה {level + 1}</Text>
                 </View>
                 <View style={styles.xpTrack}>
                   <LinearGradient
-                    colors={['#818CF8', '#C4B5FD']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
+                    colors={['#7C6FF7', '#C084FC']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={[styles.xpFill, { width: `${xpPercent}%` }]}
                   />
                 </View>
               </View>
+
+              {/* Stats row */}
+              <View style={styles.heroStats}>
+                {[
+                  { val: String(xp), label: 'XP', color: Colors.primaryLight },
+                  { val: String(streak), label: 'רצף', color: '#FBBF24' },
+                  { val: `${accuracy}%`, label: 'דיוק', color: Colors.success },
+                  { val: String(level), label: 'רמה', color: Colors.accent },
+                ].map((s, i) => (
+                  <View key={i} style={styles.heroStat}>
+                    <Text style={[styles.heroStatVal, { color: s.color }]}>{s.val}</Text>
+                    <Text style={styles.heroStatLbl}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
             </LinearGradient>
           </Animated.View>
 
-          <Animated.View style={{ transform: [{ translateY: cardSlide }] }}>
-            {/* ── Continue Practice CTA ── */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>ממשיך מאיפה שעצרת</Text>
-              <Text style={styles.sectionTitle}>המשך תרגול</Text>
-            </View>
-
+          {/* ── Practice CTA ── */}
+          <Animated.View style={[styles.ctaWrap, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
             <Pressable
-              style={({ pressed }) => [styles.mainCta, { opacity: pressed ? 0.75 : 1 }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                startQuickPractice(mainTopic?.id ?? 'topic_quantitative');
-              }}
+              onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
+              style={({ pressed }) => [styles.ctaBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
             >
               <LinearGradient
-                colors={selectedTarget.gradientColors as [string, string]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.mainCtaGrad}
+                colors={['#7C6FF7', '#5A52D5']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.ctaGrad}
               >
-                {/* Glass shimmer overlay */}
-                <View style={styles.mainCtaShimmer} />
-                <Text style={styles.mainCtaArrow}>←</Text>
-                <View style={styles.mainCtaText}>
-                  <Text style={styles.mainCtaTitle}>המשך תרגול</Text>
-                  <Text style={styles.mainCtaSubtitle}>
-                    {selectedTarget.name} · {selectedTarget.totalQuestions} שאלות זמינות
-                  </Text>
-                  <View style={styles.progressRingRow}>
-                    <View style={styles.progressRingTrack}>
-                      <View style={[styles.progressRingFill, { width: `${Math.min(100, xpPercent)}%` }]} />
-                    </View>
-                    <Text style={styles.progressRingLabel}>{xpPercent}% מהמטרה היומית</Text>
-                  </View>
+                <View style={styles.ctaShimmer} />
+                <View style={styles.ctaRight}>
+                  <Text style={styles.ctaTitle}>המשך תרגול</Text>
+                  <Text style={styles.ctaSub}>{selectedTarget.name} · {totalSessions} סשנים עד כה</Text>
                 </View>
-                <Text style={styles.mainCtaIcon}>{selectedTarget.icon}</Text>
+                <View style={styles.ctaArrow}>
+                  <Text style={styles.ctaArrowText}>←</Text>
+                </View>
               </LinearGradient>
             </Pressable>
+          </Animated.View>
 
-            {/* ── Recommended topics ── */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>בחר ותרגל</Text>
-              <Text style={styles.sectionTitle}>נושאים מומלצים</Text>
+          {/* ── Bento Grid: Topics ── */}
+          <Animated.View style={[styles.section, { opacity: fadeIn }]}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTag}>בחר נושא</Text>
+              <Text style={styles.sectionTitle}>תרגול מהיר</Text>
             </View>
-
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.topicsScroll}
-              directionalLockEnabled
+              contentContainerStyle={styles.topicsRow}
+              decelerationRate="fast"
             >
-              {quickActions.map(action => (
-                <Pressable
-                  key={action.topicId}
-                  onPress={() => startQuickPractice(action.topicId)}
-                  style={({ pressed }) => [styles.topicCard, { opacity: pressed ? 0.75 : 1 }]}
-                >
-                  <LinearGradient
-                    colors={action.gradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.topicCardGrad}
+              {targetTopics.map(t => {
+                const meta = TOPIC_META[t.id] ?? TOPIC_META.topic_quantitative;
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => go(t.id)}
+                    style={({ pressed }) => [styles.topicCard, { transform: [{ scale: pressed ? 0.95 : 1 }] }]}
                   >
-                    {/* Glass shimmer overlay */}
-                    <View style={styles.topicCardShimmer} />
-                    <Text style={styles.topicCardIcon}>{action.icon}</Text>
-                    <Text style={styles.topicCardLabel}>{action.label}</Text>
-                    <View style={styles.topicCardArrowWrap}>
-                      <Text style={styles.topicCardArrow}>←</Text>
-                    </View>
-                  </LinearGradient>
-                </Pressable>
-              ))}
+                    <LinearGradient
+                      colors={meta.gradient}
+                      start={{ x: 0.1, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={styles.topicGrad}
+                    >
+                      <View style={[styles.topicGlow, { shadowColor: meta.glow }]} />
+                      <Text style={styles.topicIcon}>{meta.icon}</Text>
+                      <Text style={styles.topicName}>{t.name}</Text>
+                      <View style={styles.topicChip}>
+                        <Text style={styles.topicChipText}>←</Text>
+                      </View>
+                    </LinearGradient>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
+          </Animated.View>
 
-            {/* ── Stats Row ── */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>כל הזמן</Text>
+          {/* ── Stats Bento ── */}
+          <Animated.View style={[styles.section, { opacity: fadeIn }]}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTag}>ביצועים</Text>
               <Text style={styles.sectionTitle}>הסטטיסטיקות שלי</Text>
             </View>
-
-            <View style={styles.statsRow}>
-              <View style={[styles.statCard, { borderTopColor: Colors.success }]}>
-                <Text style={styles.statEmoji}>✅</Text>
-                <Text style={[styles.statValue, { color: Colors.success }]}>{totalCorrect}</Text>
-                <Text style={styles.statLabel}>תשובות נכונות</Text>
+            <View style={styles.bentoGrid}>
+              <View style={[styles.bentoCard, styles.bentoWide]}>
+                <LinearGradient colors={['rgba(52,211,153,0.14)', 'rgba(52,211,153,0.04)']} style={styles.bentoGrad}>
+                  <Text style={styles.bentoBig}>{totalCorrect}</Text>
+                  <Text style={styles.bentoLabel}>תשובות נכונות</Text>
+                  <View style={[styles.bentoAccent, { backgroundColor: Colors.success }]} />
+                </LinearGradient>
               </View>
-              <View style={[styles.statCard, { borderTopColor: '#818CF8' }]}>
-                <Text style={styles.statEmoji}>📊</Text>
-                <Text style={[styles.statValue, { color: '#818CF8' }]}>{accuracy}%</Text>
-                <Text style={styles.statLabel}>דיוק כולל</Text>
+              <View style={styles.bentoCard}>
+                <LinearGradient colors={['rgba(124,111,247,0.14)', 'rgba(124,111,247,0.04)']} style={styles.bentoGrad}>
+                  <Text style={[styles.bentoBig, { color: Colors.primaryLight }]}>{accuracy}%</Text>
+                  <Text style={styles.bentoLabel}>דיוק</Text>
+                  <View style={[styles.bentoAccent, { backgroundColor: Colors.primary }]} />
+                </LinearGradient>
               </View>
-              <View style={[styles.statCard, { borderTopColor: Colors.accent }]}>
-                <Text style={styles.statEmoji}>🎯</Text>
-                <Text style={[styles.statValue, { color: Colors.accent }]}>{totalSessions}</Text>
-                <Text style={styles.statLabel}>סשנים</Text>
+              <View style={styles.bentoCard}>
+                <LinearGradient colors={['rgba(192,132,252,0.14)', 'rgba(192,132,252,0.04)']} style={styles.bentoGrad}>
+                  <Text style={[styles.bentoBig, { color: Colors.accent }]}>{totalSessions}</Text>
+                  <Text style={styles.bentoLabel}>סשנים</Text>
+                  <View style={[styles.bentoAccent, { backgroundColor: Colors.accent }]} />
+                </LinearGradient>
               </View>
             </View>
+          </Animated.View>
 
-            {/* ── Badges ── */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>הישגים</Text>
-              <Text style={styles.sectionTitle}>הישגים אחרונים</Text>
-            </View>
+          {/* ── Daily Challenge ── */}
+          <Animated.View style={[styles.section, { opacity: fadeIn }]}>
+            <Pressable
+              onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
+              style={({ pressed }) => [styles.challengeBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+            >
+              <LinearGradient
+                colors={['#92400E', '#D97706', '#FBBF24']}
+                start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0 }}
+                style={styles.challengeGrad}
+              >
+                <View style={styles.challengeShimmer} />
+                <View style={styles.challengeRight}>
+                  <Text style={styles.challengeTitle}>אתגר יומי</Text>
+                  <Text style={styles.challengeSub}>10 שאלות · מיוחד להיום ← </Text>
+                </View>
+                <Text style={styles.challengeEmoji}>⚡</Text>
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
 
-            {recentBadges.length > 0 ? (
+          {/* ── Badges ── */}
+          {recentBadges.length > 0 && (
+            <Animated.View style={[styles.section, { opacity: fadeIn }]}>
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTag}>הישגים</Text>
+                <Text style={styles.sectionTitle}>הישגים אחרונים</Text>
+              </View>
               <View style={styles.badgesRow}>
                 {recentBadges.map(badge => {
                   const info = BADGE_INFO[badge.badgeType] ?? { icon: '🏅', label: badge.badgeType };
                   return (
                     <View key={badge.id} style={styles.badgeCard}>
                       <LinearGradient
-                        colors={['rgba(99,102,241,0.3)', 'rgba(168,85,247,0.3)']}
+                        colors={['rgba(124,111,247,0.25)', 'rgba(192,132,252,0.12)']}
                         style={styles.badgeIconWrap}
                       >
                         <Text style={styles.badgeIcon}>{info.icon}</Text>
@@ -291,488 +296,456 @@ export default function Dashboard() {
                   );
                 })}
               </View>
-            ) : (
-              <View style={styles.emptyBadges}>
-                <Text style={styles.emptyBadgesEmoji}>🏅</Text>
-                <Text style={styles.emptyBadgesTitle}>עוד אין הישגים</Text>
-                <Text style={styles.emptyBadgesText}>
-                  השלם את הסשן הראשון שלך כדי להרוויח הישגים!
-                </Text>
+            </Animated.View>
+          )}
+
+          {/* ── First time CTA ── */}
+          {totalSessions === 0 && (
+            <Animated.View style={[styles.section, { opacity: fadeIn }]}>
+              <View style={styles.firstCard}>
+                <View style={styles.firstGlow} />
+                <Text style={styles.firstEmoji}>🚀</Text>
+                <Text style={styles.firstTitle}>מוכן להתחיל?</Text>
+                <Text style={styles.firstSub}>סיים את הסשן הראשון שלך ורוויח את התג הראשון!</Text>
                 <Pressable
-                  style={({ pressed }) => [styles.emptyBadgesBtn, { opacity: pressed ? 0.75 : 1 }]}
-                  onPress={() => startQuickPractice(mainTopic?.id ?? 'topic_quantitative')}
+                  onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
+                  style={({ pressed }) => [styles.firstBtn, { opacity: pressed ? 0.85 : 1 }]}
                 >
-                  <LinearGradient
-                    colors={['#6366F1', '#A855F7']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.emptyBadgesBtnGrad}
-                  >
-                    <Text style={styles.emptyBadgesBtnText}>התחל תרגול ←</Text>
+                  <LinearGradient colors={['#7C6FF7', '#C084FC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.firstBtnGrad}>
+                    <Text style={styles.firstBtnText}>התחל עכשיו ←</Text>
                   </LinearGradient>
                 </Pressable>
               </View>
-            )}
-
-            {/* ── Daily Challenge ── */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>כל יום</Text>
-              <Text style={styles.sectionTitle}>אתגר יומי</Text>
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [styles.challengeCard, { opacity: pressed ? 0.75 : 1 }]}
-              onPress={() => startQuickPractice(mainTopic?.id ?? 'topic_quantitative')}
-            >
-              <LinearGradient
-                colors={['#D97706', '#F59E0B', '#FCD34D']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.challengeGrad}
-              >
-                {/* Glass shimmer overlay */}
-                <View style={styles.challengeShimmer} />
-                <View style={styles.challengeLeft}>
-                  <Text style={styles.challengeArrow}>←</Text>
-                </View>
-                <View style={styles.challengeCenter}>
-                  <Text style={styles.challengeTitle}>אתגר יומי 🏆</Text>
-                  <Text style={styles.challengeDesc}>10 שאלות · מיוחד להיום</Text>
-                </View>
-                <Text style={styles.challengeIcon}>⚡</Text>
-              </LinearGradient>
-            </Pressable>
-
-            {/* ── Target card ── */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>המסלול</Text>
-              <Text style={styles.sectionTitle}>המסלול שלי</Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.targetsScroll}
-            >
-              {TARGETS.filter(t => t.id === 'target_psychometric').map(t => (
-                <View key={t.id} style={styles.targetCardWrap}>
-                  <TargetCard
-                    target={t}
-                    compact
-                    onPress={() =>
-                      router.push({ pathname: '/targets', params: { targetId: t.id } })
-                    }
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </Animated.View>
+            </Animated.View>
+          )}
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
-  scroll: { flex: 1 },
-  content: {},
+  root: { flex: 1 },
+  safe: { flex: 1 },
+  content: { paddingTop: 4 },
 
-  hero: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    borderRadius: Radius['2xl'],
-    padding: 24,
-    minHeight: 240,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 12,
+  // Ambient
+  orb: {
+    position: 'absolute',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    opacity: 0.12,
+    pointerEvents: 'none',
   },
-  heroShimmer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: Radius['2xl'],
+  orbTop: {
+    top: -80, right: -60,
+    backgroundColor: '#7C6FF7',
+    shadowColor: '#7C6FF7',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 80,
   },
-  heroTop: {
+  orbBottom: {
+    bottom: 120, left: -80,
+    backgroundColor: '#C084FC',
+    shadowColor: '#C084FC',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 80,
+  },
+
+  // Header
+  header: {
     flexDirection: 'row-reverse',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
-  streakBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+  headerText: { alignItems: 'flex-end' },
+  greetingText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'right',
+  },
+  nameText: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize['2xl'],
+    color: Colors.text,
+    textAlign: 'right',
+  },
+  streakPill: {
+    backgroundColor: 'rgba(251,191,36,0.15)',
     borderRadius: Radius.full,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(251,191,36,0.35)',
+    shadowColor: '#FBBF24',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  streakText: {
+  streakPillText: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
-    color: '#fff',
-  },
-  heroGreeting: { alignItems: 'flex-end' },
-  heroSub: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.65)',
-    textAlign: 'right',
-    marginBottom: 2,
-  },
-  heroName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    color: '#F1F5F9',
-    textAlign: 'right',
-  },
-  heroTitle: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.65)',
-    marginTop: 3,
-    textAlign: 'right',
+    color: '#FBBF24',
   },
 
-  glassRow: {
-    flexDirection: 'row-reverse',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: Radius.xl,
-    padding: 16,
-    marginBottom: 16,
+  // Hero Card
+  heroWrap: { paddingHorizontal: 16, marginBottom: 14 },
+  heroCard: {
+    borderRadius: Radius['3xl'],
+    padding: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
+    borderColor: 'rgba(124,111,247,0.22)',
+    overflow: 'hidden',
+    shadowColor: '#7C6FF7',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 16,
   },
-  glassStat: { flex: 1, alignItems: 'center' },
-  glassStatValue: {
+  heroGlowOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(124,111,247,0.05)',
+  },
+  heroGrid: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.03,
+    backgroundColor: 'transparent',
+  },
+  heroTop: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  heroBadge: {
+    backgroundColor: 'rgba(124,111,247,0.25)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.45)',
+  },
+  heroBadgeText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: '#C4B5FD',
+    letterSpacing: 0.5,
+  },
+  heroElo: {
     fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    color: '#F1F5F9',
+    fontSize: FontSize['4xl'],
+    color: '#F0F4FF',
+    letterSpacing: -1,
   },
-  glassStatLabel: {
+  heroLabel: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.65)',
-    marginTop: 2,
+    color: Colors.textTertiary,
+    textAlign: 'right',
+    marginBottom: 18,
+    letterSpacing: 0.3,
   },
-  glassDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 2 },
 
-  xpContainer: {},
-  xpLabelRow: {
+  // XP Bar
+  xpSection: { marginBottom: 20 },
+  xpHeader: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  xpLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.65)',
-    textAlign: 'right',
-  },
-  xpPercent: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.9)',
-  },
+  xpPct: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: '#C4B5FD' },
+  xpHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
   xpTrack: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    height: 5,
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderRadius: 3,
     overflow: 'hidden',
   },
-  xpFill: { height: 6, borderRadius: 3 },
+  xpFill: { height: 5, borderRadius: 3 },
 
-  sectionHeader: {
-    paddingHorizontal: 20,
-    marginTop: 28,
-    marginBottom: 14,
-    alignItems: 'flex-end',
+  // Hero Stats
+  heroStats: {
+    flexDirection: 'row-reverse',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    paddingTop: 16,
+    gap: 4,
   },
-  sectionLabel: {
-    fontFamily: FontFamily.medium,
+  heroStat: { flex: 1, alignItems: 'center', gap: 3 },
+  heroStatVal: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    letterSpacing: -0.5,
+  },
+  heroStatLbl: {
+    fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
-    color: '#818CF8',
+    color: Colors.textTertiary,
+  },
+
+  // Practice CTA
+  ctaWrap: { paddingHorizontal: 16, marginBottom: 6 },
+  ctaBtn: {
+    borderRadius: Radius['2xl'],
+    overflow: 'hidden',
+    shadowColor: '#7C6FF7',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.50,
+    shadowRadius: 20,
+    elevation: 14,
+  },
+  ctaGrad: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    gap: 14,
+  },
+  ctaShimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  ctaRight: { flex: 1, alignItems: 'flex-end' },
+  ctaTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: '#fff',
     textAlign: 'right',
+  },
+  ctaSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.75)',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  ctaArrow: {
+    width: 36, height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.20)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaArrowText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+
+  // Section
+  section: { paddingHorizontal: 16, marginTop: 22 },
+  sectionHead: { alignItems: 'flex-end', marginBottom: 12 },
+  sectionTag: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.primaryLight,
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 3,
+    letterSpacing: 1.2,
+    marginBottom: 2,
   },
   sectionTitle: {
     fontFamily: FontFamily.heading,
     fontSize: FontSize.xl,
-    color: '#F1F5F9',
+    color: Colors.text,
     textAlign: 'right',
   },
 
-  mainCta: {
-    marginHorizontal: 20,
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  mainCtaGrad: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    padding: 20,
-    gap: 16,
-  },
-  mainCtaShimmer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  mainCtaIcon: { fontSize: 40 },
-  mainCtaText: { flex: 1, alignItems: 'flex-end' },
-  mainCtaTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: '#fff',
-    textAlign: 'right',
-  },
-  mainCtaSubtitle: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'right',
-    marginTop: 2,
-    marginBottom: 10,
-  },
-  progressRingRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, width: '100%' },
-  progressRingTrack: {
-    flex: 1,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressRingFill: {
-    height: 4,
-    backgroundColor: '#fff',
-    borderRadius: 2,
-  },
-  progressRingLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  mainCtaArrow: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xl,
-    color: '#fff',
-  },
-
-  topicsScroll: {
-    paddingHorizontal: 20,
-    gap: 12,
-    flexDirection: 'row-reverse',
-    paddingBottom: 4,
-  },
+  // Topics
+  topicsRow: { gap: 10, flexDirection: 'row-reverse', paddingBottom: 4 },
   topicCard: {
-    width: 140,
-    borderRadius: Radius.xl,
+    width: 130,
+    borderRadius: Radius['2xl'],
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
     elevation: 8,
   },
-  topicCardGrad: {
+  topicGrad: {
     padding: 16,
-    minHeight: 140,
+    minHeight: 148,
     justifyContent: 'space-between',
   },
-  topicCardShimmer: {
+  topicGlow: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    opacity: 0.12,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 30,
   },
-  topicCardIcon: { fontSize: 32, textAlign: 'right' },
-  topicCardLabel: {
+  topicIcon: { fontSize: 28, textAlign: 'right', marginBottom: 6 },
+  topicName: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
     color: '#fff',
     textAlign: 'right',
-    lineHeight: 20,
+    lineHeight: 18,
+    flex: 1,
   },
-  topicCardArrowWrap: {
+  topicChip: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: Radius.full,
-    width: 28,
-    height: 28,
+    width: 28, height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  topicCardArrow: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    color: '#fff',
-  },
+  topicChipText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
 
-  statsRow: {
-    flexDirection: 'row-reverse',
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  statCard: {
+  // Bento Grid
+  bentoGrid: { flexDirection: 'row-reverse', gap: 10, flexWrap: 'wrap' },
+  bentoCard: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: Radius.xl,
-    padding: 16,
-    alignItems: 'center',
-    borderTopWidth: 3,
+    minWidth: (W - 52) / 2 - 20,
+    borderRadius: Radius['2xl'],
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
+    borderColor: Colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  statEmoji: { fontSize: 22, marginBottom: 8 },
-  statValue: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.35)',
-    textAlign: 'center',
-  },
-
-  badgesRow: {
-    flexDirection: 'row-reverse',
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  badgeCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: Radius.xl,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 4,
-    gap: 8,
-  },
-  badgeIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.4)',
-  },
-  badgeIcon: { fontSize: 26 },
-  badgeLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.65)',
-    textAlign: 'center',
-  },
-
-  emptyBadges: {
-    marginHorizontal: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: Radius.xl,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  emptyBadgesEmoji: { fontSize: 64, marginBottom: 12 },
-  emptyBadgesTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: '#F1F5F9',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyBadgesText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.65)',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  emptyBadgesBtn: {
-    borderRadius: Radius.full,
-    overflow: 'hidden',
-  },
-  emptyBadgesBtnGrad: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: Radius.full,
-  },
-  emptyBadgesBtnText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    color: '#fff',
-  },
-
-  challengeCard: {
-    marginHorizontal: 20,
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.35,
     shadowRadius: 12,
-    elevation: 10,
+    elevation: 6,
+  },
+  bentoWide: { flexBasis: '100%' },
+  bentoGrad: {
+    padding: 18,
+    minHeight: 90,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bentoAccent: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    width: 3,
+    borderRadius: 2,
+  },
+  bentoBig: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize['3xl'],
+    color: Colors.success,
+    textAlign: 'right',
+    lineHeight: 36,
+  },
+  bentoLabel: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.textTertiary,
+    textAlign: 'right',
+    marginTop: 2,
+  },
+
+  // Challenge
+  challengeBtn: {
+    borderRadius: Radius['2xl'],
+    overflow: 'hidden',
+    shadowColor: '#FBBF24',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.40,
+    shadowRadius: 20,
+    elevation: 12,
   },
   challengeGrad: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    padding: 20,
+    padding: 18,
     gap: 14,
   },
   challengeShimmer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  challengeIcon: { fontSize: 36 },
-  challengeCenter: { flex: 1, alignItems: 'flex-end' },
+  challengeRight: { flex: 1, alignItems: 'flex-end' },
   challengeTitle: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.lg,
-    color: '#1C1917',
+    color: '#fff',
     textAlign: 'right',
   },
-  challengeDesc: {
+  challengeSub: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
-    color: '#44403C',
-    textAlign: 'right',
+    color: 'rgba(255,255,255,0.80)',
     marginTop: 2,
+    textAlign: 'right',
   },
-  challengeLeft: {},
-  challengeArrow: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xl,
-    color: '#1C1917',
+  challengeEmoji: { fontSize: 36 },
+
+  // Badges
+  badgesRow: { flexDirection: 'row-reverse', gap: 10 },
+  badgeCard: {
+    flex: 1,
+    backgroundColor: Colors.surfaceCard,
+    borderRadius: Radius['2xl'],
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.20)',
+    gap: 8,
+    shadowColor: '#7C6FF7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.20,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  badgeIconWrap: {
+    width: 50, height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.30)',
+  },
+  badgeIcon: { fontSize: 24 },
+  badgeLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
 
-  targetsScroll: { paddingHorizontal: 20, gap: 12, paddingBottom: 4 },
-  targetCardWrap: { width: W * 0.65 },
+  // First-time CTA
+  firstCard: {
+    backgroundColor: Colors.surfaceCard,
+    borderRadius: Radius['3xl'],
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.22)',
+    overflow: 'hidden',
+    shadowColor: '#7C6FF7',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  firstGlow: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(124,111,247,0.04)',
+  },
+  firstEmoji: { fontSize: 56, marginBottom: 12 },
+  firstTitle: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize['2xl'],
+    color: Colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  firstSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  firstBtn: { borderRadius: Radius.full, overflow: 'hidden' },
+  firstBtnGrad: { paddingHorizontal: 28, paddingVertical: 14, alignItems: 'center' },
+  firstBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 });

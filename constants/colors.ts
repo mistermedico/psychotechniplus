@@ -1,49 +1,60 @@
 export const Colors = {
-  primary: '#6366F1',
-  primaryLight: '#818CF8',
-  primaryLighter: 'rgba(99,102,241,0.15)',
-  primaryDark: '#4338CA',
+  // Core brand
+  primary: '#7C6FF7',
+  primaryLight: '#9E99FA',
+  primaryLighter: 'rgba(124,111,247,0.18)',
+  primaryDark: '#5A52D5',
+  primaryGlow: 'rgba(124,111,247,0.45)',
 
-  accent: '#A855F7',
-  accentLight: 'rgba(168,85,247,0.15)',
+  accent: '#C084FC',
+  accentLight: 'rgba(192,132,252,0.18)',
+  accentGlow: 'rgba(192,132,252,0.40)',
 
-  success: '#10B981',
-  successLight: 'rgba(16,185,129,0.15)',
+  cyan: '#22D3EE',
+  cyanLight: 'rgba(34,211,238,0.18)',
+  cyanGlow: 'rgba(34,211,238,0.40)',
 
-  danger: '#EF4444',
-  dangerLight: 'rgba(239,68,68,0.15)',
+  success: '#34D399',
+  successLight: 'rgba(52,211,153,0.15)',
+  successGlow: 'rgba(52,211,153,0.35)',
 
-  warning: '#F59E0B',
-  warningLight: 'rgba(245,158,11,0.15)',
+  danger: '#F87171',
+  dangerLight: 'rgba(248,113,113,0.15)',
+  dangerGlow: 'rgba(248,113,113,0.35)',
 
-  gold: '#F59E0B',
+  warning: '#FBBF24',
+  warningLight: 'rgba(251,191,36,0.15)',
+  warningGlow: 'rgba(251,191,36,0.35)',
+
+  gold: '#FBBF24',
   silver: '#94A3B8',
 
-  // Dark glassmorphism backgrounds
-  background: '#060912',
-  backgroundDark: '#02040A',
-  background2: '#0D1425',
-  background3: '#1A0F2E',
+  // Backgrounds — deep space dark
+  background: '#080A12',
+  backgroundDark: '#04060D',
+  background2: '#0D1020',
+  background3: '#14102A',
 
-  // Glass surfaces
-  surface: 'rgba(255,255,255,0.07)',
-  surfaceSecondary: 'rgba(255,255,255,0.04)',
+  // Surfaces
+  surface: 'rgba(255,255,255,0.06)',
+  surfaceSecondary: 'rgba(255,255,255,0.03)',
   surfaceTertiary: 'rgba(255,255,255,0.02)',
-  surfaceStrong: 'rgba(255,255,255,0.12)',
-  surfaceCard: 'rgba(255,255,255,0.08)',
+  surfaceStrong: 'rgba(255,255,255,0.10)',
+  surfaceCard: 'rgba(255,255,255,0.07)',
+  surfaceElevated: 'rgba(255,255,255,0.09)',
 
-  // Glass borders
-  border: 'rgba(255,255,255,0.12)',
-  borderStrong: 'rgba(255,255,255,0.25)',
-  borderFocus: 'rgba(99,102,241,0.6)',
+  // Borders
+  border: 'rgba(255,255,255,0.09)',
+  borderStrong: 'rgba(255,255,255,0.20)',
+  borderFocus: 'rgba(124,111,247,0.70)',
+  borderGlow: 'rgba(124,111,247,0.40)',
 
-  // Text (on dark)
-  text: '#F1F5F9',
-  textSecondary: 'rgba(255,255,255,0.65)',
-  textTertiary: 'rgba(255,255,255,0.35)',
+  // Text
+  text: '#F0F4FF',
+  textSecondary: 'rgba(240,244,255,0.60)',
+  textTertiary: 'rgba(240,244,255,0.32)',
   textInverse: '#0F172A',
 
-  // Legacy light surface (used in admin)
   glass: 'rgba(255,255,255,0.85)',
   glassStrong: 'rgba(255,255,255,0.95)',
 
@@ -51,30 +62,33 @@ export const Colors = {
   targets: {
     ktzina: '#3B82F6',
     tayyas: '#0EA5E9',
-    psychometric: '#8B5CF6',
-    hightech: '#10B981',
-    modiin: '#F59E0B',
-    shabas: '#EF4444',
+    psychometric: '#7C6FF7',
+    hightech: '#34D399',
+    modiin: '#FBBF24',
+    shabas: '#F87171',
   },
 
-  // Gradient pairs [from, to]
+  // Gradient pairs
   gradients: {
-    primary: ['#6366F1', '#A855F7'] as [string, string],
-    success: ['#10B981', '#059669'] as [string, string],
-    danger: ['#EF4444', '#DC2626'] as [string, string],
-    gold: ['#F59E0B', '#D97706'] as [string, string],
-    bg: ['#060912', '#0D1425', '#1A0F2E'] as unknown as [string, string],
+    primary: ['#7C6FF7', '#C084FC'] as [string, string],
+    primaryDeep: ['#5A52D5', '#7C6FF7'] as [string, string],
+    success: ['#34D399', '#10B981'] as [string, string],
+    danger: ['#F87171', '#EF4444'] as [string, string],
+    gold: ['#FBBF24', '#F59E0B'] as [string, string],
+    cyan: ['#22D3EE', '#0EA5E9'] as [string, string],
+    bg: ['#080A12', '#0D1020', '#14102A'] as unknown as [string, string],
+    hero: ['#1A1740', '#0E0B2A'] as [string, string],
     ktzina: ['#3B82F6', '#1D4ED8'] as [string, string],
     tayyas: ['#0EA5E9', '#0284C7'] as [string, string],
-    psychometric: ['#8B5CF6', '#6D28D9'] as [string, string],
-    hightech: ['#10B981', '#047857'] as [string, string],
-    modiin: ['#F59E0B', '#B45309'] as [string, string],
+    psychometric: ['#7C6FF7', '#5A52D5'] as [string, string],
+    hightech: ['#34D399', '#10B981'] as [string, string],
+    modiin: ['#FBBF24', '#F59E0B'] as [string, string],
   },
 
-  // Glass helpers
+  // Opacity helpers
+  glass05: 'rgba(255,255,255,0.05)',
+  glass08: 'rgba(255,255,255,0.08)',
   glass10: 'rgba(255,255,255,0.10)',
   glass15: 'rgba(255,255,255,0.15)',
   glass20: 'rgba(255,255,255,0.20)',
-  glass05: 'rgba(255,255,255,0.05)',
 };
-

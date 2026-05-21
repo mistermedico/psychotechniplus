@@ -7,14 +7,14 @@ export const FontFamily = {
 };
 
 export const FontSize = {
-  xs: 12,
-  sm: 14,
-  base: 16,
-  lg: 18,
+  xs: 11,
+  sm: 13,
+  base: 15,
+  lg: 17,
   xl: 20,
   '2xl': 24,
   '3xl': 30,
-  '4xl': 36,
+  '4xl': 38,
   '5xl': 48,
 };
 
@@ -35,43 +35,51 @@ export const Radius = {
   md: 12,
   lg: 16,
   xl: 20,
-  '2xl': 24,
+  '2xl': 26,
+  '3xl': 32,
   full: 9999,
 };
 
 export const Shadow = {
   sm: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
   },
   md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 7,
   },
   lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 32,
-    elevation: 12,
+    shadowOpacity: 0.55,
+    shadowRadius: 28,
+    elevation: 14,
   },
   primary: {
-    shadowColor: '#6366F1',
+    shadowColor: '#7C6FF7',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    elevation: 10,
   },
-  glow: (color: string) => ({
+  glow: (color: string, radius = 20) => ({
     shadowColor: color,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
+    shadowOpacity: 0.65,
+    shadowRadius: radius,
+    elevation: 12,
+  }),
+  neon: (color: string) => ({
+    shadowColor: color,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
     shadowRadius: 20,
     elevation: 10,
   }),

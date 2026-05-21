@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View, Text } from 'react-native';
+import { Platform, StyleSheet, View, Text, Animated, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { FontFamily } from '../../constants/theme';
+import { Colors } from '../../constants/colors';
 
 interface TabIconProps {
   icon: string;
@@ -13,94 +14,109 @@ interface TabIconProps {
 }
 
 function TabIcon({ icon, label, focused }: TabIconProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(focused ? 1 : 0.45)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: focused ? 1.12 : 1,
+        friction: 6,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: focused ? 1 : 0.45,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [focused]);
+
   return (
-    <View style={[styles.tabItem, focused && styles.tabItemFocused]}>
+    <Animated.View
+      style={[
+        styles.tabItem,
+        focused && styles.tabItemFocused,
+        { transform: [{ scale }], opacity },
+      ]}
+    >
+      {focused && (
+        <View style={styles.activeGlow} />
+      )}
       <Text style={[styles.tabIcon, focused && styles.tabIconFocused]}>{icon}</Text>
       <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]}>{label}</Text>
-    </View>
+    </Animated.View>
   );
-}
-
-function TabBarBackground() {
-  if (Platform.OS === 'ios') {
-    return (
-      <BlurView
-        tint="dark"
-        intensity={60}
-        style={[StyleSheet.absoluteFill, styles.blurBase]}
-      />
-    );
-  }
-  return <View style={[StyleSheet.absoluteFill, styles.androidBackground]} />;
 }
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const TAB_HEIGHT = 64;
+  const BAR_HEIGHT = TAB_HEIGHT + Math.max(insets.bottom, 12);
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarBackground: () => <TabBarBackground />,
+        tabBarBackground: () => (
+          <View style={StyleSheet.absoluteFill}>
+            {Platform.OS === 'ios' ? (
+              <BlurView tint="dark" intensity={80} style={[StyleSheet.absoluteFill, styles.blurBase]} />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, styles.androidBackground]} />
+            )}
+            <View style={styles.topBorder} />
+          </View>
+        ),
         tabBarStyle: {
           position: 'absolute',
-          borderTopWidth: 1,
-          borderTopColor: 'rgba(255,255,255,0.1)',
-          height: 62 + insets.bottom,
-          paddingBottom: insets.bottom || 8,
+          borderTopWidth: 0,
+          height: BAR_HEIGHT,
+          paddingBottom: Math.max(insets.bottom, 12),
           paddingTop: 8,
-          backgroundColor: Platform.OS === 'android' ? 'rgba(10,14,28,0.97)' : 'transparent',
+          backgroundColor: 'transparent',
           elevation: 0,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.4,
-          shadowRadius: 20,
+          shadowOffset: { width: 0, height: -6 },
+          shadowOpacity: 0.45,
+          shadowRadius: 24,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon icon="🏠" label="בית" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon icon="⌂" label="בית" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="targets"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon icon="🎯" label="מסלולים" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon icon="◎" label="מסלולים" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="practice"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon icon="✏️" label="תרגול" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon icon="✦" label="תרגול" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="progress"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon icon="📈" label="התקדמות" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon icon="◈" label="התקדמות" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon icon="👤" label="פרופיל" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon icon="◉" label="פרופיל" focused={focused} />,
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
@@ -109,44 +125,58 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  blurBase: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
+  blurBase: {},
   androidBackground: {
-    backgroundColor: 'rgba(10,14,28,0.97)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(8,10,18,0.97)',
+  },
+  topBorder: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 1,
+    backgroundColor: 'rgba(124,111,247,0.20)',
   },
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
     gap: 2,
+    minWidth: 52,
+    position: 'relative',
   },
   tabItemFocused: {
-    backgroundColor: 'rgba(99,102,241,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.35)',
+    backgroundColor: 'rgba(124,111,247,0.15)',
+  },
+  activeGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    backgroundColor: 'rgba(124,111,247,0.08)',
+    shadowColor: '#7C6FF7',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 0,
   },
   tabIcon: {
     fontSize: 20,
-    opacity: 0.5,
+    color: 'rgba(240,244,255,0.45)',
+    fontFamily: FontFamily.regular,
   },
   tabIconFocused: {
+    color: '#9E99FA',
     fontSize: 22,
-    opacity: 1,
   },
   tabLabel: {
     fontFamily: FontFamily.regular,
     fontSize: 10,
-    color: 'rgba(255,255,255,0.35)',
+    color: 'rgba(240,244,255,0.35)',
+    letterSpacing: 0.2,
   },
   tabLabelFocused: {
-    fontFamily: FontFamily.medium,
+    fontFamily: FontFamily.semiBold,
     fontSize: 10,
-    color: '#818CF8',
+    color: '#9E99FA',
+    letterSpacing: 0.3,
   },
 });
