@@ -127,7 +127,7 @@ export default function ExportScreen() {
             {includeStats && <Text style={styles.checkmark}>✓</Text>}
           </View>
           <View style={styles.optionText}>
-            <Text style={styles.optionLabel}>כלול נתוני ELO/פסיכומטריה</Text>
+            <Text style={styles.optionLabel}>כלול נתוני ELO/פסיכוטכניקה</Text>
             <Text style={styles.optionDesc}>elo, discrimination, guessProbability</Text>
           </View>
         </Pressable>

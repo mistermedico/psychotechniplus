@@ -12,7 +12,7 @@ import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
-import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { eloToTitle } from '../../utils/elo';
 
 interface SettingRowProps {
@@ -25,16 +25,18 @@ interface SettingRowProps {
   toggle?: boolean;
   toggleValue?: boolean;
   onToggle?: (val: boolean) => void;
+  disabled?: boolean;
 }
 
-function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggleValue, onToggle }: SettingRowProps) {
+function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggleValue, onToggle, disabled }: SettingRowProps) {
   return (
     <Pressable
-      onPress={toggle ? undefined : onPress}
+      onPress={toggle || disabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.settingRow,
         isLast && styles.settingRowLast,
-        !toggle && { opacity: pressed ? 0.75 : 1 },
+        !toggle && !disabled && { opacity: pressed ? 0.72 : 1 },
+        disabled && { opacity: 0.45 },
       ]}
     >
       {toggle ? (
@@ -43,9 +45,10 @@ function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggl
           onValueChange={v => { Haptics.selectionAsync(); onToggle?.(v); }}
           trackColor={{ false: 'rgba(255,255,255,0.15)', true: Colors.primary }}
           thumbColor="#fff"
+          ios_backgroundColor="rgba(255,255,255,0.15)"
         />
       ) : (
-        <Text style={[styles.settingChevron, danger && { color: Colors.danger }]}>←</Text>
+        <Text style={[styles.settingChevron, danger && { color: Colors.danger }]}>‹</Text>
       )}
       <View style={styles.settingLabelWrap}>
         <Text style={[styles.settingLabel, danger && { color: Colors.danger }]}>{label}</Text>
@@ -142,7 +145,13 @@ export default function ProfileTab() {
   const handleReset = () => {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { title: 'איפוס כל הנתונים', message: 'האם אתה בטוח? כל ההתקדמות תימחק לצמיתות.', options: ['ביטול', 'איפוס'], destructiveButtonIndex: 1, cancelButtonIndex: 0 },
+        {
+          title: 'איפוס כל הנתונים',
+          message: 'האם אתה בטוח? כל ההתקדמות תימחק לצמיתות.',
+          options: ['ביטול', 'איפוס'],
+          destructiveButtonIndex: 1,
+          cancelButtonIndex: 0,
+        },
         (buttonIndex) => {
           if (buttonIndex === 1) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -154,448 +163,510 @@ export default function ProfileTab() {
     } else {
       Alert.alert('איפוס נתונים', 'האם אתה בטוח? כל ההתקדמות תימחק.', [
         { text: 'ביטול', style: 'cancel' },
-        { text: 'איפוס', style: 'destructive', onPress: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); reset(); router.replace('/onboarding'); } },
+        {
+          text: 'איפוס', style: 'destructive',
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            reset();
+            router.replace('/onboarding');
+          },
+        },
       ]);
     }
   };
 
+  const handleContact = () => {
+    Haptics.selectionAsync();
+    const url = 'mailto:support@psychotechniplus.com';
+    Linking.canOpenURL(url).then(supported => {
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        Alert.alert('צור קשר', 'שלח מייל לכתובת:\nsupport@psychotechniplus.com');
+      }
+    });
+  };
+
+  const handleNotifications = () => {
+    Haptics.selectionAsync();
+    if (Platform.OS !== 'web') {
+      Linking.openSettings();
+    } else {
+      Alert.alert('התראות', 'לניהול התראות — פתח את הגדרות הדפדפן שלך.');
+    }
+  };
+
   return (
-    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-      >
-        {/* ── Profile Hero ── */}
-        <View style={styles.profileHero}>
-          <View style={styles.avatarWrap}>
-            <LinearGradient colors={['#6366F1', '#A855F7']} style={styles.avatarGradient}>
-              <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
-            </LinearGradient>
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelBadgeText}>{level}</Text>
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['#080A12', '#0D1020', '#14102A']}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Ambient orb */}
+      <View style={styles.orbTop} />
+
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Profile Hero ── */}
+          <View style={styles.profileHero}>
+            <View style={styles.avatarWrap}>
+              <LinearGradient
+                colors={[Colors.primary, Colors.accent]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.avatarGradient}
+              >
+                <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
+              </LinearGradient>
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelBadgeText}>{level}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.profileName}>{name || 'מתאמן'}</Text>
+            <Text style={styles.profileEloTitle}>{eloToTitle(mainElo)}</Text>
+            <Text style={styles.profileEmail}>{email}</Text>
+
+            {isPremium ? (
+              <LinearGradient
+                colors={['#D97706', '#FBBF24', '#FDE68A']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.premiumPill}
+              >
+                <Text style={styles.premiumPillText}>💎 פרמיום</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.freePill}>
+                <Text style={styles.freePillText}>⭐ חינמי</Text>
+              </View>
+            )}
+
+            <View style={styles.heroStats}>
+              {[
+                { val: String(totalAnswered), lbl: 'שאלות' },
+                { val: `${accuracy}%`, lbl: 'דיוק' },
+                { val: `${streak}🔥`, lbl: 'רצף' },
+                { val: String(totalSessions), lbl: 'סשנים' },
+              ].map((s, i, arr) => (
+                <React.Fragment key={s.lbl}>
+                  <View style={styles.heroStat}>
+                    <Text style={styles.heroStatVal}>{s.val}</Text>
+                    <Text style={styles.heroStatLbl}>{s.lbl}</Text>
+                  </View>
+                  {i < arr.length - 1 && <View style={styles.heroStatDivider} />}
+                </React.Fragment>
+              ))}
             </View>
           </View>
 
-          <Text style={styles.profileName}>{name || 'מתאמן'}</Text>
-          <Text style={styles.profileElo}>{eloToTitle(mainElo)}</Text>
-
-          {isPremium ? (
-            <LinearGradient
-              colors={['#D97706', '#F59E0B', '#FCD34D']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.premiumPill}
+          {/* ── Admin shortcut ── */}
+          {showAdmin && (
+            <Pressable
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/admin'); }}
+              style={({ pressed }) => [styles.adminCard, { opacity: pressed ? 0.82 : 1 }]}
             >
-              <Text style={styles.premiumPillText}>💎 פרמיום</Text>
-            </LinearGradient>
-          ) : (
-            <View style={styles.freePill}>
-              <Text style={styles.freePillText}>⭐ חינמי</Text>
-            </View>
+              <LinearGradient
+                colors={[Colors.primaryLighter, 'rgba(124,111,247,0.08)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.adminCardGrad}
+              >
+                <Text style={styles.adminChevron}>‹</Text>
+                <View style={styles.adminCardText}>
+                  <Text style={styles.adminCardTitle}>🛠️ פאנל ניהול</Text>
+                  <Text style={styles.adminCardSub}>גישה מלאה לניהול המערכת</Text>
+                </View>
+                <View style={styles.adminBadgeWrap}>
+                  <Text style={styles.adminBadge}>מנהל</Text>
+                </View>
+              </LinearGradient>
+            </Pressable>
           )}
 
-          <View style={styles.heroStats}>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatVal}>{totalAnswered}</Text>
-              <Text style={styles.heroStatLbl}>שאלות</Text>
-            </View>
-            <View style={styles.heroStatDivider} />
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatVal}>{accuracy}%</Text>
-              <Text style={styles.heroStatLbl}>דיוק</Text>
-            </View>
-            <View style={styles.heroStatDivider} />
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatVal}>{streak}🔥</Text>
-              <Text style={styles.heroStatLbl}>רצף</Text>
-            </View>
-            <View style={styles.heroStatDivider} />
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatVal}>{totalSessions}</Text>
-              <Text style={styles.heroStatLbl}>סשנים</Text>
-            </View>
+          {/* ── Achievements ── */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTag}>ACHIEVEMENTS</Text>
+            <Text style={styles.sectionTitle}>הישגים</Text>
           </View>
-        </View>
 
-        {/* ── Admin shortcut ── */}
-        {showAdmin && (
-          <Pressable
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/admin'); }}
-            style={({ pressed }) => [styles.adminCard, { opacity: pressed ? 0.85 : 1 }]}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.badgesScroll}
+            directionalLockEnabled
+            style={styles.badgesScrollOuter}
           >
-            <LinearGradient colors={['rgba(99,102,241,0.25)', 'rgba(168,85,247,0.15)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.adminCardGrad}>
-              <Text style={styles.adminCardArrow}>←</Text>
-              <View style={styles.adminCardText}>
-                <Text style={styles.adminCardTitle}>🛠️ פאנל ניהול</Text>
-                <Text style={styles.adminCardSub}>גישה מלאה לניהול המערכת</Text>
+            {ACHIEVEMENT_BADGES.map((badge, i) => (
+              <View key={i} style={styles.achievementBadge}>
+                <View style={[styles.achievementIconWrap, badge.earned ? styles.achievementIconEarned : styles.achievementIconLocked]}>
+                  <Text style={[styles.achievementIcon, !badge.earned && { opacity: 0.4 }]}>{badge.icon}</Text>
+                </View>
+                <Text style={[styles.achievementLabel, !badge.earned && { color: Colors.textTertiary }]}>
+                  {badge.label}
+                </Text>
+                {!badge.earned && <Text style={styles.achievementLock}>🔒</Text>}
               </View>
-              <View style={styles.adminBadgeWrap}>
-                <Text style={styles.adminBadge}>מנהל</Text>
-              </View>
-            </LinearGradient>
-          </Pressable>
-        )}
+            ))}
+          </ScrollView>
 
-        {/* ── Achievements ── */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>הישגים</Text>
-          <Text style={styles.sectionSub}>ACHIEVEMENTS</Text>
-        </View>
+          {/* ── Current Target ── */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTag}>TRACK</Text>
+            <Text style={styles.sectionTitle}>המסלול שלי</Text>
+          </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.badgesScroll}
-          directionalLockEnabled
-          style={styles.badgesScrollOuter}
-        >
-          {ACHIEVEMENT_BADGES.map((badge, i) => (
-            <View key={i} style={styles.achievementBadge}>
-              <View style={[styles.achievementIconWrap, badge.earned ? styles.achievementIconEarned : styles.achievementIconLocked]}>
-                <Text style={[styles.achievementIcon, !badge.earned && { opacity: 0.4 }]}>{badge.icon}</Text>
-              </View>
-              <Text style={[styles.achievementLabel, !badge.earned && { color: 'rgba(255,255,255,0.35)' }]}>
-                {badge.label}
-              </Text>
-              {!badge.earned && <Text style={styles.achievementLock}>🔒</Text>}
+          <Pressable
+            style={({ pressed }) => [styles.targetRow, { opacity: pressed ? 0.78 : 1 }]}
+            onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/targets'); }}
+          >
+            <Text style={styles.settingChevron}>‹</Text>
+            <View style={styles.targetInfo}>
+              <Text style={styles.targetName}>{target.name}</Text>
+              <Text style={styles.targetDesc} numberOfLines={1}>{target.description}</Text>
             </View>
-          ))}
-        </ScrollView>
+            <View style={styles.targetIconCircle}>
+              <Text style={styles.targetIcon}>{target.icon}</Text>
+            </View>
+          </Pressable>
 
-        {/* ── Target ── */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>המסלול שלי</Text>
-          <Text style={styles.sectionSub}>TRACK</Text>
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [styles.targetRow, { opacity: pressed ? 0.8 : 1 }]}
-          onPress={() => router.push('/(tabs)/targets')}
-        >
-          <Text style={styles.settingChevron}>←</Text>
-          <View style={styles.targetInfo}>
-            <Text style={styles.targetName}>{target.name}</Text>
-            <Text style={styles.targetDesc} numberOfLines={1}>{target.description}</Text>
+          {/* ── Settings ── */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTag}>SETTINGS</Text>
+            <Text style={styles.sectionTitle}>הגדרות</Text>
           </View>
-          <View style={styles.targetIconCircle}>
-            <Text style={styles.targetIcon}>{target.icon}</Text>
-          </View>
-        </Pressable>
 
-        {/* ── Settings ── */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>הגדרות</Text>
-          <Text style={styles.sectionSub}>SETTINGS</Text>
-        </View>
-
-        <View style={styles.settingsCard}>
-          <SettingRow
-            icon="🔔"
-            label="התראות"
-            value="הגדרות מכשיר"
-            onPress={() => {
+          <View style={styles.settingsCard}>
+            <SettingRow
+              icon="🔔"
+              label="התראות"
+              value="הגדרות מכשיר"
+              onPress={handleNotifications}
+            />
+            <SettingRow
+              icon="🌙"
+              label="מצב כהה"
+              value="פעיל תמיד"
+              onPress={() => { Haptics.selectionAsync(); Alert.alert('מצב כהה', 'האפליקציה פועלת במצב כהה בלבד לחוויה אופטימלית.'); }}
+            />
+            <SettingRow
+              icon="📊"
+              label="קושי ברירת מחדל"
+              value="אוטומטי (ELO)"
+              onPress={() => {
                 Haptics.selectionAsync();
-                if (Platform.OS !== 'web') {
-                  Linking.openSettings();
+                if (showAdmin) {
+                  router.push('/admin/display-settings');
                 } else {
-                  Alert.alert('התראות', 'לניהול התראות — פתח את הגדרות הדפדפן שלך (⋮ → הגדרות → התראות)');
+                  Alert.alert('קושי אדפטיבי', 'הקושי מחושב אוטומטית לפי ה-ELO שלך ומשתנה בזמן אמת.');
                 }
               }}
-          />
-          <SettingRow
-            icon="🌙"
-            label="מצב כהה"
-            value="פעיל תמיד"
-            onPress={() => { Haptics.selectionAsync(); Alert.alert('מצב כהה', 'האפליקציה פועלת במצב כהה בלבד לחוויה אופטימלית.'); }}
-          />
-          <SettingRow
-            icon="📊"
-            label="קושי ברירת מחדל"
-            value="אוטומטי (ELO)"
-            onPress={() => { Haptics.selectionAsync(); if (showAdmin) router.push('/admin/display-settings'); else Alert.alert('קושי אדפטיבי', 'הקושי מחושב אוטומטית לפי ה-ELO שלך ומשתנה בזמן אמת.'); }}
-          />
-          <SettingRow
-            icon="🔊"
-            label="רטט והפטיקה"
-            toggle
-            toggleValue={hapticsEnabled}
-            onToggle={v => updateSetting('hapticsEnabled', v)}
-          />
-          {showAdmin && (
-            <SettingRow icon="🖥️" label="הגדרות תצוגה" onPress={() => { Haptics.selectionAsync(); router.push('/admin/display-settings'); }} isLast />
+            />
+            <SettingRow
+              icon="🔊"
+              label="רטט והפטיקה"
+              toggle
+              toggleValue={hapticsEnabled}
+              onToggle={v => updateSetting('hapticsEnabled', v)}
+              isLast={!showAdmin}
+            />
+            {showAdmin && (
+              <SettingRow
+                icon="🖥️"
+                label="הגדרות תצוגה"
+                onPress={() => { Haptics.selectionAsync(); router.push('/admin/display-settings'); }}
+                isLast
+              />
+            )}
+          </View>
+
+          {/* ── Account ── */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTag}>ACCOUNT</Text>
+            <Text style={styles.sectionTitle}>חשבון</Text>
+          </View>
+
+          <View style={styles.settingsCard}>
+            <SettingRow
+              icon="⭐"
+              label="שאלות מועדפות"
+              value="בקרוב"
+              onPress={() => { Haptics.selectionAsync(); Alert.alert('שאלות מועדפות', 'סמן שאלות כמועדפות ותרגל אותן בנפרד — בקרוב!'); }}
+              disabled
+            />
+            <SettingRow
+              icon="📝"
+              label="ההיסטוריה שלי"
+              onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/progress'); }}
+            />
+            <SettingRow
+              icon="💬"
+              label="צור קשר ותמיכה"
+              onPress={handleContact}
+            />
+            <SettingRow
+              icon="🔒"
+              label="מדיניות פרטיות"
+              onPress={() => { Haptics.selectionAsync(); router.push('/privacy'); }}
+            />
+            <SettingRow
+              icon="📄"
+              label="תנאי שימוש"
+              onPress={() => { Haptics.selectionAsync(); router.push('/terms'); }}
+            />
+          </View>
+
+          {/* ── Danger Zone ── */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTag}>DANGER ZONE</Text>
+            <Text style={[styles.sectionTitle, { color: Colors.danger }]}>פעולות חשבון</Text>
+          </View>
+
+          <View style={styles.settingsCard}>
+            <SettingRow
+              icon="🚪"
+              label="יציאה מהחשבון"
+              onPress={handleSignOut}
+              danger
+            />
+            <SettingRow
+              icon="🗑️"
+              label="איפוס כל הנתונים"
+              onPress={handleReset}
+              danger
+            />
+            <SettingRow
+              icon="⛔"
+              label="מחיקת חשבון לצמיתות"
+              onPress={handleDeleteAccount}
+              danger
+              isLast
+            />
+          </View>
+
+          {/* ── Premium banner ── */}
+          {!isPremium && (
+            <Pressable
+              style={({ pressed }) => [styles.premiumBanner, { opacity: pressed ? 0.82 : 1 }]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/paywall'); }}
+            >
+              <LinearGradient
+                colors={['#92400E', '#D97706', '#FBBF24']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.premiumBannerGrad}
+              >
+                <Text style={styles.premiumBannerChevron}>‹</Text>
+                <View style={styles.premiumBannerText}>
+                  <Text style={styles.premiumBannerTitle}>שדרג לפרמיום 💎</Text>
+                  <Text style={styles.premiumBannerSub}>תרגול ללא הגבלה, כל הנושאים, סימולציות</Text>
+                </View>
+                <Text style={styles.premiumBannerEmoji}>👑</Text>
+              </LinearGradient>
+            </Pressable>
           )}
-        </View>
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>חשבון</Text>
-          <Text style={styles.sectionSub}>ACCOUNT</Text>
-        </View>
-
-        <View style={styles.settingsCard}>
-          <SettingRow
-            icon="⭐"
-            label="שאלות מועדפות"
-            value="בקרוב"
-            onPress={() => { Haptics.selectionAsync(); Alert.alert('שאלות מועדפות', 'סמן שאלות כמועדפות ותרגל אותן בנפרד — בקרוב!'); }}
-          />
-          <SettingRow icon="📝" label="ההיסטוריה שלי" onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/progress'); }} />
-          <SettingRow icon="💬" label="צור קשר ותמיכה" onPress={() => { Haptics.selectionAsync(); Linking.openURL('mailto:support@psychotechniplus.com'); }} />
-          <SettingRow icon="🔒" label="מדיניות פרטיות" onPress={() => { Haptics.selectionAsync(); router.push('/privacy'); }} />
-          <SettingRow icon="📄" label="תנאי שימוש" onPress={() => { Haptics.selectionAsync(); router.push('/terms'); }} />
-          <SettingRow icon="🚪" label="יציאה מהחשבון" onPress={handleSignOut} danger />
-          <SettingRow icon="🗑️" label="איפוס כל הנתונים" onPress={handleReset} danger />
-          <SettingRow icon="⛔" label="מחיקת חשבון לצמיתות" onPress={handleDeleteAccount} danger isLast />
-        </View>
-
-        {/* ── Premium upgrade banner ── */}
-        {!isPremium && (
-          <Pressable
-            style={({ pressed }) => [styles.premiumBanner, { opacity: pressed ? 0.85 : 1 }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/paywall'); }}
-          >
-            <LinearGradient colors={['#D97706', '#F59E0B', '#FCD34D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.premiumBannerGrad}>
-              <Text style={styles.premiumBannerArrow}>←</Text>
-              <View style={styles.premiumBannerText}>
-                <Text style={styles.premiumBannerTitle}>שדרג לפרמיום 💎</Text>
-                <Text style={styles.premiumBannerSub}>תרגול ללא הגבלה, כל הנושאים, סימולציות</Text>
-              </View>
-              <Text style={styles.premiumBannerEmoji}>👑</Text>
-            </LinearGradient>
+          <Pressable onPress={handleVersionTap} style={styles.versionWrap}>
+            <Text style={styles.version}>PsychoTechniPlus v1.0.0</Text>
+            <Text style={styles.versionSub}>לחץ 5 פעמים לגישת מנהל</Text>
           </Pressable>
-        )}
-
-        <Pressable onPress={handleVersionTap}>
-          <Text style={styles.version}>PsychoTechniPlus v1.0.0 · Sprint 1</Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
-    </LinearGradient>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
+  root: { flex: 1 },
+  safe: { flex: 1 },
   scroll: { flex: 1 },
   content: {},
 
-  profileHero: {
-    paddingHorizontal: 20,
-    paddingTop: 28,
-    paddingBottom: 28,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
-    marginBottom: 4,
+  orbTop: {
+    position: 'absolute',
+    top: -60, right: -40,
+    width: 240, height: 240,
+    borderRadius: 120,
+    backgroundColor: Colors.primary,
+    opacity: 0.08,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 80,
+    pointerEvents: 'none',
   },
 
-  avatarWrap: { position: 'relative', marginBottom: 16 },
-  avatarGradient: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+  // Hero
+  profileHero: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    marginBottom: 4,
+  },
+  avatarWrap: { position: 'relative', marginBottom: 14 },
+  avatarGradient: {
+    width: 90, height: 90, borderRadius: 45,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'rgba(124,111,247,0.40)',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45, shadowRadius: 18, elevation: 12,
   },
   avatarEmoji: { fontSize: 38 },
   levelBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
+    position: 'absolute', bottom: -4, right: -4,
     backgroundColor: Colors.warning,
     borderRadius: Radius.full,
-    width: 26,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(6,9,18,0.9)',
+    width: 26, height: 26,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#080A12',
   },
   levelBadgeText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
 
-  profileName: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#F1F5F9', marginBottom: 4 },
-  profileElo: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.6)', marginBottom: 14 },
+  profileName: {
+    fontFamily: FontFamily.heading, fontSize: FontSize['2xl'],
+    color: Colors.text, marginBottom: 3, textAlign: 'center',
+  },
+  profileEloTitle: {
+    fontFamily: FontFamily.medium, fontSize: FontSize.sm,
+    color: Colors.primaryLight, marginBottom: 3, textAlign: 'center',
+  },
+  profileEmail: {
+    fontFamily: FontFamily.regular, fontSize: FontSize.xs,
+    color: Colors.textTertiary, marginBottom: 14, textAlign: 'center',
+  },
 
-  premiumPill: { borderRadius: Radius.full, paddingHorizontal: 18, paddingVertical: 7, marginBottom: 20 },
+  premiumPill: { borderRadius: Radius.full, paddingHorizontal: 18, paddingVertical: 7, marginBottom: 18 },
   premiumPillText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#1C1917' },
   freePill: {
-    borderRadius: Radius.full,
-    paddingHorizontal: 18,
-    paddingVertical: 7,
-    marginBottom: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: Radius.full, paddingHorizontal: 18, paddingVertical: 7, marginBottom: 18,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
   },
-  freePillText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.6)' },
+  freePillText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
 
   heroStats: {
     flexDirection: 'row-reverse',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: Radius.xl,
-    padding: 16,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl, padding: 16,
+    width: '100%', borderWidth: 1, borderColor: Colors.border,
   },
   heroStat: { flex: 1, alignItems: 'center' },
-  heroStatVal: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#F1F5F9' },
-  heroStatLbl: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
-  heroStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)' },
+  heroStatVal: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text },
+  heroStatLbl: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+  heroStatDivider: { width: 1, backgroundColor: Colors.border },
 
-  sectionHeaderRow: { paddingHorizontal: 20, marginTop: 28, marginBottom: 12, alignItems: 'flex-end' },
-  sectionSub: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: '#818CF8',
-    textAlign: 'right',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 3,
+  // Section headers
+  sectionHeaderRow: { paddingHorizontal: 20, marginTop: 26, marginBottom: 10, alignItems: 'flex-end' },
+  sectionTag: {
+    fontFamily: FontFamily.semiBold, fontSize: FontSize.xs,
+    color: Colors.primaryLight, letterSpacing: 1.2,
+    textTransform: 'uppercase', marginBottom: 2,
   },
-  sectionTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: '#F1F5F9', textAlign: 'right' },
+  sectionTitle: {
+    fontFamily: FontFamily.heading, fontSize: FontSize.xl,
+    color: Colors.text, textAlign: 'right',
+  },
 
+  // Admin card
   adminCard: {
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.3)',
+    marginHorizontal: 20, marginTop: 14,
+    borderRadius: Radius.xl, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(124,111,247,0.30)',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 12, elevation: 6,
   },
-  adminCardGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 18, gap: 12 },
-  adminCardArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: 'rgba(255,255,255,0.4)' },
+  adminCardGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 16, gap: 12 },
+  adminChevron: { fontFamily: FontFamily.bold, fontSize: 22, color: Colors.textTertiary },
   adminCardText: { flex: 1, alignItems: 'flex-end' },
-  adminCardTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#F1F5F9' },
-  adminCardSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
+  adminCardTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
+  adminCardSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   adminBadgeWrap: {
-    backgroundColor: 'rgba(245,158,11,0.15)',
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.4)',
+    backgroundColor: 'rgba(251,191,36,0.15)', borderRadius: Radius.full,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
   },
-  adminBadge: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#F59E0B' },
+  adminBadge: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.warning },
 
+  // Achievements
   badgesScrollOuter: { marginHorizontal: -20 },
-  badgesScroll: { paddingHorizontal: 20, flexDirection: 'row-reverse', gap: 12, paddingBottom: 4 },
+  badgesScroll: { paddingHorizontal: 20, flexDirection: 'row-reverse', gap: 14, paddingBottom: 4 },
   achievementBadge: { alignItems: 'center', gap: 8, position: 'relative' },
-  achievementIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  achievementIconWrap: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },
   achievementIconEarned: {
-    backgroundColor: 'rgba(245,158,11,0.2)',
-    borderWidth: 2,
-    borderColor: 'rgba(245,158,11,0.5)',
+    backgroundColor: 'rgba(251,191,36,0.18)',
+    borderWidth: 2, borderColor: 'rgba(251,191,36,0.50)',
+    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8,
   },
   achievementIconLocked: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Colors.surface, borderWidth: 2, borderColor: Colors.border,
   },
   achievementIcon: { fontSize: 26 },
   achievementLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
-    textAlign: 'center',
-    maxWidth: 60,
+    fontFamily: FontFamily.medium, fontSize: 10,
+    color: Colors.textSecondary, textAlign: 'center', maxWidth: 62,
   },
-  achievementLock: { fontSize: 12, position: 'absolute', bottom: 22, right: -2 },
+  achievementLock: { fontSize: 11, position: 'absolute', bottom: 24, right: -3 },
 
+  // Target row
   targetRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    marginHorizontal: 20,
-    borderRadius: Radius.xl,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
+    flexDirection: 'row-reverse', alignItems: 'center',
+    backgroundColor: Colors.surface, marginHorizontal: 20,
+    borderRadius: Radius.xl, padding: 16, gap: 12,
+    borderWidth: 1, borderColor: Colors.border,
   },
   targetIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: Colors.surfaceStrong, alignItems: 'center', justifyContent: 'center',
   },
   targetIcon: { fontSize: 24 },
   targetInfo: { flex: 1, alignItems: 'flex-end' },
-  targetName: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#F1F5F9', textAlign: 'right' },
-  targetDesc: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.35)',
-    textAlign: 'right',
-    marginTop: 2,
-  },
+  targetName: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
+  targetDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
 
+  // Settings cards
   settingsCard: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    marginHorizontal: 20,
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
+    backgroundColor: Colors.surface, marginHorizontal: 20,
+    borderRadius: Radius.xl, overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.border,
   },
   settingRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    gap: 12,
+    flexDirection: 'row-reverse', alignItems: 'center',
+    paddingVertical: 14, paddingHorizontal: 16,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    gap: 12, minHeight: 52,
   },
   settingRowLast: { borderBottomWidth: 0 },
   settingIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.surfaceStrong, alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   settingIconCircleDanger: { backgroundColor: Colors.dangerLight },
   settingIcon: { fontSize: 17 },
   settingLabelWrap: { flex: 1, alignItems: 'flex-end' },
-  settingLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: '#F1F5F9', textAlign: 'right' },
+  settingLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
   settingValue: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.45)',
-    textAlign: 'right',
-    marginTop: 1,
+    fontFamily: FontFamily.regular, fontSize: FontSize.xs,
+    color: Colors.textTertiary, textAlign: 'right', marginTop: 1,
   },
-  settingChevron: { color: 'rgba(255,255,255,0.4)', fontSize: FontSize.base },
+  settingChevron: { color: Colors.textTertiary, fontSize: 22, fontWeight: '300' },
 
-  premiumBanner: { marginHorizontal: 20, marginTop: 28, borderRadius: Radius.xl, overflow: 'hidden' },
-  premiumBannerGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 20, gap: 14 },
-  premiumBannerEmoji: { fontSize: 36 },
+  // Premium banner
+  premiumBanner: { marginHorizontal: 20, marginTop: 26, borderRadius: Radius.xl, overflow: 'hidden',
+    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 10,
+  },
+  premiumBannerGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 18, gap: 14 },
+  premiumBannerEmoji: { fontSize: 34 },
   premiumBannerText: { flex: 1, alignItems: 'flex-end' },
   premiumBannerTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#1C1917', textAlign: 'right' },
-  premiumBannerSub: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: '#44403C',
-    textAlign: 'right',
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  premiumBannerArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: '#1C1917' },
+  premiumBannerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#44403C', textAlign: 'right', marginTop: 2, lineHeight: 18 },
+  premiumBannerChevron: { fontFamily: FontFamily.bold, fontSize: 22, color: 'rgba(28,25,23,0.5)' },
 
-  version: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.35)',
-    textAlign: 'center',
-    marginTop: 24,
-    marginBottom: 8,
-  },
+  versionWrap: { alignItems: 'center', marginTop: 24, marginBottom: 8, padding: 12 },
+  version: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'center' },
+  versionSub: { fontFamily: FontFamily.regular, fontSize: 10, color: 'rgba(255,255,255,0.15)', marginTop: 2 },
 });

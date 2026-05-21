@@ -195,7 +195,7 @@ export default function SimulationBuilder() {
             <TextInput
               style={styles.input} value={name}
               onChangeText={v => { setName(v); markDirty(); }}
-              textAlign="right" placeholder="לדוגמה: סימולציה פסיכומטרית מלאה"
+              textAlign="right" placeholder="לדוגמה: סימולציה פסיכוטכנית מלאה"
               placeholderTextColor={Colors.textTertiary}
             />
             <Text style={styles.charCount}>{name.length} / 60</Text>
