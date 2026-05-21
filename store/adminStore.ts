@@ -614,7 +614,9 @@ interface AdminState {
   clearSelection: () => void;
   selectAll: () => void;
   assignQuestionsToTopic: (questionIds: string[], topicId: string) => void;
+  assignQuestionsToTargets: (questionIds: string[], targetIds: string[]) => void;
   setQuestionsAccessLevel: (questionIds: string[], level: AccessLevel) => void;
+  setQuestionsAdaptiveEligibility: (questionIds: string[], smart: boolean, general: boolean) => void;
 
   // Actions — topics
   addTopic: (t: Omit<Topic, 'id'>) => Topic;
@@ -969,6 +971,40 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       if (r.error) logger.error('adminStore:setQuestionsAccessLevel', `שגיאה בעדכון גישה לשאלה ${q.id}`, r.error);
     }));
     logger.info('adminStore:setQuestionsAccessLevel', `${questionIds.length} שאלות → ${level}`);
+  },
+
+  assignQuestionsToTargets: (questionIds, targetIds) => {
+    const idSet = new Set(questionIds);
+    let toSync: Question[] = [];
+    set(s => {
+      const updated = s.questions.map(q =>
+        idSet.has(q.id) ? { ...q, targetIds } : q
+      );
+      toSync = updated.filter(q => idSet.has(q.id));
+      return { questions: updated };
+    });
+    toSync.forEach(q => dbUpsert(q).then(r => {
+      if (r.error) logger.error('adminStore:assignQuestionsToTargets', `שגיאה בהקצאת מסלול לשאלה ${q.id}`, r.error);
+    }));
+    logger.info('adminStore:assignQuestionsToTargets', `${questionIds.length} שאלות → מסלולים: ${targetIds.join(',')}`);
+    get().logActivity(`שויכו ${questionIds.length} שאלות למסלולים: ${targetIds.join(', ')}`, 'question');
+  },
+
+  setQuestionsAdaptiveEligibility: (questionIds, smart, general) => {
+    const idSet = new Set(questionIds);
+    let toSync: Question[] = [];
+    set(s => {
+      const updated = s.questions.map(q =>
+        idSet.has(q.id) ? { ...q, smartPracticeEligible: smart, generalPracticeEligible: general } : q
+      );
+      toSync = updated.filter(q => idSet.has(q.id));
+      return { questions: updated };
+    });
+    toSync.forEach(q => dbUpsert(q).then(r => {
+      if (r.error) logger.error('adminStore:setQuestionsAdaptiveEligibility', `שגיאה בעדכון אדפטיבי לשאלה ${q.id}`, r.error);
+    }));
+    logger.info('adminStore:setQuestionsAdaptiveEligibility', `${questionIds.length} שאלות — חכם:${smart} כללי:${general}`);
+    get().logActivity(`עודכנה כשירות אדפטיבית ל-${questionIds.length} שאלות`, 'question');
   },
 
   addTopic: (t) => {
