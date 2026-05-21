@@ -5,9 +5,9 @@ import { Target, Topic, Question } from './types';
 export const TARGETS: Target[] = [
   {
     id: 'target_psychometric',
-    name: 'פסיכומטרי',
-    slug: 'psychometric',
-    description: 'הכנה מקיפה למבחן הפסיכומטרי — כמותי, מילולי ואנגלית',
+    name: 'פסיכוטכני כללי',
+    slug: 'psychotechni',
+    description: 'תרגול פסיכוטכני כללי — חשיבה לוגית, כמותית, מילולית ומרחבית',
     icon: '🧠',
     color: '#8B5CF6',
     gradientColors: ['#8B5CF6', '#6D28D9'],
