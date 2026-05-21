@@ -205,22 +205,30 @@ export default function QuestionEditor() {
     if (isEdit && questionId) {
       updateQuestion(questionId, q);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('נשמר!', 'השאלה עודכנה בהצלחה', [{ text: 'חזרה', onPress: () => router.back() }]);
+      Alert.alert(
+        '✅ שאלה עודכנה',
+        `נשמרה ל-Supabase עם סטטוס "${validationStatus}"\nעדכונים יופיעו מיד.`,
+        [{ text: 'אוקי', onPress: () => router.back() }]
+      );
     } else {
       addQuestion(q);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('נוסף!', 'השאלה נוספה למאגר', [
-        { text: 'הוסף עוד', onPress: () => {
-          setQuestionText('');
-          setExplanation('');
-          setOptions(DEFAULT_OPTIONS.map(o => ({ ...o })));
-          setDifficulty(5);
-          setEloOverride(String(difficultyToElo(5)));
-          eloManuallyEdited.current = false;
-          setIsDirty(false);
-        }},
-        { text: 'חזרה לרשימה', onPress: () => router.back() },
-      ]);
+      Alert.alert(
+        '✅ שאלה נוצרה',
+        `נשמרה ל-Supabase עם סטטוס "${validationStatus}"\nתופיע בתור ולידציה.`,
+        [
+          { text: 'הוסף עוד', onPress: () => {
+            setQuestionText('');
+            setExplanation('');
+            setOptions(DEFAULT_OPTIONS.map(o => ({ ...o })));
+            setDifficulty(5);
+            setEloOverride(String(difficultyToElo(5)));
+            eloManuallyEdited.current = false;
+            setIsDirty(false);
+          }},
+          { text: 'אוקי', onPress: () => router.back() },
+        ]
+      );
     }
   };
 

@@ -52,6 +52,8 @@ const CATEGORY_ICONS: Record<AdminActivityLog['category'], string> = {
   promo:        '🎟️',
   notification: '🔔',
   system:       '⚙️',
+  session:      '🎯',
+  import:       '📥',
 };
 
 // Format a UTC ISO timestamp to Israeli time (Asia/Jerusalem)
