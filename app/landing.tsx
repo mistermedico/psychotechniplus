@@ -126,8 +126,10 @@ export default function LandingScreen() {
                   >
                     <Text style={styles.featureIcon}>{f.icon}</Text>
                   </LinearGradient>
-                  <Text style={styles.featureTitle}>{f.title}</Text>
-                  <Text style={styles.featureDesc}>{f.desc}</Text>
+                  <View style={styles.featureTextWrap}>
+                    <Text style={styles.featureTitle}>{f.title}</Text>
+                    <Text style={styles.featureDesc}>{f.desc}</Text>
+                  </View>
                 </View>
               ))}
             </View>
@@ -172,9 +174,9 @@ export default function LandingScreen() {
           <View style={styles.footer}>
             <Text style={styles.footerText}>
               בלחיצה על "התחל" אתה מסכים ל
-              <Text style={styles.footerLink} onPress={() => router.push('/terms' as any)}> תנאי השימוש </Text>
+              <Text style={styles.footerLink} onPress={() => router.push('/terms')}> תנאי השימוש </Text>
               ול
-              <Text style={styles.footerLink} onPress={() => router.push('/privacy' as any)}> מדיניות הפרטיות</Text>
+              <Text style={styles.footerLink} onPress={() => router.push('/privacy')}> מדיניות הפרטיות</Text>
             </Text>
           </View>
         </ScrollView>
@@ -234,13 +236,14 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   featureIcon: { fontSize: 24 },
+  featureTextWrap: { flex: 1, alignItems: 'flex-end' },
   featureTitle: {
     fontFamily: FontFamily.bold, fontSize: FontSize.sm,
-    color: '#fff', textAlign: 'right', marginBottom: 4, flex: 1,
+    color: '#fff', textAlign: 'right', marginBottom: 4,
   },
   featureDesc: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.55)', textAlign: 'right', lineHeight: 17, flex: 1,
+    color: 'rgba(255,255,255,0.55)', textAlign: 'right', lineHeight: 17,
   },
 
   highlightCard: { marginHorizontal: 20, marginBottom: 28, borderRadius: Radius.xl, overflow: 'hidden' },

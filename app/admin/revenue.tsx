@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   },
   funnelLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#E2E8F0', flex: 1, textAlign: 'right' },
   funnelValue: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
-  funnelPct: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: '#94A3B8', minWidth: 40, textAlign: 'left' },
+  funnelPct: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: '#94A3B8', minWidth: 40, textAlign: 'right' },
   funnelBarTrack: { height: 14, backgroundColor: '#0F172A', borderRadius: 7, overflow: 'hidden' },
   funnelBarFill: { height: 14, borderRadius: 7 },
 });

@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   },
 
   logRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 12,
     minHeight: 56,
   },

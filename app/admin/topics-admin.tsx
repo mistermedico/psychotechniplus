@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   cancelText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
   card: { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: 16, marginBottom: 12, ...Shadow.sm, borderWidth: 1, borderColor: Colors.border },
   label: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', marginBottom: 8 },
-  charCount: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'left', marginTop: 2 },
+  charCount: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
   input: {
     backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 12,
     fontFamily: FontFamily.regular, fontSize: FontSize.base, color: Colors.text,

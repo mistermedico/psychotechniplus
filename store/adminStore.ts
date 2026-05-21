@@ -678,15 +678,16 @@ interface AdminState {
 const SEED_TEMPLATES: SmartExamTemplate[] = [
   {
     id: 'tmpl_001',
-    name: 'סימולציה פסיכומטרית מלאה',
-    description: '50 שאלות בחלוקה מדויקת לפי מבנה המבחן האמיתי',
+    name: 'סימולציה פסיכוטכנית מלאה',
+    description: '40 שאלות בחלוקה מדויקת לפי מבנה המבחן הפסיכוטכני',
     targetId: 'target_psychometric',
-    totalQuestions: 50,
-    timeLimitMinutes: 90,
+    totalQuestions: 40,
+    timeLimitMinutes: 60,
     rules: [
-      { id: 'r1', topicId: 'topic_quantitative', count: 20, minDifficulty: 3, maxDifficulty: 8, useAdaptive: true },
-      { id: 'r2', topicId: 'topic_verbal', count: 20, minDifficulty: 3, maxDifficulty: 8, useAdaptive: true },
-      { id: 'r3', topicId: 'topic_english', count: 10, minDifficulty: 2, maxDifficulty: 7, useAdaptive: false },
+      { id: 'r1', topicId: 'topic_quantitative', count: 12, minDifficulty: 3, maxDifficulty: 8, useAdaptive: true },
+      { id: 'r2', topicId: 'topic_verbal', count: 12, minDifficulty: 3, maxDifficulty: 8, useAdaptive: true },
+      { id: 'r3', topicId: 'topic_logic', count: 10, minDifficulty: 3, maxDifficulty: 8, useAdaptive: true },
+      { id: 'r4', topicId: 'topic_spatial', count: 6, minDifficulty: 2, maxDifficulty: 7, useAdaptive: true },
     ],
     passingScore: 65,
     createdAt: new Date('2025-01-10'),

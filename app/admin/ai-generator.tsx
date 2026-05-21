@@ -231,40 +231,6 @@ function generateMockQuestions(params: {
         },
       ],
     },
-    topic_english: {
-      verbal: [
-        {
-          questionText: 'Choose the word most similar in meaning to "Verbose":',
-          options: [{ id: 'a', text: 'Concise', isCorrect: false }, { id: 'b', text: 'Wordy', isCorrect: true }, { id: 'c', text: 'Silent', isCorrect: false }, { id: 'd', text: 'Clear', isCorrect: false }],
-          correctAnswer: 'b', explanation: '"Verbose" means using more words than needed — "wordy" is the closest synonym.', difficulty, questionType,
-        },
-        {
-          questionText: 'Choose the antonym of "Benevolent":',
-          options: [{ id: 'a', text: 'Kind', isCorrect: false }, { id: 'b', text: 'Generous', isCorrect: false }, { id: 'c', text: 'Malevolent', isCorrect: true }, { id: 'd', text: 'Helpful', isCorrect: false }],
-          correctAnswer: 'c', explanation: '"Benevolent" = kind/well-meaning. Its antonym is "malevolent" = wishing harm.', difficulty, questionType,
-        },
-        {
-          questionText: 'Complete: "The scientist made a remarkable ___ that changed medicine."',
-          options: [{ id: 'a', text: 'disaster', isCorrect: false }, { id: 'b', text: 'discovery', isCorrect: true }, { id: 'c', text: 'decision', isCorrect: false }, { id: 'd', text: 'departure', isCorrect: false }],
-          correctAnswer: 'b', explanation: 'In context, "discovery" fits — scientists make discoveries that change fields.', difficulty, questionType,
-        },
-        {
-          questionText: 'Analogy: Chapter : Book = Scene : ___',
-          options: [{ id: 'a', text: 'Actor', isCorrect: false }, { id: 'b', text: 'Stage', isCorrect: false }, { id: 'c', text: 'Play', isCorrect: true }, { id: 'd', text: 'Theatre', isCorrect: false }],
-          correctAnswer: 'c', explanation: 'A chapter is a part of a book; a scene is a part of a play.', difficulty, questionType,
-        },
-        {
-          questionText: 'Which sentence uses "affect" correctly?',
-          options: [
-            { id: 'a', text: 'The affect of rain is flooding.', isCorrect: false },
-            { id: 'b', text: 'Rain can affect the crops.', isCorrect: true },
-            { id: 'c', text: 'What is the affect?', isCorrect: false },
-            { id: 'd', text: 'This has no affect on me.', isCorrect: false },
-          ],
-          correctAnswer: 'b', explanation: '"Affect" is a verb meaning "to influence". "Effect" is the noun for the result.', difficulty, questionType,
-        },
-      ],
-    },
   };
 
   // Get the pool for this topic + type

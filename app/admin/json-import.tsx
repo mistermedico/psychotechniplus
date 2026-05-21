@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    textAlign: 'left',
+    textAlign: 'right',
     marginBottom: 8,
     ...Shadow.sm,
   },

@@ -26,7 +26,6 @@ const QUICK_ACTION_META: Record<string, { icon: string; color: string; gradient:
   topic_verbal: { icon: '📚', color: Colors.success, gradient: ['#10B981', '#059669'] },
   topic_logic: { icon: '🧩', color: Colors.accent, gradient: ['#9333EA', '#7C3AED'] },
   topic_spatial: { icon: '🔷', color: '#F59E0B', gradient: ['#F59E0B', '#D97706'] },
-  topic_english: { icon: '🔤', color: '#0EA5E9', gradient: ['#0EA5E9', '#0284C7'] },
 };
 
 const BADGE_INFO: Record<string, { icon: string; label: string }> = {

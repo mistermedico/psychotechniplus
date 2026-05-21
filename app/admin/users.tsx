@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { TARGETS, TOPICS } from '../../data/mockData';
+import { logger } from '../../utils/logger';
 
 interface RealUser {
   id: string;
@@ -47,7 +48,7 @@ export default function UsersScreen() {
         .select('*')
         .order('total_sessions', { ascending: false });
 
-      if (pe) { console.error('users:load', pe.message); return; }
+      if (pe) { logger.error('users:load', 'שגיאה בטעינת משתמשים', pe.message); return; }
       if (!profiles?.length) { setUsers([]); return; }
 
       // 2. Load all ELOs in one query
@@ -85,7 +86,7 @@ export default function UsersScreen() {
 
       setUsers(combined);
     } catch (e: any) {
-      console.error('users:load exception', e?.message);
+      logger.error('users:load', 'חריגה בטעינת משתמשים', e?.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -619,7 +620,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.primary,
     width: 40,
-    textAlign: 'left',
+    textAlign: 'right',
   },
 
   sessionRow: {

@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
 
-  charCount: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'left', marginTop: 4 },
+  charCount: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 4 },
   eloHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 4 },
   warningText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.danger, textAlign: 'right', marginTop: 6 },
   validatedHint: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.success, textAlign: 'right', marginTop: 6 },

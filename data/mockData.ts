@@ -148,17 +148,6 @@ export const TOPICS: Topic[] = [
     isPremiumOnly: false,
     color: '#10B981',
   },
-  {
-    id: 'topic_english',
-    targetId: 'target_psychometric',
-    name: 'אנגלית',
-    slug: 'english',
-    description: 'שלמות משפטים, הבנת הנקרא, אוצר מילים',
-    icon: '🇬🇧',
-    order: 5,
-    isPremiumOnly: true,
-    color: '#F59E0B',
-  },
 ];
 
 // ── Questions ──────────────────────────────────────────────────────────────

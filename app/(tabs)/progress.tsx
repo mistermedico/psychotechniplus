@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
-    textAlign: 'left',
+    textAlign: 'right',
     marginBottom: 4,
   },
   badgesGrid: {

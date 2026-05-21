@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: FontSize.xs,
     minWidth: 32,
-    textAlign: 'left',
+    textAlign: 'right',
   },
 
   lockIcon: { fontSize: 18 },

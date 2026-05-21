@@ -48,12 +48,6 @@ const TOPICS_PLAN = [
     types: ['shapes', 'multiple_choice'],
     difficulties: [3, 5, 7],
   },
-  {
-    topicId: 'topic_english',
-    topicName: 'אנגלית',
-    types: ['verbal', 'fill_in_the_blank'],
-    difficulties: [2, 4, 6],
-  },
 ];
 
 for (const topic of TOPICS_PLAN) {

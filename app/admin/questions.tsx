@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
   statusText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs },
   diffBadge: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 2 },
   diffText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
-  eloText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, flex: 1, textAlign: 'left' },
+  eloText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, flex: 1, textAlign: 'right' },
   accessBadge: { fontSize: 12 },
   checkCircle: {
     width: 24, height: 24, borderRadius: 12,

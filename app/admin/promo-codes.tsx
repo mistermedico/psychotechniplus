@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
 
   cardTop: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10 },
   cardTitleWrap: { flex: 1 },
-  cardActions: { flexDirection: 'row', gap: 4 },
+  cardActions: { flexDirection: 'row-reverse', gap: 4 },
   actionBtn: { padding: 6 },
   actionBtnText: { fontSize: 18 },
 
