@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
+import { usePurchaseStore } from '../store/purchaseStore';
 import { ensureDbSeeded } from '../lib/db';
 
 // Force RTL for Hebrew
@@ -32,6 +33,7 @@ export default function RootLayout() {
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
   const loadAdminData = useAdminStore(s => s.loadAdminData);
   const loadQuestionsFromSupabase = useAdminStore(s => s.loadQuestionsFromSupabase);
+  const initializePurchases = usePurchaseStore(s => s.initialize);
 
   const [fontsLoaded, fontError] = useFonts({
     Heebo_400Regular,
@@ -45,7 +47,7 @@ export default function RootLayout() {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
       initialize().then(() => {
-        const { email } = useUserStore.getState();
+        const { email, userId } = useUserStore.getState();
         // Ensure targets+topics exist in Supabase for all users (FK prerequisite)
         ensureDbSeeded().then(() => {
           if (email.toLowerCase() === ADMIN_EMAIL) {
@@ -55,6 +57,10 @@ export default function RootLayout() {
             loadQuestionsFromSupabase();
           }
         });
+        // Initialize RevenueCat and restore premium status (no-op in dev)
+        if (userId) {
+          initializePurchases(userId).catch(() => null);
+        }
       });
     }
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps

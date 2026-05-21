@@ -414,6 +414,7 @@ export default function ProfileTab() {
               icon="📄"
               label="תנאי שימוש"
               onPress={() => { Haptics.selectionAsync(); router.push('/terms'); }}
+              isLast
             />
           </View>
 

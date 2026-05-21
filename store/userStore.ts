@@ -8,6 +8,7 @@ import {
 } from '../lib/db';
 import { logger } from '../utils/logger';
 import { useAdminStore } from './adminStore';
+import { logOutPurchases } from '../lib/purchases';
 
 interface TopicElo {
   elo: number;
@@ -148,6 +149,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   signOut: async () => {
     logger.info('userStore:signOut', 'משתמש התנתק');
+    await logOutPurchases().catch(() => null);
     await supabase.auth.signOut();
     useAdminStore.getState().logActivity('משתמש התנתק', 'user');
     set({ ...INITIAL_STATE, isLoaded: true });

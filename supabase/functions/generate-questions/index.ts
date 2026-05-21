@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
   const typeInstruction = TYPE_INSTRUCTIONS[questionType] ?? TYPE_INSTRUCTIONS.multiple_choice;
   const isTrueFalse = questionType === 'true_false';
 
-  const systemPrompt = `אתה מחולל שאלות מקצועי לבחינות פסיכוטכניות בישראל (פסיכומטרי, קצינים, טייסים, וכו').
+  const systemPrompt = `אתה מחולל שאלות מקצועי לבחינות פסיכוטכניות בישראל (פסיכוטכני, קצינים, טייסים, וכו').
 צור שאלות בעברית ברמה גבוהה, מדויקות, עם הסבר מלא.
 החזר JSON בלבד — מערך של אובייקטי שאלה, ללא טקסט נוסף לפני או אחרי.`;
 
