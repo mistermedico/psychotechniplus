@@ -94,7 +94,7 @@ export default function TargetsTab() {
   };
 
   return (
-    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: Colors.background }}>
     <SafeAreaView style={styles.safe} edges={['top']}>
       <LinearGradient
         colors={Colors.gradients.primary}
@@ -271,7 +271,7 @@ export default function TargetsTab() {
         })}
       </ScrollView>
     </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

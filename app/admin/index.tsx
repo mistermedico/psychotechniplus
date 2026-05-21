@@ -56,11 +56,11 @@ const ADMIN_SECTIONS: NavSection[] = [
 ];
 
 const CATEGORY_COLORS: Record<NavCategory, [string, string]> = {
-  content:  ['#4F46E5', '#7C3AED'],
-  exams:    ['#7C3AED', '#6D28D9'],
-  users:    ['#10B981', '#059669'],
-  business: ['#D97706', '#B45309'],
-  system:   ['#475569', '#334155'],
+  content:  ['#5A52D5', '#7C6FF7'],
+  exams:    ['#7C6FF7', '#C084FC'],
+  users:    ['#10B981', '#34D399'],
+  business: ['#D97706', '#FBBF24'],
+  system:   ['#334155', '#475569'],
 };
 
 const CATEGORY_LABELS: Record<NavCategory, string> = {
@@ -322,7 +322,7 @@ export default function AdminDashboard() {
 
 const CATEGORY_ICON_COLORS: Record<string, string> = {
   question: Colors.primary,
-  user: '#A855F7',
+  user: Colors.accent,
   promo: Colors.success,
   notification: '#F59E0B',
   system: Colors.textTertiary,

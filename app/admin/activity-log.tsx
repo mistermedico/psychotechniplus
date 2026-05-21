@@ -24,9 +24,9 @@ const FILTERS: { key: FilterKey; label: string; icon: string }[] = [
 ];
 
 const CATEGORY_COLORS: Record<AdminActivityLog['category'], string> = {
-  page:         '#6366F1',
+  page:         Colors.primary,
   question:     Colors.primary,
-  user:         '#A855F7',
+  user:         Colors.accent,
   promo:        Colors.success,
   notification: '#F59E0B',
   system:       Colors.textTertiary,
@@ -35,9 +35,9 @@ const CATEGORY_COLORS: Record<AdminActivityLog['category'], string> = {
 };
 
 const CATEGORY_BG: Record<AdminActivityLog['category'], string> = {
-  page:         '#6366F120',
+  page:         Colors.primaryLighter,
   question:     Colors.primaryLighter,
-  user:         '#A855F720',
+  user:         Colors.accentLight,
   promo:        Colors.successLight,
   notification: '#FEF3C7',
   system:       Colors.surfaceSecondary,

@@ -103,7 +103,7 @@ export default function PracticeTab() {
   };
 
   return (
-    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
+    <View style={styles.root}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         {/* Header row with home button + tab bar */}
         <View style={styles.headerRow}>
@@ -160,7 +160,7 @@ export default function PracticeTab() {
           />
         )}
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -194,10 +194,10 @@ function FreePracticePane({
           </View>
           {!isPremium && (
             <Pressable
-              onPress={() => Alert.alert('שדרג לפרמיום', 'פרמיום מאפשר תרגול ללא הגבלה 💎')}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/paywall'); }}
               style={({ pressed }) => [styles.upgradeChip, { opacity: pressed ? 0.75 : 1 }]}
             >
-              <LinearGradient colors={['#6366F1', '#A855F7']} style={styles.upgradeChipGrad}>
+              <LinearGradient colors={Colors.gradients.primary} style={styles.upgradeChipGrad}>
                 <Text style={styles.upgradeChipText}>שדרג 💎</Text>
               </LinearGradient>
             </Pressable>
@@ -249,7 +249,8 @@ function FreePracticePane({
                 disabled={isLocked}
                 onPress={() => {
                   if (isLocked) {
-                    Alert.alert('נושא פרמיום 💎', 'שדרג לפרמיום לגישה לנושא זה');
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    router.push('/paywall');
                     return;
                   }
                   Haptics.selectionAsync();
@@ -322,7 +323,7 @@ function FreePracticePane({
           style={({ pressed }) => [{ opacity: pressed && canStart ? 0.75 : 1 }]}
         >
           <LinearGradient
-            colors={canStart ? ['#6366F1', '#A855F7'] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.06)']}
+            colors={canStart ? Colors.gradients.primary : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.06)']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={[styles.startBtn, !canStart && { shadowOpacity: 0 }]}
           >
@@ -404,7 +405,7 @@ function SimulationsPane({
           <View key={tmpl.id} style={styles.simCard}>
             {/* Card header with gradient strip */}
             <LinearGradient
-              colors={['#3730A3', '#6366F1', '#A855F7']}
+              colors={['#1E1A4A', Colors.primary, Colors.accent]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.simCardHeader}
@@ -455,7 +456,7 @@ function SimulationsPane({
                 onPress={() => onStart(tmpl.id)}
                 style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
               >
-                <LinearGradient colors={['#6366F1', '#A855F7']} style={styles.simStartGrad}>
+                <LinearGradient colors={Colors.gradients.primary} style={styles.simStartGrad}>
                   <Text style={styles.simStartText}>
                     🚀 התחל מבחן — {totalQ} שאלות, {tmpl.timeLimitMinutes} דקות
                   </Text>
@@ -494,6 +495,7 @@ const ssStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: Colors.background },
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   content: { padding: 20, gap: 4 },
@@ -551,7 +553,7 @@ const styles = StyleSheet.create({
   tabBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.45)' },
   tabBtnTextActive: { color: '#F1F5F9', fontFamily: FontFamily.bold },
   tabCount: {
-    backgroundColor: '#6366F1',
+    backgroundColor: Colors.primary,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
@@ -589,7 +591,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
-    color: '#818CF8',
+    color: Colors.primaryLight,
     textAlign: 'right',
     marginBottom: 12,
     marginTop: 8,

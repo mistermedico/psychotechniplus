@@ -285,7 +285,7 @@ export default function ValidateQueue() {
                     onPress={handleSaveEdit}
                     style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.85 }]}
                   >
-                    <LinearGradient colors={['#6366F1', '#A855F7']} style={styles.saveBtnGrad}>
+                    <LinearGradient colors={Colors.gradients.primary} style={styles.saveBtnGrad}>
                       <Text style={styles.saveBtnText}>💾 שמור שינויים</Text>
                     </LinearGradient>
                   </Pressable>

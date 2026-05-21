@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { logger, LogEntry, LogLevel } from '../../utils/logger';
+import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 
 const LEVEL_COLOR: Record<LogLevel, string> = {
@@ -70,7 +71,7 @@ export default function LogsScreen() {
   });
 
   return (
-    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <SafeAreaView style={styles.safe} edges={['bottom']}>
 
         {/* Toolbar */}
@@ -107,9 +108,9 @@ export default function LogsScreen() {
             <Pressable
               key={lvl}
               onPress={() => setFilter(lvl)}
-              style={[styles.filterChip, filter === lvl && { backgroundColor: lvl === 'all' ? 'rgba(99,102,241,0.3)' : LEVEL_BG[lvl as LogLevel], borderColor: lvl === 'all' ? '#6366F1' : LEVEL_COLOR[lvl as LogLevel] }]}
+              style={[styles.filterChip, filter === lvl && { backgroundColor: lvl === 'all' ? Colors.primaryLighter : LEVEL_BG[lvl as LogLevel], borderColor: lvl === 'all' ? Colors.primary : LEVEL_COLOR[lvl as LogLevel] }]}
             >
-              <Text style={[styles.filterChipText, filter === lvl && { color: lvl === 'all' ? '#818CF8' : LEVEL_COLOR[lvl as LogLevel] }]}>
+              <Text style={[styles.filterChipText, filter === lvl && { color: lvl === 'all' ? Colors.primaryLight : LEVEL_COLOR[lvl as LogLevel] }]}>
                 {lvl === 'all' ? 'הכל' : lvl}
               </Text>
             </Pressable>
@@ -161,7 +162,7 @@ export default function LogsScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

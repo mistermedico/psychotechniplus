@@ -85,7 +85,7 @@ export default function ProgressTab() {
   // Empty state — no sessions yet
   if (totalSessions === 0) {
     return (
-      <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateEmoji}>🎯</Text>
@@ -107,12 +107,12 @@ export default function ProgressTab() {
           </Pressable>
         </View>
       </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   return (
-    <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: Colors.background }}>
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
@@ -123,7 +123,7 @@ export default function ProgressTab() {
       >
         {/* ── Gradient Hero Banner ── */}
         <LinearGradient
-          colors={['#1E1B4B', '#312E81', '#4C1D95']}
+          colors={['#1E1A4A', '#150F38', '#0E0B2A']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -342,7 +342,7 @@ export default function ProgressTab() {
         </View>
       </ScrollView>
     </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
