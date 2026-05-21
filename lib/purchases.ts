@@ -59,8 +59,8 @@ const MOCK_PACKAGES: PurchasePackage[] = [
   {
     identifier: 'weekly',
     productIdentifier: PRODUCT_IDS.weekly,
-    price: 14.90,
-    priceString: '₪14.90',
+    price: 49.90,
+    priceString: '₪49.90',
     description: 'פרמיום שבועי',
     offeringIdentifier: 'default',
     isSubscription: true,
@@ -68,8 +68,8 @@ const MOCK_PACKAGES: PurchasePackage[] = [
   {
     identifier: 'monthly',
     productIdentifier: PRODUCT_IDS.monthly,
-    price: 39.90,
-    priceString: '₪39.90',
+    price: 99.90,
+    priceString: '₪99.90',
     description: 'פרמיום חודשי',
     offeringIdentifier: 'default',
     isSubscription: true,
@@ -77,8 +77,8 @@ const MOCK_PACKAGES: PurchasePackage[] = [
   {
     identifier: 'lifetime',
     productIdentifier: PRODUCT_IDS.lifetime,
-    price: 149.90,
-    priceString: '₪149.90',
+    price: 199.00,
+    priceString: '₪199',
     description: 'גישה לצמיתות',
     offeringIdentifier: 'default',
     isSubscription: false,
