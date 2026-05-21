@@ -164,6 +164,8 @@ export default function Dashboard() {
           <Animated.View style={[styles.ctaWrap, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
             <Pressable
               onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
+              accessibilityRole="button"
+              accessibilityLabel={`המשך תרגול · ${selectedTarget.name}`}
               style={({ pressed }) => [styles.ctaBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
             >
               <LinearGradient
@@ -201,6 +203,8 @@ export default function Dashboard() {
                   <Pressable
                     key={t.id}
                     onPress={() => go(t.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`תרגול ${t.name}`}
                     style={({ pressed }) => [styles.topicCard, { transform: [{ scale: pressed ? 0.95 : 1 }] }]}
                   >
                     <LinearGradient
@@ -256,6 +260,8 @@ export default function Dashboard() {
           <Animated.View style={[styles.section, { opacity: fadeIn }]}>
             <Pressable
               onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
+              accessibilityRole="button"
+              accessibilityLabel="אתגר יומי — 10 שאלות"
               style={({ pressed }) => [styles.challengeBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
             >
               <LinearGradient

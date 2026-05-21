@@ -109,7 +109,8 @@ export default function PaywallScreen() {
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.closeBtn, { opacity: pressed ? 0.7 : 1 }]}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel="סגור"
+            accessibilityRole="button"
           >
             <Text style={styles.closeBtnText}>✕</Text>
           </Pressable>
@@ -175,6 +176,9 @@ export default function PaywallScreen() {
                     isSelected && styles.planCardSelected,
                     { opacity: pressed ? 0.88 : 1 },
                   ]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: isSelected }}
+                  accessibilityLabel={`${meta.label} · ${pkg.priceString} ${meta.period}`}
                 >
                   {isSelected && (
                     <LinearGradient
@@ -216,6 +220,9 @@ export default function PaywallScreen() {
           <Pressable
             onPress={handlePurchase}
             disabled={isPurchasing || !selectedPkg}
+            accessibilityRole="button"
+            accessibilityLabel={selectedPkg ? `שדרג עכשיו · ${selectedPkg.priceString}` : 'שדרג עכשיו'}
+            accessibilityState={{ disabled: isPurchasing || !selectedPkg }}
             style={({ pressed }) => [
               styles.purchaseBtn,
               { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: !selectedPkg ? 0.6 : 1 },
@@ -242,6 +249,9 @@ export default function PaywallScreen() {
           <Pressable
             onPress={handleRestore}
             disabled={isRestoring}
+            accessibilityRole="button"
+            accessibilityLabel="שחזר רכישה קודמת"
+            accessibilityState={{ disabled: isRestoring }}
             style={[styles.restoreBtn, { opacity: isRestoring ? 0.6 : 1 }]}
           >
             <Text style={styles.restoreBtnText}>
@@ -298,7 +308,7 @@ const styles = StyleSheet.create({
   },
 
   closeBtn: {
-    alignSelf: 'flex-start', width: 38, height: 38, borderRadius: 19,
+    alignSelf: 'flex-start', width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center',
     marginTop: 12, marginBottom: 4,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',

@@ -88,35 +88,40 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="⌂" label="בית" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" label="בית" focused={focused} />,
+          tabBarAccessibilityLabel: 'בית',
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="targets"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="◎" label="מסלולים" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="🎯" label="מסלולים" focused={focused} />,
+          tabBarAccessibilityLabel: 'מסלולים',
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="practice"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="✦" label="תרגול" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="✏️" label="תרגול" focused={focused} />,
+          tabBarAccessibilityLabel: 'תרגול',
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="progress"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="◈" label="התקדמות" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="📊" label="התקדמות" focused={focused} />,
+          tabBarAccessibilityLabel: 'התקדמות',
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="◉" label="פרופיל" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon icon="👤" label="פרופיל" focused={focused} />,
+          tabBarAccessibilityLabel: 'פרופיל',
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />

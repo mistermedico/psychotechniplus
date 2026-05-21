@@ -61,6 +61,19 @@ function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggl
   );
 }
 
+const DIFFICULTY_LABELS: Record<string, string> = {
+  auto:   'אוטומטי (ELO)',
+  easy:   'קל',
+  medium: 'בינוני',
+  hard:   'קשה',
+};
+
+const FONT_SIZE_LABELS: Record<string, string> = {
+  small:  'קטן',
+  medium: 'בינוני',
+  large:  'גדול',
+};
+
 const ACHIEVEMENT_BADGES = [
   { icon: '🌱', label: 'סשן ראשון', earned: true },
   { icon: '🔥', label: '7 ימים', earned: false },
@@ -219,13 +232,6 @@ export default function ProfileTab() {
     const next: 'dark' | 'light' = isDark ? 'dark' : 'light';
     updateSetting('theme', next);
     Appearance.setColorScheme(next);
-  };
-
-  const DIFFICULTY_LABELS: Record<string, string> = {
-    auto: 'אוטומטי (ELO)',
-    easy: 'קל',
-    medium: 'בינוני',
-    hard: 'קשה',
   };
 
   const handleDifficulty = () => {
@@ -440,7 +446,7 @@ export default function ProfileTab() {
             <SettingRow
               icon="🔡"
               label="גודל טקסט שאלות"
-              value={{ small: 'קטן', medium: 'בינוני', large: 'גדול' }[questionFontSize]}
+              value={FONT_SIZE_LABELS[questionFontSize]}
               onPress={handleFontSize}
             />
             <SettingRow

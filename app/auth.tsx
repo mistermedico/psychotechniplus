@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, Pressable,
   KeyboardAvoidingView, Platform, ActivityIndicator,
-  ScrollView, Animated,
+  ScrollView, Animated, AccessibilityInfo,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +28,11 @@ export default function AuthScreen() {
 
   const initialize = useUserStore(s => s.initialize);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
+
+  const nameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(32)).current;
@@ -208,6 +213,9 @@ export default function AuthScreen() {
                     key={m}
                     onPress={() => switchMode(m)}
                     style={[styles.tab, mode === m && styles.tabActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: mode === m }}
+                    accessibilityLabel={m === 'login' ? 'התחברות' : 'הרשמה'}
                   >
                     {mode === m && (
                       <LinearGradient
@@ -226,6 +234,7 @@ export default function AuthScreen() {
               <View style={styles.form}>
                 {mode === 'register' && (
                   <TextInput
+                    ref={nameRef}
                     style={styles.input}
                     value={displayName}
                     onChangeText={setDisplayName}
@@ -237,9 +246,12 @@ export default function AuthScreen() {
                     textContentType="name"
                     autoComplete="name"
                     returnKeyType="next"
+                    onSubmitEditing={() => emailRef.current?.focus()}
+                    accessibilityLabel="שם מלא"
                   />
                 )}
                 <TextInput
+                  ref={emailRef}
                   style={styles.input}
                   value={email}
                   onChangeText={v => { setEmail(v); setError(''); }}
@@ -251,8 +263,12 @@ export default function AuthScreen() {
                   textAlign="right"
                   textContentType="emailAddress"
                   autoComplete="email"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  accessibilityLabel="כתובת מייל"
                 />
                 <TextInput
+                  ref={passwordRef}
                   style={styles.input}
                   value={password}
                   onChangeText={v => { setPassword(v); setError(''); }}
@@ -260,13 +276,15 @@ export default function AuthScreen() {
                   placeholderTextColor={Colors.textTertiary}
                   secureTextEntry
                   textAlign="right"
-                  onSubmitEditing={mode === 'login' ? handleSubmit : undefined}
+                  onSubmitEditing={mode === 'login' ? handleSubmit : () => confirmRef.current?.focus()}
                   textContentType={mode === 'login' ? 'password' : 'newPassword'}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   returnKeyType={mode === 'login' ? 'go' : 'next'}
+                  accessibilityLabel="סיסמה"
                 />
                 {mode === 'register' && (
                   <TextInput
+                    ref={confirmRef}
                     style={styles.input}
                     value={confirmPassword}
                     onChangeText={v => { setConfirmPassword(v); setError(''); }}
@@ -278,6 +296,7 @@ export default function AuthScreen() {
                     textContentType="newPassword"
                     autoComplete="new-password"
                     returnKeyType="go"
+                    accessibilityLabel="אימות סיסמה"
                   />
                 )}
 
@@ -290,6 +309,9 @@ export default function AuthScreen() {
                 <Pressable
                   onPress={handleSubmit}
                   disabled={loading}
+                  accessibilityRole="button"
+                  accessibilityLabel={mode === 'login' ? 'כניסה לחשבון' : 'יצירת חשבון'}
+                  accessibilityState={{ disabled: loading }}
                   style={({ pressed }) => [styles.submitBtn, { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: loading ? 0.85 : 1 }]}
                 >
                   <LinearGradient
