@@ -14,7 +14,6 @@ import { useSettingsStore, DifficultyOption } from '../../store/settingsStore';
 import { TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
-import { eloToTitle } from '../../utils/elo';
 
 interface SettingRowProps {
   icon: string;
@@ -89,7 +88,7 @@ export default function ProfileTab() {
   const {
     name, level, xp: _xp, streak, selectedTargetId,
     totalSessions, totalCorrect, totalAnswered,
-    getTopicElo, reset, signOut, deleteAccount, isPremium,
+    getTopicLevelLabel, reset, signOut, deleteAccount, isPremium,
   } = useUserStore();
   const { hapticsEnabled, theme, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
   const [signingOut, setSigningOut] = useState(false);
@@ -111,7 +110,7 @@ export default function ProfileTab() {
 
   const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
-  const mainElo = getTopicElo('topic_quantitative');
+  const mainLevelLabel = getTopicLevelLabel('topic_quantitative');
 
   const { isAdmin, setIsAdmin } = useAdminStore();
   const email = useUserStore(s => s.email);
@@ -321,7 +320,7 @@ export default function ProfileTab() {
             </View>
 
             <Text style={styles.profileName}>{name || 'מתאמן'}</Text>
-            <Text style={styles.profileEloTitle}>{eloToTitle(mainElo)}</Text>
+            <Text style={styles.profileEloTitle}>{mainLevelLabel}</Text>
             <Text style={styles.profileEmail}>{email}</Text>
 
             {isPremium ? (

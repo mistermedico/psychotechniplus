@@ -8,11 +8,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { useUserStore } from '../store/userStore';
-import { TARGETS, TOPICS } from '../data/mockData';
+import { TARGETS } from '../data/mockData';
 import { Target } from '../data/types';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
-import { DEFAULT_ELO } from '../utils/elo';
 
 const haptic = (style: Haptics.ImpactFeedbackStyle) => Haptics.impactAsync(style);
 const hapticSuccess = () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -44,10 +43,8 @@ export default function Onboarding() {
   const handleFinish = () => {
     hapticSuccess();
     animateTo(1);
-    const initialElos: Record<string, number> = {};
-    TOPICS.forEach(t => { initialElos[t.id] = DEFAULT_ELO; });
     const finalName = name.trim() || 'מתאמן';
-    completeOnboarding(finalName, selectedTarget?.id ?? TARGETS[0].id, initialElos);
+    completeOnboarding(finalName, selectedTarget?.id ?? TARGETS[0].id);
     router.replace('/(tabs)');
   };
 

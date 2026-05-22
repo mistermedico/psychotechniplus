@@ -13,7 +13,7 @@ import { ProgressBar } from '../../components/ProgressBar';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
-import { eloToTitle } from '../../utils/elo';
+import { LEVEL_LABELS } from '../../utils/adaptive';
 
 // Animated topics container that springs in when a target is expanded
 function AnimatedTopicsContainer({
@@ -74,7 +74,7 @@ export default function TargetsTab() {
   const insets = useSafeAreaInsets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const { getTopicElo, totalSessions } = useUserStore();
+  const { getTopicAccuracy, getTopicLevel, totalSessions } = useUserStore();
 
   const selected = TARGETS.find(t => t.id === selectedId);
   const selectedTopics = selected ? TOPICS.filter(t => t.targetId === selected.id) : [];
@@ -125,10 +125,11 @@ export default function TargetsTab() {
       >
         {TARGETS.filter(t => t.id === 'target_psychometric').map(target => {
           const topics = TOPICS.filter(t => t.targetId === target.id);
-          const avgElo = topics.length > 0
-            ? topics.reduce((s, t) => s + getTopicElo(t.id), 0) / topics.length
-            : 1200;
-          const progress = Math.max(0, Math.min(1, (avgElo - 900) / 600));
+          const accuracies = topics.map(t => getTopicAccuracy(t.id));
+          const avgAccuracy = accuracies.length > 0
+            ? accuracies.reduce((s, a) => s + a, 0) / accuracies.length
+            : 0;
+          const progress = avgAccuracy;
           const progressPct = Math.round(progress * 100);
           const isExpanded = selectedId === target.id;
 
@@ -165,9 +166,9 @@ export default function TargetsTab() {
                     <Text style={styles.emptyTopics}>אין נושאים זמינים</Text>
                   ) : (
                     selectedTopics.map((topic, index) => {
-                      const elo = getTopicElo(topic.id);
-                      const topicProgress = Math.max(0, Math.min(1, (elo - 900) / 600));
-                      const topicPct = Math.round(topicProgress * 100);
+                      const topicAccuracy = getTopicAccuracy(topic.id);
+                      const topicLevel = getTopicLevel(topic.id);
+                      const topicPct = Math.round(topicAccuracy * 100);
                       const isLast = index === selectedTopics.length - 1;
 
                       return (
@@ -179,24 +180,24 @@ export default function TargetsTab() {
                             isLast && styles.topicRowLast,
                           ]}
                         >
-                          {/* Right side: icon + name + elo */}
+                          {/* Right side: icon + name + accuracy */}
                           <View style={styles.topicInfo}>
                             <Text style={styles.topicIcon}>{topic.icon}</Text>
                             <View style={styles.topicTextBlock}>
                               <Text style={styles.topicName}>{topic.name}</Text>
                               <Text style={styles.topicElo}>
-                                {eloToTitle(elo)}
+                                {LEVEL_LABELS[topicLevel]}
                               </Text>
                               <View style={styles.topicProgressRow}>
                                 <View style={styles.topicProgressWrap}>
                                   <ProgressBar
-                                    progress={topicProgress}
+                                    progress={topicAccuracy}
                                     color={topic.color}
                                     height={4}
                                   />
                                 </View>
                                 <Text style={[styles.topicProgressPct, { color: topic.color }]}>
-                                  {topicPct}%
+                                  {topicAccuracy > 0 ? `${topicPct}%` : '—'}
                                 </Text>
                               </View>
                             </View>

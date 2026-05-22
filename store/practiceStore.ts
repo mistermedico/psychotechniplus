@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Question, UserAnswer, SessionMode } from '../data/types';
-import { selectAdaptiveQuestion } from '../utils/elo';
+import { selectAdaptiveQuestion, computeAdaptiveLevel, PerformanceLevel } from '../utils/adaptive';
 
 interface ActiveSession {
   id: string;
@@ -12,6 +12,7 @@ interface ActiveSession {
   answers: UserAnswer[];
   startedAt: Date;
   questionStartedAt: Date;
+  adaptiveLevel: PerformanceLevel;
 }
 
 interface PracticeState {
@@ -23,6 +24,7 @@ interface PracticeState {
     topicId: string;
     mode: SessionMode;
     questions: Question[];
+    initialLevel?: PerformanceLevel;
   }) => void;
 
   submitAnswer: (selectedAnswerId: string) => {
@@ -32,18 +34,18 @@ interface PracticeState {
   };
 
   skipQuestion: () => void;
-  nextQuestion: () => boolean; // returns true if more questions
+  nextQuestion: () => boolean;
   endSession: () => ActiveSession | null;
   getCurrentQuestion: () => Question | null;
   getAnswerForCurrent: () => UserAnswer | undefined;
-  getAdaptiveNext: (userElo: number) => void;
+  getAdaptiveNext: () => void;
 }
 
 export const usePracticeStore = create<PracticeState>((set, get) => ({
   session: null,
   lastCompletedSessionId: null,
 
-  startSession: ({ targetId, topicId, mode, questions }) => {
+  startSession: ({ targetId, topicId, mode, questions, initialLevel = 'beginner' }) => {
     const now = new Date();
     set({
       session: {
@@ -56,6 +58,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
         answers: [],
         startedAt: now,
         questionStartedAt: now,
+        adaptiveLevel: initialLevel,
       },
     });
   },
@@ -79,9 +82,14 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       questionDifficulty: question.difficulty,
     };
 
+    // Update adaptive level based on session performance so far
+    const updatedAnswers = [...session.answers, answer];
+    const history = updatedAnswers.map(a => ({ isCorrect: a.isCorrect, difficulty: a.questionDifficulty }));
+    const newLevel = computeAdaptiveLevel(history, session.adaptiveLevel);
+
     set(state => ({
       session: state.session
-        ? { ...state.session, answers: [...state.session.answers, answer] }
+        ? { ...state.session, answers: updatedAnswers, adaptiveLevel: newLevel }
         : null,
     }));
 
@@ -117,21 +125,18 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     if (next >= session.questions.length) return false;
     set(state => ({
       session: state.session
-        ? {
-            ...state.session,
-            currentIndex: next,
-            questionStartedAt: new Date(),
-          }
+        ? { ...state.session, currentIndex: next, questionStartedAt: new Date() }
         : null,
     }));
     return true;
   },
 
-  getAdaptiveNext: (userElo) => {
+  // Reorder to next best adaptive question within the session pool
+  getAdaptiveNext: () => {
     const { session } = get();
     if (!session) return;
     const answeredIds = session.answers.map(a => a.questionId);
-    const next = selectAdaptiveQuestion(userElo, session.questions, answeredIds);
+    const next = selectAdaptiveQuestion(session.adaptiveLevel, session.questions, answeredIds);
     if (!next) return;
     const nextIndex = session.questions.findIndex(q => q.id === next.id);
     if (nextIndex === -1) return;

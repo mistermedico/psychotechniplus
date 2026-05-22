@@ -26,22 +26,23 @@ const { width: W } = Dimensions.get('window');
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 export default function PracticeSession() {
-  const { topicId, targetId, mode, templateId, questionLimit } = useLocalSearchParams<{
+  const { topicId, targetId, mode, templateId, questionLimit, difficulty } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
     mode?: SessionMode;
     templateId?: string;
     questionLimit?: string;
+    difficulty?: string; // 'easy' | 'medium' | 'hard' | 'all'
   }>();
 
   const insets = useSafeAreaInsets();
 
   const {
     session, startSession, submitAnswer, skipQuestion,
-    nextQuestion, endSession, getCurrentQuestion,
+    nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
   } = usePracticeStore();
 
-  const { updateElo, recordSession, getTopicElo, topicElos, userId, name: userName } = useUserStore();
+  const { recordAnswer, recordSession, getTopicLevel, userId, name: userName } = useUserStore();
   const { templates, questions: adminQuestions, practiceSettings, addSessionRecord } = useAdminStore();
 
   const {
@@ -89,19 +90,14 @@ export default function PracticeSession() {
     let cancelled = false;
 
     if (isSimulation && templateId) {
-      // SIMULATION MODE: generate questions from template
       const template = templates.find(t => t.id === templateId);
       if (!template) {
         Alert.alert('שגיאה', 'תבנית המבחן לא נמצאה');
         router.back();
         return;
       }
-      const userElos: Record<string, number> = {};
-      Object.entries(topicElos).forEach(([tid, data]) => {
-        userElos[tid] = (data as { elo: number }).elo ?? 1200;
-      });
       const generated = generateSmartExamQuestions(
-        template, adminQuestions.filter(q => q.validationStatus === 'validated'), userElos
+        template, adminQuestions.filter(q => q.validationStatus === 'validated'), {}
       );
       if (generated.allQuestions.length === 0) {
         Alert.alert('שגיאה', 'לא נמצאו שאלות מתאימות למבחן זה. נסה לאמת שאלות קודם.');
@@ -109,7 +105,6 @@ export default function PracticeSession() {
         return;
       }
       setExamSections(generated.sections);
-      // Start with first section's questions
       const firstSection = generated.sections[0];
       startSession({
         targetId: targetId ?? '',
@@ -120,8 +115,9 @@ export default function PracticeSession() {
       return () => { cancelled = true; };
     }
 
-    // FREE PRACTICE MODE
+    // FREE / ADAPTIVE PRACTICE MODE
     const limit = questionLimit ? parseInt(questionLimit) : 10;
+    const userLevel = getTopicLevel(topicId ?? '');
     fetchQuestions({ topicId: topicId ?? '', status: 'validated' }).then(questions => {
       if (cancelled) return;
       if (questions.length === 0) {
@@ -129,11 +125,18 @@ export default function PracticeSession() {
         router.back();
         return;
       }
+      // Apply difficulty filter if provided
+      let filtered = questions;
+      if (difficulty === 'easy') filtered = questions.filter(q => q.difficulty <= 4);
+      else if (difficulty === 'medium') filtered = questions.filter(q => q.difficulty >= 3 && q.difficulty <= 7);
+      else if (difficulty === 'hard') filtered = questions.filter(q => q.difficulty >= 6);
+      if (filtered.length === 0) filtered = questions; // fallback to all
       startSession({
         targetId: targetId ?? '',
         topicId: topicId ?? '',
         mode: mode ?? 'practice',
-        questions: questions.slice(0, limit),
+        questions: filtered.slice(0, limit),
+        initialLevel: userLevel,
       });
     });
     return () => {
@@ -205,7 +208,7 @@ export default function PracticeSession() {
     if (!selectedId || revealed) return;
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const { isCorrect, correctAnswerId } = submitAnswer(selectedId);
+    const { isCorrect } = submitAnswer(selectedId);
 
     Haptics.notificationAsync(
       isCorrect
@@ -213,10 +216,10 @@ export default function PracticeSession() {
         : Haptics.NotificationFeedbackType.Error
     );
 
-    // Update ELO
+    // Record answer for adaptive tracking
     const question = getCurrentQuestion();
     if (question) {
-      updateElo(question.topicId, question.psychometricStats.elo, isCorrect);
+      recordAnswer(question.topicId, question.difficulty, isCorrect);
     }
 
     setLastAnswerCorrect(isCorrect);
@@ -255,6 +258,8 @@ export default function PracticeSession() {
     setLastAnswerCorrect(false);
     setShowExplanation(false);
     explanationAnim.setValue(0);
+    // In adaptive mode, pick the best next question before advancing index
+    if (mode === 'adaptive') getAdaptiveNext();
     advanceOrEnd();
   };
 

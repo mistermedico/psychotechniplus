@@ -11,7 +11,7 @@ import { useUserStore } from '../../store/userStore';
 import { TARGETS, TOPICS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
-import { eloToTitle } from '../../utils/elo';
+import { LEVEL_LABELS } from '../../utils/adaptive';
 
 const { width: W } = Dimensions.get('window');
 
@@ -38,14 +38,13 @@ export default function Dashboard() {
   const {
     name, streak, level, xp, badges,
     totalSessions, totalCorrect, totalAnswered,
-    selectedTargetId, getTopicElo,
+    selectedTargetId, getTopicLevel,
   } = useUserStore();
 
   const selectedTarget = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const targetTopics = TOPICS.filter(t => t.targetId === selectedTarget.id);
   const mainTopic = targetTopics[0] ?? null;
-  const currentElo = mainTopic ? getTopicElo(mainTopic.id) : 1200;
-  const title = eloToTitle(currentElo);
+  const title = mainTopic ? LEVEL_LABELS[getTopicLevel(mainTopic.id)] : LEVEL_LABELS['beginner'];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const xpPercent = Math.min(100, Math.round((xp / (level * 100)) * 100));
   const recentBadges = badges.slice(-3);
@@ -123,10 +122,10 @@ export default function Dashboard() {
                 <View style={styles.heroBadge}>
                   <Text style={styles.heroBadgeText}>{title}</Text>
                 </View>
-                <Text style={styles.heroElo}>{currentElo}</Text>
+                <Text style={styles.heroElo}>{accuracy > 0 ? `${accuracy}%` : '—'}</Text>
               </View>
 
-              <Text style={styles.heroLabel}>דירוג ELO נוכחי</Text>
+              <Text style={styles.heroLabel}>דיוק כולל</Text>
 
               {/* XP progress */}
               <View style={styles.xpSection}>

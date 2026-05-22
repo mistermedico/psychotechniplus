@@ -1,18 +1,23 @@
 import { create } from 'zustand';
-import { DEFAULT_ELO, updatePlayerElo } from '../utils/elo';
 import { UserBadge, BadgeType } from '../data/types';
 import { supabase } from '../lib/supabase';
 import {
   getOrCreateUserId, loadUserProfile, saveUserProfile,
-  loadUserElos, saveUserElo, loadUserBadges, saveUserBadge,
+  loadUserBadges, saveUserBadge,
 } from '../lib/db';
 import { logger } from '../utils/logger';
 import { useAdminStore } from './adminStore';
 import { logOutPurchases } from '../lib/purchases';
+import { PerformanceLevel, computeAdaptiveLevel, LEVEL_LABELS } from '../utils/adaptive';
 
-interface TopicElo {
-  elo: number;
-  history: { elo: number; date: string }[];
+export interface TopicPerformanceEntry {
+  isCorrect: boolean;
+  difficulty: number;
+}
+
+export interface TopicPerformance {
+  history: TopicPerformanceEntry[];
+  currentLevel: PerformanceLevel;
 }
 
 interface UserState {
@@ -22,7 +27,7 @@ interface UserState {
   selectedTargetId: string | null;
   hasCompletedOnboarding: boolean;
 
-  topicElos: Record<string, TopicElo>;
+  topicPerformance: Record<string, TopicPerformance>;
 
   streak: number;
   longestStreak: number;
@@ -36,7 +41,6 @@ interface UserState {
   totalAnswered: number;
   isPremium: boolean;
 
-  // Auth + Supabase sync
   isLoaded: boolean;
   isSyncing: boolean;
   isAuthenticated: boolean;
@@ -44,14 +48,15 @@ interface UserState {
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
 
-  // Actions
-  completeOnboarding: (name: string, targetId: string, initialElos: Record<string, number>) => void;
-  updateElo: (topicId: string, questionElo: number, isCorrect: boolean) => void;
+  completeOnboarding: (name: string, targetId: string) => void;
+  recordAnswer: (topicId: string, difficulty: number, isCorrect: boolean) => void;
   addXp: (amount: number) => void;
   updateStreak: () => void;
   earnBadge: (type: BadgeType) => UserBadge;
   recordSession: (correct: number, total: number) => void;
-  getTopicElo: (topicId: string) => number;
+  getTopicAccuracy: (topicId: string) => number;
+  getTopicLevel: (topicId: string) => PerformanceLevel;
+  getTopicLevelLabel: (topicId: string) => string;
   setPremium: (val: boolean) => void;
   reset: () => void;
 }
@@ -62,13 +67,13 @@ const INITIAL_STATE = {
   name: '',
   selectedTargetId: null,
   hasCompletedOnboarding: false,
-  topicElos: {},
+  topicPerformance: {} as Record<string, TopicPerformance>,
   streak: 0,
   longestStreak: 0,
   lastPracticedDate: null,
   level: 1,
   xp: 0,
-  badges: [],
+  badges: [] as UserBadge[],
   totalSessions: 0,
   totalCorrect: 0,
   totalAnswered: 0,
@@ -84,14 +89,12 @@ export const useUserStore = create<UserState>((set, get) => ({
   ...INITIAL_STATE,
 
   initialize: async (overrideUserId?: string) => {
-    // If already loaded and no override, skip
     if (get().isLoaded && !overrideUserId) return;
     set({ isSyncing: true });
 
     let userId = overrideUserId;
     let sessionEmail = '';
 
-    // If no userId provided, check Supabase Auth session (single call)
     if (!userId) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -100,7 +103,6 @@ export const useUserStore = create<UserState>((set, get) => ({
           sessionEmail = session.user.email ?? '';
           logger.info('userStore:initialize', `משתמש מחובר: ${sessionEmail}`);
         } else {
-          // Not authenticated — stop here, let index.tsx redirect to /auth
           set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
           return;
         }
@@ -110,7 +112,6 @@ export const useUserStore = create<UserState>((set, get) => ({
         return;
       }
     } else {
-      // userId provided externally (after login) — still grab email from session
       try {
         const { data: { session } } = await supabase.auth.getSession();
         sessionEmail = session?.user?.email ?? '';
@@ -119,9 +120,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     set({ userId, isAuthenticated: true, email: sessionEmail });
 
-    const [profile, elos, badges] = await Promise.all([
+    const [profile, badges] = await Promise.all([
       loadUserProfile(userId),
-      loadUserElos(userId),
       loadUserBadges(userId),
     ]);
 
@@ -141,7 +141,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       });
     }
 
-    if (Object.keys(elos).length > 0) set({ topicElos: elos });
     if (badges.length > 0) set({ badges });
 
     set({ isLoaded: true, isSyncing: false });
@@ -159,7 +158,6 @@ export const useUserStore = create<UserState>((set, get) => ({
     const { userId } = get();
     if (!userId) return { success: false, error: 'No user session' };
     try {
-      // Delete all user data from Supabase tables
       logger.info('userStore:deleteAccount', `מוחק חשבון: ${userId}`);
       await Promise.all([
         supabase.from('user_profiles').delete().eq('id', userId),
@@ -168,7 +166,6 @@ export const useUserStore = create<UserState>((set, get) => ({
         supabase.from('practice_sessions').delete().eq('user_id', userId),
       ]);
       logger.success('userStore:deleteAccount', 'נתוני משתמש נמחקו');
-      // Sign out — the auth user record is removed via edge function if available
       await supabase.functions.invoke('delete-user', { body: { userId } }).catch(() => null);
       await supabase.auth.signOut();
       set({ ...INITIAL_STATE, isLoaded: true });
@@ -178,36 +175,43 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  completeOnboarding: (name, targetId, initialElos) => {
-    const topicElos: Record<string, TopicElo> = {};
-    Object.entries(initialElos).forEach(([topicId, elo]) => {
-      topicElos[topicId] = { elo, history: [{ elo, date: new Date().toISOString() }] };
-    });
-    set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true, topicElos });
-
+  completeOnboarding: (name, targetId) => {
+    set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true });
     const { userId } = get();
     saveUserProfile(userId, {
       name, selected_target_id: targetId, has_completed_onboarding: true,
-    });
-    Object.entries(topicElos).forEach(([topicId, { elo, history }]) => {
-      saveUserElo(userId, topicId, elo, history);
     });
     logger.success('userStore:completeOnboarding', `אונבורדינג הושלם — ${name}, מסלול: ${targetId}`);
     useAdminStore.getState().logActivity(`${name} השלים אונבורדינג — מסלול: ${targetId}`, 'user');
   },
 
-  updateElo: (topicId, questionElo, isCorrect) => {
+  recordAnswer: (topicId, difficulty, isCorrect) => {
     set(state => {
-      const current = state.topicElos[topicId] ?? { elo: DEFAULT_ELO, history: [] };
-      const newElo = updatePlayerElo(current.elo, questionElo, isCorrect);
-      const entry = { elo: newElo, date: new Date().toISOString() };
-      const updated = { elo: newElo, history: [...current.history.slice(-29), entry] };
-      saveUserElo(state.userId, topicId, newElo, updated.history);
-      logger.debug('userStore:updateElo', `ELO ${topicId}: ${current.elo} → ${newElo}`);
+      const current = state.topicPerformance[topicId] ?? { history: [], currentLevel: 'beginner' as PerformanceLevel };
+      const newHistory = [...current.history.slice(-39), { isCorrect, difficulty }];
+      const newLevel = computeAdaptiveLevel(newHistory, current.currentLevel);
       return {
-        topicElos: { ...state.topicElos, [topicId]: updated },
+        topicPerformance: {
+          ...state.topicPerformance,
+          [topicId]: { history: newHistory, currentLevel: newLevel },
+        },
       };
     });
+  },
+
+  getTopicAccuracy: (topicId) => {
+    const perf = get().topicPerformance[topicId];
+    if (!perf || perf.history.length === 0) return 0;
+    return perf.history.filter(h => h.isCorrect).length / perf.history.length;
+  },
+
+  getTopicLevel: (topicId) => {
+    return get().topicPerformance[topicId]?.currentLevel ?? 'beginner';
+  },
+
+  getTopicLevelLabel: (topicId) => {
+    const level = get().topicPerformance[topicId]?.currentLevel ?? 'beginner';
+    return LEVEL_LABELS[level];
   },
 
   addXp: (amount) => {
@@ -262,17 +266,14 @@ export const useUserStore = create<UserState>((set, get) => ({
     const wasFirstSession = get().totalSessions === 0;
     const xpGain = correct * 10 + 20;
     set(state => {
-      // Session stats
       const totalSessions = state.totalSessions + 1;
       const totalCorrect = state.totalCorrect + correct;
       const totalAnswered = state.totalAnswered + total;
 
-      // XP + level
       let newXp = state.xp + xpGain;
       let newLevel = state.level;
       while (newXp >= xpForLevel(newLevel)) { newXp -= xpForLevel(newLevel); newLevel++; }
 
-      // Streak
       const today = new Date().toDateString();
       const yesterday = new Date(Date.now() - 86400000).toDateString();
       const newStreak = state.lastPracticedDate === today
@@ -280,7 +281,6 @@ export const useUserStore = create<UserState>((set, get) => ({
         : state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
       const longestStreak = Math.max(newStreak, state.longestStreak);
 
-      // One atomic Supabase write
       saveUserProfile(state.userId, {
         total_sessions: totalSessions,
         total_correct: totalCorrect,
@@ -304,8 +304,6 @@ export const useUserStore = create<UserState>((set, get) => ({
     logger.success('userStore:recordSession', `סשן הושלם — נכון: ${correct}/${total}, XP+${xpGain}`);
     useAdminStore.getState().logActivity(`סשן הושלם — ${correct}/${total} נכון, XP+${xpGain}`, 'session');
   },
-
-  getTopicElo: (topicId) => get().topicElos[topicId]?.elo ?? DEFAULT_ELO,
 
   setPremium: (val) => set({ isPremium: val }),
 

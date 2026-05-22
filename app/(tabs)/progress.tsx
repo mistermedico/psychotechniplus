@@ -18,7 +18,7 @@ import { ProgressBar } from '../../components/ProgressBar';
 import { StatCard } from '../../components/StatCard';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
-import { eloToTitle, eloToProgress } from '../../utils/elo';
+import { LEVEL_LABELS } from '../../utils/adaptive';
 
 const BADGE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
   first_session: { icon: '🌱', label: 'סשן ראשון', desc: 'השלמת את הסשן הראשון שלך' },
@@ -41,7 +41,7 @@ export default function ProgressTab() {
   const {
     name, level, xp, streak, longestStreak,
     totalSessions, totalCorrect, totalAnswered,
-    badges, selectedTargetId, getTopicElo,
+    badges, selectedTargetId, getTopicAccuracy, getTopicLevel,
   } = useUserStore();
 
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
@@ -256,15 +256,15 @@ export default function ProgressTab() {
           )}
         </View>
 
-        {/* ── ELO per topic ── */}
+        {/* ── Per-topic accuracy ── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionLabel}>רמת שליטה</Text>
-          <Text style={styles.sectionTitle}>ELO לפי נושא</Text>
+          <Text style={styles.sectionTitle}>דיוק לפי נושא</Text>
         </View>
         <View style={styles.eloContainer}>
           {topics.map((topic, idx) => {
-            const elo = getTopicElo(topic.id);
-            const progress = eloToProgress(elo);
+            const accuracy = getTopicAccuracy(topic.id);
+            const level = getTopicLevel(topic.id);
             const isLast = idx === topics.length - 1;
             return (
               <View
@@ -280,14 +280,16 @@ export default function ProgressTab() {
                   <View>
                     <Text style={styles.eloTopicName}>{topic.name}</Text>
                     <Text style={[styles.eloTitle, { color: topic.color }]}>
-                      {eloToTitle(elo)}
+                      {LEVEL_LABELS[level]}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.eloRight}>
-                  <Text style={[styles.eloValue, { color: topic.color }]}>{elo}</Text>
+                  <Text style={[styles.eloValue, { color: topic.color }]}>
+                    {accuracy > 0 ? `${Math.round(accuracy * 100)}%` : '—'}
+                  </Text>
                   <View style={styles.eloBar}>
-                    <ProgressBar progress={progress} color={topic.color} height={5} />
+                    <ProgressBar progress={accuracy} color={topic.color} height={5} />
                   </View>
                 </View>
               </View>
@@ -295,7 +297,7 @@ export default function ProgressTab() {
           })}
           {topics.length === 0 && (
             <Text style={styles.emptyText}>
-              השלם לפחות סשן אחד כדי לראות את ה-ELO שלך
+              השלם לפחות סשן אחד כדי לראות את הדיוק שלך
             </Text>
           )}
         </View>

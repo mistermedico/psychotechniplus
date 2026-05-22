@@ -12,9 +12,16 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore, SmartExamTemplate } from '../../store/adminStore';
-import { eloToTitle } from '../../utils/elo';
 
 type PracticeTab = 'free' | 'simulations';
+
+type DifficultyFilter = 'all' | 'easy' | 'medium' | 'hard';
+const DIFFICULTY_OPTIONS: { id: DifficultyFilter; label: string; icon: string; color: string }[] = [
+  { id: 'all',    label: 'הכל',    icon: '🎯', color: Colors.primary },
+  { id: 'easy',   label: 'קל',     icon: '🟢', color: Colors.success },
+  { id: 'medium', label: 'בינוני', icon: '🟡', color: Colors.warning },
+  { id: 'hard',   label: 'קשה',    icon: '🔴', color: Colors.danger },
+];
 
 const FREE_MODES = [
   {
@@ -47,10 +54,11 @@ export default function PracticeTab() {
   const [activeTab, setActiveTab] = useState<PracticeTab>('free');
   const [selectedMode, setSelectedMode] = useState('practice');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyFilter>('all');
   const tabAnim = useRef(new Animated.Value(0)).current;
   const indicatorLeft = tabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '50%'] });
 
-  const { selectedTargetId, getTopicElo, isPremium } = useUserStore();
+  const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium } = useUserStore();
   const { freePracticeLimit, templates } = useAdminStore();
 
   const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
@@ -81,8 +89,8 @@ export default function PracticeTab() {
         topicId: selectedTopicId,
         targetId: target.id,
         mode: selectedMode,
+        difficulty: selectedDifficulty,
         questionLimit: isPremium ? '999' : String(freePracticeLimit),
-        isPremium: isPremium ? '1' : '0',
       },
     });
   };
@@ -145,7 +153,10 @@ export default function PracticeTab() {
             setSelectedMode={setSelectedMode}
             selectedTopicId={selectedTopicId}
             setSelectedTopicId={setSelectedTopicId}
-            getTopicElo={getTopicElo}
+            selectedDifficulty={selectedDifficulty}
+            setSelectedDifficulty={setSelectedDifficulty}
+            getTopicAccuracy={getTopicAccuracy}
+            getTopicLevelLabel={getTopicLevelLabel}
             isPremium={isPremium}
             freePracticeLimit={freePracticeLimit}
             canStart={selectedTopicId !== null}
@@ -166,13 +177,17 @@ export default function PracticeTab() {
 
 function FreePracticePane({
   topics, selectedMode, setSelectedMode,
-  selectedTopicId, setSelectedTopicId, getTopicElo,
+  selectedTopicId, setSelectedTopicId,
+  selectedDifficulty, setSelectedDifficulty,
+  getTopicAccuracy, getTopicLevelLabel,
   isPremium, freePracticeLimit, canStart, onStart,
 }: {
   topics: typeof TOPICS;
   selectedMode: string; setSelectedMode: (m: string) => void;
   selectedTopicId: string | null; setSelectedTopicId: (id: string | null) => void;
-  getTopicElo: (id: string) => number;
+  selectedDifficulty: DifficultyFilter; setSelectedDifficulty: (d: DifficultyFilter) => void;
+  getTopicAccuracy: (id: string) => number;
+  getTopicLevelLabel: (id: string) => string;
   isPremium: boolean; freePracticeLimit: number;
   canStart: boolean; onStart: () => void;
 }) {
@@ -236,11 +251,40 @@ function FreePracticePane({
           </View>
         ))}
 
+        {/* Difficulty selector — hidden for adaptive (algo decides) */}
+        {selectedMode !== 'adaptive' && (
+          <>
+            <Text style={styles.sectionLabel}>רמת קושי</Text>
+            <View style={styles.difficultyRow}>
+              {DIFFICULTY_OPTIONS.map(opt => {
+                const isActive = selectedDifficulty === opt.id;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => { Haptics.selectionAsync(); setSelectedDifficulty(opt.id); }}
+                    style={({ pressed }) => [
+                      styles.difficultyChip,
+                      isActive && { borderColor: opt.color, backgroundColor: opt.color + '22' },
+                      { opacity: pressed ? 0.75 : 1 },
+                    ]}
+                  >
+                    <Text style={styles.difficultyChipIcon}>{opt.icon}</Text>
+                    <Text style={[styles.difficultyChipLabel, isActive && { color: opt.color }]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         {/* Topic section */}
         <Text style={styles.sectionLabel}>בחר נושא</Text>
         <View style={styles.topicsGrid}>
           {topics.map(topic => {
-            const elo = getTopicElo(topic.id);
+            const accuracy = getTopicAccuracy(topic.id);
+            const levelLabel = getTopicLevelLabel(topic.id);
             const isSelected = selectedTopicId === topic.id;
             const isLocked = topic.isPremiumOnly && !isPremium;
             return (
@@ -291,7 +335,7 @@ function FreePracticePane({
                   {topic.name}
                 </Text>
                 <Text style={[styles.topicCardElo, { color: isLocked ? 'rgba(255,255,255,0.35)' : topic.color }]}>
-                  {eloToTitle(elo)}
+                  {isLocked ? '💎' : accuracy > 0 ? `${Math.round(accuracy * 100)}% · ${levelLabel}` : levelLabel}
                 </Text>
               </Pressable>
             );
@@ -595,6 +639,32 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 12,
     marginTop: 8,
+  },
+
+  /* ── Difficulty chips ── */
+  difficultyRow: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+    marginBottom: 8,
+  },
+  difficultyChip: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    borderRadius: Radius.xl,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+    minHeight: 60,
+    justifyContent: 'center',
+  },
+  difficultyChipIcon: { fontSize: 16 },
+  difficultyChipLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.55)',
   },
 
   /* ── Mode chips ── */
