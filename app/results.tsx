@@ -174,16 +174,16 @@ export default function Results() {
             {score < 70 && (
               <RecommendCard
                 icon="🎯" title="תרגל את החולשות שלך" desc="זיהינו תחומים לשיפור — תרגל שאלות ממוקדות" color={Colors.danger}
-                onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'adaptive' } })}
+                onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'adaptive', questionLimit: params.total } })}
               />
             )}
             <RecommendCard
               icon="🔄" title="תרגל שוב" desc="חזור על אותו נושא לחיזוק" color={Colors.primary}
-              onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice' } })}
+              onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice', questionLimit: params.total } })}
             />
             <RecommendCard
               icon="⚡" title="אתגר מהירות" desc="נסה את אותו נושא במצב מהירות" color={Colors.warning}
-              onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'speed' } })}
+              onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'speed', questionLimit: params.total } })}
             />
           </View>
         </Animated.View>
@@ -202,7 +202,7 @@ export default function Results() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice' } });
+            router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice', questionLimit: params.total } });
           }}
           style={({ pressed }) => [styles.againBtn, { opacity: pressed ? 0.75 : 1 }]}
         >

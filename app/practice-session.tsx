@@ -57,6 +57,7 @@ export default function PracticeSession() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [timer, setTimer] = useState(practiceSettings.speedModeSecondsPerQuestion);
   const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(0);
+  const [loadError, setLoadError] = useState(false);
 
   // Favorite & note features
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -119,7 +120,14 @@ export default function PracticeSession() {
     // FREE / ADAPTIVE PRACTICE MODE
     const limit = questionLimit ? parseInt(questionLimit) : 10;
     const userLevel = getTopicLevel(topicId ?? '');
+
+    const loadTimeout = setTimeout(() => {
+      if (cancelled) return;
+      setLoadError(true);
+    }, 10000);
+
     fetchQuestions({ topicId: topicId ?? '', status: 'validated' }).then(questions => {
+      clearTimeout(loadTimeout);
       if (cancelled) return;
       if (questions.length === 0) {
         Alert.alert('שגיאה', 'לא נמצאו שאלות לנושא זה');
@@ -157,6 +165,7 @@ export default function PracticeSession() {
     });
     return () => {
       cancelled = true;
+      clearTimeout(loadTimeout);
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     };
@@ -227,7 +236,7 @@ export default function PracticeSession() {
   };
 
   const handleConfirm = () => {
-    if (!selectedId || revealed) return;
+    if (!selectedId || revealed || !session) return;
     if (timerRef.current) clearInterval(timerRef.current);
 
     const { isCorrect } = submitAnswer(selectedId);
@@ -512,9 +521,18 @@ export default function PracticeSession() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.loading}>
-          <Text style={styles.loadingText}>
-            {isSimulation ? 'בונה מבחן חכם...' : 'טוען שאלות...'}
-          </Text>
+          {loadError ? (
+            <>
+              <Text style={styles.loadingText}>לא ניתן לטעון שאלות. בדוק חיבור לאינטרנט.</Text>
+              <Pressable onPress={() => router.back()} style={styles.loadErrorBtn}>
+                <Text style={styles.loadErrorBtnText}>חזרה</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.loadingText}>
+              {isSimulation ? 'בונה מבחן חכם...' : 'טוען שאלות...'}
+            </Text>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -721,8 +739,10 @@ export default function PracticeSession() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  loadingText: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: Colors.textSecondary },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
+  loadingText: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center' },
+  loadErrorBtn: { backgroundColor: Colors.primary, borderRadius: Radius.xl, paddingHorizontal: 28, paddingVertical: 14 },
+  loadErrorBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 
   // Rest screen between simulation sections
   restScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
