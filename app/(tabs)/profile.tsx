@@ -231,7 +231,9 @@ export default function ProfileTab() {
     Haptics.selectionAsync();
     const next: 'dark' | 'light' = isDark ? 'dark' : 'light';
     updateSetting('theme', next);
-    Appearance.setColorScheme(next);
+    if (typeof Appearance.setColorScheme === 'function') {
+      Appearance.setColorScheme(next);
+    }
   };
 
   const handleDifficulty = () => {
