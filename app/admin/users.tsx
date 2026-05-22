@@ -17,6 +17,7 @@ interface RealUser {
   email?: string;
   selected_target_id: string | null;
   has_completed_onboarding: boolean;
+  is_premium: boolean;
   streak: number;
   longest_streak: number;
   level: number;
@@ -27,10 +28,17 @@ interface RealUser {
   last_practiced_date: string | null;
   created_at: string;
   updated_at: string;
-  topicElos: Record<string, number>;
 }
 
 type SortKey = 'sessions' | 'level' | 'streak' | 'correct_rate' | 'joined';
+
+function getPerformanceLevel(totalCorrect: number, totalAnswered: number): { label: string; color: string } {
+  if (totalAnswered === 0) return { label: 'מתחיל', color: Colors.danger };
+  const rate = totalCorrect / totalAnswered;
+  if (rate >= 0.75) return { label: 'מתקדם', color: Colors.success };
+  if (rate >= 0.35) return { label: 'בינוני', color: Colors.warning };
+  return { label: 'מתחיל', color: Colors.danger };
+}
 
 export default function UsersScreen() {
   const [users, setUsers] = useState<RealUser[]>([]);
@@ -39,10 +47,10 @@ export default function UsersScreen() {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('sessions');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [inactiveFilter, setInactiveFilter] = useState(false);
 
   const loadUsers = useCallback(async () => {
     try {
-      // 1. Load all user profiles
       const { data: profiles, error: pe } = await supabase
         .from('user_profiles')
         .select('*')
@@ -51,26 +59,12 @@ export default function UsersScreen() {
       if (pe) { logger.error('users:load', 'שגיאה בטעינת משתמשים', pe.message); return; }
       if (!profiles?.length) { setUsers([]); return; }
 
-      // 2. Load all ELOs in one query
-      const userIds = profiles.map(p => p.id);
-      const { data: elosData } = await supabase
-        .from('user_elos')
-        .select('user_id, topic_id, elo')
-        .in('user_id', userIds);
-
-      // Build ELO map per user
-      const eloMap: Record<string, Record<string, number>> = {};
-      (elosData ?? []).forEach(row => {
-        if (!eloMap[row.user_id]) eloMap[row.user_id] = {};
-        eloMap[row.user_id][row.topic_id] = row.elo;
-      });
-
-      // 3. Load auth emails from sessions (best-effort)
       const combined: RealUser[] = profiles.map(p => ({
         id: p.id,
         name: p.name || 'ללא שם',
         selected_target_id: p.selected_target_id,
         has_completed_onboarding: p.has_completed_onboarding ?? false,
+        is_premium: p.is_premium ?? false,
         streak: p.streak ?? 0,
         longest_streak: p.longest_streak ?? 0,
         level: p.level ?? 1,
@@ -81,7 +75,6 @@ export default function UsersScreen() {
         last_practiced_date: p.last_practiced_date ?? null,
         created_at: p.created_at,
         updated_at: p.updated_at,
-        topicElos: eloMap[p.id] ?? {},
       }));
 
       setUsers(combined);
@@ -97,6 +90,29 @@ export default function UsersScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadUsers(); };
 
+  const handleExportCSV = () => {
+    const header = 'שם,סשנים,דיוק%,רצף,הצטרף';
+    const rows = users.map(u => {
+      const acc = u.total_answered > 0 ? Math.round((u.total_correct / u.total_answered) * 100) : 0;
+      const joined = new Date(u.created_at).toLocaleDateString('he-IL');
+      return `"${u.name}",${u.total_sessions},${acc}%,${u.streak},"${joined}"`;
+    });
+    const csv = [header, ...rows].join('\n');
+    const preview = [header, ...rows.slice(0, 3)].join('\n');
+    Alert.alert(
+      '📤 ייצוא CSV',
+      `${users.length} משתמשים\n\nתצוגה מקדימה (3 שורות ראשונות):\n\n${preview}`,
+      [{ text: 'סגור', style: 'cancel' }]
+    );
+    logger.info('users:export', `CSV generated with ${users.length} rows`);
+  };
+
+  const sevenDaysAgo = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  }, []);
+
   const filtered = useMemo(() => {
     let list = users;
     if (search.trim()) {
@@ -106,6 +122,12 @@ export default function UsersScreen() {
         (u.email ?? '').toLowerCase().includes(s) ||
         u.id.toLowerCase().includes(s)
       );
+    }
+    if (inactiveFilter) {
+      list = list.filter(u => {
+        if (!u.last_practiced_date) return true;
+        return u.last_practiced_date < sevenDaysAgo;
+      });
     }
     return [...list].sort((a, b) => {
       switch (sortKey) {
@@ -121,19 +143,15 @@ export default function UsersScreen() {
         default:             return 0;
       }
     });
-  }, [users, search, sortKey]);
+  }, [users, search, sortKey, inactiveFilter, sevenDaysAgo]);
 
   const selectedUser = users.find(u => u.id === selectedUserId);
 
   const stats = useMemo(() => ({
     total: users.length,
     withSessions: users.filter(u => u.total_sessions > 0).length,
-    avgLevel: users.length ? Math.round(users.reduce((s, u) => s + u.level, 0) / users.length * 10) / 10 : 0,
+    premium: users.filter(u => u.is_premium).length,
     avgSessions: users.length ? Math.round(users.reduce((s, u) => s + u.total_sessions, 0) / users.length) : 0,
-    activeToday: users.filter(u => {
-      if (!u.last_practiced_date) return false;
-      return u.last_practiced_date === new Date().toDateString();
-    }).length,
   }), [users]);
 
   if (loading) {
@@ -148,7 +166,13 @@ export default function UsersScreen() {
   }
 
   if (selectedUser) {
-    return <UserDetailScreen user={selectedUser} onBack={() => setSelectedUserId(null)} />;
+    return (
+      <UserDetailScreen
+        user={selectedUser}
+        onBack={() => { setSelectedUserId(null); loadUsers(); }}
+        onDeleted={() => { setSelectedUserId(null); loadUsers(); }}
+      />
+    );
   }
 
   return (
@@ -157,25 +181,36 @@ export default function UsersScreen() {
       <View style={styles.statsBar}>
         <StatChip label="סה״כ" value={String(stats.total)} />
         <StatChip label="פעילים" value={String(stats.withSessions)} />
-        <StatChip label="רמה ממוצעת" value={String(stats.avgLevel)} />
+        <StatChip label="פרמיום" value={String(stats.premium)} />
         <StatChip label="סשנים ממוצע" value={String(stats.avgSessions)} />
       </View>
 
-      {/* Search + sort */}
+      {/* Search + export */}
       <View style={styles.controlRow}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { flex: 1 }]}
           placeholder="🔍 חפש משתמש..."
           placeholderTextColor={Colors.textTertiary}
           value={search}
           onChangeText={setSearch}
           textAlign="right"
         />
+        <Pressable onPress={handleExportCSV} style={styles.exportBtn}>
+          <Text style={styles.exportBtnText}>📤 CSV</Text>
+        </Pressable>
       </View>
 
-      {/* Sort chips */}
+      {/* Sort chips + inactive filter */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.sortChips} style={styles.sortScroll}>
+        <Pressable
+          onPress={() => setInactiveFilter(v => !v)}
+          style={[styles.sortChip, inactiveFilter && styles.sortChipWarning]}
+        >
+          <Text style={[styles.sortChipText, inactiveFilter && styles.sortChipTextActive]}>
+            לא פעיל 7+ ימים
+          </Text>
+        </Pressable>
         {([
           ['sessions', 'סשנים'],
           ['level', 'רמה'],
@@ -219,7 +254,7 @@ export default function UsersScreen() {
               ? Math.round((u.total_correct / u.total_answered) * 100)
               : null;
             const joinDate = new Date(u.created_at).toLocaleDateString('he-IL');
-            const topElos = Object.entries(u.topicElos).sort(([,a],[,b]) => b - a).slice(0, 2);
+            const perf = getPerformanceLevel(u.total_correct, u.total_answered);
 
             return (
               <Pressable
@@ -234,7 +269,10 @@ export default function UsersScreen() {
                     </Text>
                   </View>
                   <View style={styles.userMainInfo}>
-                    <Text style={styles.userName}>{u.name}</Text>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.userName}>{u.name}</Text>
+                      {u.is_premium && <Text style={{ fontSize: 14 }}>💎</Text>}
+                    </View>
                     <Text style={styles.userId} numberOfLines={1}>
                       {target ? `${target.icon} ${target.name}` : 'ללא מסלול'}
                       {!u.has_completed_onboarding ? ' · לא השלים אונבורדינג' : ''}
@@ -252,22 +290,12 @@ export default function UsersScreen() {
                   <MiniStat icon="⭐" value={String(u.xp)} label="XP" />
                 </View>
 
-                {topElos.length > 0 && (
-                  <View style={styles.eloRow}>
-                    {topElos.map(([topicId, elo]) => {
-                      const topic = TOPICS.find(t => t.id === topicId);
-                      return (
-                        <View key={topicId} style={styles.eloPill}>
-                          <Text style={styles.eloPillText}>
-                            {topic?.icon ?? '📚'} {topic?.name ?? topicId}: {elo}
-                          </Text>
-                        </View>
-                      );
-                    })}
+                <View style={styles.cardFooter}>
+                  <Text style={styles.userJoined}>הצטרף: {joinDate}</Text>
+                  <View style={[styles.perfPill, { backgroundColor: perf.color + '22', borderColor: perf.color + '55' }]}>
+                    <Text style={[styles.perfPillText, { color: perf.color }]}>{perf.label}</Text>
                   </View>
-                )}
-
-                <Text style={styles.userJoined}>הצטרף: {joinDate}</Text>
+                </View>
               </Pressable>
             );
           })
@@ -279,9 +307,20 @@ export default function UsersScreen() {
 
 // ── User Detail Screen ─────────────────────────────────────────────────────
 
-function UserDetailScreen({ user, onBack }: { user: RealUser; onBack: () => void }) {
+function UserDetailScreen({
+  user,
+  onBack,
+  onDeleted,
+}: {
+  user: RealUser;
+  onBack: () => void;
+  onDeleted: () => void;
+}) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  const [isPremium, setIsPremium] = useState(user.is_premium);
+  const [togglingPremium, setTogglingPremium] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     supabase
@@ -296,17 +335,81 @@ function UserDetailScreen({ user, onBack }: { user: RealUser; onBack: () => void
       });
   }, [user.id]);
 
+  const handleTogglePremium = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTogglingPremium(true);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ is_premium: !isPremium })
+        .eq('id', user.id);
+      if (error) {
+        Alert.alert('שגיאה', 'לא ניתן לעדכן סטטוס פרמיום: ' + error.message);
+      } else {
+        setIsPremium(prev => !prev);
+        Alert.alert('עודכן', !isPremium ? '💎 המשתמש עודכן לפרמיום' : '🔓 פרמיום הוסר מהמשתמש');
+      }
+    } finally {
+      setTogglingPremium(false);
+    }
+  };
+
+  const handleDeleteUser = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Alert.alert(
+      'מחק משתמש',
+      `האם אתה בטוח שברצונך למחוק את ${user.name}?\nפעולה זו בלתי הפיכה ותמחק את כל הסשנים.`,
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'מחק',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              const { error: sessErr } = await supabase
+                .from('practice_sessions')
+                .delete()
+                .eq('user_id', user.id);
+              if (sessErr) {
+                Alert.alert('שגיאה', 'לא ניתן למחוק סשנים: ' + sessErr.message);
+                setDeleting(false);
+                return;
+              }
+              const { error: profErr } = await supabase
+                .from('user_profiles')
+                .delete()
+                .eq('id', user.id);
+              if (profErr) {
+                Alert.alert('שגיאה', 'לא ניתן למחוק פרופיל: ' + profErr.message);
+                setDeleting(false);
+                return;
+              }
+              Alert.alert('נמחק', `המשתמש ${user.name} נמחק בהצלחה`, [
+                { text: 'אישור', onPress: onDeleted },
+              ]);
+            } catch (e: any) {
+              Alert.alert('שגיאה', e?.message ?? 'שגיאה לא ידועה');
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const target = TARGETS.find(t => t.id === user.selected_target_id);
   const correctRate = user.total_answered > 0
     ? Math.round((user.total_correct / user.total_answered) * 100)
     : null;
+  const perf = getPerformanceLevel(user.total_correct, user.total_answered);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         {/* Back */}
         <Pressable onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← חזרה לרשימה</Text>
+          <Text style={styles.backBtnText}>→ חזרה לרשימה</Text>
         </Pressable>
 
         {/* User header */}
@@ -316,8 +419,14 @@ function UserDetailScreen({ user, onBack }: { user: RealUser; onBack: () => void
               {user.name.charAt(0).toUpperCase() || '?'}
             </Text>
           </View>
-          <Text style={styles.detailName}>{user.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.detailName}>{user.name}</Text>
+            {isPremium && <Text style={{ fontSize: 22 }}>💎</Text>}
+          </View>
           <Text style={styles.detailSub}>{target ? `${target.icon} ${target.name}` : 'ללא מסלול'}</Text>
+          <View style={[styles.perfPill, { backgroundColor: perf.color + '22', borderColor: perf.color + '55', marginTop: 4 }]}>
+            <Text style={[styles.perfPillText, { color: perf.color }]}>{perf.label}</Text>
+          </View>
           <Text style={[styles.detailSub, { fontSize: FontSize.xs, marginTop: 2, color: Colors.textTertiary }]}>
             ID: {user.id.slice(0, 16)}...
           </Text>
@@ -341,27 +450,33 @@ function UserDetailScreen({ user, onBack }: { user: RealUser; onBack: () => void
           ))}
         </View>
 
-        {/* ELOs */}
-        {Object.keys(user.topicElos).length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📊 ELO לפי נושא</Text>
-            {Object.entries(user.topicElos)
-              .sort(([,a],[,b]) => b - a)
-              .map(([topicId, elo]) => {
-                const topic = TOPICS.find(t => t.id === topicId);
-                const pct = Math.min(100, Math.max(0, ((elo - 800) / 800) * 100));
-                return (
-                  <View key={topicId} style={styles.eloBarRow}>
-                    <Text style={styles.eloBarLabel}>{topic?.icon ?? '📚'} {topic?.name ?? topicId}</Text>
-                    <View style={styles.eloBarBg}>
-                      <View style={[styles.eloBarFill, { width: `${pct}%` as any, backgroundColor: topic?.color ?? Colors.primary }]} />
-                    </View>
-                    <Text style={styles.eloBarValue}>{elo}</Text>
-                  </View>
-                );
-              })}
-          </View>
-        )}
+        {/* Premium toggle */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>⚙️ פעולות ניהול</Text>
+          <Pressable
+            onPress={handleTogglePremium}
+            disabled={togglingPremium}
+            style={[styles.actionBtn, isPremium ? styles.actionBtnWarning : styles.actionBtnPrimary]}
+          >
+            {togglingPremium
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.actionBtnText}>
+                  {isPremium ? '🔓 הסר פרמיום' : '💎 הוסף פרמיום'}
+                </Text>
+            }
+          </Pressable>
+
+          <Pressable
+            onPress={handleDeleteUser}
+            disabled={deleting}
+            style={[styles.actionBtn, styles.actionBtnDanger, { marginTop: 10 }]}
+          >
+            {deleting
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.actionBtnText}>🗑️ מחק משתמש</Text>
+            }
+          </Pressable>
+        </View>
 
         {/* Recent sessions */}
         <View style={styles.section}>
@@ -379,7 +494,7 @@ function UserDetailScreen({ user, onBack }: { user: RealUser; onBack: () => void
                 <View key={s.id} style={styles.sessionRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.sessionMode}>
-                      {s.mode === 'simulation' ? '🏆 סימולציה' : s.mode === 'speed' ? '⚡ מהירות' : '📝 תרגול'}
+                      {s.mode === 'simulation' ? '🏆 סימולציה' : s.mode === 'speed' ? '⚡ מהירות' : s.mode === 'adaptive' ? '🧠 אדפטיבי' : '📝 תרגול'}
                       {topic ? ` · ${topic.icon} ${topic.name}` : ''}
                     </Text>
                     <Text style={styles.sessionMeta}>
@@ -452,7 +567,7 @@ const styles = StyleSheet.create({
   statChipValue: { fontFamily: FontFamily.heading, fontSize: FontSize.lg, color: Colors.primary },
   statChipLabel: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
 
-  controlRow: { paddingHorizontal: 12, paddingVertical: 8 },
+  controlRow: { paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row-reverse', gap: 8, alignItems: 'center' },
   searchInput: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
@@ -463,6 +578,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  exportBtn: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: Radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exportBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
 
   sortScroll: { maxHeight: 44 },
   sortChips: { paddingHorizontal: 12, gap: 8, flexDirection: 'row-reverse' },
@@ -473,8 +600,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   sortChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  sortChipWarning: { backgroundColor: Colors.warning + '30', borderColor: Colors.warning },
   sortChipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
   sortChipTextActive: { color: '#fff' },
 
@@ -538,16 +668,14 @@ const styles = StyleSheet.create({
   miniStatValue: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text },
   miniStatLabel: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
 
-  eloRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
-  eloPill: {
-    backgroundColor: Colors.surfaceSecondary,
+  cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  perfPill: {
     borderRadius: Radius.full,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
-  eloPillText: { fontFamily: FontFamily.medium, fontSize: 11, color: Colors.textSecondary },
+  perfPillText: { fontFamily: FontFamily.medium, fontSize: 11 },
 
   userJoined: {
     fontFamily: FontFamily.regular,
@@ -557,7 +685,7 @@ const styles = StyleSheet.create({
   },
 
   // Detail screen
-  backBtn: { alignSelf: 'flex-end', marginBottom: 16 },
+  backBtn: { alignSelf: 'flex-end', marginBottom: 16, minHeight: 44, justifyContent: 'center' },
   backBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
 
   detailHeader: { alignItems: 'center', marginBottom: 20, gap: 6 },
@@ -594,34 +722,27 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  eloBarRow: {
-    flexDirection: 'row-reverse',
+  actionBtn: {
+    borderRadius: Radius.xl,
+    paddingVertical: 14,
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
+    justifyContent: 'center',
+    minHeight: 48,
+    borderWidth: 1,
   },
-  eloBarLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    width: 90,
-    textAlign: 'right',
+  actionBtnPrimary: {
+    backgroundColor: Colors.primaryLighter,
+    borderColor: Colors.primary + '60',
   },
-  eloBarBg: {
-    flex: 1,
-    height: 8,
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 4,
-    overflow: 'hidden',
+  actionBtnWarning: {
+    backgroundColor: Colors.warning + '20',
+    borderColor: Colors.warning + '60',
   },
-  eloBarFill: { height: '100%', borderRadius: 4 },
-  eloBarValue: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.primary,
-    width: 40,
-    textAlign: 'right',
+  actionBtnDanger: {
+    backgroundColor: Colors.danger + '20',
+    borderColor: Colors.danger + '60',
   },
+  actionBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
 
   sessionRow: {
     backgroundColor: Colors.surface,
