@@ -29,6 +29,10 @@ export default function AuthScreen() {
 
   const initialize = useUserStore(s => s.initialize);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
+  const registrationOpen = useAdminStore(s => s.appConfig.registrationOpen);
+  const announcementEnabled = useAdminStore(s => s.appConfig.announcementEnabled);
+  const announcementText = useAdminStore(s => s.appConfig.announcementText);
+  const announcementLevel = useAdminStore(s => s.appConfig.announcementLevel);
 
   const nameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
@@ -206,6 +210,20 @@ export default function AuthScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Announcement banner */}
+            {announcementEnabled && announcementText ? (
+              <View style={{
+                backgroundColor: announcementLevel === 'critical' ? 'rgba(239,68,68,0.15)' : announcementLevel === 'warning' ? 'rgba(245,158,11,0.15)' : 'rgba(124,111,247,0.15)',
+                borderRadius: 12, padding: 14, marginBottom: 16,
+                borderWidth: 1,
+                borderColor: announcementLevel === 'critical' ? 'rgba(239,68,68,0.4)' : announcementLevel === 'warning' ? 'rgba(245,158,11,0.4)' : 'rgba(124,111,247,0.4)',
+              }}>
+                <Text style={{ fontFamily: 'Heebo_500Medium', fontSize: 14, color: announcementLevel === 'critical' ? '#EF4444' : announcementLevel === 'warning' ? '#F59E0B' : '#7C6FF7', textAlign: 'right', lineHeight: 20 }}>
+                  {announcementLevel === 'critical' ? '🚨 ' : announcementLevel === 'warning' ? '⚠️ ' : 'ℹ️ '}{announcementText}
+                </Text>
+              </View>
+            ) : null}
+
             {/* Logo */}
             <Animated.View style={[styles.logoSection, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
               <View style={styles.logoOrb}>
@@ -250,108 +268,120 @@ export default function AuthScreen() {
               </View>
 
               {/* Inputs */}
-              <View style={styles.form}>
-                {mode === 'register' && (
+              {mode === 'register' && !registrationOpen ? (
+                <View style={{ backgroundColor: 'rgba(239,68,68,0.15)', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)', marginTop: 16 }}>
+                  <Text style={{ fontFamily: 'Heebo_700Bold', fontSize: 16, color: '#EF4444', textAlign: 'right', marginBottom: 8 }}>🚫 הרשמות סגורות</Text>
+                  <Text style={{ fontFamily: 'Heebo_400Regular', fontSize: 14, color: '#94A3B8', textAlign: 'right', lineHeight: 20 }}>
+                    הרשמת משתמשים חדשים אינה זמינה כרגע. פנה למנהל האפליקציה.
+                  </Text>
+                  <Pressable onPress={() => switchMode('login')} style={{ marginTop: 16, backgroundColor: '#1E293B', borderRadius: 12, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontFamily: 'Heebo_500Medium', fontSize: 14, color: '#94A3B8' }}>עבור להתחברות</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.form}>
+                  {mode === 'register' && (
+                    <TextInput
+                      ref={nameRef}
+                      style={styles.input}
+                      value={displayName}
+                      onChangeText={setDisplayName}
+                      placeholder="שם מלא (אופציונלי)"
+                      placeholderTextColor={Colors.textTertiary}
+                      textAlign="right"
+                      autoCorrect={false}
+                      autoCapitalize="words"
+                      textContentType="name"
+                      autoComplete="name"
+                      returnKeyType="next"
+                      onSubmitEditing={() => emailRef.current?.focus()}
+                      accessibilityLabel="שם מלא"
+                    />
+                  )}
                   <TextInput
-                    ref={nameRef}
+                    ref={emailRef}
                     style={styles.input}
-                    value={displayName}
-                    onChangeText={setDisplayName}
-                    placeholder="שם מלא (אופציונלי)"
+                    value={email}
+                    onChangeText={v => { setEmail(v); setError(''); }}
+                    placeholder="כתובת מייל"
                     placeholderTextColor={Colors.textTertiary}
-                    textAlign="right"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                     autoCorrect={false}
-                    autoCapitalize="words"
-                    textContentType="name"
-                    autoComplete="name"
+                    textAlign="right"
+                    textContentType="emailAddress"
+                    autoComplete="email"
                     returnKeyType="next"
-                    onSubmitEditing={() => emailRef.current?.focus()}
-                    accessibilityLabel="שם מלא"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                    accessibilityLabel="כתובת מייל"
                   />
-                )}
-                <TextInput
-                  ref={emailRef}
-                  style={styles.input}
-                  value={email}
-                  onChangeText={v => { setEmail(v); setError(''); }}
-                  placeholder="כתובת מייל"
-                  placeholderTextColor={Colors.textTertiary}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textAlign="right"
-                  textContentType="emailAddress"
-                  autoComplete="email"
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                  accessibilityLabel="כתובת מייל"
-                />
-                <TextInput
-                  ref={passwordRef}
-                  style={styles.input}
-                  value={password}
-                  onChangeText={v => { setPassword(v); setError(''); }}
-                  placeholder="סיסמה (מינימום 6 תווים)"
-                  placeholderTextColor={Colors.textTertiary}
-                  secureTextEntry
-                  textAlign="right"
-                  onSubmitEditing={mode === 'login' ? handleSubmit : () => confirmRef.current?.focus()}
-                  textContentType={mode === 'login' ? 'password' : 'newPassword'}
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  returnKeyType={mode === 'login' ? 'go' : 'next'}
-                  accessibilityLabel="סיסמה"
-                />
-                {mode === 'register' && (
                   <TextInput
-                    ref={confirmRef}
+                    ref={passwordRef}
                     style={styles.input}
-                    value={confirmPassword}
-                    onChangeText={v => { setConfirmPassword(v); setError(''); }}
-                    placeholder="אימות סיסמה"
+                    value={password}
+                    onChangeText={v => { setPassword(v); setError(''); }}
+                    placeholder="סיסמה (מינימום 6 תווים)"
                     placeholderTextColor={Colors.textTertiary}
                     secureTextEntry
                     textAlign="right"
-                    onSubmitEditing={handleSubmit}
-                    textContentType="newPassword"
-                    autoComplete="new-password"
-                    returnKeyType="go"
-                    accessibilityLabel="אימות סיסמה"
+                    onSubmitEditing={mode === 'login' ? handleSubmit : () => confirmRef.current?.focus()}
+                    textContentType={mode === 'login' ? 'password' : 'newPassword'}
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    returnKeyType={mode === 'login' ? 'go' : 'next'}
+                    accessibilityLabel="סיסמה"
                   />
-                )}
+                  {mode === 'register' && (
+                    <TextInput
+                      ref={confirmRef}
+                      style={styles.input}
+                      value={confirmPassword}
+                      onChangeText={v => { setConfirmPassword(v); setError(''); }}
+                      placeholder="אימות סיסמה"
+                      placeholderTextColor={Colors.textTertiary}
+                      secureTextEntry
+                      textAlign="right"
+                      onSubmitEditing={handleSubmit}
+                      textContentType="newPassword"
+                      autoComplete="new-password"
+                      returnKeyType="go"
+                      accessibilityLabel="אימות סיסמה"
+                    />
+                  )}
 
-                {!!error && (
-                  <View style={styles.errorBox}>
-                    <Text style={styles.errorText}>⚠️ {error}</Text>
-                  </View>
-                )}
+                  {!!error && (
+                    <View style={styles.errorBox}>
+                      <Text style={styles.errorText}>⚠️ {error}</Text>
+                    </View>
+                  )}
 
-                <Pressable
-                  onPress={handleSubmit}
-                  disabled={loading}
-                  accessibilityRole="button"
-                  accessibilityLabel={mode === 'login' ? 'כניסה לחשבון' : 'יצירת חשבון'}
-                  accessibilityState={{ disabled: loading }}
-                  style={({ pressed }) => [styles.submitBtn, { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: loading ? 0.85 : 1 }]}
-                >
-                  <LinearGradient
-                    colors={[Colors.primary, Colors.primaryDark]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={styles.submitGrad}
+                  <Pressable
+                    onPress={handleSubmit}
+                    disabled={loading}
+                    accessibilityRole="button"
+                    accessibilityLabel={mode === 'login' ? 'כניסה לחשבון' : 'יצירת חשבון'}
+                    accessibilityState={{ disabled: loading }}
+                    style={({ pressed }) => [styles.submitBtn, { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: loading ? 0.85 : 1 }]}
                   >
-                    <View style={styles.submitShimmer} />
-                    {loading
-                      ? <ActivityIndicator color="#fff" />
-                      : <Text style={styles.submitText}>{mode === 'login' ? 'כניסה ←' : 'יצירת חשבון ←'}</Text>
-                    }
-                  </LinearGradient>
-                </Pressable>
+                    <LinearGradient
+                      colors={[Colors.primary, Colors.primaryDark]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={styles.submitGrad}
+                    >
+                      <View style={styles.submitShimmer} />
+                      {loading
+                        ? <ActivityIndicator color="#fff" />
+                        : <Text style={styles.submitText}>{mode === 'login' ? 'כניסה ←' : 'יצירת חשבון ←'}</Text>
+                      }
+                    </LinearGradient>
+                  </Pressable>
 
-                <Text style={styles.hint}>
-                  {mode === 'login'
-                    ? 'אין לך חשבון? לחץ על "הרשמה" למעלה'
-                    : 'יש לך חשבון? לחץ על "התחברות" למעלה'}
-                </Text>
-              </View>
+                  <Text style={styles.hint}>
+                    {mode === 'login'
+                      ? 'אין לך חשבון? לחץ על "הרשמה" למעלה'
+                      : 'יש לך חשבון? לחץ על "התחברות" למעלה'}
+                  </Text>
+                </View>
+              )}
 
               {/* Legal */}
               <View style={styles.legalRow}>

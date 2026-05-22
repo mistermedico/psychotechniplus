@@ -42,8 +42,8 @@ export default function PracticeSession() {
     nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
   } = usePracticeStore();
 
-  const { recordAnswer, recordSession, getTopicLevel, userId, name: userName } = useUserStore();
-  const { templates, questions: adminQuestions, practiceSettings, addSessionRecord } = useAdminStore();
+  const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium } = useUserStore();
+  const { templates, questions: adminQuestions, practiceSettings, freePracticeLimit, addSessionRecord } = useAdminStore();
 
   const {
     showTimerInPractice,
@@ -82,8 +82,8 @@ export default function PracticeSession() {
   const target = getTargetById(targetId ?? '');
   const isSpeedMode = mode === 'speed';
 
-  // Whether to show the timer (speed mode OR user enabled showTimerInPractice)
-  const showTimer = isSpeedMode || showTimerInPractice;
+  // Whether to show the timer (speed mode OR user enabled showTimerInPractice OR admin forced showTimerAlways)
+  const showTimer = isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
 
   // Initialize session — simulation mode or free practice
   useEffect(() => {
@@ -131,11 +131,26 @@ export default function PracticeSession() {
       else if (difficulty === 'medium') filtered = questions.filter(q => q.difficulty >= 3 && q.difficulty <= 7);
       else if (difficulty === 'hard') filtered = questions.filter(q => q.difficulty >= 6);
       if (filtered.length === 0) filtered = questions; // fallback to all
+      // Apply free user difficulty cap
+      let questionPool = filtered;
+      if (!isPremium) {
+        const capped = questionPool.filter(q => q.difficulty <= practiceSettings.freeUserMaxDifficulty);
+        if (capped.length > 0) questionPool = capped;
+      }
+      // Apply free user question limit
+      const effectiveLimit = !isPremium ? Math.min(limit, freePracticeLimit) : limit;
+      // Shuffle answer options if admin setting is enabled
+      if (practiceSettings.shuffleAnswerOptions) {
+        questionPool = questionPool.map(q => ({
+          ...q,
+          options: [...q.options].sort(() => Math.random() - 0.5),
+        }));
+      }
       startSession({
         targetId: targetId ?? '',
         topicId: topicId ?? '',
         mode: mode ?? 'practice',
-        questions: filtered.slice(0, limit),
+        questions: questionPool.slice(0, effectiveLimit),
         initialLevel: userLevel,
       });
     });

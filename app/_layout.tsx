@@ -88,6 +88,7 @@ export default function RootLayout() {
           <Stack.Screen name="paywall" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="terms" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="privacy" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+          <Stack.Screen name="maintenance" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

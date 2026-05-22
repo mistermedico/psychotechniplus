@@ -59,7 +59,9 @@ export default function PracticeTab() {
   const indicatorLeft = tabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '50%'] });
 
   const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium } = useUserStore();
-  const { freePracticeLimit, templates } = useAdminStore();
+  const { freePracticeLimit, templates, appConfig, practiceSettings } = useAdminStore();
+  const featureFlags = appConfig.featureFlags;
+  const premiumOnlyModes = practiceSettings.premiumOnlyModes;
 
   const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const topics = TOPICS.filter(t => t.targetId === target.id);
@@ -82,6 +84,18 @@ export default function PracticeTab() {
 
   const handleStartFree = () => {
     if (!selectedTopicId) return;
+    // Check if mode is premium-only
+    if (premiumOnlyModes.includes(selectedMode) && !isPremium) {
+      Alert.alert(
+        'פרמיום בלבד',
+        'מצב זה זמין למנויי פרמיום בלבד. שדרג את החשבון שלך.',
+        [
+          { text: 'שדרג', onPress: () => router.push('/paywall') },
+          { text: 'ביטול', style: 'cancel' },
+        ]
+      );
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     router.push({
       pathname: '/practice-session',
@@ -161,14 +175,21 @@ export default function PracticeTab() {
             freePracticeLimit={freePracticeLimit}
             canStart={selectedTopicId !== null}
             onStart={handleStartFree}
+            showSpeedMode={featureFlags.speedMode}
           />
-        ) : (
+        ) : featureFlags.simulations !== false ? (
           <SimulationsPane
             templates={activeTemplates}
             target={target}
             onStart={handleStartSimulation}
             isPremium={isPremium}
           />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateEmoji}>🔒</Text>
+            <Text style={styles.emptyStateTitle}>מבחנים חכמים אינם זמינים כרגע</Text>
+            <Text style={styles.emptyStateSub}>תכונה זו הושבתה זמנית</Text>
+          </View>
         )}
       </SafeAreaView>
     </View>
@@ -180,7 +201,7 @@ function FreePracticePane({
   selectedTopicId, setSelectedTopicId,
   selectedDifficulty, setSelectedDifficulty,
   getTopicAccuracy, getTopicLevelLabel,
-  isPremium, freePracticeLimit, canStart, onStart,
+  isPremium, freePracticeLimit, canStart, onStart, showSpeedMode,
 }: {
   topics: typeof TOPICS;
   selectedMode: string; setSelectedMode: (m: string) => void;
@@ -190,6 +211,7 @@ function FreePracticePane({
   getTopicLevelLabel: (id: string) => string;
   isPremium: boolean; freePracticeLimit: number;
   canStart: boolean; onStart: () => void;
+  showSpeedMode?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -230,7 +252,7 @@ function FreePracticePane({
           directionalLockEnabled
           style={styles.modesRowOuter}
         >
-          {FREE_MODES.map(mode => (
+          {FREE_MODES.filter(mode => mode.id !== 'speed' || showSpeedMode !== false).map(mode => (
             <ModeChip
               key={mode.id}
               mode={mode}

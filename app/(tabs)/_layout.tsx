@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { FontFamily } from '../../constants/theme';
 import { Colors } from '../../constants/colors';
+import { useAdminStore } from '../../store/adminStore';
 
 interface TabIconProps {
   icon: string;
@@ -50,12 +51,61 @@ function TabIcon({ icon, label, focused }: TabIconProps) {
   );
 }
 
+function AnnouncementBanner() {
+  const announcementEnabled = useAdminStore(s => s.appConfig.announcementEnabled);
+  const announcementText = useAdminStore(s => s.appConfig.announcementText);
+  const announcementLevel = useAdminStore(s => s.appConfig.announcementLevel);
+
+  if (!announcementEnabled || !announcementText) return null;
+
+  const bgColor = announcementLevel === 'critical'
+    ? 'rgba(239,68,68,0.20)'
+    : announcementLevel === 'warning'
+      ? 'rgba(245,158,11,0.20)'
+      : 'rgba(124,111,247,0.20)';
+  const borderColor = announcementLevel === 'critical'
+    ? 'rgba(239,68,68,0.5)'
+    : announcementLevel === 'warning'
+      ? 'rgba(245,158,11,0.5)'
+      : 'rgba(124,111,247,0.5)';
+  const textColor = announcementLevel === 'critical'
+    ? '#EF4444'
+    : announcementLevel === 'warning'
+      ? '#F59E0B'
+      : '#9E99FA';
+  const icon = announcementLevel === 'critical' ? '🚨 ' : announcementLevel === 'warning' ? '⚠️ ' : 'ℹ️ ';
+
+  return (
+    <View style={{
+      backgroundColor: bgColor,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: borderColor,
+    }}>
+      <Text
+        numberOfLines={1}
+        style={{
+          fontFamily: FontFamily.medium,
+          fontSize: 13,
+          color: textColor,
+          textAlign: 'right',
+        }}
+      >
+        {icon}{announcementText}
+      </Text>
+    </View>
+  );
+}
+
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const TAB_HEIGHT = 64;
   const BAR_HEIGHT = TAB_HEIGHT + Math.max(insets.bottom, 12);
 
   return (
+    <View style={{ flex: 1 }}>
+      <AnnouncementBanner />
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -126,6 +176,7 @@ export default function TabLayout() {
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
     </Tabs>
+    </View>
   );
 }
 
