@@ -8,97 +8,128 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { Colors } from '../constants/colors';
-import { FontFamily, FontSize, Radius } from '../constants/theme';
+import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 
 const { width: W } = Dimensions.get('window');
 
 const FEATURES = [
   {
-    icon: '🧠',
-    title: 'אדפטיבי ומותאם אישית',
-    desc: 'מנוע ELO מזהה את רמתך ומתאים את קושי השאלות בזמן אמת — כמו מאמן פרטי',
+    icon: '🎯',
+    title: 'מותאם אישית',
+    desc: 'מנוע אדפטיבי מזהה את רמתך ומתאים שאלות בזמן אמת',
     color: Colors.primary,
   },
   {
     icon: '📊',
-    title: 'מעקב התקדמות חכם',
-    desc: 'גרפים, רצפים, XP ותגים — ראה בדיוק כיצד אתה משתפר לאורך זמן',
+    title: 'מעקב מתקדם',
+    desc: 'גרפים, רצפים ותגים — ראה בדיוק כיצד אתה משתפר',
     color: Colors.accent,
-  },
-  {
-    icon: '🎯',
-    title: 'כל תחומי הפסיכוטכני',
-    desc: 'חשיבה לוגית, כמותית, מילולית ומרחבית — כיסוי מלא לכל פרק המבחן',
-    color: Colors.success,
   },
   {
     icon: '⚡',
     title: 'סימולציות מלאות',
-    desc: 'מבחנים מדויקים בתנאי לחץ אמיתיים עם ניתוח ביצועים מפורט',
+    desc: 'מבחנים מדויקים בתנאי לחץ עם ניתוח ביצועים',
     color: Colors.warning,
   },
   {
     icon: '🏆',
     title: 'מערכת הישגים',
-    desc: 'תגים, רמות ולוח מובילים — הפוך את הלמידה לחוויה מהנה ומניעה',
-    color: Colors.danger,
+    desc: 'תגים, רמות ולוח מובילים — הפוך את הלמידה למשחק',
+    color: Colors.success,
   },
   {
     icon: '💡',
     title: 'הסברים מעמיקים',
-    desc: 'כל שאלה עם הסבר מפורט לתשובה — למד מהטעויות ואל תחזור עליהן',
+    desc: 'כל שאלה עם הסבר מפורט — למד מהטעויות',
     color: Colors.cyan,
+  },
+  {
+    icon: '🎓',
+    title: 'כל תחומי הפסיכוטכני',
+    desc: 'חשיבה לוגית, כמותית, מילולית ומרחבית',
+    color: Colors.primary,
   },
 ];
 
 const STATS = [
+  { value: '10,000+', label: 'משתמשים' },
+  { value: '95%', label: 'שיפור ממוצע' },
   { value: '3,000+', label: 'שאלות' },
-  { value: '94%', label: 'שיפור ממוצע' },
-  { value: '12+', label: 'נושאים' },
 ];
 
+const HOW_STEPS = [
+  { icon: '📋', title: 'הירשם', desc: 'הרשמה מהירה ב-30 שניות' },
+  { icon: '🧠', title: 'תרגל', desc: 'שאלות מותאמות לרמתך' },
+  { icon: '🚀', title: 'תצליח', desc: 'הגע לציון הרצוי' },
+];
+
+const TESTIMONIALS = [
+  {
+    stars: '⭐⭐⭐⭐⭐',
+    text: 'עלה לי 30 נקודות תוך חודש! האפליקציה מרגישה כמו מאמן אישי. ממליץ בחום!',
+    author: '— דנה ג., ציון 134',
+  },
+  {
+    stars: '⭐⭐⭐⭐⭐',
+    text: 'הסימולציות חיקו בדיוק את המבחן האמיתי. הגעתי מוכן לחלוטין.',
+    author: '— יואב מ., ציון 141',
+  },
+];
 
 export default function LandingScreen() {
-  const heroOpacity  = useRef(new Animated.Value(0)).current;
-  const heroSlide    = useRef(new Animated.Value(24)).current;
-  const heroScale    = useRef(new Animated.Value(0.92)).current;
-
-  const statsOpacity = useRef(new Animated.Value(0)).current;
-  const statsSlide   = useRef(new Animated.Value(20)).current;
-
-  const featOpacity  = useRef(new Animated.Value(0)).current;
-  const featSlide    = useRef(new Animated.Value(20)).current;
-
-  const quoteOpacity = useRef(new Animated.Value(0)).current;
-  const ctaOpacity   = useRef(new Animated.Value(0)).current;
-  const ctaSlide     = useRef(new Animated.Value(16)).current;
+  // Animation refs
+  const navOpacity    = useRef(new Animated.Value(0)).current;
+  const heroOpacity   = useRef(new Animated.Value(0)).current;
+  const heroSlide     = useRef(new Animated.Value(28)).current;
+  const heroScale     = useRef(new Animated.Value(0.92)).current;
+  const statsOpacity  = useRef(new Animated.Value(0)).current;
+  const statsSlide    = useRef(new Animated.Value(20)).current;
+  const howOpacity    = useRef(new Animated.Value(0)).current;
+  const howSlide      = useRef(new Animated.Value(20)).current;
+  const featOpacity   = useRef(new Animated.Value(0)).current;
+  const featSlide     = useRef(new Animated.Value(20)).current;
+  const testOpacity   = useRef(new Animated.Value(0)).current;
+  const testSlide     = useRef(new Animated.Value(20)).current;
+  const priceOpacity  = useRef(new Animated.Value(0)).current;
+  const priceSlide    = useRef(new Animated.Value(20)).current;
+  const ctaOpacity    = useRef(new Animated.Value(0)).current;
+  const ctaSlide      = useRef(new Animated.Value(16)).current;
+  const ctaPressScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.sequence([
-      // Hero animates first
+      Animated.timing(navOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.parallel([
-        Animated.timing(heroOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(heroOpacity, { toValue: 1, duration: 550, useNativeDriver: true }),
         Animated.spring(heroSlide,   { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
         Animated.spring(heroScale,   { toValue: 1, friction: 9, tension: 70, useNativeDriver: true }),
       ]),
-      // Stats — short pause
       Animated.parallel([
-        Animated.timing(statsOpacity, { toValue: 1, duration: 420, useNativeDriver: true }),
+        Animated.timing(statsOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
         Animated.spring(statsSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
       ]),
-      // Features
       Animated.parallel([
-        Animated.timing(featOpacity, { toValue: 1, duration: 420, useNativeDriver: true }),
+        Animated.timing(howOpacity, { toValue: 1, duration: 360, useNativeDriver: true }),
+        Animated.spring(howSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(featOpacity, { toValue: 1, duration: 360, useNativeDriver: true }),
         Animated.spring(featSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
       ]),
-      // Quote + CTA together
       Animated.parallel([
-        Animated.timing(quoteOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
-        Animated.timing(ctaOpacity,   { toValue: 1, duration: 380, useNativeDriver: true }),
-        Animated.spring(ctaSlide,     { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+        Animated.timing(testOpacity, { toValue: 1, duration: 340, useNativeDriver: true }),
+        Animated.spring(testSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(priceOpacity, { toValue: 1, duration: 340, useNativeDriver: true }),
+        Animated.spring(priceSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(ctaOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
+        Animated.spring(ctaSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
       ]),
     ]).start();
-  }, []);
+  }, []); // eslint-disable-line
 
   const handleStart = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -110,6 +141,13 @@ export default function LandingScreen() {
     router.push('/auth');
   };
 
+  const onCtaPressIn = () => {
+    Animated.spring(ctaPressScale, { toValue: 0.96, friction: 10, tension: 120, useNativeDriver: true }).start();
+  };
+  const onCtaPressOut = () => {
+    Animated.spring(ctaPressScale, { toValue: 1, friction: 10, tension: 120, useNativeDriver: true }).start();
+  };
+
   return (
     <View style={styles.root}>
       {/* Ambient orbs */}
@@ -118,6 +156,15 @@ export default function LandingScreen() {
       <View style={styles.orbCyan} />
 
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+
+        {/* ─── Nav Bar ─── */}
+        <Animated.View style={[styles.navBar, { opacity: navOpacity }]}>
+          <Pressable onPress={handleLogin} style={styles.navLogin}>
+            <Text style={styles.navLoginText}>כניסה</Text>
+          </Pressable>
+          <Text style={styles.navAppName}>PsychoTechniPlus</Text>
+        </Animated.View>
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
@@ -129,14 +176,14 @@ export default function LandingScreen() {
             opacity: heroOpacity,
             transform: [{ translateY: heroSlide }, { scale: heroScale }],
           }]}>
-            {/* Badge */}
-            <View style={styles.heroBadge}>
+            {/* Animated badge */}
+            <View style={styles.heroBadgeWrap}>
               <LinearGradient
                 colors={[Colors.primaryLighter, Colors.accentLight]}
                 style={styles.heroBadgeGrad}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.heroBadgeText}>✦ AI-Powered · פסיכוטכני</Text>
+                <Text style={styles.heroBadgeText}>🏆 הכנה לפסיכוטכני</Text>
               </LinearGradient>
             </View>
 
@@ -153,25 +200,43 @@ export default function LandingScreen() {
             </View>
 
             <Text style={styles.appName}>פסיכוטכניPlus</Text>
-            <Text style={styles.tagline}>
-              הדרך החכמה ביותר להתכונן{'\n'}למבחן הפסיכוטכני ולהצליח
-            </Text>
+            <Text style={styles.tagline}>הדרך החכמה ביותר להגיע לציון שרצית</Text>
+            <Text style={styles.subTagline}>מנוע אדפטיבי · תרגול חכם · סימולציות מלאות</Text>
+
+            {/* Primary CTA */}
+            <Animated.View style={[styles.ctaPrimaryWrap, { transform: [{ scale: ctaPressScale }] }]}>
+              <Pressable
+                onPress={handleStart}
+                onPressIn={onCtaPressIn}
+                onPressOut={onCtaPressOut}
+                style={styles.ctaPrimary}
+              >
+                <LinearGradient
+                  colors={Colors.gradients.primary}
+                  style={styles.ctaPrimaryGrad}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                >
+                  <Text style={styles.ctaPrimaryText}>התחל בחינם — ללא כרטיס אשראי ←</Text>
+                </LinearGradient>
+              </Pressable>
+              <View style={styles.ctaGlow} />
+            </Animated.View>
+
+            {/* Secondary CTA */}
+            <Pressable onPress={handleLogin} style={styles.ctaSecondary}>
+              <Text style={styles.ctaSecondaryText}>יש לי חשבון</Text>
+            </Pressable>
           </Animated.View>
 
-          {/* ─── Stats ─── */}
-          <Animated.View style={[styles.statsRow, {
+          {/* ─── Social Proof Stats ─── */}
+          <Animated.View style={[styles.statsCard, {
             opacity: statsOpacity,
             transform: [{ translateY: statsSlide }],
           }]}>
             {STATS.map((s, i) => (
               <React.Fragment key={s.label}>
                 <View style={styles.statItem}>
-                  <LinearGradient
-                    colors={Colors.gradients.primary}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  >
-                    <Text style={styles.statValue}>{s.value}</Text>
-                  </LinearGradient>
+                  <Text style={styles.statValue}>{s.value}</Text>
                   <Text style={styles.statLabel}>{s.label}</Text>
                 </View>
                 {i < STATS.length - 1 && <View style={styles.statDivider} />}
@@ -179,15 +244,45 @@ export default function LandingScreen() {
             ))}
           </Animated.View>
 
-          {/* ─── Features ─── */}
+          {/* ─── How It Works ─── */}
+          <Animated.View style={[styles.howSection, {
+            opacity: howOpacity,
+            transform: [{ translateY: howSlide }],
+          }]}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTag}>
+                <Text style={styles.sectionTagText}>איך זה עובד</Text>
+              </View>
+              <Text style={styles.sectionTitle}>3 צעדים פשוטים</Text>
+            </View>
+            <View style={styles.howSteps}>
+              {HOW_STEPS.map((step, i) => (
+                <View key={step.title} style={styles.howStep}>
+                  <LinearGradient
+                    colors={[Colors.primaryLighter, 'rgba(192,132,252,0.10)']}
+                    style={styles.howIconWrap}
+                  >
+                    <Text style={styles.howIcon}>{step.icon}</Text>
+                  </LinearGradient>
+                  <Text style={styles.howStepNum}>שלב {i + 1}</Text>
+                  <Text style={styles.howStepTitle}>{step.title}</Text>
+                  <Text style={styles.howStepDesc}>{step.desc}</Text>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+
+          {/* ─── Features Grid ─── */}
           <Animated.View style={[styles.featuresSection, {
             opacity: featOpacity,
             transform: [{ translateY: featSlide }],
           }]}>
-            <View style={styles.sectionTag}>
-              <Text style={styles.sectionTagText}>מה תקבל</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTag}>
+                <Text style={styles.sectionTagText}>מה תקבל</Text>
+              </View>
+              <Text style={styles.sectionTitle}>כל מה שצריך{'\n'}כדי להצליח</Text>
             </View>
-            <Text style={styles.sectionTitle}>כל מה שצריך{'\n'}כדי לעבור</Text>
             <View style={styles.featuresGrid}>
               {FEATURES.map((f) => (
                 <View key={f.title} style={styles.featureCard}>
@@ -197,55 +292,127 @@ export default function LandingScreen() {
                   >
                     <Text style={styles.featureIcon}>{f.icon}</Text>
                   </LinearGradient>
-                  <View style={styles.featureTextWrap}>
-                    <Text style={styles.featureTitle}>{f.title}</Text>
-                    <Text style={styles.featureDesc}>{f.desc}</Text>
-                  </View>
+                  <Text style={styles.featureTitle}>{f.title}</Text>
+                  <Text style={styles.featureDesc}>{f.desc}</Text>
                 </View>
               ))}
             </View>
           </Animated.View>
 
-          {/* ─── Quote / Highlight ─── */}
-          <Animated.View style={[styles.highlightCard, { opacity: quoteOpacity }]}>
-            <LinearGradient
-              colors={['rgba(124,111,247,0.14)', 'rgba(192,132,252,0.07)']}
-              style={styles.highlightGrad}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            >
-              <Text style={styles.highlightQuote}>"</Text>
-              <Text style={styles.highlightText}>
-                המערכת האדפטיבית מזהה בדיוק איפה אתה צריך לחזק — ומתמקדת שם. זה לא עוד בנק שאלות. זה מאמן אישי לפסיכוטכני.
-              </Text>
-              <View style={styles.highlightFooter}>
-                <Text style={styles.highlightStars}>★★★★★</Text>
-                <Text style={styles.highlightAuthor}>מנוע ELO אדפטיבי</Text>
+          {/* ─── Testimonials ─── */}
+          <Animated.View style={[styles.testimonialsSection, {
+            opacity: testOpacity,
+            transform: [{ translateY: testSlide }],
+          }]}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTag}>
+                <Text style={styles.sectionTagText}>מה אומרים עלינו</Text>
               </View>
-            </LinearGradient>
+              <Text style={styles.sectionTitle}>סטודנטים שהצליחו</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.testimonialsRow}
+              decelerationRate="fast"
+            >
+              {TESTIMONIALS.map((t, i) => (
+                <View key={i} style={styles.testimonialCard}>
+                  <LinearGradient
+                    colors={['rgba(124,111,247,0.12)', 'rgba(192,132,252,0.06)']}
+                    style={styles.testimonialGrad}
+                  >
+                    <Text style={styles.testimonialStars}>{t.stars}</Text>
+                    <Text style={styles.testimonialText}>{t.text}</Text>
+                    <Text style={styles.testimonialAuthor}>{t.author}</Text>
+                  </LinearGradient>
+                </View>
+              ))}
+            </ScrollView>
           </Animated.View>
 
-          {/* ─── CTAs ─── */}
-          <Animated.View style={[styles.ctaSection, {
+          {/* ─── Pricing Preview ─── */}
+          <Animated.View style={[styles.pricingSection, {
+            opacity: priceOpacity,
+            transform: [{ translateY: priceSlide }],
+          }]}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTag}>
+                <Text style={styles.sectionTagText}>תוכניות</Text>
+              </View>
+              <Text style={styles.sectionTitle}>בחר את התוכנית שלך</Text>
+            </View>
+            <View style={styles.pricingRow}>
+              {/* Free plan */}
+              <View style={styles.pricingCard}>
+                <View style={styles.pricingHeader}>
+                  <Text style={styles.pricingPlanName}>חינמי 🆓</Text>
+                  <Text style={styles.pricingPrice}>ללא עלות</Text>
+                </View>
+                <View style={styles.pricingFeatures}>
+                  {['תרגול בסיסי', '3 נושאים', 'ללא סימולציות'].map(f => (
+                    <View key={f} style={styles.pricingFeatureRow}>
+                      <Text style={styles.pricingFeatureDot}>·</Text>
+                      <Text style={styles.pricingFeatureText}>{f}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* Premium plan */}
+              <View style={[styles.pricingCard, styles.pricingCardPremium]}>
+                <LinearGradient
+                  colors={Colors.gradients.primary}
+                  style={styles.pricingPremiumHeader}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                >
+                  <Text style={styles.pricingPremiumName}>פרמיום 💎</Text>
+                  <Text style={styles.pricingPremiumPrice}>₪49 לחודש</Text>
+                </LinearGradient>
+                <View style={styles.pricingFeatures}>
+                  {['כל הנושאים', 'סימולציות מלאות', 'אנליטיקס מלא', 'תמיכה'].map(f => (
+                    <View key={f} style={styles.pricingFeatureRow}>
+                      <Text style={[styles.pricingFeatureDot, { color: Colors.primary }]}>✓</Text>
+                      <Text style={[styles.pricingFeatureText, { color: Colors.text }]}>{f}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* ─── Final CTA Banner ─── */}
+          <Animated.View style={[styles.finalCtaSection, {
             opacity: ctaOpacity,
             transform: [{ translateY: ctaSlide }],
           }]}>
-            <View style={styles.ctaPrimaryWrap}>
-              <Pressable onPress={handleStart} style={styles.ctaPrimary}>
-                <LinearGradient
-                  colors={Colors.gradients.primary}
-                  style={styles.ctaPrimaryGrad}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            <LinearGradient
+              colors={['rgba(124,111,247,0.18)', 'rgba(192,132,252,0.10)']}
+              style={styles.finalCtaBanner}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.finalCtaGlow} />
+              <Text style={styles.finalCtaTitle}>מוכן להצליח בפסיכוטכני?</Text>
+              <Text style={styles.finalCtaSub}>
+                הצטרף לאלפי סטודנטים שכבר משתמשים ב-PsychoTechniPlus
+              </Text>
+              <Animated.View style={{ transform: [{ scale: ctaPressScale }] }}>
+                <Pressable
+                  onPress={handleStart}
+                  onPressIn={onCtaPressIn}
+                  onPressOut={onCtaPressOut}
+                  style={styles.finalCtaBtn}
                 >
-                  <Text style={styles.ctaPrimaryText}>התחל עכשיו — בחינם</Text>
-                  <Text style={styles.ctaArrow}>←</Text>
-                </LinearGradient>
-              </Pressable>
-              <View style={styles.ctaGlow} />
-            </View>
-
-            <Pressable onPress={handleLogin} style={styles.ctaSecondary}>
-              <Text style={styles.ctaSecondaryText}>יש לי חשבון — כניסה</Text>
-            </Pressable>
+                  <LinearGradient
+                    colors={Colors.gradients.primary}
+                    style={styles.finalCtaBtnGrad}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.finalCtaBtnText}>התחל עכשיו — בחינם ←</Text>
+                  </LinearGradient>
+                </Pressable>
+              </Animated.View>
+            </LinearGradient>
           </Animated.View>
 
           {/* ─── Footer ─── */}
@@ -269,29 +436,65 @@ const styles = StyleSheet.create({
 
   // Ambient orbs
   orbPurple: {
-    position: 'absolute', width: 340, height: 340,
-    borderRadius: 170, backgroundColor: Colors.primaryGlow,
-    top: -80, left: -80, opacity: 0.22,
+    position: 'absolute', width: 360, height: 360,
+    borderRadius: 180, backgroundColor: Colors.primaryGlow,
+    top: -90, left: -90, opacity: 0.20,
   },
   orbPink: {
-    position: 'absolute', width: 260, height: 260,
-    borderRadius: 130, backgroundColor: Colors.accentGlow,
-    top: 180, right: -100, opacity: 0.14,
+    position: 'absolute', width: 280, height: 280,
+    borderRadius: 140, backgroundColor: Colors.accentGlow,
+    top: 220, right: -110, opacity: 0.13,
   },
   orbCyan: {
-    position: 'absolute', width: 200, height: 200,
-    borderRadius: 100, backgroundColor: Colors.cyanGlow,
-    bottom: 200, left: -60, opacity: 0.09,
+    position: 'absolute', width: 220, height: 220,
+    borderRadius: 110, backgroundColor: Colors.cyanGlow,
+    bottom: 300, left: -70, opacity: 0.08,
+  },
+
+  // Nav Bar
+  navBar: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    backgroundColor: 'rgba(8,10,18,0.85)',
+  },
+  navAppName: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: Colors.text,
+    letterSpacing: -0.3,
+  },
+  navLogin: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryLighter,
+    borderWidth: 1,
+    borderColor: Colors.borderGlow,
+  },
+  navLoginText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.primaryLight,
   },
 
   scroll: { paddingBottom: 48 },
 
   // Hero
-  hero: { alignItems: 'center', paddingTop: 36, paddingBottom: 28, paddingHorizontal: 24 },
+  hero: {
+    alignItems: 'center',
+    paddingTop: 40,
+    paddingBottom: 32,
+    paddingHorizontal: 24,
+  },
 
-  heroBadge: { marginBottom: 24, borderRadius: Radius.full, overflow: 'hidden' },
+  heroBadgeWrap: { marginBottom: 26, borderRadius: Radius.full, overflow: 'hidden' },
   heroBadgeGrad: {
-    paddingHorizontal: 16, paddingVertical: 7,
+    paddingHorizontal: 18, paddingVertical: 8,
     borderRadius: Radius.full,
     borderWidth: 1, borderColor: Colors.borderGlow,
   },
@@ -304,37 +507,69 @@ const styles = StyleSheet.create({
   logoGrad: {
     width: 92, height: 92, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.7, shadowRadius: 24, elevation: 18,
+    ...Shadow.primary,
   },
   logoEmoji: { fontSize: 46 },
   logoGlow: {
-    position: 'absolute', width: 130, height: 130, borderRadius: 65,
-    backgroundColor: Colors.primaryGlow, opacity: 0.25,
+    position: 'absolute', width: 136, height: 136, borderRadius: 68,
+    backgroundColor: Colors.primaryGlow, opacity: 0.22,
   },
 
   appName: {
-    fontFamily: FontFamily.heading, fontSize: 36, color: Colors.text,
-    textAlign: 'center', letterSpacing: -0.8,
+    fontFamily: FontFamily.heading, fontSize: 38, color: Colors.text,
+    textAlign: 'center', letterSpacing: -1,
+    marginBottom: 10,
   },
   tagline: {
     fontFamily: FontFamily.regular, fontSize: FontSize.base,
     color: Colors.textSecondary, textAlign: 'center',
-    marginTop: 10, lineHeight: 24, maxWidth: 280,
+    lineHeight: 24, maxWidth: 290,
+    marginBottom: 6,
+  },
+  subTagline: {
+    fontFamily: FontFamily.medium, fontSize: FontSize.xs,
+    color: Colors.textTertiary, textAlign: 'center',
+    letterSpacing: 0.3, marginBottom: 28,
+  },
+
+  // CTA in hero
+  ctaPrimaryWrap: { width: '100%', marginBottom: 12, position: 'relative' },
+  ctaPrimary: { borderRadius: Radius.xl, overflow: 'hidden' },
+  ctaPrimaryGrad: {
+    paddingVertical: 17, paddingHorizontal: 24,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ctaPrimaryText: {
+    fontFamily: FontFamily.bold, fontSize: FontSize.base,
+    color: '#fff', letterSpacing: 0.1,
+  },
+  ctaGlow: {
+    position: 'absolute', bottom: -10, left: '10%', right: '10%', height: 28,
+    backgroundColor: Colors.primaryGlow, borderRadius: 20, opacity: 0.45,
+  },
+  ctaSecondary: {
+    paddingVertical: 13, paddingHorizontal: 24,
+    borderRadius: Radius.xl, alignItems: 'center',
+    width: '100%',
+  },
+  ctaSecondaryText: {
+    fontFamily: FontFamily.medium, fontSize: FontSize.base,
+    color: Colors.textSecondary,
   },
 
   // Stats
-  statsRow: {
+  statsCard: {
     flexDirection: 'row-reverse',
     backgroundColor: Colors.surfaceCard,
-    marginHorizontal: 20, borderRadius: Radius.xl, padding: 18,
+    marginHorizontal: 20, borderRadius: Radius.xl, padding: 20,
     borderWidth: 1, borderColor: Colors.border,
-    marginBottom: 32,
+    marginBottom: 36,
+    ...Shadow.md,
   },
   statItem: { flex: 1, alignItems: 'center' },
   statValue: {
     fontFamily: FontFamily.bold, fontSize: 22,
-    color: Colors.text, backgroundColor: 'transparent',
+    color: Colors.primaryLight,
   },
   statLabel: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
@@ -342,97 +577,179 @@ const styles = StyleSheet.create({
   },
   statDivider: { width: 1, backgroundColor: Colors.border, marginVertical: 4 },
 
-  // Features
-  featuresSection: { paddingHorizontal: 20, marginBottom: 28 },
-
+  // Section header reusable
+  sectionHeader: { marginBottom: 18, alignItems: 'flex-end' },
   sectionTag: {
     alignSelf: 'flex-end',
     backgroundColor: Colors.primaryLighter,
     borderRadius: Radius.full,
     paddingHorizontal: 12, paddingVertical: 5,
     borderWidth: 1, borderColor: Colors.borderGlow,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   sectionTagText: {
     fontFamily: FontFamily.medium, fontSize: 11,
     color: Colors.primaryLight, letterSpacing: 0.5,
   },
   sectionTitle: {
-    fontFamily: FontFamily.bold, fontSize: 24, color: Colors.text,
-    textAlign: 'right', marginBottom: 18, lineHeight: 32,
+    fontFamily: FontFamily.bold, fontSize: FontSize['2xl'],
+    color: Colors.text, textAlign: 'right', lineHeight: 30,
   },
-  featuresGrid: { gap: 10 },
+
+  // How It Works
+  howSection: { paddingHorizontal: 20, marginBottom: 36 },
+  howSteps: { flexDirection: 'row-reverse', gap: 10 },
+  howStep: {
+    flex: 1,
+    backgroundColor: Colors.surfaceCard,
+    borderRadius: Radius.xl, padding: 14,
+    borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'flex-end',
+  },
+  howIconWrap: {
+    width: 46, height: 46, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 10,
+  },
+  howIcon: { fontSize: 22 },
+  howStepNum: {
+    fontFamily: FontFamily.regular, fontSize: 10,
+    color: Colors.textTertiary, letterSpacing: 0.4,
+    marginBottom: 2, textAlign: 'right',
+  },
+  howStepTitle: {
+    fontFamily: FontFamily.bold, fontSize: FontSize.sm,
+    color: Colors.text, textAlign: 'right', marginBottom: 4,
+  },
+  howStepDesc: {
+    fontFamily: FontFamily.regular, fontSize: 10,
+    color: Colors.textSecondary, textAlign: 'right', lineHeight: 14,
+  },
+
+  // Features
+  featuresSection: { paddingHorizontal: 20, marginBottom: 36 },
+  featuresGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
   featureCard: {
+    width: (W - 50) / 2,
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl, padding: 16,
     borderWidth: 1, borderColor: Colors.border,
-    flexDirection: 'row-reverse', gap: 14, alignItems: 'flex-start',
+    alignItems: 'flex-end',
   },
   featureIconWrap: {
-    width: 50, height: 50, borderRadius: 15,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    width: 46, height: 46, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 10, flexShrink: 0,
   },
-  featureIcon: { fontSize: 24 },
-  featureTextWrap: { flex: 1, alignItems: 'flex-end' },
+  featureIcon: { fontSize: 22 },
   featureTitle: {
     fontFamily: FontFamily.bold, fontSize: FontSize.sm,
-    color: Colors.text, textAlign: 'right', marginBottom: 5,
+    color: Colors.text, textAlign: 'right', marginBottom: 6,
   },
   featureDesc: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
-    color: Colors.textSecondary, textAlign: 'right', lineHeight: 17,
+    color: Colors.textSecondary, textAlign: 'right', lineHeight: 16,
   },
 
-  // Highlight / Quote
-  highlightCard: { marginHorizontal: 20, marginBottom: 28, borderRadius: Radius.xl, overflow: 'hidden' },
-  highlightGrad: {
-    padding: 22,
-    borderWidth: 1, borderColor: Colors.borderGlow,
+  // Testimonials
+  testimonialsSection: { marginBottom: 36 },
+  testimonialsRow: { paddingHorizontal: 20, gap: 12, flexDirection: 'row-reverse' },
+  testimonialCard: {
+    width: W * 0.78,
     borderRadius: Radius.xl,
+    overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.borderGlow,
   },
-  highlightQuote: {
-    fontFamily: FontFamily.bold, fontSize: 52, color: Colors.primaryLighter,
-    textAlign: 'right', lineHeight: 40, marginBottom: 6,
+  testimonialGrad: { padding: 20 },
+  testimonialStars: {
+    fontSize: 14, marginBottom: 10, textAlign: 'right',
   },
-  highlightText: {
+  testimonialText: {
     fontFamily: FontFamily.regular, fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.78)', textAlign: 'right', lineHeight: 23, marginBottom: 16,
+    color: Colors.text, textAlign: 'right', lineHeight: 22,
+    marginBottom: 12,
   },
-  highlightFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  highlightStars: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.warning },
-  highlightAuthor: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textTertiary },
-
-  // CTAs
-  ctaSection: { paddingHorizontal: 20, gap: 12, marginBottom: 24 },
-
-  ctaPrimaryWrap: { position: 'relative' },
-  ctaPrimary: { borderRadius: Radius.xl, overflow: 'hidden' },
-  ctaPrimaryGrad: {
-    paddingVertical: 17, paddingHorizontal: 24,
-    alignItems: 'center', justifyContent: 'center',
-    flexDirection: 'row-reverse', gap: 8,
+  testimonialAuthor: {
+    fontFamily: FontFamily.medium, fontSize: FontSize.xs,
+    color: Colors.primaryLight, textAlign: 'right',
   },
-  ctaPrimaryText: {
+
+  // Pricing
+  pricingSection: { paddingHorizontal: 20, marginBottom: 36 },
+  pricingRow: { flexDirection: 'row-reverse', gap: 12 },
+  pricingCard: {
+    flex: 1,
+    backgroundColor: Colors.surfaceCard,
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  pricingCardPremium: {
+    borderColor: Colors.borderGlow,
+    ...Shadow.primary,
+  },
+  pricingHeader: {
+    padding: 16, alignItems: 'flex-end',
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  pricingPlanName: {
+    fontFamily: FontFamily.bold, fontSize: FontSize.base,
+    color: Colors.text, textAlign: 'right',
+  },
+  pricingPrice: {
+    fontFamily: FontFamily.regular, fontSize: FontSize.xs,
+    color: Colors.textTertiary, textAlign: 'right', marginTop: 2,
+  },
+  pricingPremiumHeader: {
+    padding: 16, alignItems: 'flex-end',
+  },
+  pricingPremiumName: {
+    fontFamily: FontFamily.bold, fontSize: FontSize.base,
+    color: '#fff', textAlign: 'right',
+  },
+  pricingPremiumPrice: {
+    fontFamily: FontFamily.regular, fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.80)', textAlign: 'right', marginTop: 2,
+  },
+  pricingFeatures: { padding: 14, gap: 8, alignItems: 'flex-end' },
+  pricingFeatureRow: { flexDirection: 'row-reverse', gap: 6, alignItems: 'center' },
+  pricingFeatureDot: {
+    fontFamily: FontFamily.bold, fontSize: FontSize.sm,
+    color: Colors.textTertiary, width: 14,
+  },
+  pricingFeatureText: {
+    fontFamily: FontFamily.regular, fontSize: FontSize.xs,
+    color: Colors.textSecondary, textAlign: 'right',
+  },
+
+  // Final CTA
+  finalCtaSection: { paddingHorizontal: 20, marginBottom: 28 },
+  finalCtaBanner: {
+    borderRadius: Radius['2xl'], padding: 28,
+    borderWidth: 1, borderColor: Colors.borderGlow,
+    alignItems: 'center', overflow: 'hidden',
+  },
+  finalCtaGlow: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(124,111,247,0.04)',
+  },
+  finalCtaTitle: {
+    fontFamily: FontFamily.heading, fontSize: FontSize['2xl'],
+    color: Colors.text, textAlign: 'center', marginBottom: 10,
+  },
+  finalCtaSub: {
+    fontFamily: FontFamily.regular, fontSize: FontSize.sm,
+    color: Colors.textSecondary, textAlign: 'center',
+    lineHeight: 20, marginBottom: 24, maxWidth: 280,
+  },
+  finalCtaBtn: { borderRadius: Radius.xl, overflow: 'hidden' },
+  finalCtaBtnGrad: {
+    paddingVertical: 16, paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  finalCtaBtnText: {
     fontFamily: FontFamily.bold, fontSize: FontSize.lg,
     color: '#fff', letterSpacing: 0.2,
-  },
-  ctaArrow: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: 'rgba(255,255,255,0.8)' },
-  ctaGlow: {
-    position: 'absolute', bottom: -10, left: '10%', right: '10%', height: 30,
-    backgroundColor: Colors.primaryGlow, borderRadius: 20,
-    opacity: 0.45,
-  },
-
-  ctaSecondary: {
-    paddingVertical: 15, paddingHorizontal: 24,
-    borderRadius: Radius.xl, alignItems: 'center',
-    backgroundColor: Colors.surfaceCard,
-    borderWidth: 1, borderColor: Colors.border,
-    marginTop: 4,
-  },
-  ctaSecondaryText: {
-    fontFamily: FontFamily.medium, fontSize: FontSize.base,
-    color: Colors.textSecondary,
   },
 
   // Footer

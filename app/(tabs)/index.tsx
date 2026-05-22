@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
+import { useAdminStore } from '../../store/adminStore';
 import { TARGETS, TOPICS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
@@ -41,8 +42,13 @@ export default function Dashboard() {
     selectedTargetId, getTopicLevel,
   } = useUserStore();
 
+  const { dailyChallenges } = useAdminStore();
+
   const selectedTarget = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const targetTopics = TOPICS.filter(t => t.targetId === selectedTarget.id);
+
+  const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  const todayChallenge = dailyChallenges.find(c => c.date === today);
   const mainTopic = targetTopics[0] ?? null;
   const title = mainTopic ? LEVEL_LABELS[getTopicLevel(mainTopic.id)] : LEVEL_LABELS['beginner'];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
@@ -261,7 +267,23 @@ export default function Dashboard() {
           {/* ── Daily Challenge ── */}
           <Animated.View style={[styles.section, { opacity: fadeIn }]}>
             <Pressable
-              onPress={() => go(mainTopic?.id ?? 'topic_quantitative', { mode: 'speed', questionLimit: '10' })}
+              onPress={() => {
+                if (todayChallenge) {
+                  // Navigate to the specific challenge question in speed mode
+                  router.push({
+                    pathname: '/practice-session',
+                    params: {
+                      topicId: 'topic_quantitative', // fallback topic
+                      targetId: selectedTarget.id,
+                      mode: 'speed',
+                      questionLimit: '10',
+                      challengeQuestionId: todayChallenge.questionId, // admin-set question
+                    },
+                  });
+                } else {
+                  go(mainTopic?.id ?? 'topic_quantitative', { mode: 'speed', questionLimit: '10' });
+                }
+              }}
               accessibilityRole="button"
               accessibilityLabel="אתגר יומי — 10 שאלות"
               style={({ pressed }) => [styles.challengeBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
@@ -274,7 +296,11 @@ export default function Dashboard() {
                 <View style={styles.challengeShimmer} />
                 <View style={styles.challengeRight}>
                   <Text style={styles.challengeTitle}>אתגר יומי</Text>
-                  <Text style={styles.challengeSub}>10 שאלות · מיוחד להיום ← </Text>
+                  <Text style={styles.challengeSub}>
+                    {todayChallenge
+                      ? `${todayChallenge.title} · ${todayChallenge.bonusXp} XP בונוס`
+                      : '10 שאלות · מיוחד להיום ← '}
+                  </Text>
                 </View>
                 <Text style={styles.challengeEmoji}>⚡</Text>
               </LinearGradient>
