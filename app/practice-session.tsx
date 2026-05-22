@@ -77,6 +77,7 @@ export default function PracticeSession() {
   const resultAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishingRef = useRef(false);
 
   const topic = getTopicById(topicId ?? '');
   const target = getTargetById(targetId ?? '');
@@ -175,7 +176,7 @@ export default function PracticeSession() {
       });
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [session?.currentIndex, revealed]);
+  }, [session?.currentIndex, revealed, handleTimeUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Non-speed timer display (counts up to SPEED_LIMIT for display only)
   const [practiceTimer, setPracticeTimer] = useState(0);
@@ -207,11 +208,17 @@ export default function PracticeSession() {
 
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
-    if (!revealed) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      handleSkip();
-    }
-  }, [revealed]);
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    if (revealed) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setSelectedId(null);
+    setRevealed(false);
+    setLastAnswerCorrect(false);
+    setShowExplanation(false);
+    explanationAnim.setValue(0);
+    skipQuestion();
+    advanceOrEnd();
+  }, [revealed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelect = (optId: string) => {
     if (revealed) return;
@@ -260,22 +267,35 @@ export default function PracticeSession() {
     }).start();
   };
 
+  const resetQuestionState = () => {
+    setSelectedId(null);
+    setRevealed(false);
+    setLastAnswerCorrect(false);
+    setShowExplanation(false);
+    explanationAnim.setValue(0);
+  };
+
   const handleSkip = () => {
     if (timerRef.current) clearInterval(timerRef.current);
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    resetQuestionState();
     skipQuestion();
     advanceOrEnd();
   };
 
   const handleNext = () => {
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-    setSelectedId(null);
-    setRevealed(false);
-    setLastAnswerCorrect(false);
-    setShowExplanation(false);
-    explanationAnim.setValue(0);
-    // In adaptive mode, pick the best next question before advancing index
-    if (mode === 'adaptive') getAdaptiveNext();
-    advanceOrEnd();
+    resetQuestionState();
+    if (mode === 'adaptive') {
+      getAdaptiveNext();
+      // End session when all questions have been answered
+      const s = usePracticeStore.getState().session;
+      if (!s || s.answers.length >= s.questions.length) {
+        finishSession();
+      }
+    } else {
+      advanceOrEnd();
+    }
   };
 
   const advanceOrEnd = () => {
@@ -312,8 +332,10 @@ export default function PracticeSession() {
   };
 
   const finishSession = () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     const finished = endSession();
-    if (!finished) return;
+    if (!finished) { finishingRef.current = false; return; }
     const scores = calcAllScores(finished.answers);
     const correct = finished.answers.filter(a => a.isCorrect).length;
 
