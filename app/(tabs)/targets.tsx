@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Animated, RefreshControl, Platform,
+  Animated, RefreshControl, Platform, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -242,17 +242,19 @@ export default function TargetsTab() {
                     ]}
                     onPress={() => {
                       const firstFreeTopic = selectedTopics.find(t => !t.isPremiumOnly);
-                      if (firstFreeTopic) {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        router.push({
-                          pathname: '/practice-session',
-                          params: {
-                            topicId: firstFreeTopic.id,
-                            targetId: target.id,
-                            mode: 'adaptive',
-                          },
-                        });
+                      if (!firstFreeTopic) {
+                        Alert.alert('תרגול אדפטיבי', 'כל הנושאים במסלול זה דורשים מנוי פרמיום.');
+                        return;
                       }
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      router.push({
+                        pathname: '/practice-session',
+                        params: {
+                          topicId: firstFreeTopic.id,
+                          targetId: target.id,
+                          mode: 'adaptive',
+                        },
+                      });
                     }}
                   >
                     <LinearGradient
@@ -445,6 +447,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    minHeight: 44,
+    minWidth: 72,
   },
   practiceChipText: {
     fontFamily: FontFamily.bold,

@@ -55,7 +55,7 @@ export default function PracticeSession() {
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const [timer, setTimer] = useState(practiceSettings.speedModeSecondsPerQuestion);
-  const [isFinished, setIsFinished] = useState(false);
+  const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(0);
 
   // Favorite & note features
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -170,15 +170,20 @@ export default function PracticeSession() {
     return () => clearInterval(id);
   }, [session?.currentIndex, revealed, isSpeedMode]);
 
-  // Auto-advance after answer is revealed
+  // Auto-advance after answer is revealed — also drives the live countdown banner
   useEffect(() => {
     if (!revealed || autoAdvanceDelay === 0) return;
+    setAutoAdvanceCountdown(autoAdvanceDelay);
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     autoAdvanceRef.current = setTimeout(() => {
       handleNext();
     }, autoAdvanceDelay * 1000);
+    const countId = setInterval(() => {
+      setAutoAdvanceCountdown(prev => Math.max(0, prev - 1));
+    }, 1000);
     return () => {
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+      clearInterval(countId);
     };
   }, [revealed, autoAdvanceDelay]);
 
@@ -611,7 +616,7 @@ export default function PracticeSession() {
         {revealed && autoAdvanceDelay > 0 && (
           <View style={styles.autoAdvanceBanner}>
             <Text style={styles.autoAdvanceText}>
-              ממשיך אוטומטית עוד {autoAdvanceDelay} שניות...
+              ממשיך אוטומטית עוד {autoAdvanceCountdown} שניות...
             </Text>
           </View>
         )}
@@ -698,9 +703,9 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   quitBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',

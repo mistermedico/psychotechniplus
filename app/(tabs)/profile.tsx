@@ -210,19 +210,25 @@ export default function ProfileTab() {
   const handleContact = () => {
     Haptics.selectionAsync();
     const url = 'mailto:support@psychotechniplus.com';
-    Linking.canOpenURL(url).then(supported => {
-      if (supported) {
-        Linking.openURL(url);
-      } else {
+    Linking.canOpenURL(url)
+      .then(supported => {
+        if (supported) {
+          Linking.openURL(url).catch(() => {
+            Alert.alert('צור קשר', 'שלח מייל לכתובת:\nsupport@psychotechniplus.com');
+          });
+        } else {
+          Alert.alert('צור קשר', 'שלח מייל לכתובת:\nsupport@psychotechniplus.com');
+        }
+      })
+      .catch(() => {
         Alert.alert('צור קשר', 'שלח מייל לכתובת:\nsupport@psychotechniplus.com');
-      }
-    });
+      });
   };
 
   const handleNotifications = () => {
     Haptics.selectionAsync();
     if (Platform.OS !== 'web') {
-      Linking.openSettings();
+      Linking.openSettings().catch(() => null);
     } else {
       Alert.alert('התראות', 'לניהול התראות — פתח את הגדרות הדפדפן שלך.');
     }

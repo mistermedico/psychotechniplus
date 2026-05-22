@@ -174,16 +174,16 @@ export default function Results() {
             {score < 70 && (
               <RecommendCard
                 icon="🎯" title="תרגל את החולשות שלך" desc="זיהינו תחומים לשיפור — תרגל שאלות ממוקדות" color={Colors.danger}
-                onPress={() => router.push({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'adaptive' } })}
+                onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'adaptive' } })}
               />
             )}
             <RecommendCard
               icon="🔄" title="תרגל שוב" desc="חזור על אותו נושא לחיזוק" color={Colors.primary}
-              onPress={() => router.push({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice' } })}
+              onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice' } })}
             />
             <RecommendCard
               icon="⚡" title="אתגר מהירות" desc="נסה את אותו נושא במצב מהירות" color={Colors.warning}
-              onPress={() => router.push({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'speed' } })}
+              onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'speed' } })}
             />
           </View>
         </Animated.View>
@@ -191,7 +191,10 @@ export default function Results() {
 
       <View style={[styles.bottomCtas, { paddingBottom: Math.max(insets.bottom + 4, 20), backgroundColor: 'rgba(10,14,28,0.95)' }]}>
         <Pressable
-          onPress={() => router.replace('/(tabs)')}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.replace('/(tabs)');
+          }}
           style={({ pressed }) => [styles.homeBtn, { opacity: pressed ? 0.75 : 1 }]}
         >
           <Text style={styles.homeBtnText}>חזרה לבית</Text>
@@ -199,7 +202,7 @@ export default function Results() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice' } });
+            router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice' } });
           }}
           style={({ pressed }) => [styles.againBtn, { opacity: pressed ? 0.75 : 1 }]}
         >
