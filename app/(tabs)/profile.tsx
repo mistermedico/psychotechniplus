@@ -130,14 +130,9 @@ export default function ProfileTab() {
         onPress: async () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           setSigningOut(true);
-          try {
-            await signOut();
-          } catch (e) {
-            // signOut clears local state regardless — continue
-          } finally {
-            setSigningOut(false);
-          }
           router.replace('/landing');
+          await signOut().catch(() => null);
+          setSigningOut(false);
         },
       },
     ]);
@@ -155,17 +150,12 @@ export default function ProfileTab() {
           onPress: async () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             setDeletingAccount(true);
-            try {
-              const result = await deleteAccount();
-              if (result.success) {
-                router.replace('/landing');
-              } else {
-                Alert.alert('שגיאה', result.error ?? 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.');
-              }
-            } catch {
-              Alert.alert('שגיאה', 'אירעה שגיאה. נסה שנית.');
-            } finally {
+            const result = await deleteAccount().catch(() => ({ success: false, error: 'אירעה שגיאה. נסה שנית.' }));
+            if (result.success) {
+              router.replace('/landing');
+            } else {
               setDeletingAccount(false);
+              Alert.alert('שגיאה', result.error ?? 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.');
             }
           },
         },
