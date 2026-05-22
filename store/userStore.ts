@@ -150,7 +150,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   signOut: async () => {
     logger.info('userStore:signOut', 'משתמש התנתק');
     await logOutPurchases().catch(() => null);
-    await supabase.auth.signOut();
+    await supabase.auth.signOut().catch(() => null);
     useAdminStore.getState().logActivity('משתמש התנתק', 'user');
     set({ ...INITIAL_STATE, isLoaded: true });
   },

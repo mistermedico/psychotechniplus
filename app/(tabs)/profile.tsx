@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Alert, ActionSheetIOS, Platform, Linking, Switch, Appearance,
+  Alert, ActionSheetIOS, Platform, Linking, Switch,
 } from 'react-native';
+import { Appearance } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -231,8 +232,8 @@ export default function ProfileTab() {
     Haptics.selectionAsync();
     const next: 'dark' | 'light' = isDark ? 'dark' : 'light';
     updateSetting('theme', next);
-    if (typeof Appearance.setColorScheme === 'function') {
-      Appearance.setColorScheme(next);
+    if (Platform.OS !== 'web') {
+      try { Appearance.setColorScheme(next); } catch {}
     }
   };
 
