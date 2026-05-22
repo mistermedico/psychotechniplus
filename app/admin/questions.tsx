@@ -27,7 +27,7 @@ const STATUS_LABELS: Record<ValidationStatus, string> = {
   rejected: 'נדחה',
 };
 
-const SORT_OPTIONS = ['חדש → ישן', 'ישן → חדש', 'קושי ↑', 'קושי ↓', 'ELO ↑', 'ELO ↓'];
+const SORT_OPTIONS = ['חדש → ישן', 'ישן → חדש', 'קושי ↑', 'קושי ↓', 'גישה חופשית', 'גישה פרמיום'];
 
 export default function QuestionsAdmin() {
   const insets = useSafeAreaInsets();
@@ -55,8 +55,8 @@ export default function QuestionsAdmin() {
       case 1: /* natural order = oldest first */ break;
       case 2: q = q.slice().sort((a, b) => a.difficulty - b.difficulty); break;
       case 3: q = q.slice().sort((a, b) => b.difficulty - a.difficulty); break;
-      case 4: q = q.slice().sort((a, b) => a.psychometricStats.elo - b.psychometricStats.elo); break;
-      case 5: q = q.slice().sort((a, b) => b.psychometricStats.elo - a.psychometricStats.elo); break;
+      case 4: q = q.slice().sort((a, b) => (a.accessLevel === 'free' ? -1 : 1) - (b.accessLevel === 'free' ? -1 : 1)); break;
+      case 5: q = q.slice().sort((a, b) => (a.accessLevel === 'premium' ? -1 : 1) - (b.accessLevel === 'premium' ? -1 : 1)); break;
     }
     return q;
   }, [questions, search, filterStatus, filterTopicId, sortIdx]);

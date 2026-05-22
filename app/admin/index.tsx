@@ -47,6 +47,7 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'notifications',      icon: '🔔', label: 'הודעות Push',     desc: 'שליחת התראות',           route: '/admin/notifications',       category: 'business' },
   { id: 'app-settings',       icon: '⚙️', label: 'הגדרות אפליקציה',desc: 'פרמטרים גלובליים',       route: '/admin/app-settings',        category: 'business' },
   // System
+  { id: 'performance',        icon: '📈', label: 'ביצועים',           desc: 'דיוק, רמות, נושאים',     route: '/admin/performance',         category: 'system' },
   { id: 'analytics',          icon: '📊', label: 'אנליטיקס',         desc: 'גרפים ומגמות',           route: '/admin/analytics',           category: 'system' },
   { id: 'app-control',        icon: '🎮', label: 'מרכז שליטה',       desc: 'תחזוקה, דגלים',          route: '/admin/app-control',         category: 'system' },
   { id: 'session-settings',   icon: '🎛️', label: 'הגדרות סשן',      desc: 'תרגול ומבחנים',          route: '/admin/session-settings',    category: 'system' },
@@ -74,6 +75,8 @@ const CATEGORY_LABELS: Record<NavCategory, string> = {
 const QUICK_ACTIONS = [
   { icon: '✅', label: 'אמת שאלות', route: '/admin/validate' },
   { icon: '➕', label: 'הוסף שאלה', route: '/admin/question-editor?mode=add' },
+  { icon: '📈', label: 'ביצועים',    route: '/admin/performance' },
+  { icon: '👥', label: 'משתמשים',   route: '/admin/users' },
   { icon: '📤', label: 'ייצא',        route: '/admin/export' },
   { icon: '🔔', label: 'שלח הודעה',  route: '/admin/notifications' },
 ];

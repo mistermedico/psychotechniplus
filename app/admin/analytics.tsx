@@ -172,14 +172,13 @@ export default function Analytics() {
           })}
         </View>
 
-        {/* ELO distribution */}
-        <Text style={styles.chartTitle}>📈 התפלגות ELO שאלות</Text>
+        {/* Discrimination quality */}
+        <Text style={styles.chartTitle}>🎯 איכות הפרדה (discrimination)</Text>
         <View style={styles.card}>
           {[
-            { label: 'קל (< 1100)', count: questions.filter(q => q.psychometricStats.elo < 1100).length, color: Colors.success },
-            { label: 'בינוני (1100-1300)', count: questions.filter(q => q.psychometricStats.elo >= 1100 && q.psychometricStats.elo < 1300).length, color: Colors.warning },
-            { label: 'קשה (1300-1500)', count: questions.filter(q => q.psychometricStats.elo >= 1300 && q.psychometricStats.elo < 1500).length, color: Colors.danger },
-            { label: 'מאסטר (> 1500)', count: questions.filter(q => q.psychometricStats.elo >= 1500).length, color: Colors.accent },
+            { label: 'גבוהה (≥0.5)', count: questions.filter(q => (q.psychometricStats.discrimination ?? 0) >= 0.5).length, color: Colors.success },
+            { label: 'בינונית (0.25–0.5)', count: questions.filter(q => { const d = q.psychometricStats.discrimination ?? 0; return d >= 0.25 && d < 0.5; }).length, color: Colors.warning },
+            { label: 'נמוכה (<0.25)', count: questions.filter(q => (q.psychometricStats.discrimination ?? 0) < 0.25).length, color: Colors.danger },
           ].map(d => (
             <View key={d.label} style={styles.barRow}>
               <View style={styles.barLabelWrap}>
