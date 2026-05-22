@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, Pressable,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
   ScrollView, Animated, AccessibilityInfo,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +23,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
   const [emailPending, setEmailPending] = useState(false);
 
@@ -161,8 +162,26 @@ export default function AuthScreen() {
                 <Text style={styles.pendingBtnText}>עבור להתחברות ←</Text>
               </LinearGradient>
             </Pressable>
-            <Pressable onPress={() => setEmailPending(false)} style={styles.pendingBack}>
-              <Text style={styles.pendingBackText}>שלח שוב / שנה מייל</Text>
+            <Pressable
+              onPress={async () => {
+                setResending(true);
+                try {
+                  await supabase.auth.resend({ type: 'signup', email });
+                  Alert.alert('נשלח!', 'בדוק את תיבת הדואר שלך שוב.');
+                } catch {
+                  // fall back: let user change email
+                  setEmailPending(false);
+                  setMode('register');
+                } finally {
+                  setResending(false);
+                }
+              }}
+              disabled={resending}
+              accessibilityRole="button"
+              accessibilityLabel="שלח שוב או שנה מייל"
+              style={styles.pendingBack}
+            >
+              <Text style={styles.pendingBackText}>{resending ? 'שולח...' : 'שלח שוב / שנה מייל'}</Text>
             </Pressable>
           </Animated.View>
         </SafeAreaView>

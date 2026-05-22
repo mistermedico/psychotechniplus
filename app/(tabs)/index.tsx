@@ -75,9 +75,12 @@ export default function Dashboard() {
     }
   }, [streak]); // eslint-disable-line
 
-  const go = (topicId: string) => {
+  const go = (topicId: string, opts?: { questionLimit?: string; mode?: string }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({ pathname: '/practice-session', params: { topicId, targetId: selectedTarget.id, mode: 'practice' } });
+    router.push({
+      pathname: '/practice-session',
+      params: { topicId, targetId: selectedTarget.id, mode: opts?.mode ?? 'practice', ...(opts?.questionLimit ? { questionLimit: opts.questionLimit } : {}) },
+    });
   };
 
   return (
@@ -258,7 +261,7 @@ export default function Dashboard() {
           {/* ── Daily Challenge ── */}
           <Animated.View style={[styles.section, { opacity: fadeIn }]}>
             <Pressable
-              onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
+              onPress={() => go(mainTopic?.id ?? 'topic_quantitative', { mode: 'speed', questionLimit: '10' })}
               accessibilityRole="button"
               accessibilityLabel="אתגר יומי — 10 שאלות"
               style={({ pressed }) => [styles.challengeBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
