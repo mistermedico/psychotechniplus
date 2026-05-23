@@ -100,7 +100,7 @@ export default function ProgressTab() {
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push('/(tabs)/practice');
+              router.push('/(tabs)');
             }}
           >
             <Text style={styles.emptyStateCtaText}>→ לתרגול</Text>

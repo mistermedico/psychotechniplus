@@ -178,7 +178,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   completeOnboarding: (name, targetId) => {
     set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true });
     const { userId } = get();
-    saveUserProfile(userId, {
+    if (userId) saveUserProfile(userId, {
       name, selected_target_id: targetId, has_completed_onboarding: true,
     });
     logger.success('userStore:completeOnboarding', `אונבורדינג הושלם — ${name}, מסלול: ${targetId}`);
@@ -222,7 +222,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         newXp -= xpForLevel(newLevel);
         newLevel += 1;
       }
-      saveUserProfile(state.userId, { xp: newXp, level: newLevel });
+      if (state.userId) saveUserProfile(state.userId, { xp: newXp, level: newLevel });
       return { xp: newXp, level: newLevel };
     });
   },

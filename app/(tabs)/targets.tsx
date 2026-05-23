@@ -55,9 +55,11 @@ function AnimatedTopicsContainer({
           duration: 160,
           useNativeDriver: true,
         }),
-      ]).start(() => setShouldRender(false));
-      // Reset for next open
-      translateY.setValue(20);
+      ]).start(() => {
+        setShouldRender(false);
+        // Reset for next open after animation completes
+        translateY.setValue(20);
+      });
     }
   }, [visible]);
 

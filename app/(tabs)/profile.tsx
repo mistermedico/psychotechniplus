@@ -74,22 +74,25 @@ const FONT_SIZE_LABELS: Record<string, string> = {
   large:  'גדול',
 };
 
-const ACHIEVEMENT_BADGES = [
-  { icon: '🌱', label: 'סשן ראשון', earned: true },
-  { icon: '🔥', label: '7 ימים', earned: false },
-  { icon: '🌟', label: '30 ימים', earned: false },
-  { icon: '💯', label: 'ניקוד מושלם', earned: false },
-  { icon: '⚡', label: 'מהירות', earned: false },
-  { icon: '🏆', label: 'נושא הושלם', earned: false },
+const ACHIEVEMENT_BADGE_DEFS = [
+  { icon: '🌱', label: 'סשן ראשון', type: 'first_session' },
+  { icon: '🔥', label: '7 ימים', type: 'streak_7' },
+  { icon: '🌟', label: '30 ימים', type: 'streak_30' },
+  { icon: '💯', label: 'ניקוד מושלם', type: 'perfect_score' },
+  { icon: '⚡', label: 'מהירות', type: 'speed_master' },
+  { icon: '🏆', label: 'נושא הושלם', type: 'topic_complete' },
 ];
 
 export default function ProfileTab() {
   const insets = useSafeAreaInsets();
   const {
     name, level, xp: _xp, streak, selectedTargetId,
-    totalSessions, totalCorrect, totalAnswered,
+    totalSessions, totalCorrect, totalAnswered, badges,
     getTopicLevelLabel, reset, signOut, deleteAccount, isPremium,
   } = useUserStore();
+
+  const earnedBadgeTypes = new Set(badges.map(b => b.badgeType));
+  const ACHIEVEMENT_BADGES = ACHIEVEMENT_BADGE_DEFS.map(b => ({ ...b, earned: earnedBadgeTypes.has(b.type as any) }));
   const { hapticsEnabled, theme, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);

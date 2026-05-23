@@ -168,6 +168,7 @@ export default function PracticeSession() {
       clearTimeout(loadTimeout);
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -226,7 +227,8 @@ export default function PracticeSession() {
     setShowExplanation(false);
     explanationAnim.setValue(0);
     skipQuestion();
-    advanceOrEnd();
+    const hasMore = nextQuestion();
+    if (!hasMore) finishSession();
   }, [revealed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelect = (optId: string) => {
@@ -296,12 +298,12 @@ export default function PracticeSession() {
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     resetQuestionState();
     if (mode === 'adaptive') {
-      getAdaptiveNext();
-      // End session when all questions have been answered
       const s = usePracticeStore.getState().session;
       if (!s || s.answers.length >= s.questions.length) {
         finishSession();
+        return;
       }
+      getAdaptiveNext();
     } else {
       advanceOrEnd();
     }
