@@ -21,6 +21,7 @@ const SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtkbmtydmx0Z3B0aWZmeGtjbHlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMzgyODcsImV4cCI6MjA5NDYxNDI4N30.FPfk0H5ln1gTkWgyt84atBJ3MgnSnWJR9Xi6ujYM6pM';
 
 const DRY_RUN = process.argv.includes('--dry-run');
+const SQL_MODE = process.argv.includes('--sql');
 
 // ── Raw question data ────────────────────────────────────────────────────────
 // Each entry: { topicId, prefix, questionType, text, passage?, a, b, c, d, correct, explanation, difficulty }
@@ -811,6 +812,59 @@ async function main() {
       console.log(`    Q: ${q.questionText.slice(0, 90)}`);
       console.log(`    ✓: ${q.options.find(o => o.isCorrect)?.text}`);
     });
+    return;
+  }
+
+  if (SQL_MODE) {
+    const rows = processed.map(questionToRow);
+    function escSql(s) { return (s ?? '').replace(/'/g, "''"); }
+    function rowToSql(r) {
+      return `  ('${r.id}', '${r.topic_id}', '${JSON.stringify(r.target_ids)}'::jsonb, '${r.question_type}', ` +
+        `'${escSql(r.question_text)}', ` +
+        (r.reading_passage ? `'${escSql(r.reading_passage)}'` : 'NULL') + `, ` +
+        `'${JSON.stringify(r.options)}'::jsonb, '${r.correct_answer}', '${escSql(r.explanation)}', ` +
+        `${r.difficulty}, '${JSON.stringify(r.psychometric_stats)}'::jsonb, ` +
+        `'${r.access_level}', '${r.validation_status}', ${r.smart_practice_eligible}, ${r.general_practice_eligible})`;
+    }
+    const byTopic = {};
+    for (const q of processed) byTopic[q.topicId] = (byTopic[q.topicId] ?? 0) + 1;
+    const sql = `-- ═══════════════════════════════════════════════════════════════════════
+-- PsychoTechniPlus — Seed ${rows.length} Psychotechnic Questions
+-- ═══════════════════════════════════════════════════════════════════════
+-- HOW TO USE:
+--   1. פתח: https://supabase.com/dashboard/project/kdnkrvltgptiffxkclyg/sql/new
+--   2. הדבק את כל הקובץ הזה
+--   3. לחץ "Run"
+-- ═══════════════════════════════════════════════════════════════════════
+-- Topics: ${Object.entries(byTopic).map(([t, c]) => `${t.replace('topic_','')}=${c}`).join(', ')}
+
+INSERT INTO questions (
+  id, topic_id, target_ids, question_type, question_text, reading_passage,
+  options, correct_answer, explanation, difficulty, psychometric_stats,
+  access_level, validation_status, smart_practice_eligible, general_practice_eligible
+)
+VALUES
+${rows.map(rowToSql).join(',\n')}
+ON CONFLICT (id) DO UPDATE SET
+  question_text              = EXCLUDED.question_text,
+  options                    = EXCLUDED.options,
+  correct_answer             = EXCLUDED.correct_answer,
+  explanation                = EXCLUDED.explanation,
+  difficulty                 = EXCLUDED.difficulty,
+  psychometric_stats         = EXCLUDED.psychometric_stats,
+  validation_status          = EXCLUDED.validation_status,
+  smart_practice_eligible    = EXCLUDED.smart_practice_eligible,
+  general_practice_eligible  = EXCLUDED.general_practice_eligible;
+
+-- Verify count:
+SELECT topic_id, COUNT(*) as count FROM questions GROUP BY topic_id ORDER BY topic_id;
+`;
+    const outPath = join(ROOT, 'scripts/seed-supabase.sql');
+    writeFileSync(outPath, sql, 'utf-8');
+    console.log(`\n✅ Generated SQL → scripts/seed-supabase.sql (${rows.length} questions)`);
+    console.log('\n🔗 פתח בדפדפן:');
+    console.log('   https://supabase.com/dashboard/project/kdnkrvltgptiffxkclyg/sql/new');
+    console.log('\n   הדבק את תוכן הקובץ scripts/seed-supabase.sql והרץ אותו.\n');
     return;
   }
 
