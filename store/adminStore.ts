@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
-import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
+import { TOPICS, TARGETS } from '../data/mockData';
 import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
@@ -713,7 +713,7 @@ const SEED_TEMPLATES: SmartExamTemplate[] = [
 export const useAdminStore = create<AdminState>((set, get) => ({
   isAdmin: false,
   freePracticeLimit: 30,
-  questions: [...QUESTIONS, ...PENDING_SEED],
+  questions: [...PENDING_SEED],
   topics: [...TOPICS],
   targets: [...TARGETS],
   templates: SEED_TEMPLATES,

@@ -93,29 +93,27 @@ export async function fetchQuestions(opts?: {
   targetId?: string;
   status?: string;
 }): Promise<Question[]> {
-  try {
-    let query = supabase.from('questions').select('*');
-    if (opts?.topicId) query = query.eq('topic_id', opts.topicId);
-    if (opts?.status)  query = query.eq('validation_status', opts.status);
-    if (opts?.targetId) query = query.contains('target_ids', [opts.targetId]);
-    const { data, error } = await query;
-    if (error || !data?.length) return fallbackQuestions(opts);
-    return data.map(rowToQuestion);
-  } catch {
-    return fallbackQuestions(opts);
+  let query = supabase.from('questions').select('*');
+  if (opts?.topicId) query = query.eq('topic_id', opts.topicId);
+  if (opts?.status)  query = query.eq('validation_status', opts.status);
+  if (opts?.targetId) query = query.contains('target_ids', [opts.targetId]);
+  const { data, error } = await query;
+  if (error) {
+    logger.error('db:fetchQuestions', 'שגיאה בטעינת שאלות', error.message);
+    return [];
   }
+  return (data ?? []).map(rowToQuestion);
 }
 
 export async function fetchAllQuestions(): Promise<Question[]> {
   try {
     const { data, error } = await supabase.from('questions').select('*').order('created_at', { ascending: false });
-    if (error) { logger.error('db:fetchAllQuestions', 'שגיאה בטעינת שאלות', error.message); return QUESTIONS; }
-    if (!data) return QUESTIONS;
-    logger.info('db:fetchAllQuestions', `נטענו ${data.length} שאלות מסופאבייס`);
-    return data.map(rowToQuestion);
+    if (error) { logger.error('db:fetchAllQuestions', 'שגיאה בטעינת שאלות', error.message); return []; }
+    logger.info('db:fetchAllQuestions', `נטענו ${data?.length ?? 0} שאלות מסופאבייס`);
+    return (data ?? []).map(rowToQuestion);
   } catch (e: any) {
     logger.error('db:fetchAllQuestions', 'חריגה בטעינת שאלות', e?.message);
-    return QUESTIONS;
+    return [];
   }
 }
 
@@ -363,14 +361,6 @@ function rowToTopic(row: any): Topic {
     description: row.description, icon: row.icon, order: row.order_index,
     isPremiumOnly: row.is_premium_only, color: row.color,
   };
-}
-
-function fallbackQuestions(opts?: { topicId?: string; targetId?: string; status?: string }): Question[] {
-  let q = QUESTIONS;
-  if (opts?.topicId) q = q.filter(x => x.topicId === opts.topicId);
-  if (opts?.targetId) q = q.filter(x => x.targetIds.includes(opts.targetId!));
-  if (opts?.status) q = q.filter(x => x.validationStatus === opts.status);
-  return q;
 }
 
 // ── Topic persistence ──────────────────────────────────────────────────────
