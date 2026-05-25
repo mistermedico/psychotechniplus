@@ -45,7 +45,7 @@ export default function PracticeSession() {
     nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
   } = usePracticeStore();
 
-  const { recordAnswer, recordSession, getTopicLevel, addXp, userId, name: userName, isPremium } = useUserStore();
+  const { recordAnswer, recordSession, getTopicLevel, addXp, userId, name: userName, email: userEmail, isPremium } = useUserStore();
   const { templates, questions: adminQuestions, practiceSettings, examSettings, freePracticeLimit, addSessionRecord } = useAdminStore();
 
   const {
@@ -366,8 +366,8 @@ export default function PracticeSession() {
       action: 'סשן הושלם',
       userId: userId || null,
       userName: userName || 'משתמש',
-      userEmail: '',
-      isGuest: false,
+      userEmail: userEmail || '',
+      isGuest: !userId,
       meta: `${correct}/${finished.answers.length} נכון · מצב: ${mode ?? 'רגיל'}`,
     });
 

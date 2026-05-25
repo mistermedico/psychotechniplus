@@ -443,6 +443,12 @@ export default function ProfileTab() {
               onPress={() => { Haptics.selectionAsync(); router.push('/inbox'); }}
             />
             <SettingRow
+              icon="💡"
+              label="עזרה ומדריך"
+              value="מדריך למשתמש"
+              onPress={() => { Haptics.selectionAsync(); router.push('/help'); }}
+            />
+            <SettingRow
               icon="🔔"
               label="התראות"
               value="הגדרות מכשיר"
