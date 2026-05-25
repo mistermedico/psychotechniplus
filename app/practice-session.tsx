@@ -15,7 +15,8 @@ import { getTopicById, getTargetById, TOPICS } from '../data/mockData';
 import { fetchQuestions } from '../lib/db';
 import { QuestionCard } from '../components/QuestionCard';
 import { ProgressBar } from '../components/ProgressBar';
-import { Colors } from '../constants/colors';
+import { logUserAction } from '../utils/visitTracker';
+
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { calcAllScores } from '../utils/scoring';
 import { SessionMode } from '../data/types';
@@ -360,6 +361,15 @@ export default function PracticeSession() {
     if (!finished) { finishingRef.current = false; return; }
     const scores = calcAllScores(finished.answers);
     const correct = finished.answers.filter(a => a.isCorrect).length;
+    logUserAction({
+      screen: 'סשן תרגול',
+      action: 'סשן הושלם',
+      userId: userId || null,
+      userName: userName || 'משתמש',
+      userEmail: '',
+      isGuest: false,
+      meta: `${correct}/${finished.answers.length} נכון · מצב: ${mode ?? 'רגיל'}`,
+    });
 
     // Save session record to Supabase and admin store (only for authenticated users)
     const template = isSimulation ? templates.find(t => t.id === templateId) : undefined;

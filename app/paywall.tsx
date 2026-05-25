@@ -10,6 +10,7 @@ import * as Haptics from '../utils/haptics';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore } from '../store/adminStore';
+import { useScreenVisit } from '../utils/visitTracker';
 import { PurchasePackage } from '../lib/purchases';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
@@ -33,6 +34,7 @@ export default function PaywallScreen() {
   const { packages, isPurchasing, isRestoring, loadError, fetchOfferings, purchase, restore } = usePurchaseStore();
   const { isPremium, setPremium } = useUserStore();
   const { promoCodes } = useAdminStore();
+  useScreenVisit('Paywall — דף תשלום');
   const [selected, setSelected] = useState<string>('monthly');
   const [promoInput, setPromoInput] = useState('');
   const [promoApplying, setPromoApplying] = useState(false);

@@ -11,6 +11,7 @@ const PROMO_CODES_KEY = '@psychotechniplus/admin/promoCodes';
 const DAILY_CHALLENGES_KEY = '@psychotechniplus/admin/dailyChallenges';
 const PUSH_NOTIFICATIONS_KEY = '@psychotechniplus/admin/pushNotifications';
 const INBOX_MESSAGES_KEY = '@psychotechniplus/admin/inboxMessages';
+const VISIT_LOG_KEY = '@psychotechniplus/admin/visitLog';
 
 export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
@@ -372,6 +373,20 @@ export interface InboxMessage {
   createdAt: string;
 }
 
+// ── Visit / Action Log ─────────────────────────────────────────────────────
+export interface VisitLogEntry {
+  id: string;
+  timestamp: string;        // ISO UTC
+  screen: string;           // human-readable screen name
+  action: string;           // e.g. 'ביקור', 'סשן הושלם', 'רכישה', 'כניסה', 'יציאה'
+  userId: string | null;
+  userName: string;         // name or 'אורח' for guests
+  userEmail: string;
+  isGuest: boolean;
+  sessionId: string;        // random per-launch ID to group one user's visit
+  meta?: string;            // optional extra info (score, topic, etc.)
+}
+
 // ── Revenue Snapshots ──────────────────────────────────────────────────────
 export interface RevenueSnapshot {
   month: string;
@@ -593,6 +608,7 @@ interface AdminState {
   promoCodes: PromoCode[];
   pushNotifications: PushNotification[];
   inboxMessages: InboxMessage[];
+  visitLog: VisitLogEntry[];
   revenueSnapshots: RevenueSnapshot[];
   activityLog: AdminActivityLog[];
 
@@ -667,6 +683,10 @@ interface AdminState {
   // Actions — inbox messages
   addInboxMessage: (msg: Omit<InboxMessage, 'id' | 'createdAt' | 'sentAt'>) => InboxMessage;
   deleteInboxMessage: (id: string) => void;
+
+  // Actions — visit log
+  logVisit: (entry: Omit<VisitLogEntry, 'id' | 'timestamp'>) => void;
+  clearVisitLog: () => void;
 
   // Actions — activity log
   logActivity: (action: string, category: AdminActivityLog['category']) => void;
@@ -748,6 +768,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   promoCodes: SEED_PROMO_CODES,
   pushNotifications: SEED_PUSH_NOTIFICATIONS,
   inboxMessages: [],
+  visitLog: [],
   revenueSnapshots: SEED_REVENUE_SNAPSHOTS,
   activityLog: SEED_ACTIVITY_LOG,
   generationSessions: SEED_GENERATION_SESSIONS,
@@ -1280,6 +1301,24 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     });
   },
 
+  logVisit: (entry) => {
+    const newEntry: VisitLogEntry = {
+      ...entry,
+      id: `visit_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+    };
+    set(s => {
+      const next = [newEntry, ...s.visitLog].slice(0, 3000);
+      AsyncStorage.setItem(VISIT_LOG_KEY, JSON.stringify(next)).catch(() => null);
+      return { visitLog: next };
+    });
+  },
+
+  clearVisitLog: () => {
+    set({ visitLog: [] });
+    AsyncStorage.removeItem(VISIT_LOG_KEY).catch(() => null);
+  },
+
   addGenerationSession: (s) => {
     const newSession: GenerationSession = {
       ...s,
@@ -1479,6 +1518,17 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הודעות תיבת דואר', e?.message);
+    }
+
+    // 10. Load persisted visit log from AsyncStorage
+    try {
+      const savedVisits = await AsyncStorage.getItem(VISIT_LOG_KEY);
+      if (savedVisits) {
+        const parsed: VisitLogEntry[] = JSON.parse(savedVisits);
+        if (parsed.length > 0) set({ visitLog: parsed });
+      }
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת יומן ביקורים', e?.message);
     }
 
     logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');

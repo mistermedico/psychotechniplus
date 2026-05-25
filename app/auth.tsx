@@ -11,6 +11,7 @@ import * as Haptics from '../utils/haptics';
 import { supabase } from '../lib/supabase';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
+import { logUserAction } from '../utils/visitTracker';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
 
@@ -103,6 +104,7 @@ export default function AuthScreen() {
 
       await initialize(data.user.id);
       if (data.user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
+      logUserAction({ screen: 'מסך כניסה', action: 'התחברות', userId: data.user.id, userName: 'משתמש', userEmail: email.trim(), isGuest: false });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const { hasCompletedOnboarding } = useUserStore.getState();
       router.replace(hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
@@ -136,6 +138,7 @@ export default function AuthScreen() {
 
       await initialize(data.user.id);
       if (data.user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
+      logUserAction({ screen: 'מסך הרשמה', action: 'הרשמה', userId: data.user.id, userName: displayName.trim() || 'משתמש', userEmail: email.trim(), isGuest: false });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/onboarding');
     }

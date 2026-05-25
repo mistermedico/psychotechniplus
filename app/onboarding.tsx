@@ -12,11 +12,13 @@ import { TARGETS } from '../data/mockData';
 import { Target } from '../data/types';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
+import { useScreenVisit } from '../utils/visitTracker';
 
 const haptic = (style: Haptics.ImpactFeedbackStyle) => Haptics.impactAsync(style);
 const hapticSuccess = () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
 export default function Onboarding() {
+  useScreenVisit('אונבורדינג');
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const psychometricTarget = TARGETS.find(t => t.id === 'target_psychometric') ?? TARGETS[0];

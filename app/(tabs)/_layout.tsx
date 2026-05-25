@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import { Platform, StyleSheet, View, Text, Animated, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,8 @@ import * as Haptics from '../../utils/haptics';
 import { FontFamily } from '../../constants/theme';
 import { Colors } from '../../constants/colors';
 import { useAdminStore } from '../../store/adminStore';
+import { useUserStore } from '../../store/userStore';
+import { logUserAction } from '../../utils/visitTracker';
 
 interface TabIconProps {
   icon: string;
@@ -98,10 +100,42 @@ function AnnouncementBanner() {
   );
 }
 
+const TAB_SCREEN_NAMES: Record<string, string> = {
+  '/(tabs)': 'דף הבית',
+  '/(tabs)/index': 'דף הבית',
+  '/(tabs)/practice': 'תרגול',
+  '/(tabs)/progress': 'התקדמות',
+  '/(tabs)/profile': 'פרופיל',
+  '/(tabs)/targets': 'מסלולים',
+};
+
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const TAB_HEIGHT = 64;
   const BAR_HEIGHT = TAB_HEIGHT + Math.max(insets.bottom, 12);
+  const pathname = usePathname();
+  const lastTrackedTab = useRef<string | null>(null);
+
+  const visitUserId = useUserStore(s => s.userId);
+  const visitName = useUserStore(s => s.name);
+  const visitEmail = useUserStore(s => s.email);
+  const visitIsAuth = useUserStore(s => s.isAuthenticated);
+  const visitIsPremium = useUserStore(s => s.isPremium);
+
+  useEffect(() => {
+    if (!TAB_SCREEN_NAMES[pathname]) return;
+    if (pathname === lastTrackedTab.current) return;
+    lastTrackedTab.current = pathname;
+    logUserAction({
+      screen: TAB_SCREEN_NAMES[pathname],
+      action: 'ביקור',
+      userId: visitIsAuth && visitUserId ? visitUserId : null,
+      userName: visitIsAuth && visitName ? visitName : 'אורח',
+      userEmail: visitIsAuth ? visitEmail : '',
+      isGuest: !visitIsAuth,
+      meta: visitIsAuth ? (visitIsPremium ? 'פרמיום' : 'חינמי') : undefined,
+    });
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <View style={{ flex: 1 }}>

@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
+import { useScreenVisit } from '../utils/visitTracker';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 
@@ -77,6 +78,7 @@ const TESTIMONIALS = [
 ];
 
 export default function LandingScreen() {
+  useScreenVisit('דף נחיתה');
   // Animation refs
   const navOpacity    = useRef(new Animated.Value(0)).current;
   const heroOpacity   = useRef(new Animated.Value(0)).current;

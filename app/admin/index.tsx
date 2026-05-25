@@ -47,6 +47,7 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'notifications',      icon: '🔔', label: 'הודעות Push',     desc: 'שליחת התראות',           route: '/admin/notifications',       category: 'business' },
   { id: 'app-settings',       icon: '⚙️', label: 'הגדרות אפליקציה',desc: 'פרמטרים גלובליים',       route: '/admin/app-settings',        category: 'business' },
   // System
+  { id: 'visit-log', icon: '📍', label: 'יומן ביקורים', desc: 'מעקב ביקורי משתמשים ואורחים', route: '/admin/visit-log', category: 'system' },
   { id: 'performance',        icon: '📈', label: 'ביצועים',           desc: 'דיוק, רמות, נושאים',     route: '/admin/performance',         category: 'system' },
   { id: 'analytics',          icon: '📊', label: 'אנליטיקס',         desc: 'גרפים ומגמות',           route: '/admin/analytics',           category: 'system' },
   { id: 'app-control',        icon: '🎮', label: 'מרכז שליטה',       desc: 'תחזוקה, דגלים',          route: '/admin/app-control',         category: 'system' },
