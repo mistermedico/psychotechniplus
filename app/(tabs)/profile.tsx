@@ -89,6 +89,7 @@ export default function ProfileTab() {
     name, level, xp: _xp, streak, selectedTargetId,
     totalSessions, totalCorrect, totalAnswered, badges,
     getTopicLevelLabel, reset, signOut, deleteAccount, isPremium,
+    userId, readMessageIds,
   } = useUserStore();
 
   const earnedBadgeTypes = new Set(badges.map(b => b.badgeType));
@@ -115,8 +116,19 @@ export default function ProfileTab() {
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const mainLevelLabel = getTopicLevelLabel('topic_quantitative');
 
-  const { isAdmin, setIsAdmin } = useAdminStore();
+  const { isAdmin, setIsAdmin, inboxMessages } = useAdminStore();
   const email = useUserStore(s => s.email);
+
+  const inboxUnreadCount = React.useMemo(() => {
+    return inboxMessages.filter(msg => {
+      const visible =
+        msg.targetType === 'all' ||
+        (msg.targetType === 'premium' && isPremium) ||
+        (msg.targetType === 'free' && !isPremium) ||
+        (msg.targetType === 'specific' && msg.targetUserIds.includes(userId));
+      return visible && !readMessageIds.includes(msg.id);
+    }).length;
+  }, [inboxMessages, userId, isPremium, readMessageIds]);
   React.useEffect(() => {
     if (email.toLowerCase() === ADMIN_EMAIL && !isAdmin) setIsAdmin(true);
   }, [email]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -424,6 +436,12 @@ export default function ProfileTab() {
           </View>
 
           <View style={styles.settingsCard}>
+            <SettingRow
+              icon="📬"
+              label="הודעות"
+              value={inboxUnreadCount > 0 ? `${inboxUnreadCount} חדשות` : undefined}
+              onPress={() => { Haptics.selectionAsync(); router.push('/inbox'); }}
+            />
             <SettingRow
               icon="🔔"
               label="התראות"

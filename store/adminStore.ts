@@ -10,6 +10,7 @@ const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
 const PROMO_CODES_KEY = '@psychotechniplus/admin/promoCodes';
 const DAILY_CHALLENGES_KEY = '@psychotechniplus/admin/dailyChallenges';
 const PUSH_NOTIFICATIONS_KEY = '@psychotechniplus/admin/pushNotifications';
+const INBOX_MESSAGES_KEY = '@psychotechniplus/admin/inboxMessages';
 
 export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
@@ -359,6 +360,18 @@ export interface PushNotification {
   createdAt: string;
 }
 
+// ── In-App Inbox Messages ──────────────────────────────────────────────────
+export interface InboxMessage {
+  id: string;
+  title: string;
+  body: string;
+  icon: string;
+  targetType: 'all' | 'free' | 'premium' | 'specific';
+  targetUserIds: string[];
+  sentAt: string;
+  createdAt: string;
+}
+
 // ── Revenue Snapshots ──────────────────────────────────────────────────────
 export interface RevenueSnapshot {
   month: string;
@@ -579,6 +592,7 @@ interface AdminState {
   // New fields
   promoCodes: PromoCode[];
   pushNotifications: PushNotification[];
+  inboxMessages: InboxMessage[];
   revenueSnapshots: RevenueSnapshot[];
   activityLog: AdminActivityLog[];
 
@@ -649,6 +663,10 @@ interface AdminState {
   updatePushNotification: (id: string, updates: Partial<PushNotification>) => void;
   deletePushNotification: (id: string) => void;
   sendPushNotification: (id: string) => void;
+
+  // Actions — inbox messages
+  addInboxMessage: (msg: Omit<InboxMessage, 'id' | 'createdAt' | 'sentAt'>) => InboxMessage;
+  deleteInboxMessage: (id: string) => void;
 
   // Actions — activity log
   logActivity: (action: string, category: AdminActivityLog['category']) => void;
@@ -729,6 +747,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   userNotes: [],
   promoCodes: SEED_PROMO_CODES,
   pushNotifications: SEED_PUSH_NOTIFICATIONS,
+  inboxMessages: [],
   revenueSnapshots: SEED_REVENUE_SNAPSHOTS,
   activityLog: SEED_ACTIVITY_LOG,
   generationSessions: SEED_GENERATION_SESSIONS,
@@ -1236,6 +1255,31 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     if (notif) get().logActivity(`שלח הודעת Push: ${notif.title}`, 'notification');
   },
 
+  addInboxMessage: (msg) => {
+    const now = new Date().toISOString();
+    const newMsg: InboxMessage = {
+      ...msg,
+      id: `inbox_${Date.now()}`,
+      createdAt: now,
+      sentAt: now,
+    };
+    set(s => {
+      const next = [newMsg, ...s.inboxMessages];
+      AsyncStorage.setItem(INBOX_MESSAGES_KEY, JSON.stringify(next)).catch(() => null);
+      return { inboxMessages: next };
+    });
+    get().logActivity(`הודעה נשלחה: ${msg.title}`, 'notification');
+    return newMsg;
+  },
+
+  deleteInboxMessage: (id) => {
+    set(s => {
+      const next = s.inboxMessages.filter(m => m.id !== id);
+      AsyncStorage.setItem(INBOX_MESSAGES_KEY, JSON.stringify(next)).catch(() => null);
+      return { inboxMessages: next };
+    });
+  },
+
   addGenerationSession: (s) => {
     const newSession: GenerationSession = {
       ...s,
@@ -1424,6 +1468,17 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הודעות Push', e?.message);
+    }
+
+    // 9. Load persisted inbox messages from AsyncStorage
+    try {
+      const savedInbox = await AsyncStorage.getItem(INBOX_MESSAGES_KEY);
+      if (savedInbox) {
+        const parsed: InboxMessage[] = JSON.parse(savedInbox);
+        if (parsed.length > 0) set({ inboxMessages: parsed });
+      }
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הודעות תיבת דואר', e?.message);
     }
 
     logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');

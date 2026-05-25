@@ -25,6 +25,7 @@ export default function Results() {
     difficultyScore: string;
     speedScore: string;
     stability: string;
+    bonusXp?: string;
   }>();
 
   const score = parseInt(params.score ?? '0');
@@ -35,6 +36,7 @@ export default function Results() {
   const difficultyScore = parseInt(params.difficultyScore ?? '0');
   const speedScore = parseInt(params.speedScore ?? '0');
   const stability = parseInt(params.stability ?? '100');
+  const bonusXp = parseInt(params.bonusXp ?? '0');
 
   const topic = getTopicById(params.topicId ?? '');
   const { label, color } = getPerformanceLevel(score);
@@ -145,6 +147,12 @@ export default function Results() {
             <Text style={styles.sectionSub}>BREAKDOWN</Text>
             <Text style={styles.sectionTitle}>ניקוד מפורט</Text>
           </View>
+
+          {bonusXp > 0 && (
+            <View style={styles.bonusXpBanner}>
+              <Text style={styles.bonusXpText}>🎯 אתגר יומי הושלם! +{bonusXp} XP בונוס</Text>
+            </View>
+          )}
 
           <View style={styles.advancedCard}>
             <ScoreRow icon="⚖️" label="ניקוד משוקלל קושי" value={difficultyScore} desc="מתחשב ברמת קושי כל שאלה" color={Colors.primary} />
@@ -302,6 +310,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text, textAlign: 'right' },
 
   advancedCard: { backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 20, borderRadius: Radius.xl, paddingHorizontal: 16, ...Shadow.md, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)' },
+  bonusXpBanner: { marginHorizontal: 20, marginBottom: 12, borderRadius: Radius.xl, padding: 14, backgroundColor: 'rgba(217,119,6,0.2)', borderWidth: 1.5, borderColor: '#D97706' },
+  bonusXpText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#FBBF24', textAlign: 'center' },
 
   percentileCard: { backgroundColor: Colors.primaryLighter, marginHorizontal: 20, borderRadius: Radius.xl, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: Colors.primary + '30' },
   percentileTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.primary, textAlign: 'right', marginBottom: 6 },

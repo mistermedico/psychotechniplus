@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  ActivityIndicator, Alert, Animated,
+  ActivityIndicator, Alert, Animated, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { useUserStore } from '../store/userStore';
+import { useAdminStore } from '../store/adminStore';
 import { PurchasePackage } from '../lib/purchases';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
@@ -30,8 +31,11 @@ const PLAN_META: Record<string, { label: string; badge?: string; period: string;
 
 export default function PaywallScreen() {
   const { packages, isPurchasing, isRestoring, loadError, fetchOfferings, purchase, restore } = usePurchaseStore();
-  const { isPremium } = useUserStore();
+  const { isPremium, setPremium } = useUserStore();
+  const { promoCodes } = useAdminStore();
   const [selected, setSelected] = useState<string>('monthly');
+  const [promoInput, setPromoInput] = useState('');
+  const [promoApplying, setPromoApplying] = useState(false);
 
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(28)).current;
@@ -84,6 +88,47 @@ export default function PaywallScreen() {
       Alert.alert('שגיאה', result.error);
     } else {
       Alert.alert('לא נמצא מנוי', 'לא נמצאו רכישות קודמות לשחזור עבור חשבון זה.');
+    }
+  };
+
+  const handlePromoCode = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) { Alert.alert('שגיאה', 'הזן קוד קופון'); return; }
+
+    const promo = promoCodes.find(c => c.code === code && c.isActive);
+    if (!promo) {
+      Alert.alert('קוד לא תקין', 'הקוד לא קיים, לא פעיל, או פג תוקפו');
+      return;
+    }
+    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
+      Alert.alert('קוד פג תוקף', 'תוקף הקוד הזה פג');
+      return;
+    }
+    if (promo.maxUses > 0 && promo.usedCount >= promo.maxUses) {
+      Alert.alert('קוד מנוצל', 'הקוד הגיע למגבלת השימושים');
+      return;
+    }
+
+    setPromoApplying(true);
+    try {
+      if (promo.discountType === 'full_access') {
+        setPremium(true);
+        setPromoInput('');
+        Alert.alert('🎉 גישה מלאה!', 'הקוד אושר — גישה פרמיום הופעלה', [
+          { text: 'מצוין ←', onPress: () => router.back() },
+        ]);
+      } else if (promo.discountType === 'days_free') {
+        setPremium(true);
+        setPromoInput('');
+        Alert.alert('🎉 ניסיון חינמי!', `הקוד אושר — ${promo.discountValue} ימי פרמיום הופעלו`, [
+          { text: 'מצוין ←', onPress: () => router.back() },
+        ]);
+      } else if (promo.discountType === 'percent') {
+        setPromoInput('');
+        Alert.alert('🎟️ קוד הנחה', `הקוד אושר — ${promo.discountValue}% הנחה\nהחל הנחה זו ברכישה.`);
+      }
+    } finally {
+      setPromoApplying(false);
     }
   };
 
@@ -258,6 +303,30 @@ export default function PaywallScreen() {
               {isRestoring ? 'משחזר רכישות...' : 'שחזר רכישה קודמת'}
             </Text>
           </Pressable>
+
+          {/* Promo code */}
+          <View style={styles.promoSection}>
+            <View style={styles.promoRow}>
+              <Pressable
+                onPress={handlePromoCode}
+                disabled={promoApplying}
+                style={[styles.promoBtn, promoApplying && { opacity: 0.6 }]}
+              >
+                <Text style={styles.promoBtnText}>{promoApplying ? '...' : 'החל'}</Text>
+              </Pressable>
+              <TextInput
+                style={styles.promoInput}
+                value={promoInput}
+                onChangeText={v => setPromoInput(v.toUpperCase())}
+                placeholder="קוד קופון"
+                placeholderTextColor="rgba(255,255,255,0.25)"
+                textAlign="right"
+                autoCapitalize="characters"
+                returnKeyType="done"
+                onSubmitEditing={handlePromoCode}
+              />
+            </View>
+          </View>
 
           {/* Legal text */}
           {selectedPkg?.isSubscription && (
@@ -469,4 +538,19 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.regular, fontSize: 11,
     color: Colors.textTertiary,
   },
+
+  promoSection: { marginBottom: 8 },
+  promoRow: { flexDirection: 'row-reverse', gap: 8 },
+  promoInput: {
+    flex: 1, height: 44, borderRadius: Radius.lg,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 14,
+    fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text,
+  },
+  promoBtn: {
+    height: 44, paddingHorizontal: 20, borderRadius: Radius.lg,
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  promoBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
 });

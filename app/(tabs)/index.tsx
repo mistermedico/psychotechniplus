@@ -273,11 +273,12 @@ export default function Dashboard() {
                   router.push({
                     pathname: '/practice-session',
                     params: {
-                      topicId: 'topic_quantitative', // fallback topic
+                      topicId: 'topic_quantitative',
                       targetId: selectedTarget.id,
                       mode: 'speed',
                       questionLimit: '10',
-                      challengeQuestionId: todayChallenge.questionId, // admin-set question
+                      challengeQuestionId: todayChallenge.questionId,
+                      challengeBonusXp: String(todayChallenge.bonusXp),
                     },
                   });
                 } else {

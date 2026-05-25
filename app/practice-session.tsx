@@ -26,13 +26,15 @@ const { width: W } = Dimensions.get('window');
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 export default function PracticeSession() {
-  const { topicId, targetId, mode, templateId, questionLimit, difficulty } = useLocalSearchParams<{
+  const { topicId, targetId, mode, templateId, questionLimit, difficulty, challengeQuestionId, challengeBonusXp } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
     mode?: SessionMode;
     templateId?: string;
     questionLimit?: string;
     difficulty?: string; // 'easy' | 'medium' | 'hard' | 'all'
+    challengeQuestionId?: string;
+    challengeBonusXp?: string;
   }>();
 
   const insets = useSafeAreaInsets();
@@ -42,8 +44,8 @@ export default function PracticeSession() {
     nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
   } = usePracticeStore();
 
-  const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium } = useUserStore();
-  const { templates, questions: adminQuestions, practiceSettings, freePracticeLimit, addSessionRecord } = useAdminStore();
+  const { recordAnswer, recordSession, getTopicLevel, addXp, userId, name: userName, isPremium } = useUserStore();
+  const { templates, questions: adminQuestions, practiceSettings, examSettings, freePracticeLimit, addSessionRecord } = useAdminStore();
 
   const {
     showTimerInPractice,
@@ -389,6 +391,13 @@ export default function PracticeSession() {
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
     recordSession(correct, finished.answers.filter(a => !a.isSkipped).length);
 
+    // Award daily challenge bonus XP
+    const bonusXp = challengeBonusXp ? parseInt(challengeBonusXp, 10) : 0;
+    if (bonusXp > 0) {
+      addXp(bonusXp);
+      logger.info('practiceSession:finish', `אתגר יומי — בונוס +${bonusXp} XP הוענק`);
+    }
+
     router.replace({
       pathname: '/results',
       params: {
@@ -403,6 +412,7 @@ export default function PracticeSession() {
         difficultyScore: scores.difficultyWeightedScore,
         speedScore: scores.speedAdjustedScore,
         stability: scores.stabilityScore,
+        bonusXp: bonusXp > 0 ? bonusXp : undefined,
       },
     });
   };
@@ -697,12 +707,14 @@ export default function PracticeSession() {
       <View style={[styles.actions, { paddingBottom: Math.max(24, insets.bottom + 12) }]}>
         {!revealed ? (
           <View style={styles.actionsRow}>
-            <Pressable
-              onPress={handleSkip}
-              style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.skipText}>דלג</Text>
-            </Pressable>
+            {(!isSimulation || examSettings.allowSkipInExam) && (
+              <Pressable
+                onPress={handleSkip}
+                style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.skipText}>דלג</Text>
+              </Pressable>
+            )}
 
             <Pressable
               onPress={handleConfirm}

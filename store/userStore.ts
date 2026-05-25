@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserBadge, BadgeType } from '../data/types';
 import { supabase } from '../lib/supabase';
 import {
@@ -58,6 +59,8 @@ interface UserState {
   getTopicLevel: (topicId: string) => PerformanceLevel;
   getTopicLevelLabel: (topicId: string) => string;
   setPremium: (val: boolean) => void;
+  readMessageIds: string[];
+  markMessageRead: (id: string) => void;
   reset: () => void;
 }
 
@@ -78,6 +81,7 @@ const INITIAL_STATE = {
   totalCorrect: 0,
   totalAnswered: 0,
   isPremium: false,
+  readMessageIds: [] as string[],
   isLoaded: false,
   isSyncing: false,
   isAuthenticated: false,
@@ -144,6 +148,15 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (badges.length > 0) set({ badges });
 
     set({ isLoaded: true, isSyncing: false });
+
+    // Load persisted read message IDs
+    try {
+      const savedReads = await AsyncStorage.getItem(`@psychotechniplus/user/${userId}/readMessages`);
+      if (savedReads) {
+        const parsed: string[] = JSON.parse(savedReads);
+        if (parsed.length > 0) set({ readMessageIds: parsed });
+      }
+    } catch {}
   },
 
   signOut: async () => {
@@ -306,6 +319,16 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   setPremium: (val) => set({ isPremium: val }),
+
+  readMessageIds: [],
+  markMessageRead: (id) => {
+    set(s => {
+      if (s.readMessageIds.includes(id)) return {};
+      const next = [...s.readMessageIds, id];
+      AsyncStorage.setItem(`@psychotechniplus/user/${s.userId}/readMessages`, JSON.stringify(next)).catch(() => null);
+      return { readMessageIds: next };
+    });
+  },
 
   reset: () => {
     const { userId } = get();
