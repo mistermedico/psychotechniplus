@@ -172,6 +172,21 @@ export default function PracticeSession() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleTimeUp = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    if (revealed) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setSelectedId(null);
+    setRevealed(false);
+    setLastAnswerCorrect(false);
+    setShowExplanation(false);
+    explanationAnim.setValue(0);
+    skipQuestion();
+    const hasMore = nextQuestion();
+    if (!hasMore) finishSession();
+  }, [revealed, skipQuestion, nextQuestion, explanationAnim]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Speed mode timer (only in speed mode — showTimerInPractice shows timer but doesn't auto-skip)
   useEffect(() => {
     if (!isSpeedMode || revealed) return;
@@ -214,22 +229,7 @@ export default function PracticeSession() {
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
       clearInterval(countId);
     };
-  }, [revealed, autoAdvanceDelay]);
-
-  const handleTimeUp = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-    if (revealed) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    setSelectedId(null);
-    setRevealed(false);
-    setLastAnswerCorrect(false);
-    setShowExplanation(false);
-    explanationAnim.setValue(0);
-    skipQuestion();
-    const hasMore = nextQuestion();
-    if (!hasMore) finishSession();
-  }, [revealed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [revealed, autoAdvanceDelay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelect = (optId: string) => {
     if (revealed) return;
@@ -291,7 +291,16 @@ export default function PracticeSession() {
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     resetQuestionState();
     skipQuestion();
-    advanceOrEnd();
+    if (mode === 'adaptive') {
+      const s = usePracticeStore.getState().session;
+      if (!s || s.answers.length >= s.questions.length) {
+        finishSession();
+        return;
+      }
+      getAdaptiveNext();
+    } else {
+      advanceOrEnd();
+    }
   };
 
   const handleNext = () => {

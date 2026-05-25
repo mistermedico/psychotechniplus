@@ -136,7 +136,7 @@ function StepSelectTarget({
   onSelect: (t: Target) => void;
   onFinish: () => void;
 }) {
-  const activeTargets = TARGETS.filter(t => t.id === 'target_psychometric');
+  const activeTargets = TARGETS.filter(t => t.isActive && !t.comingSoon);
 
   return (
     <View style={styles.stepContainer}>

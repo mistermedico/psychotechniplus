@@ -170,10 +170,15 @@ export default function AuthScreen() {
               onPress={async () => {
                 setResending(true);
                 try {
-                  await supabase.auth.resend({ type: 'signup', email });
-                  Alert.alert('נשלח!', 'בדוק את תיבת הדואר שלך שוב.');
+                  const { error: resendError } = await supabase.auth.resend({ type: 'signup', email });
+                  if (resendError) {
+                    setEmailPending(false);
+                    setMode('register');
+                    setError(translateError(resendError.message));
+                  } else {
+                    Alert.alert('נשלח!', 'בדוק את תיבת הדואר שלך שוב.');
+                  }
                 } catch {
-                  // fall back: let user change email
                   setEmailPending(false);
                   setMode('register');
                 } finally {
