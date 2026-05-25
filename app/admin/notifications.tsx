@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Modal, Alert,
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, PushNotification } from '../../store/adminStore';
+import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -50,6 +51,37 @@ export default function NotificationsScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [composeVisible, setComposeVisible] = useState(false);
 
+  // Real user counts per segment, fetched once from Supabase
+  const [reachCounts, setReachCounts] = useState<Record<PushNotification['targetSegment'], number>>({
+    all: 0, free: 0, premium: 0, inactive_7d: 0, inactive_30d: 0,
+  });
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('is_premium, last_practiced_date');
+
+        if (!data) return;
+        const cutoff7 = new Date();
+        cutoff7.setDate(cutoff7.getDate() - 7);
+        const cutoff30 = new Date();
+        cutoff30.setDate(cutoff30.getDate() - 30);
+        const c7 = cutoff7.toISOString().split('T')[0];
+        const c30 = cutoff30.toISOString().split('T')[0];
+
+        const all = data.length;
+        const premium = data.filter(u => u.is_premium).length;
+        const free = all - premium;
+        const inactive_7d = data.filter(u => !u.last_practiced_date || u.last_practiced_date < c7).length;
+        const inactive_30d = data.filter(u => !u.last_practiced_date || u.last_practiced_date < c30).length;
+        setReachCounts({ all, free, premium, inactive_7d, inactive_30d });
+      } catch {}
+    };
+    fetchCounts();
+  }, []);
+
   // Compose form state
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -68,9 +100,7 @@ export default function NotificationsScreen() {
       Alert.alert('שגיאה', 'מלא כותרת ותוכן');
       return;
     }
-    const estimatedReachMap: Record<PushNotification['targetSegment'], number> = {
-      all: 2612, free: 2445, premium: 167, inactive_7d: 340, inactive_30d: 820,
-    };
+    const estimatedReachMap = reachCounts;
     if (scheduleToggle && scheduledAt) {
       addPushNotification({
         title: title.trim(),

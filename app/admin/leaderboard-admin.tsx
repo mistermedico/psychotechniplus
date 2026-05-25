@@ -1,64 +1,166 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert,
+  ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
+import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import { logger } from '../../utils/logger';
 
-// Mock leaderboard data (would come from Supabase in production)
-const LEADERBOARD_MOCK = [
-  { id: 'u002', name: 'מיכל כהן',     elo: 1580, sessions: 124, streak: 31, isPremium: true,  excluded: false },
-  { id: 'u012', name: 'גיל טוב',      elo: 1550, sessions: 103, streak: 18, isPremium: true,  excluded: false },
-  { id: 'u001', name: 'יונתן לוי',    elo: 1480, sessions: 87,  streak: 14, isPremium: true,  excluded: false },
-  { id: 'u006', name: 'נועה ברק',      elo: 1410, sessions: 66,  streak: 22, isPremium: true,  excluded: false },
-  { id: 'u008', name: 'שירה גולן',    elo: 1350, sessions: 38,  streak: 10, isPremium: true,  excluded: false },
-  { id: 'u004', name: 'תמר אברהם',    elo: 1320, sessions: 45,  streak: 7,  isPremium: false, excluded: false },
-  { id: 'u007', name: 'עידו שפירא',   elo: 1210, sessions: 19,  streak: 5,  isPremium: false, excluded: false },
-  { id: 'u010', name: 'דניאל רוזנברג', elo: 1200, sessions: 5,   streak: 5,  isPremium: false, excluded: false },
-  { id: 'u003', name: 'אור שמיר',     elo: 1150, sessions: 23,  streak: 3,  isPremium: false, excluded: false },
-  { id: 'u009', name: 'אלון מזרחי',   elo: 1080, sessions: 8,   streak: 2,  isPremium: false, excluded: false },
-];
+const EXCLUDED_KEY = '@admin/leaderboard-excluded';
 
-type LeaderEntry = typeof LEADERBOARD_MOCK[0];
+interface LeaderEntry {
+  id: string;
+  name: string;
+  elo: number;
+  sessions: number;
+  streak: number;
+  isPremium: boolean;
+  excluded: boolean;
+}
 
 export default function LeaderboardAdminScreen() {
   const { appConfig, setAppConfig } = useAdminStore();
-  const [entries, setEntries] = useState(LEADERBOARD_MOCK);
+  const [entries, setEntries] = useState<LeaderEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const [showExcluded, setShowExcluded] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
-  const visible = useMemo(() =>
-    entries.filter(e => showExcluded ? e.excluded : !e.excluded),
-    [entries, showExcluded]
-  );
+  const loadData = useCallback(async () => {
+    try {
+      const savedExcluded = await AsyncStorage.getItem(EXCLUDED_KEY);
+      const excluded: Set<string> = savedExcluded
+        ? new Set(JSON.parse(savedExcluded))
+        : new Set();
+      setExcludedIds(excluded);
 
-  const toggleExclude = (id: string) => {
-    setEntries(prev => prev.map(e => e.id === id ? { ...e, excluded: !e.excluded } : e));
+      const { data: profiles, error: profErr } = await supabase
+        .from('user_profiles')
+        .select('id, name, is_premium, total_sessions, streak')
+        .order('total_sessions', { ascending: false })
+        .limit(100);
+
+      if (profErr) logger.error('leaderboard:load', 'שגיאה בטעינת פרופילים', profErr.message);
+
+      const { data: elos, error: eloErr } = await supabase
+        .from('user_elos')
+        .select('user_id, elo');
+
+      if (eloErr) logger.error('leaderboard:load', 'שגיאה בטעינת ELO', eloErr.message);
+
+      const eloByUser = new Map<string, number[]>();
+      (elos ?? []).forEach(e => {
+        if (!eloByUser.has(e.user_id)) eloByUser.set(e.user_id, []);
+        eloByUser.get(e.user_id)!.push(e.elo);
+      });
+
+      const computed: LeaderEntry[] = (profiles ?? [])
+        .filter(p => (p.total_sessions ?? 0) > 0)
+        .map(p => {
+          const userElos = eloByUser.get(p.id) ?? [1200];
+          const avgElo = Math.round(userElos.reduce((s, e) => s + e, 0) / userElos.length);
+          return {
+            id: p.id,
+            name: p.name || 'ללא שם',
+            elo: avgElo,
+            sessions: p.total_sessions ?? 0,
+            streak: p.streak ?? 0,
+            isPremium: p.is_premium ?? false,
+            excluded: excluded.has(p.id),
+          };
+        })
+        .sort((a, b) => b.elo - a.elo);
+
+      setEntries(computed);
+    } catch (e: any) {
+      logger.error('leaderboard:load', 'חריגה', e?.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const onRefresh = () => { setRefreshing(true); loadData(); };
+
+  const toggleExclude = async (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next = new Set(excludedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setExcludedIds(next);
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, excluded: !e.excluded } : e));
+    AsyncStorage.setItem(EXCLUDED_KEY, JSON.stringify([...next])).catch(() => null);
   };
 
   const handleReset = () => {
     Alert.alert(
       '⚠️ איפוס לוח מובילים',
-      'לאפס את כל הדירוגים ל-ELO 1200? פעולה זו בלתי הפיכה.',
+      'לאפס את כל ציוני ELO ל-1200? פעולה זו בלתי הפיכה.',
       [
         { text: 'ביטול', style: 'cancel' },
-        { text: 'אפס הכל', style: 'destructive', onPress: () => {
-          setEntries(prev => prev.map(e => ({ ...e, elo: 1200 })));
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          Alert.alert('✅ אופס', 'כל הדירוגים אופסו ל-1200');
-        }},
+        {
+          text: 'אפס הכל', style: 'destructive', onPress: async () => {
+            setResetting(true);
+            try {
+              const { error } = await supabase
+                .from('user_elos')
+                .update({ elo: 1200, history: [] })
+                .gte('elo', 0);
+
+              if (error) {
+                Alert.alert('שגיאה', 'לא ניתן לאפס ELO: ' + error.message);
+              } else {
+                setEntries(prev => prev.map(e => ({ ...e, elo: 1200 })));
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                Alert.alert('✅ אופס', 'כל ציוני ELO אופסו ל-1200');
+              }
+            } catch (e: any) {
+              Alert.alert('שגיאה', e?.message ?? 'שגיאה לא ידועה');
+            } finally {
+              setResetting(false);
+            }
+          },
+        },
       ],
     );
   };
 
-  const excludedCount = entries.filter(e => e.excluded).length;
+  const visible = useMemo(() =>
+    entries.filter(e => showExcluded ? e.excluded : !e.excluded),
+    [entries, showExcluded],
+  );
 
+  const excludedCount = entries.filter(e => e.excluded).length;
   const RANK_COLORS = ['#F59E0B', '#94A3B8', '#CD7F32'];
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.back}>
+            <Text style={styles.backText}>← חזרה</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>🏅 ניהול לוח מובילים</Text>
+        </LinearGradient>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <ActivityIndicator color={Colors.primary} size="large" />
+          <Text style={{ fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary }}>
+            טוען נתונים מ-Supabase...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -70,10 +172,16 @@ export default function LeaderboardAdminScreen() {
         <Text style={styles.headerSub}>{entries.length - excludedCount} שחקנים גלויים</Text>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+      >
         {/* Visibility toggle */}
-        <View style={[styles.visCard, { borderColor: appConfig.leaderboardVisible ? Colors.success + '50' : Colors.danger + '50', backgroundColor: appConfig.leaderboardVisible ? Colors.success + '10' : Colors.danger + '10' }]}>
+        <View style={[styles.visCard, {
+          borderColor: appConfig.leaderboardVisible ? Colors.success + '50' : Colors.danger + '50',
+          backgroundColor: appConfig.leaderboardVisible ? Colors.success + '10' : Colors.danger + '10',
+        }]}>
           <View style={styles.visRow}>
             <Switch
               value={appConfig.leaderboardVisible}
@@ -89,7 +197,9 @@ export default function LeaderboardAdminScreen() {
                 {appConfig.leaderboardVisible ? '✅ לוח מובילים גלוי' : '🚫 לוח מובילים מוסתר'}
               </Text>
               <Text style={styles.visDesc}>
-                {appConfig.leaderboardVisible ? 'כל המשתמשים יכולים לראות את הדירוג' : 'הדירוג מוסתר מהמשתמשים'}
+                {appConfig.leaderboardVisible
+                  ? 'כל המשתמשים יכולים לראות את הדירוג'
+                  : 'הדירוג מוסתר מהמשתמשים'}
               </Text>
             </View>
           </View>
@@ -106,7 +216,9 @@ export default function LeaderboardAdminScreen() {
             <Text style={styles.statLbl}>מוסרים</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={[styles.statVal, { color: Colors.warning }]}>{entries.filter(e => e.isPremium).length}</Text>
+            <Text style={[styles.statVal, { color: Colors.warning }]}>
+              {entries.filter(e => e.isPremium).length}
+            </Text>
             <Text style={styles.statLbl}>פרמיום</Text>
           </View>
         </View>
@@ -115,9 +227,13 @@ export default function LeaderboardAdminScreen() {
         <View style={styles.controlsRow}>
           <Pressable
             onPress={handleReset}
+            disabled={resetting}
             style={[styles.controlBtn, { borderColor: Colors.danger }]}
           >
-            <Text style={[styles.controlBtnText, { color: Colors.danger }]}>🔄 איפוס ציונים</Text>
+            {resetting
+              ? <ActivityIndicator size="small" color={Colors.danger} />
+              : <Text style={[styles.controlBtnText, { color: Colors.danger }]}>🔄 איפוס ציונים</Text>
+            }
           </Pressable>
           <Pressable
             onPress={() => setShowExcluded(v => !v)}
@@ -129,7 +245,6 @@ export default function LeaderboardAdminScreen() {
           </Pressable>
         </View>
 
-        {/* Leaderboard */}
         <Text style={styles.sectionTitle}>{showExcluded ? 'משתמשים מוסרים' : 'דירוג נוכחי'}</Text>
 
         {visible.map((entry, idx) => {
@@ -162,7 +277,10 @@ export default function LeaderboardAdminScreen() {
 
               <Pressable
                 onPress={() => toggleExclude(entry.id)}
-                style={[styles.excludeBtn, entry.excluded ? { backgroundColor: Colors.successLight } : { backgroundColor: Colors.dangerLight }]}
+                style={[
+                  styles.excludeBtn,
+                  entry.excluded ? { backgroundColor: Colors.successLight } : { backgroundColor: Colors.dangerLight },
+                ]}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Text style={styles.excludeBtnText}>{entry.excluded ? '✅ הצג' : '🚫 הסר'}</Text>
@@ -174,7 +292,9 @@ export default function LeaderboardAdminScreen() {
         {visible.length === 0 && (
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>{showExcluded ? '✅' : '🏅'}</Text>
-            <Text style={styles.emptyText}>{showExcluded ? 'אין משתמשים מוסרים' : 'לוח המובילים ריק'}</Text>
+            <Text style={styles.emptyText}>
+              {showExcluded ? 'אין משתמשים מוסרים' : 'אין משתמשים עם סשנים עדיין'}
+            </Text>
           </View>
         )}
       </ScrollView>

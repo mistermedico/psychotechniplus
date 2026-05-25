@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  TextInput, Alert, ActivityIndicator, RefreshControl,
+  TextInput, Alert, ActivityIndicator, RefreshControl, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
@@ -90,21 +90,23 @@ export default function UsersScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadUsers(); };
 
-  const handleExportCSV = () => {
-    const header = 'שם,סשנים,דיוק%,רצף,הצטרף';
+  const handleExportCSV = async () => {
+    const header = 'שם,סשנים,דיוק%,רצף,פרמיום,הצטרף';
     const rows = users.map(u => {
       const acc = u.total_answered > 0 ? Math.round((u.total_correct / u.total_answered) * 100) : 0;
       const joined = new Date(u.created_at).toLocaleDateString('he-IL');
-      return `"${u.name}",${u.total_sessions},${acc}%,${u.streak},"${joined}"`;
+      return `"${u.name}",${u.total_sessions},${acc}%,${u.streak},${u.is_premium ? 'כן' : 'לא'},"${joined}"`;
     });
     const csv = [header, ...rows].join('\n');
-    const preview = [header, ...rows.slice(0, 3)].join('\n');
-    Alert.alert(
-      '📤 ייצוא CSV',
-      `${users.length} משתמשים\n\nתצוגה מקדימה (3 שורות ראשונות):\n\n${preview}`,
-      [{ text: 'סגור', style: 'cancel' }]
-    );
     logger.info('users:export', `CSV generated with ${users.length} rows`);
+    try {
+      await Share.share({
+        message: csv,
+        title: `psychotechniplus-users-${new Date().toLocaleDateString('he-IL')}.csv`,
+      });
+    } catch {
+      Alert.alert('שגיאה', 'לא ניתן לשתף את הקובץ');
+    }
   };
 
   const sevenDaysAgo = useMemo(() => {

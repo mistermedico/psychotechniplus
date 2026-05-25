@@ -12,9 +12,8 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 export default function AppSettingsScreen() {
-  const { questions, seedToSupabase, loadQuestionsFromSupabase, freePracticeLimit, setFreePracticeLimit } = useAdminStore();
+  const { questions, seedToSupabase, loadQuestionsFromSupabase, freePracticeLimit, setFreePracticeLimit, appConfig, setAppConfig } = useAdminStore();
 
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [freeTrialDays, setFreeTrialDays] = useState('7');
   const [maxSessionQuestions, setMaxSessionQuestions] = useState('20');
   const [freeLimitInput, setFreeLimitInput] = useState(String(freePracticeLimit));
@@ -88,7 +87,7 @@ export default function AppSettingsScreen() {
           </Text>
           <View style={styles.switchRow}>
             <Switch
-              value={maintenanceMode}
+              value={appConfig.maintenanceMode}
               onValueChange={val => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 if (val) {
@@ -97,18 +96,18 @@ export default function AppSettingsScreen() {
                     'משתמשים לא יוכלו להיכנס לאפליקציה. להמשיך?',
                     [
                       { text: 'ביטול', style: 'cancel' },
-                      { text: 'הפעל', style: 'destructive', onPress: () => setMaintenanceMode(true) },
+                      { text: 'הפעל', style: 'destructive', onPress: () => setAppConfig({ maintenanceMode: true }) },
                     ],
                   );
                 } else {
-                  setMaintenanceMode(false);
+                  setAppConfig({ maintenanceMode: false });
                 }
               }}
               trackColor={{ false: '#334155', true: Colors.danger }}
               thumbColor="#fff"
             />
-            <Text style={[styles.switchLabel, { color: maintenanceMode ? Colors.danger : Colors.textSecondary }]}>
-              {maintenanceMode ? '🔴 מצב תחזוקה פעיל' : '🟢 האפליקציה פעילה'}
+            <Text style={[styles.switchLabel, { color: appConfig.maintenanceMode ? Colors.danger : Colors.textSecondary }]}>
+              {appConfig.maintenanceMode ? '🔴 מצב תחזוקה פעיל' : '🟢 האפליקציה פעילה'}
             </Text>
           </View>
         </View>

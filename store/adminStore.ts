@@ -7,6 +7,9 @@ import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
+const PROMO_CODES_KEY = '@psychotechniplus/admin/promoCodes';
+const DAILY_CHALLENGES_KEY = '@psychotechniplus/admin/dailyChallenges';
+const PUSH_NOTIFICATIONS_KEY = '@psychotechniplus/admin/pushNotifications';
 
 export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
@@ -754,17 +757,29 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   addDailyChallenge: (challenge) => {
     const newC: DailyChallenge = { ...challenge, id: `dc_${Date.now()}` };
-    set(s => ({ dailyChallenges: [...s.dailyChallenges, newC] }));
+    set(s => {
+      const next = [...s.dailyChallenges, newC];
+      AsyncStorage.setItem(DAILY_CHALLENGES_KEY, JSON.stringify(next)).catch(() => null);
+      return { dailyChallenges: next };
+    });
     return newC;
   },
 
-  updateDailyChallenge: (id, updates) =>
-    set(s => ({
-      dailyChallenges: s.dailyChallenges.map(c => c.id === id ? { ...c, ...updates } : c),
-    })),
+  updateDailyChallenge: (id, updates) => {
+    set(s => {
+      const next = s.dailyChallenges.map(c => c.id === id ? { ...c, ...updates } : c);
+      AsyncStorage.setItem(DAILY_CHALLENGES_KEY, JSON.stringify(next)).catch(() => null);
+      return { dailyChallenges: next };
+    });
+  },
 
-  removeDailyChallenge: (id) =>
-    set(s => ({ dailyChallenges: s.dailyChallenges.filter(c => c.id !== id) })),
+  removeDailyChallenge: (id) => {
+    set(s => {
+      const next = s.dailyChallenges.filter(c => c.id !== id);
+      AsyncStorage.setItem(DAILY_CHALLENGES_KEY, JSON.stringify(next)).catch(() => null);
+      return { dailyChallenges: next };
+    });
+  },
 
   setUserNote: (userId, note) =>
     set(s => ({
@@ -1132,17 +1147,30 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       createdAt: new Date().toISOString(),
       usedCount: 0,
     };
-    set(s => ({ promoCodes: [...s.promoCodes, newCode] }));
+    set(s => {
+      const next = [...s.promoCodes, newCode];
+      AsyncStorage.setItem(PROMO_CODES_KEY, JSON.stringify(next)).catch(() => null);
+      return { promoCodes: next };
+    });
     get().logActivity(`הוסיף קוד קופון ${newCode.code}`, 'promo');
     return newCode;
   },
 
-  updatePromoCode: (id, updates) =>
-    set(s => ({ promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, ...updates } : c) })),
+  updatePromoCode: (id, updates) => {
+    set(s => {
+      const next = s.promoCodes.map(c => c.id === id ? { ...c, ...updates } : c);
+      AsyncStorage.setItem(PROMO_CODES_KEY, JSON.stringify(next)).catch(() => null);
+      return { promoCodes: next };
+    });
+  },
 
   deletePromoCode: (id) => {
     const code = get().promoCodes.find(c => c.id === id);
-    set(s => ({ promoCodes: s.promoCodes.filter(c => c.id !== id) }));
+    set(s => {
+      const next = s.promoCodes.filter(c => c.id !== id);
+      AsyncStorage.setItem(PROMO_CODES_KEY, JSON.stringify(next)).catch(() => null);
+      return { promoCodes: next };
+    });
     if (code) get().logActivity(`מחק קוד קופון ${code.code}`, 'promo');
   },
 
@@ -1150,9 +1178,11 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     const code = get().promoCodes.find(c => c.id === id);
     if (!code) return;
     const newIsActive = !code.isActive;
-    set(s => ({
-      promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, isActive: newIsActive } : c),
-    }));
+    set(s => {
+      const next = s.promoCodes.map(c => c.id === id ? { ...c, isActive: newIsActive } : c);
+      AsyncStorage.setItem(PROMO_CODES_KEY, JSON.stringify(next)).catch(() => null);
+      return { promoCodes: next };
+    });
     get().logActivity(`${newIsActive ? 'הפעיל' : 'הסתיר'} קוד קופון ${code.code}`, 'promo');
   },
 
@@ -1165,30 +1195,45 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       sentAt: null,
       openRate: null,
     };
-    set(s => ({ pushNotifications: [...s.pushNotifications, newNotif] }));
+    set(s => {
+      const next = [...s.pushNotifications, newNotif];
+      AsyncStorage.setItem(PUSH_NOTIFICATIONS_KEY, JSON.stringify(next)).catch(() => null);
+      return { pushNotifications: next };
+    });
     get().logActivity(`יצר הודעת Push: ${newNotif.title}`, 'notification');
     return newNotif;
   },
 
-  updatePushNotification: (id, updates) =>
-    set(s => ({ pushNotifications: s.pushNotifications.map(n => n.id === id ? { ...n, ...updates } : n) })),
+  updatePushNotification: (id, updates) => {
+    set(s => {
+      const next = s.pushNotifications.map(n => n.id === id ? { ...n, ...updates } : n);
+      AsyncStorage.setItem(PUSH_NOTIFICATIONS_KEY, JSON.stringify(next)).catch(() => null);
+      return { pushNotifications: next };
+    });
+  },
 
   deletePushNotification: (id) => {
     const notif = get().pushNotifications.find(n => n.id === id);
-    set(s => ({ pushNotifications: s.pushNotifications.filter(n => n.id !== id) }));
+    set(s => {
+      const next = s.pushNotifications.filter(n => n.id !== id);
+      AsyncStorage.setItem(PUSH_NOTIFICATIONS_KEY, JSON.stringify(next)).catch(() => null);
+      return { pushNotifications: next };
+    });
     if (notif) get().logActivity(`מחק הודעת Push: ${notif.title}`, 'notification');
   },
 
   sendPushNotification: (id) => {
     const notif = get().pushNotifications.find(n => n.id === id);
-    set(s => ({
-      pushNotifications: s.pushNotifications.map(n =>
+    set(s => {
+      const next = s.pushNotifications.map(n =>
         n.id === id
-          ? { ...n, status: 'sent', sentAt: new Date().toISOString(), openRate: Math.random() * 0.3 + 0.1 }
+          ? { ...n, status: 'sent' as const, sentAt: new Date().toISOString(), openRate: null }
           : n
-      ),
-    }));
-    if (notif) get().logActivity(`שלח הודעת Push לכלל המשתמשים: ${notif.title}`, 'notification');
+      );
+      AsyncStorage.setItem(PUSH_NOTIFICATIONS_KEY, JSON.stringify(next)).catch(() => null);
+      return { pushNotifications: next };
+    });
+    if (notif) get().logActivity(`שלח הודעת Push: ${notif.title}`, 'notification');
   },
 
   addGenerationSession: (s) => {
@@ -1347,6 +1392,39 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         }
       }
     } catch {}
+
+    // 6. Load persisted promo codes from AsyncStorage
+    try {
+      const savedCodes = await AsyncStorage.getItem(PROMO_CODES_KEY);
+      if (savedCodes) {
+        const parsed: PromoCode[] = JSON.parse(savedCodes);
+        if (parsed.length > 0) set({ promoCodes: parsed });
+      }
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת קודי קופון', e?.message);
+    }
+
+    // 7. Load persisted daily challenges from AsyncStorage
+    try {
+      const savedChallenges = await AsyncStorage.getItem(DAILY_CHALLENGES_KEY);
+      if (savedChallenges) {
+        const parsed: DailyChallenge[] = JSON.parse(savedChallenges);
+        if (parsed.length > 0) set({ dailyChallenges: parsed });
+      }
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת אתגרים יומיים', e?.message);
+    }
+
+    // 8. Load persisted push notifications from AsyncStorage
+    try {
+      const savedNotifs = await AsyncStorage.getItem(PUSH_NOTIFICATIONS_KEY);
+      if (savedNotifs) {
+        const parsed: PushNotification[] = JSON.parse(savedNotifs);
+        if (parsed.length > 0) set({ pushNotifications: parsed });
+      }
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הודעות Push', e?.message);
+    }
 
     logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');
   },
