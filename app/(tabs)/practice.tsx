@@ -214,11 +214,12 @@ function FreePracticePane({
   showSpeedMode?: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const TAB_BAR_HEIGHT = 64 + Math.max(insets.bottom, 12);
   return (
     <>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: TAB_BAR_HEIGHT + 100 }]}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
@@ -382,7 +383,7 @@ function FreePracticePane({
       </ScrollView>
 
       {/* Sticky start button */}
-      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom + 4, 20) }]}>
+      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom + 4, 20), bottom: TAB_BAR_HEIGHT }]}>
         <Pressable
           onPress={onStart}
           disabled={!canStart}

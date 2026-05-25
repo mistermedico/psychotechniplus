@@ -428,6 +428,14 @@ export default function PracticeSession() {
   };
 
   const handleQuit = () => {
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if (window.confirm('לצאת מהתרגול?')) {
+        endSession();
+        router.back();
+      }
+      return;
+    }
     Alert.alert('יציאה מהתרגול', 'האם לצאת ולשמור את ההתקדמות?', [
       { text: 'ביטול', style: 'cancel' },
       {

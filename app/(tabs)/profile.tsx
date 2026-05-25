@@ -145,8 +145,8 @@ export default function ProfileTab() {
         onPress: async () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           setSigningOut(true);
-          router.replace('/landing');
           await signOut().catch(() => null);
+          router.replace('/landing');
           setSigningOut(false);
         },
       },
