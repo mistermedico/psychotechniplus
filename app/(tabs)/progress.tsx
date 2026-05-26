@@ -16,7 +16,8 @@ import { useUserStore } from '../../store/userStore';
 import { TOPICS } from '../../data/mockData';
 import { ProgressBar } from '../../components/ProgressBar';
 import { StatCard } from '../../components/StatCard';
-import { Colors } from '../../constants/colors';
+import { useColors } from '../../hooks/useColors';
+import { ThemeColors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 
@@ -38,6 +39,8 @@ const DAY_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 
 export default function ProgressTab() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const styles = React.useMemo(() => makeStyles(colors), [colors]);
   const {
     name, level, xp, streak, longestStreak,
     totalSessions, totalCorrect, totalAnswered,
@@ -85,7 +88,7 @@ export default function ProgressTab() {
   // Empty state — no sessions yet
   if (totalSessions === 0) {
     return (
-      <View style={{ flex: 1, backgroundColor: Colors.background }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateEmoji}>🎯</Text>
@@ -112,7 +115,7 @@ export default function ProgressTab() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
@@ -123,7 +126,7 @@ export default function ProgressTab() {
       >
         {/* ── Gradient Hero Banner ── */}
         <LinearGradient
-          colors={['#1E1A4A', '#150F38', '#0E0B2A']}
+          colors={colors.gradients.hero as any}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -170,16 +173,16 @@ export default function ProgressTab() {
 
         <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTranslateY }] }}>
           <View style={styles.statsGrid}>
-            <StatCard icon="🎯" label="סשנים" value={totalSessions} color={Colors.primary} />
-            <StatCard icon="✅" label="נכון" value={totalCorrect} color={Colors.success} />
+            <StatCard icon="🎯" label="סשנים" value={totalSessions} color={colors.primary} />
+            <StatCard icon="✅" label="נכון" value={totalCorrect} color={colors.success} />
           </View>
           <View style={[styles.statsGrid, { marginTop: 10 }]}>
-            <StatCard icon="📊" label="דיוק" value={`${accuracy}%`} color={Colors.accent} />
-            <StatCard icon="🔥" label="רצף" value={`${streak} ימים`} color={Colors.warning} />
+            <StatCard icon="📊" label="דיוק" value={`${accuracy}%`} color={colors.accent} />
+            <StatCard icon="🔥" label="רצף" value={`${streak} ימים`} color={colors.warning} />
           </View>
           <View style={[styles.statsGrid, { marginTop: 10 }]}>
-            <StatCard icon="🏅" label="רצף שיא" value={`${longestStreak} ימים`} color={Colors.gold} />
-            <StatCard icon="📝" label="סה״כ שאלות" value={totalAnswered} color={Colors.textSecondary} />
+            <StatCard icon="🏅" label="רצף שיא" value={`${longestStreak} ימים`} color={colors.gold} />
+            <StatCard icon="📝" label="סה״כ שאלות" value={totalAnswered} color={colors.textSecondary} />
           </View>
         </Animated.View>
 
@@ -200,7 +203,7 @@ export default function ProgressTab() {
                   key={`r1-${i}`}
                   style={[
                     styles.streakDay,
-                    active && { backgroundColor: Colors.warning },
+                    active && { backgroundColor: colors.warning },
                   ]}
                 >
                   <Text style={[styles.streakDayText, active && { color: '#fff' }]}>
@@ -221,7 +224,7 @@ export default function ProgressTab() {
                   key={`r2-${i}`}
                   style={[
                     styles.streakDay,
-                    active && { backgroundColor: Colors.warning },
+                    active && { backgroundColor: colors.warning },
                     isToday && styles.streakDayToday,
                   ]}
                 >
@@ -327,7 +330,7 @@ export default function ProgressTab() {
                 <Text style={[styles.badgeIcon, !earned && { opacity: 0.3 }]}>
                   {badge.icon}
                 </Text>
-                <Text style={[styles.badgeLabel, !earned && { color: Colors.textTertiary }]}>
+                <Text style={[styles.badgeLabel, !earned && { color: colors.textTertiary }]}>
                   {badge.label}
                 </Text>
                 <Text style={styles.badgeDesc} numberOfLines={2}>
@@ -348,361 +351,363 @@ export default function ProgressTab() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
-  scroll: { flex: 1 },
-  content: { paddingBottom: 20 },
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: 'transparent' },
+    scroll: { flex: 1 },
+    content: { paddingBottom: 20 },
 
-  // ── Empty state (no sessions) ─────────────────────────────────────────────
-  emptyStateContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyStateEmoji: {
-    fontSize: 64,
-    marginBottom: 20,
-  },
-  emptyStateTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    color: Colors.text,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  emptyStateBody: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.base,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  emptyStateCta: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.xl,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    ...Shadow.primary,
-  },
-  emptyStateCtaText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: '#fff',
-    textAlign: 'center',
-  },
+    // ── Empty state (no sessions) ─────────────────────────────────────────────
+    emptyStateContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 32,
+    },
+    emptyStateEmoji: {
+      fontSize: 64,
+      marginBottom: 20,
+    },
+    emptyStateTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['2xl'],
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    emptyStateBody: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.base,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 24,
+      marginBottom: 32,
+    },
+    emptyStateCta: {
+      backgroundColor: colors.primary,
+      borderRadius: Radius.xl,
+      paddingHorizontal: 32,
+      paddingVertical: 14,
+      ...Shadow.primary,
+    },
+    emptyStateCtaText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.lg,
+      color: '#fff',
+      textAlign: 'center',
+    },
 
-  // ── Hero banner ───────────────────────────────────────────────────────────
-  hero: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    borderRadius: Radius['2xl'],
-    padding: 24,
-    ...Shadow.primary,
-  },
-  heroTop: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  streakBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: Radius.full,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  streakBadgeText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    color: '#fff',
-  },
-  heroGreeting: { alignItems: 'flex-end' },
-  heroSubLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.6)',
-    textAlign: 'right',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  heroName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    color: '#fff',
-    textAlign: 'right',
-  },
+    // ── Hero banner ───────────────────────────────────────────────────────────
+    hero: {
+      marginHorizontal: 20,
+      marginTop: 12,
+      borderRadius: Radius['2xl'],
+      padding: 24,
+      ...Shadow.primary,
+    },
+    heroTop: {
+      flexDirection: 'row-reverse',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 20,
+    },
+    streakBadge: {
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderRadius: Radius.full,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    streakBadgeText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.sm,
+      color: '#fff',
+    },
+    heroGreeting: { alignItems: 'flex-end' },
+    heroSubLabel: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.xs,
+      color: 'rgba(255,255,255,0.6)',
+      textAlign: 'right',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 4,
+    },
+    heroName: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['2xl'],
+      color: '#fff',
+      textAlign: 'right',
+    },
 
-  // Accuracy big stat
-  accuracyRow: {
-    alignItems: 'flex-end',
-    marginBottom: 20,
-  },
-  accuracyValue: {
-    fontFamily: FontFamily.heading,
-    fontSize: 52,
-    color: '#fff',
-    lineHeight: 56,
-    textAlign: 'right',
-  },
-  accuracyLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.65)',
-    textAlign: 'right',
-    marginTop: 2,
-  },
+    // Accuracy big stat
+    accuracyRow: {
+      alignItems: 'flex-end',
+      marginBottom: 20,
+    },
+    accuracyValue: {
+      fontFamily: FontFamily.heading,
+      fontSize: 52,
+      color: '#fff',
+      lineHeight: 56,
+      textAlign: 'right',
+    },
+    accuracyLabel: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: 'rgba(255,255,255,0.65)',
+      textAlign: 'right',
+      marginTop: 2,
+    },
 
-  // Level row inside hero
-  levelRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 14,
-  },
-  levelBadgeCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  levelNum: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    color: '#fff',
-  },
-  levelInfo: { flex: 1, alignItems: 'flex-end' },
-  levelTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.base,
-    color: '#fff',
-  },
-  levelXp: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 2,
-    textAlign: 'right',
-  },
-  xpTrack: {
-    height: 8,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  xpFill: { height: 8, backgroundColor: '#fff', borderRadius: 4 },
+    // Level row inside hero
+    levelRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      gap: 16,
+      marginBottom: 14,
+    },
+    levelBadgeCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    levelNum: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.xl,
+      color: '#fff',
+    },
+    levelInfo: { flex: 1, alignItems: 'flex-end' },
+    levelTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.base,
+      color: '#fff',
+    },
+    levelXp: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: 'rgba(255,255,255,0.7)',
+      marginTop: 2,
+      textAlign: 'right',
+    },
+    xpTrack: {
+      height: 8,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    xpFill: { height: 8, backgroundColor: '#fff', borderRadius: 4 },
 
-  // ── Section headers (two-line style) ─────────────────────────────────────
-  sectionHeader: {
-    paddingHorizontal: 20,
-    marginTop: 28,
-    marginBottom: 14,
-    alignItems: 'flex-end',
-  },
-  sectionLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.primary,
-    textAlign: 'right',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 3,
-  },
-  sectionTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    color: Colors.text,
-    textAlign: 'right',
-  },
+    // ── Section headers (two-line style) ─────────────────────────────────────
+    sectionHeader: {
+      paddingHorizontal: 20,
+      marginTop: 28,
+      marginBottom: 14,
+      alignItems: 'flex-end',
+    },
+    sectionLabel: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.xs,
+      color: colors.primary,
+      textAlign: 'right',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 3,
+    },
+    sectionTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.xl,
+      color: colors.text,
+      textAlign: 'right',
+    },
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
-  statsGrid: { flexDirection: 'row-reverse', gap: 10, paddingHorizontal: 20 },
+    // ── Stats ─────────────────────────────────────────────────────────────────
+    statsGrid: { flexDirection: 'row-reverse', gap: 10, paddingHorizontal: 20 },
 
-  // ── 14-day streak calendar ────────────────────────────────────────────────
-  streakCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: 16,
-    marginBottom: 8,
-    marginHorizontal: 20,
-    ...Shadow.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  streakAccentStripe: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: Colors.warning,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-  },
-  streakRow: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  streakDay: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  streakDayToday: {
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  streakDayText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: Colors.textTertiary,
-  },
-  streakSummary: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 14,
-  },
+    // ── 14-day streak calendar ────────────────────────────────────────────────
+    streakCard: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      padding: 16,
+      marginBottom: 8,
+      marginHorizontal: 20,
+      ...Shadow.md,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    streakAccentStripe: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 3,
+      backgroundColor: colors.warning,
+      borderTopLeftRadius: Radius.xl,
+      borderTopRightRadius: Radius.xl,
+    },
+    streakRow: {
+      flexDirection: 'row-reverse',
+      justifyContent: 'space-between',
+      marginTop: 4,
+    },
+    streakDay: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    streakDayToday: {
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    streakDayText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.textTertiary,
+    },
+    streakSummary: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: 14,
+    },
 
-  // ── Trend card ────────────────────────────────────────────────────────────
-  trendCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: 16,
-    marginBottom: 8,
-    marginHorizontal: 20,
-    ...Shadow.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  trendText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    textAlign: 'right',
-    lineHeight: 24,
-  },
+    // ── Trend card ────────────────────────────────────────────────────────────
+    trendCard: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      padding: 16,
+      marginBottom: 8,
+      marginHorizontal: 20,
+      ...Shadow.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    trendText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.base,
+      color: colors.text,
+      textAlign: 'right',
+      lineHeight: 24,
+    },
 
-  // ── ELO section ───────────────────────────────────────────────────────────
-  eloContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: 4,
-    marginBottom: 8,
-    marginHorizontal: 20,
-    ...Shadow.md,
-    overflow: 'hidden',
-  },
-  eloRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    // borderRightWidth and borderRightColor applied inline per topic
-  },
-  eloLeft: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 },
-  eloIcon: { fontSize: 22 },
-  eloTopicName: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    textAlign: 'right',
-  },
-  eloTitle: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    textAlign: 'right',
-  },
-  eloRight: { alignItems: 'flex-start', width: 100 },
-  eloValue: { fontFamily: FontFamily.bold, fontSize: FontSize.xl },
-  eloBar: { width: 90, marginTop: 4 },
-  emptyText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-    padding: 20,
-  },
+    // ── ELO section ───────────────────────────────────────────────────────────
+    eloContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      padding: 4,
+      marginBottom: 8,
+      marginHorizontal: 20,
+      ...Shadow.md,
+      overflow: 'hidden',
+    },
+    eloRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      // borderRightWidth and borderRightColor applied inline per topic
+    },
+    eloLeft: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 },
+    eloIcon: { fontSize: 22 },
+    eloTopicName: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.base,
+      color: colors.text,
+      textAlign: 'right',
+    },
+    eloTitle: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      textAlign: 'right',
+    },
+    eloRight: { alignItems: 'flex-start', width: 100 },
+    eloValue: { fontFamily: FontFamily.bold, fontSize: FontSize.xl },
+    eloBar: { width: 90, marginTop: 4 },
+    emptyText: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.textTertiary,
+      textAlign: 'center',
+      padding: 20,
+    },
 
-  // ── Badges ────────────────────────────────────────────────────────────────
-  badgesSectionHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  badgesHeaderLeft: { alignItems: 'flex-end' },
-  badgesCount: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'right',
-    marginBottom: 4,
-  },
-  badgesGrid: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 8,
-    paddingHorizontal: 20,
-  },
-  badgeCard: {
-    width: '47%',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: 14,
-    alignItems: 'flex-end',
-    ...Shadow.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  badgeCardLocked: { backgroundColor: Colors.surfaceSecondary },
-  badgeCardEarned: {
-    backgroundColor: Colors.success + '08',
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.success,
-    borderColor: Colors.border,
-  },
-  badgeIcon: { fontSize: 32, marginBottom: 6 },
-  badgeLabel: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    color: Colors.text,
-    textAlign: 'right',
-    marginBottom: 3,
-  },
-  badgeDesc: {
-    fontFamily: FontFamily.regular,
-    fontSize: 11,
-    color: Colors.textTertiary,
-    textAlign: 'right',
-    lineHeight: 16,
-  },
-  earnedBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.success,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  earnedText: { fontFamily: FontFamily.bold, fontSize: 11, color: '#fff' },
-});
+    // ── Badges ────────────────────────────────────────────────────────────────
+    badgesSectionHeader: {
+      flexDirection: 'row-reverse',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+    },
+    badgesHeaderLeft: { alignItems: 'flex-end' },
+    badgesCount: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'right',
+      marginBottom: 4,
+    },
+    badgesGrid: {
+      flexDirection: 'row-reverse',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 8,
+      paddingHorizontal: 20,
+    },
+    badgeCard: {
+      width: '47%',
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      padding: 14,
+      alignItems: 'flex-end',
+      ...Shadow.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    badgeCardLocked: { backgroundColor: colors.surfaceSecondary },
+    badgeCardEarned: {
+      backgroundColor: colors.success + '08',
+      borderLeftWidth: 3,
+      borderLeftColor: colors.success,
+      borderColor: colors.border,
+    },
+    badgeIcon: { fontSize: 32, marginBottom: 6 },
+    badgeLabel: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.sm,
+      color: colors.text,
+      textAlign: 'right',
+      marginBottom: 3,
+    },
+    badgeDesc: {
+      fontFamily: FontFamily.regular,
+      fontSize: 11,
+      color: colors.textTertiary,
+      textAlign: 'right',
+      lineHeight: 16,
+    },
+    earnedBadge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: colors.success,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    earnedText: { fontFamily: FontFamily.bold, fontSize: 11, color: '#fff' },
+  });
+}

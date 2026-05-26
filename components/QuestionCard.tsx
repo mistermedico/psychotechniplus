@@ -1,12 +1,13 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, Animated, Image,
 } from 'react-native';
 import { Question } from '../data/types';
-import { Colors } from '../constants/colors';
+import { ThemeColors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../constants/theme';
 import { useSettingsStore, FontSizeOption } from '../store/settingsStore';
 import { detectDir, textAlign } from '../utils/textDirection';
+import { useColors } from '../hooks/useColors';
 
 interface Props {
   question: Question;
@@ -33,6 +34,8 @@ const fontSizeMap: Record<FontSizeOption, number> = {
 export function QuestionCard({ question, selectedId, revealed, onSelect }: Props) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const {
     showDifficultyBadge,
@@ -42,7 +45,6 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
     questionFontSize,
   } = useSettingsStore();
 
-  // Stable shuffled options order — computed once per question.id
   const shuffledOptionsRef = useRef<typeof question.options | null>(null);
   const lastQuestionIdRef = useRef<string | null>(null);
 
@@ -56,7 +58,6 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
 
   const [passageExpanded, setPassageExpanded] = useState(!collapseReadingPassage);
 
-  // Reset passage expansion when question changes
   useEffect(() => {
     setPassageExpanded(!collapseReadingPassage);
   }, [question.id, collapseReadingPassage]);
@@ -109,7 +110,6 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
       ]}
     >
-      {/* Reading passage */}
       {question.readingPassage && (
         <View style={styles.passageBox}>
           <View style={styles.passageHeaderRow}>
@@ -135,9 +135,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
         </View>
       )}
 
-      {/* Question text */}
       <View style={styles.questionBox}>
-        {/* Badge row: difficulty + ELO */}
         {(showDifficultyBadge || showEloOnQuestion) && (
           <View style={styles.badgeRow}>
             {showDifficultyBadge && (
@@ -155,7 +153,6 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
         <Text style={[styles.questionText, { fontSize: questionFontSize_, textAlign: textAlign(question.questionText), writingDirection: questionDir }]}>
           {question.questionText}
         </Text>
-        {/* Question image */}
         {question.mediaUrl && question.mediaType === 'image' && (
           <Image
             source={{ uri: question.mediaUrl }}
@@ -165,11 +162,9 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
         )}
       </View>
 
-      {/* Options */}
       {(() => {
         const allOptionsHaveImages = displayOptions.every(o => !!o.imageUrl);
         if (allOptionsHaveImages) {
-          // 2×2 grid layout
           return (
             <View style={styles.optionsGrid}>
               {displayOptions.map(opt => {
@@ -205,7 +200,6 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
           );
         }
 
-        // Normal list layout (with optional thumbnail)
         return (
           <View style={styles.optionsContainer}>
             {displayOptions.map(opt => {
@@ -249,181 +243,182 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
 
-  passageBox: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: Radius.lg,
-    padding: 14,
-    marginBottom: 14,
-    borderRightWidth: 3,
-    borderRightColor: Colors.primary,
-  },
-  passageHeaderRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  passageLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: Colors.primary,
-    textAlign: 'right',
-  },
-  passageToggleBtn: {
-    backgroundColor: Colors.primaryLighter,
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  passageToggleText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.primary,
-  },
-  passageScroll: { maxHeight: 120 },
-  passageText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.text,
-    lineHeight: 22,
-  },
+    passageBox: {
+      backgroundColor: colors.surfaceSecondary,
+      borderRadius: Radius.lg,
+      padding: 14,
+      marginBottom: 14,
+      borderRightWidth: 3,
+      borderRightColor: colors.primary,
+    },
+    passageHeaderRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 6,
+    },
+    passageLabel: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.primary,
+      textAlign: 'right',
+    },
+    passageToggleBtn: {
+      backgroundColor: colors.primaryLighter,
+      borderRadius: Radius.full,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+    },
+    passageToggleText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.xs,
+      color: colors.primary,
+    },
+    passageScroll: { maxHeight: 120 },
+    passageText: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.text,
+      lineHeight: 22,
+    },
 
-  questionBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: 20,
-    marginBottom: 16,
-    ...Shadow.md,
-  },
-  badgeRow: {
-    flexDirection: 'row-reverse',
-    gap: 6,
-    marginBottom: 10,
-    flexWrap: 'wrap',
-  },
-  difficultyBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primaryLighter,
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  difficultyText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.primary,
-  },
-  eloBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.warningLight,
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  eloText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.warning,
-  },
-  questionText: {
-    fontFamily: FontFamily.semiBold,
-    color: Colors.text,
-    lineHeight: 28,
-  },
+    questionBox: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      padding: 20,
+      marginBottom: 16,
+      ...Shadow.md,
+    },
+    badgeRow: {
+      flexDirection: 'row-reverse',
+      gap: 6,
+      marginBottom: 10,
+      flexWrap: 'wrap',
+    },
+    difficultyBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.primaryLighter,
+      borderRadius: Radius.full,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+    },
+    difficultyText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.xs,
+      color: colors.primary,
+    },
+    eloBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.warningLight,
+      borderRadius: Radius.full,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+    },
+    eloText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.xs,
+      color: colors.warning,
+    },
+    questionText: {
+      fontFamily: FontFamily.semiBold,
+      color: colors.text,
+      lineHeight: 28,
+    },
 
-  questionImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    marginTop: 8,
-  },
+    questionImage: {
+      width: '100%',
+      height: 200,
+      borderRadius: 12,
+      marginTop: 8,
+    },
 
-  optionsContainer: { gap: 10 },
+    optionsContainer: { gap: 10 },
 
-  // 2×2 grid for image options
-  optionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  optionGridCell: {
-    width: '48%',
-    borderRadius: Radius.lg,
-    borderWidth: 1.5,
-    padding: 8,
-    alignItems: 'center',
-    minHeight: 44,
-  },
-  optionGridImage: {
-    width: '100%',
-    height: 110,
-    borderRadius: Radius.md,
-    marginBottom: 4,
-  },
-  optionGridText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  optionGridIcon: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    marginTop: 4,
-  },
+    optionsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    optionGridCell: {
+      width: '48%',
+      borderRadius: Radius.lg,
+      borderWidth: 1.5,
+      padding: 8,
+      alignItems: 'center',
+      minHeight: 44,
+    },
+    optionGridImage: {
+      width: '100%',
+      height: 110,
+      borderRadius: Radius.md,
+      marginBottom: 4,
+    },
+    optionGridText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      textAlign: 'center',
+      marginTop: 2,
+    },
+    optionGridIcon: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.sm,
+      marginTop: 4,
+    },
 
-  optionThumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: Radius.sm,
-  },
+    optionThumbnail: {
+      width: 60,
+      height: 60,
+      borderRadius: Radius.sm,
+    },
 
-  optionBase: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    borderRadius: Radius.lg,
-    padding: 14,
-    borderWidth: 1.5,
-    gap: 12,
-    minHeight: 56,
-  },
-  optionDefault: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.border,
-  },
-  optionSelected: {
-    backgroundColor: Colors.primaryLighter,
-    borderColor: Colors.primary,
-  },
-  optionCorrect: {
-    backgroundColor: Colors.successLight,
-    borderColor: Colors.success,
-  },
-  optionWrong: {
-    backgroundColor: Colors.dangerLight,
-    borderColor: Colors.danger,
-  },
+    optionBase: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      borderRadius: Radius.lg,
+      padding: 14,
+      borderWidth: 1.5,
+      gap: 12,
+      minHeight: 56,
+    },
+    optionDefault: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    optionSelected: {
+      backgroundColor: colors.primaryLighter,
+      borderColor: colors.primary,
+    },
+    optionCorrect: {
+      backgroundColor: colors.successLight,
+      borderColor: colors.success,
+    },
+    optionWrong: {
+      backgroundColor: colors.dangerLight,
+      borderColor: colors.danger,
+    },
 
-  optionIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-  },
+    optionIconBox: {
+      width: 28,
+      height: 28,
+      borderRadius: Radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+    },
 
-  optionTextBase: {
-    flex: 1,
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.base,
-  },
-  optionText: { color: Colors.text },
-  optionTextSelected: { color: Colors.primary },
-  optionTextCorrect: { color: Colors.success },
-  optionTextWrong: { color: Colors.danger },
-});
+    optionTextBase: {
+      flex: 1,
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.base,
+    },
+    optionText: { color: colors.text },
+    optionTextSelected: { color: colors.primary },
+    optionTextCorrect: { color: colors.success },
+    optionTextWrong: { color: colors.danger },
+  });
+}

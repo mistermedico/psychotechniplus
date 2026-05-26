@@ -5,7 +5,8 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { FontFamily } from '../../constants/theme';
-import { Colors } from '../../constants/colors';
+import { useColors } from '../../hooks/useColors';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useAdminStore } from '../../store/adminStore';
 import { useUserStore } from '../../store/userStore';
 import { logUserAction } from '../../utils/visitTracker';
@@ -48,7 +49,7 @@ function TabIcon({ icon, label, focused }: TabIconProps) {
         <View style={styles.activeGlow} />
       )}
       <Text style={[styles.tabIcon, focused && styles.tabIconFocused]}>{icon}</Text>
-      <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]}>{label}</Text>
+      <Text style={[styles.tabLabel, focused && styles.tabLabelFocused, !focused && { color: 'rgba(128,128,160,0.7)' }]}>{label}</Text>
     </Animated.View>
   );
 }
@@ -113,6 +114,8 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const TAB_HEIGHT = 64;
   const BAR_HEIGHT = TAB_HEIGHT + Math.max(insets.bottom, 12);
+  const theme = useSettingsStore(s => s.theme);
+  const colors = useColors();
   const pathname = usePathname();
   const lastTrackedTab = useRef<string | null>(null);
 
@@ -147,9 +150,9 @@ export default function TabLayout() {
         tabBarBackground: () => (
           <View style={StyleSheet.absoluteFill}>
             {Platform.OS === 'ios' ? (
-              <BlurView tint="dark" intensity={80} style={[StyleSheet.absoluteFill, styles.blurBase]} />
+              <BlurView tint={theme === 'light' ? 'light' : 'dark'} intensity={80} style={[StyleSheet.absoluteFill, styles.blurBase]} />
             ) : (
-              <View style={[StyleSheet.absoluteFill, styles.androidBackground]} />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'light' ? 'rgba(244,246,251,0.97)' : 'rgba(8,10,18,0.97)' }]} />
             )}
             <View style={styles.topBorder} />
           </View>
@@ -250,7 +253,6 @@ const styles = StyleSheet.create({
   },
   tabIcon: {
     fontSize: 20,
-    color: 'rgba(240,244,255,0.45)',
     fontFamily: FontFamily.regular,
   },
   tabIconFocused: {
@@ -260,7 +262,6 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontFamily: FontFamily.regular,
     fontSize: 10,
-    color: 'rgba(240,244,255,0.35)',
     letterSpacing: 0.2,
   },
   tabLabelFocused: {

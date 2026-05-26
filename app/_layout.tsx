@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
 import { usePurchaseStore } from '../store/purchaseStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { ensureDbSeeded } from '../lib/db';
 
 // Force RTL for Hebrew
@@ -31,6 +32,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
+  const theme = useSettingsStore(s => s.theme);
   const loadAdminData = useAdminStore(s => s.loadAdminData);
   const loadQuestionsFromSupabase = useAdminStore(s => s.loadQuestionsFromSupabase);
   const initializePurchases = usePurchaseStore(s => s.initialize);
@@ -70,7 +72,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        <StatusBar style={theme === 'light' ? 'dark' : 'light'} />
         <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="landing" options={{ animation: 'fade' }} />

@@ -10,9 +10,10 @@ import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore } from '../../store/adminStore';
 import { TARGETS, TOPICS } from '../../data/mockData';
-import { Colors } from '../../constants/colors';
+import { ThemeColors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
+import { useColors } from '../../hooks/useColors';
 
 const { width: W } = Dimensions.get('window');
 
@@ -36,6 +37,9 @@ const BADGE_INFO: Record<string, { icon: string; label: string }> = {
 
 export default function Dashboard() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const styles = React.useMemo(() => makeStyles(colors), [colors]);
+
   const {
     name, streak, level, xp, badges,
     totalSessions, totalCorrect, totalAnswered,
@@ -92,7 +96,7 @@ export default function Dashboard() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#080A12', '#0D1020', '#14102A']}
+        colors={colors.gradients.bg as any}
         style={StyleSheet.absoluteFill}
       />
       {/* Ambient glow orbs */}
@@ -118,7 +122,7 @@ export default function Dashboard() {
           {/* ── Hero Card ── */}
           <Animated.View style={[styles.heroWrap, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
             <LinearGradient
-              colors={['#1E1A4A', '#150F38', '#0E0B2A']}
+              colors={colors.gradients.hero as any}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.heroCard}
             >
@@ -154,10 +158,10 @@ export default function Dashboard() {
               {/* Stats row */}
               <View style={styles.heroStats}>
                 {[
-                  { val: String(xp), label: 'XP', color: Colors.primaryLight },
+                  { val: String(xp), label: 'XP', color: colors.primaryLight },
                   { val: String(streak), label: 'רצף', color: '#FBBF24' },
-                  { val: `${accuracy}%`, label: 'דיוק', color: Colors.success },
-                  { val: String(level), label: 'רמה', color: Colors.accent },
+                  { val: `${accuracy}%`, label: 'דיוק', color: colors.success },
+                  { val: String(level), label: 'רמה', color: colors.accent },
                 ].map((s, i) => (
                   <View key={i} style={styles.heroStat}>
                     <Text style={[styles.heroStatVal, { color: s.color }]}>{s.val}</Text>
@@ -244,21 +248,21 @@ export default function Dashboard() {
                 <LinearGradient colors={['rgba(52,211,153,0.14)', 'rgba(52,211,153,0.04)']} style={styles.bentoGrad}>
                   <Text style={styles.bentoBig}>{totalCorrect}</Text>
                   <Text style={styles.bentoLabel}>תשובות נכונות</Text>
-                  <View style={[styles.bentoAccent, { backgroundColor: Colors.success }]} />
+                  <View style={[styles.bentoAccent, { backgroundColor: colors.success }]} />
                 </LinearGradient>
               </View>
               <View style={styles.bentoCard}>
                 <LinearGradient colors={['rgba(124,111,247,0.14)', 'rgba(124,111,247,0.04)']} style={styles.bentoGrad}>
-                  <Text style={[styles.bentoBig, { color: Colors.primaryLight }]}>{accuracy}%</Text>
+                  <Text style={[styles.bentoBig, { color: colors.primaryLight }]}>{accuracy}%</Text>
                   <Text style={styles.bentoLabel}>דיוק</Text>
-                  <View style={[styles.bentoAccent, { backgroundColor: Colors.primary }]} />
+                  <View style={[styles.bentoAccent, { backgroundColor: colors.primary }]} />
                 </LinearGradient>
               </View>
               <View style={styles.bentoCard}>
                 <LinearGradient colors={['rgba(192,132,252,0.14)', 'rgba(192,132,252,0.04)']} style={styles.bentoGrad}>
-                  <Text style={[styles.bentoBig, { color: Colors.accent }]}>{totalSessions}</Text>
+                  <Text style={[styles.bentoBig, { color: colors.accent }]}>{totalSessions}</Text>
                   <Text style={styles.bentoLabel}>סשנים</Text>
-                  <View style={[styles.bentoAccent, { backgroundColor: Colors.accent }]} />
+                  <View style={[styles.bentoAccent, { backgroundColor: colors.accent }]} />
                 </LinearGradient>
               </View>
             </View>
@@ -359,428 +363,430 @@ export default function Dashboard() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  safe: { flex: 1 },
-  content: { paddingTop: 4 },
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    safe: { flex: 1 },
+    content: { paddingTop: 4 },
 
-  // Ambient
-  orb: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    opacity: 0.12,
-    pointerEvents: 'none',
-  },
-  orbTop: {
-    top: -80, right: -60,
-    backgroundColor: '#7C6FF7',
-    shadowColor: '#7C6FF7',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 80,
-  },
-  orbBottom: {
-    bottom: 120, left: -80,
-    backgroundColor: '#C084FC',
-    shadowColor: '#C084FC',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 80,
-  },
+    // Ambient
+    orb: {
+      position: 'absolute',
+      width: 280,
+      height: 280,
+      borderRadius: 140,
+      opacity: 0.12,
+      pointerEvents: 'none',
+    },
+    orbTop: {
+      top: -80, right: -60,
+      backgroundColor: '#7C6FF7',
+      shadowColor: '#7C6FF7',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 80,
+    },
+    orbBottom: {
+      bottom: 120, left: -80,
+      backgroundColor: '#C084FC',
+      shadowColor: '#C084FC',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 80,
+    },
 
-  // Header
-  header: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  headerText: { alignItems: 'flex-end' },
-  greetingText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'right',
-  },
-  nameText: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    color: Colors.text,
-    textAlign: 'right',
-  },
-  streakPill: {
-    backgroundColor: 'rgba(251,191,36,0.15)',
-    borderRadius: Radius.full,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.35)',
-    shadowColor: '#FBBF24',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  streakPillText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    color: '#FBBF24',
-  },
+    // Header
+    header: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 16,
+    },
+    headerText: { alignItems: 'flex-end' },
+    greetingText: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'right',
+    },
+    nameText: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['2xl'],
+      color: colors.text,
+      textAlign: 'right',
+    },
+    streakPill: {
+      backgroundColor: 'rgba(251,191,36,0.15)',
+      borderRadius: Radius.full,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderWidth: 1,
+      borderColor: 'rgba(251,191,36,0.35)',
+      shadowColor: '#FBBF24',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
+      elevation: 4,
+    },
+    streakPillText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.sm,
+      color: '#FBBF24',
+    },
 
-  // Hero Card
-  heroWrap: { paddingHorizontal: 16, marginBottom: 14 },
-  heroCard: {
-    borderRadius: Radius['3xl'],
-    padding: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(124,111,247,0.22)',
-    overflow: 'hidden',
-    shadowColor: '#7C6FF7',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 16,
-  },
-  heroGlowOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(124,111,247,0.05)',
-  },
-  heroGrid: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.03,
-    backgroundColor: 'transparent',
-  },
-  heroTop: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  heroBadge: {
-    backgroundColor: 'rgba(124,111,247,0.25)',
-    borderRadius: Radius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(124,111,247,0.45)',
-  },
-  heroBadgeText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: '#C4B5FD',
-    letterSpacing: 0.5,
-  },
-  heroElo: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['4xl'],
-    color: '#F0F4FF',
-    letterSpacing: -1,
-  },
-  heroLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'right',
-    marginBottom: 18,
-    letterSpacing: 0.3,
-  },
+    // Hero Card
+    heroWrap: { paddingHorizontal: 16, marginBottom: 14 },
+    heroCard: {
+      borderRadius: Radius['3xl'],
+      padding: 22,
+      borderWidth: 1,
+      borderColor: 'rgba(124,111,247,0.22)',
+      overflow: 'hidden',
+      shadowColor: '#7C6FF7',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.35,
+      shadowRadius: 24,
+      elevation: 16,
+    },
+    heroGlowOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(124,111,247,0.05)',
+    },
+    heroGrid: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.03,
+      backgroundColor: 'transparent',
+    },
+    heroTop: {
+      flexDirection: 'row-reverse',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    heroBadge: {
+      backgroundColor: 'rgba(124,111,247,0.25)',
+      borderRadius: Radius.full,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderWidth: 1,
+      borderColor: 'rgba(124,111,247,0.45)',
+    },
+    heroBadgeText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.xs,
+      color: '#C4B5FD',
+      letterSpacing: 0.5,
+    },
+    heroElo: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['4xl'],
+      color: colors.text,
+      letterSpacing: -1,
+    },
+    heroLabel: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+      textAlign: 'right',
+      marginBottom: 18,
+      letterSpacing: 0.3,
+    },
 
-  // XP Bar
-  xpSection: { marginBottom: 20 },
-  xpHeader: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  xpPct: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: '#C4B5FD' },
-  xpHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
-  xpTrack: {
-    height: 5,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  xpFill: { height: 5, borderRadius: 3 },
+    // XP Bar
+    xpSection: { marginBottom: 20 },
+    xpHeader: {
+      flexDirection: 'row-reverse',
+      justifyContent: 'space-between',
+      marginBottom: 6,
+    },
+    xpPct: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: '#C4B5FD' },
+    xpHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: colors.textTertiary },
+    xpTrack: {
+      height: 5,
+      backgroundColor: colors.glass08,
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    xpFill: { height: 5, borderRadius: 3 },
 
-  // Hero Stats
-  heroStats: {
-    flexDirection: 'row-reverse',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    paddingTop: 16,
-    gap: 4,
-  },
-  heroStat: { flex: 1, alignItems: 'center', gap: 3 },
-  heroStatVal: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    letterSpacing: -0.5,
-  },
-  heroStatLbl: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-  },
+    // Hero Stats
+    heroStats: {
+      flexDirection: 'row-reverse',
+      borderTopWidth: 1,
+      borderTopColor: colors.glass08,
+      paddingTop: 16,
+      gap: 4,
+    },
+    heroStat: { flex: 1, alignItems: 'center', gap: 3 },
+    heroStatVal: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.lg,
+      letterSpacing: -0.5,
+    },
+    heroStatLbl: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+    },
 
-  // Practice CTA
-  ctaWrap: { paddingHorizontal: 16, marginBottom: 6 },
-  ctaBtn: {
-    borderRadius: Radius['2xl'],
-    overflow: 'hidden',
-    shadowColor: '#7C6FF7',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.50,
-    shadowRadius: 20,
-    elevation: 14,
-  },
-  ctaGrad: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    gap: 14,
-  },
-  ctaShimmer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  ctaRight: { flex: 1, alignItems: 'flex-end' },
-  ctaTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: '#fff',
-    textAlign: 'right',
-  },
-  ctaSub: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.75)',
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  ctaArrow: {
-    width: 36, height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.20)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaArrowText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+    // Practice CTA
+    ctaWrap: { paddingHorizontal: 16, marginBottom: 6 },
+    ctaBtn: {
+      borderRadius: Radius['2xl'],
+      overflow: 'hidden',
+      shadowColor: '#7C6FF7',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.50,
+      shadowRadius: 20,
+      elevation: 14,
+    },
+    ctaGrad: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      paddingVertical: 18,
+      paddingHorizontal: 20,
+      gap: 14,
+    },
+    ctaShimmer: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255,255,255,0.07)',
+    },
+    ctaRight: { flex: 1, alignItems: 'flex-end' },
+    ctaTitle: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.lg,
+      color: '#fff',
+      textAlign: 'right',
+    },
+    ctaSub: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: 'rgba(255,255,255,0.75)',
+      textAlign: 'right',
+      marginTop: 2,
+    },
+    ctaArrow: {
+      width: 36, height: 36,
+      borderRadius: 18,
+      backgroundColor: 'rgba(255,255,255,0.20)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ctaArrowText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
 
-  // Section
-  section: { paddingHorizontal: 16, marginTop: 22 },
-  sectionHead: { alignItems: 'flex-end', marginBottom: 12 },
-  sectionTag: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.xs,
-    color: Colors.primaryLight,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: 2,
-  },
-  sectionTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    color: Colors.text,
-    textAlign: 'right',
-  },
+    // Section
+    section: { paddingHorizontal: 16, marginTop: 22 },
+    sectionHead: { alignItems: 'flex-end', marginBottom: 12 },
+    sectionTag: {
+      fontFamily: FontFamily.semiBold,
+      fontSize: FontSize.xs,
+      color: colors.primaryLight,
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+      marginBottom: 2,
+    },
+    sectionTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.xl,
+      color: colors.text,
+      textAlign: 'right',
+    },
 
-  // Topics
-  topicsRow: { gap: 10, flexDirection: 'row-reverse', paddingBottom: 4 },
-  topicCard: {
-    width: 130,
-    borderRadius: Radius['2xl'],
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  topicGrad: {
-    padding: 16,
-    minHeight: 148,
-    justifyContent: 'space-between',
-  },
-  topicGlow: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.12,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 30,
-  },
-  topicIcon: { fontSize: 28, textAlign: 'right', marginBottom: 6 },
-  topicName: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    color: '#fff',
-    textAlign: 'right',
-    lineHeight: 18,
-    flex: 1,
-  },
-  topicChip: {
-    alignSelf: 'flex-start',
-    width: 28, height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topicChipText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
+    // Topics
+    topicsRow: { gap: 10, flexDirection: 'row-reverse', paddingBottom: 4 },
+    topicCard: {
+      width: 130,
+      borderRadius: Radius['2xl'],
+      overflow: 'hidden',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.45,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    topicGrad: {
+      padding: 16,
+      minHeight: 148,
+      justifyContent: 'space-between',
+    },
+    topicGlow: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.12,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 30,
+    },
+    topicIcon: { fontSize: 28, textAlign: 'right', marginBottom: 6 },
+    topicName: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.sm,
+      color: '#fff',
+      textAlign: 'right',
+      lineHeight: 18,
+      flex: 1,
+    },
+    topicChip: {
+      alignSelf: 'flex-start',
+      width: 28, height: 28,
+      borderRadius: 14,
+      backgroundColor: 'rgba(255,255,255,0.22)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    topicChipText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
 
-  // Bento Grid
-  bentoGrid: { flexDirection: 'row-reverse', gap: 10, flexWrap: 'wrap' },
-  bentoCard: {
-    flex: 1,
-    minWidth: (W - 52) / 2 - 20,
-    borderRadius: Radius['2xl'],
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  bentoWide: { flexBasis: '100%' },
-  bentoGrad: {
-    padding: 18,
-    minHeight: 90,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  bentoAccent: {
-    position: 'absolute',
-    left: 0, top: 0, bottom: 0,
-    width: 3,
-    borderRadius: 2,
-  },
-  bentoBig: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['3xl'],
-    color: Colors.success,
-    textAlign: 'right',
-    lineHeight: 36,
-  },
-  bentoLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'right',
-    marginTop: 2,
-  },
+    // Bento Grid
+    bentoGrid: { flexDirection: 'row-reverse', gap: 10, flexWrap: 'wrap' },
+    bentoCard: {
+      flex: 1,
+      minWidth: (W - 52) / 2 - 20,
+      borderRadius: Radius['2xl'],
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    bentoWide: { flexBasis: '100%' },
+    bentoGrad: {
+      padding: 18,
+      minHeight: 90,
+      justifyContent: 'center',
+      alignItems: 'flex-end',
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    bentoAccent: {
+      position: 'absolute',
+      left: 0, top: 0, bottom: 0,
+      width: 3,
+      borderRadius: 2,
+    },
+    bentoBig: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['3xl'],
+      color: colors.success,
+      textAlign: 'right',
+      lineHeight: 36,
+    },
+    bentoLabel: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+      textAlign: 'right',
+      marginTop: 2,
+    },
 
-  // Challenge
-  challengeBtn: {
-    borderRadius: Radius['2xl'],
-    overflow: 'hidden',
-    shadowColor: '#FBBF24',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.40,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-  challengeGrad: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    padding: 18,
-    gap: 14,
-  },
-  challengeShimmer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  challengeRight: { flex: 1, alignItems: 'flex-end' },
-  challengeTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: '#fff',
-    textAlign: 'right',
-  },
-  challengeSub: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.80)',
-    marginTop: 2,
-    textAlign: 'right',
-  },
-  challengeEmoji: { fontSize: 36 },
+    // Challenge
+    challengeBtn: {
+      borderRadius: Radius['2xl'],
+      overflow: 'hidden',
+      shadowColor: '#FBBF24',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.40,
+      shadowRadius: 20,
+      elevation: 12,
+    },
+    challengeGrad: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      padding: 18,
+      gap: 14,
+    },
+    challengeShimmer: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255,255,255,0.06)',
+    },
+    challengeRight: { flex: 1, alignItems: 'flex-end' },
+    challengeTitle: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.lg,
+      color: '#fff',
+      textAlign: 'right',
+    },
+    challengeSub: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: 'rgba(255,255,255,0.80)',
+      marginTop: 2,
+      textAlign: 'right',
+    },
+    challengeEmoji: { fontSize: 36 },
 
-  // Badges
-  badgesRow: { flexDirection: 'row-reverse', gap: 10 },
-  badgeCard: {
-    flex: 1,
-    backgroundColor: Colors.surfaceCard,
-    borderRadius: Radius['2xl'],
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(124,111,247,0.20)',
-    gap: 8,
-    shadowColor: '#7C6FF7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.20,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  badgeIconWrap: {
-    width: 50, height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(124,111,247,0.30)',
-  },
-  badgeIcon: { fontSize: 24 },
-  badgeLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
+    // Badges
+    badgesRow: { flexDirection: 'row-reverse', gap: 10 },
+    badgeCard: {
+      flex: 1,
+      backgroundColor: colors.surfaceCard,
+      borderRadius: Radius['2xl'],
+      padding: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(124,111,247,0.20)',
+      gap: 8,
+      shadowColor: '#7C6FF7',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.20,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    badgeIconWrap: {
+      width: 50, height: 50,
+      borderRadius: 25,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(124,111,247,0.30)',
+    },
+    badgeIcon: { fontSize: 24 },
+    badgeLabel: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.xs,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
 
-  // First-time CTA
-  firstCard: {
-    backgroundColor: Colors.surfaceCard,
-    borderRadius: Radius['3xl'],
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(124,111,247,0.22)',
-    overflow: 'hidden',
-    shadowColor: '#7C6FF7',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 10,
-  },
-  firstGlow: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(124,111,247,0.04)',
-  },
-  firstEmoji: { fontSize: 56, marginBottom: 12 },
-  firstTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    color: Colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  firstSub: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  firstBtn: { borderRadius: Radius.full, overflow: 'hidden' },
-  firstBtnGrad: { paddingHorizontal: 28, paddingVertical: 14, alignItems: 'center' },
-  firstBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
-});
+    // First-time CTA
+    firstCard: {
+      backgroundColor: colors.surfaceCard,
+      borderRadius: Radius['3xl'],
+      padding: 28,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(124,111,247,0.22)',
+      overflow: 'hidden',
+      shadowColor: '#7C6FF7',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.25,
+      shadowRadius: 24,
+      elevation: 10,
+    },
+    firstGlow: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(124,111,247,0.04)',
+    },
+    firstEmoji: { fontSize: 56, marginBottom: 12 },
+    firstTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['2xl'],
+      color: colors.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    firstSub: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 20,
+    },
+    firstBtn: { borderRadius: Radius.full, overflow: 'hidden' },
+    firstBtnGrad: { paddingHorizontal: 28, paddingVertical: 14, alignItems: 'center' },
+    firstBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+  });
+}

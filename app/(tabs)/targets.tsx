@@ -10,7 +10,8 @@ import * as Haptics from '../../utils/haptics';
 import { TARGETS, TOPICS } from '../../data/mockData';
 import { TargetCard } from '../../components/TargetCard';
 import { ProgressBar } from '../../components/ProgressBar';
-import { Colors } from '../../constants/colors';
+import { ThemeColors } from '../../constants/colors';
+import { useColors } from '../../hooks/useColors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { LEVEL_LABELS } from '../../utils/adaptive';
@@ -77,6 +78,8 @@ export default function TargetsTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { getTopicAccuracy, getTopicLevel, totalSessions } = useUserStore();
+  const colors = useColors();
+  const styles = React.useMemo(() => makeStyles(colors), [colors]);
 
   const selected = TARGETS.find(t => t.id === selectedId);
   const selectedTopics = selected ? TOPICS.filter(t => t.targetId === selected.id) : [];
@@ -96,10 +99,10 @@ export default function TargetsTab() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
     <SafeAreaView style={styles.safe} edges={['top']}>
       <LinearGradient
-        colors={Colors.gradients.primary}
+        colors={colors.gradients.primary}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.hero}
@@ -121,7 +124,7 @@ export default function TargetsTab() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={Colors.primary}
+            tintColor={colors.primary}
           />
         }
       >
@@ -261,7 +264,7 @@ export default function TargetsTab() {
                     }}
                   >
                     <LinearGradient
-                      colors={Colors.gradients.primary}
+                      colors={colors.gradients.primary}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.adaptiveBtnGrad}
@@ -280,198 +283,200 @@ export default function TargetsTab() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
-  hero: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 28,
-  },
-  heroTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['3xl'],
-    color: '#fff',
-    textAlign: 'right',
-    fontWeight: 'bold',
-  },
-  heroSubtitle: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'right',
-    marginTop: 4,
-  },
-  heroBadge: {
-    alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: Radius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginTop: 10,
-  },
-  heroBadgeText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: '#fff',
-  },
-  scroll: { flex: 1 },
-  content: { padding: 16, gap: 12 },
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: 'transparent' },
+    hero: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 28,
+    },
+    heroTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['3xl'],
+      color: '#fff',
+      textAlign: 'right',
+      fontWeight: 'bold',
+    },
+    heroSubtitle: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: 'rgba(255,255,255,0.8)',
+      textAlign: 'right',
+      marginTop: 4,
+    },
+    heroBadge: {
+      alignSelf: 'flex-end',
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderRadius: Radius.full,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      marginTop: 10,
+    },
+    heroBadgeText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.xs,
+      color: '#fff',
+    },
+    scroll: { flex: 1 },
+    content: { padding: 16, gap: 12 },
 
-  // Wrapper for TargetCard + overlays
-  cardWrapper: {
-    position: 'relative',
-  },
+    // Wrapper for TargetCard + overlays
+    cardWrapper: {
+      position: 'relative',
+    },
 
-  // Progress percentage badge — top-right corner (RTL: visually top-right)
-  progressPctBadge: {
-    position: 'absolute',
-    top: 14,
-    right: 14,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    zIndex: 2,
-  },
-  progressPctText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: '#fff',
-  },
+    // Progress percentage badge — top-right corner (RTL: visually top-right)
+    progressPctBadge: {
+      position: 'absolute',
+      top: 14,
+      right: 14,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      borderRadius: 8,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      zIndex: 2,
+    },
+    progressPctText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.xs,
+      color: '#fff',
+    },
 
-  // Coming-soon overlay covers the entire card
-  comingSoonOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    borderRadius: Radius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  comingSoonBadge: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.lg,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    ...Shadow.primary,
-  },
-  comingSoonText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: '#fff',
-  },
+    // Coming-soon overlay covers the entire card
+    comingSoonOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10,
+    },
+    comingSoonBadge: {
+      backgroundColor: colors.primary,
+      borderRadius: Radius.lg,
+      paddingHorizontal: 18,
+      paddingVertical: 8,
+      ...Shadow.primary,
+    },
+    comingSoonText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.base,
+      color: '#fff',
+    },
 
-  // Expanded topics container
-  topicsContainer: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: Radius.xl,
-    padding: 18,
-    marginTop: 4,
-    ...Shadow.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
-    borderTopWidth: 3,
-    borderTopColor: Colors.primary,
-  },
-  topicsTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    textAlign: 'right',
-    marginBottom: 12,
-  },
-  emptyTopics: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-    paddingVertical: 16,
-  },
+    // Expanded topics container
+    topicsContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.xl,
+      padding: 18,
+      marginTop: 4,
+      ...Shadow.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderTopWidth: 3,
+      borderTopColor: colors.primary,
+    },
+    topicsTitle: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.base,
+      color: colors.text,
+      textAlign: 'right',
+      marginBottom: 12,
+    },
+    emptyTopics: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.textTertiary,
+      textAlign: 'center',
+      paddingVertical: 16,
+    },
 
-  // Topic row: right side = info, left side = chip
-  topicRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: 12,
-  },
-  topicRowLast: {
-    borderBottomWidth: 0,
-  },
-  topicLocked: { opacity: 0.5 },
+    // Topic row: right side = info, left side = chip
+    topicRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      gap: 12,
+    },
+    topicRowLast: {
+      borderBottomWidth: 0,
+    },
+    topicLocked: { opacity: 0.5 },
 
-  // Right side: icon + text block
-  topicInfo: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  topicIcon: { fontSize: 24 },
-  topicTextBlock: { flex: 1, alignItems: 'flex-end' },
-  topicName: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    textAlign: 'right',
-  },
-  topicElo: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  topicProgressRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-  },
-  topicProgressWrap: { flex: 1 },
-  topicProgressPct: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    minWidth: 32,
-    textAlign: 'right',
-  },
+    // Right side: icon + text block
+    topicInfo: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+    },
+    topicIcon: { fontSize: 24 },
+    topicTextBlock: { flex: 1, alignItems: 'flex-end' },
+    topicName: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.base,
+      color: colors.text,
+      textAlign: 'right',
+    },
+    topicElo: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+      textAlign: 'right',
+      marginTop: 2,
+    },
+    topicProgressRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 6,
+    },
+    topicProgressWrap: { flex: 1 },
+    topicProgressPct: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.xs,
+      minWidth: 32,
+      textAlign: 'right',
+    },
 
-  lockIcon: { fontSize: 18 },
+    lockIcon: { fontSize: 18 },
 
-  // "תרגל ←" chip button
-  practiceChip: {
-    borderWidth: 1.5,
-    borderRadius: Radius.xl,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    minHeight: 44,
-    minWidth: 72,
-  },
-  practiceChipText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-  },
+    // "תרגל ←" chip button
+    practiceChip: {
+      borderWidth: 1.5,
+      borderRadius: Radius.xl,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      minHeight: 44,
+      minWidth: 72,
+    },
+    practiceChipText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.sm,
+    },
 
-  // Adaptive practice button at bottom
-  adaptiveBtn: {
-    borderRadius: Radius.lg,
-    marginTop: 12,
-    overflow: 'hidden',
-    ...Shadow.primary,
-  },
-  adaptiveBtnGrad: {
-    padding: 14,
-    alignItems: 'center',
-  },
-  adaptiveBtnText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: '#fff',
-  },
-});
+    // Adaptive practice button at bottom
+    adaptiveBtn: {
+      borderRadius: Radius.lg,
+      marginTop: 12,
+      overflow: 'hidden',
+      ...Shadow.primary,
+    },
+    adaptiveBtnGrad: {
+      padding: 14,
+      alignItems: 'center',
+    },
+    adaptiveBtnText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.base,
+      color: '#fff',
+    },
+  });
+}

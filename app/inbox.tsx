@@ -5,10 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAdminStore, InboxMessage } from '../store/adminStore';
 import { useUserStore } from '../store/userStore';
-import { Colors } from '../constants/colors';
+import { ThemeColors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 
 export default function InboxScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const { inboxMessages } = useAdminStore();
   const { userId, isPremium, readMessageIds, markMessageRead } = useUserStore();
 
@@ -18,7 +22,7 @@ export default function InboxScreen() {
         if (msg.targetType === 'all') return true;
         if (msg.targetType === 'premium') return isPremium;
         if (msg.targetType === 'free') return !isPremium;
-        if (msg.targetType === 'specific') return msg.targetUserIds.includes(userId);
+        if (msg.targetType === 'specific') return !!userId && msg.targetUserIds.includes(userId);
         return false;
       })
       .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
@@ -30,7 +34,7 @@ export default function InboxScreen() {
         markMessageRead(msg.id);
       }
     });
-  }, [visibleMessages]);
+  }, [visibleMessages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatDate = (iso: string) => {
     return new Date(iso).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -38,7 +42,7 @@ export default function InboxScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
+      <LinearGradient colors={colors.gradients.primaryDeep} style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>→</Text>
         </Pressable>
@@ -78,76 +82,78 @@ export default function InboxScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  header: { padding: 20, paddingTop: 16, paddingBottom: 20, alignItems: 'flex-end' },
-  backBtn: { marginBottom: 6 },
-  backText: { fontFamily: FontFamily.medium, fontSize: FontSize.lg, color: '#94A3B8' },
-  headerTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
-  headerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8', marginTop: 2 },
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    header: { padding: 20, paddingTop: 16, paddingBottom: 20, alignItems: 'flex-end' },
+    backBtn: { marginBottom: 6 },
+    backText: { fontFamily: FontFamily.medium, fontSize: FontSize.lg, color: 'rgba(255,255,255,0.75)' },
+    headerTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
+    headerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
 
-  content: { padding: 16, gap: 12 },
+    content: { padding: 16, gap: 12 },
 
-  empty: { alignItems: 'center', paddingTop: 80, gap: 12 },
-  emptyIcon: { fontSize: 48 },
-  emptyText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.textSecondary },
+    empty: { alignItems: 'center', paddingTop: 80, gap: 12 },
+    emptyIcon: { fontSize: 48 },
+    emptyText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: colors.textSecondary },
 
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    ...Shadow.sm,
-  },
-  cardUnread: {
-    borderColor: Colors.primary + '60',
-    backgroundColor: Colors.primary + '08',
-  },
-  unreadDot: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
-    zIndex: 1,
-  },
-  cardInner: {
-    flexDirection: 'row-reverse',
-    padding: 16,
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.primary + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  icon: { fontSize: 24 },
-  cardBody: { flex: 1, alignItems: 'flex-end', gap: 4 },
-  cardTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    textAlign: 'right',
-  },
-  cardText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'right',
-    lineHeight: 20,
-  },
-  cardDate: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    marginTop: 4,
-  },
-});
+    card: {
+      backgroundColor: colors.surfaceCard,
+      borderRadius: Radius.xl,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+      ...Shadow.sm,
+    },
+    cardUnread: {
+      borderColor: colors.primary + '60',
+      backgroundColor: colors.primary + '08',
+    },
+    unreadDot: {
+      position: 'absolute',
+      top: 12,
+      left: 12,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.primary,
+      zIndex: 1,
+    },
+    cardInner: {
+      flexDirection: 'row-reverse',
+      padding: 16,
+      gap: 12,
+      alignItems: 'flex-start',
+    },
+    iconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: Radius.lg,
+      backgroundColor: colors.primaryLighter,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    icon: { fontSize: 24 },
+    cardBody: { flex: 1, alignItems: 'flex-end', gap: 4 },
+    cardTitle: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.base,
+      color: colors.text,
+      textAlign: 'right',
+    },
+    cardText: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'right',
+      lineHeight: 20,
+    },
+    cardDate: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+      marginTop: 4,
+    },
+  });
+}

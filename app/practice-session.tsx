@@ -22,6 +22,8 @@ import { calcAllScores } from '../utils/scoring';
 import { SessionMode } from '../data/types';
 import { generateSmartExamQuestions, GeneratedExamSection } from '../utils/smartExam';
 import { logger } from '../utils/logger';
+import { useColors } from '../hooks/useColors';
+import { ThemeColors } from '../constants/colors';
 
 const { width: W } = Dimensions.get('window');
 const SPEED_LIMIT = 60; // seconds per question in speed mode
@@ -37,6 +39,9 @@ export default function PracticeSession() {
     challengeQuestionId?: string;
     challengeBonusXp?: string;
   }>();
+
+  const colors = useColors();
+  const styles = React.useMemo(() => makeStyles(colors), [colors]);
 
   const insets = useSafeAreaInsets();
 
@@ -527,7 +532,7 @@ export default function PracticeSession() {
     const nextTopic = nextSection ? TOPICS.find(t => t.id === nextSection.topicId) : null;
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <LinearGradient colors={['#060912', '#1E1B4B', '#312E81']} style={styles.restScreen}>
+        <LinearGradient colors={colors.gradients.bg as any} style={styles.restScreen}>
           <Text style={styles.restIcon}>😴</Text>
           <Text style={styles.restTitle}>
             {template?.restScreenMessage ?? 'כל הכבוד! מנוחה קצרה לפני החלק הבא'}
@@ -586,8 +591,8 @@ export default function PracticeSession() {
   // Timer display values
   const displayTimer = isSpeedMode ? timer : practiceTimer;
   const timerColor = isSpeedMode
-    ? (timer <= 10 ? Colors.danger : timer <= 20 ? Colors.warning : Colors.success)
-    : Colors.textSecondary;
+    ? (timer <= 10 ? colors.danger : timer <= 20 ? colors.warning : colors.success)
+    : colors.textSecondary;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -625,7 +630,7 @@ export default function PracticeSession() {
       <View style={styles.progressWrap}>
         <ProgressBar
           progress={progress}
-          color={topic?.color ?? Colors.primary}
+          color={topic?.color ?? colors.primary}
           height={5}
         />
       </View>
@@ -651,7 +656,7 @@ export default function PracticeSession() {
             style={[styles.quickBtn, notes[question.id] ? styles.quickBtnActive : null]}
           >
             <Text style={styles.quickBtnIcon}>📝</Text>
-            <Text style={[styles.quickBtnLabel, notes[question.id] ? { color: Colors.primary } : null]}>
+            <Text style={[styles.quickBtnLabel, notes[question.id] ? { color: colors.primary } : null]}>
               {notes[question.id] ? 'עריכת הערה' : 'הוסף הערה'}
             </Text>
           </Pressable>
@@ -697,8 +702,8 @@ export default function PracticeSession() {
             <LinearGradient
               colors={
                 lastAnswerCorrect
-                  ? [Colors.successLight, '#fff']
-                  : [Colors.dangerLight, '#fff']
+                  ? [colors.successLight, '#fff']
+                  : [colors.dangerLight, '#fff']
               }
               style={styles.explanationGrad}
             >
@@ -744,7 +749,7 @@ export default function PracticeSession() {
               ]}
             >
               <LinearGradient
-                colors={selectedId ? Colors.gradients.primary : ['#CBD5E1', '#94A3B8']}
+                colors={selectedId ? colors.gradients.primary : ['#CBD5E1', '#94A3B8']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.confirmBtnGrad}
@@ -759,7 +764,7 @@ export default function PracticeSession() {
             style={({ pressed }) => [styles.nextBtn, pressed && { opacity: 0.9 }]}
           >
             <LinearGradient
-              colors={Colors.gradients.primary}
+              colors={colors.gradients.primary}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.nextBtnGrad}
@@ -777,261 +782,263 @@ export default function PracticeSession() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
 
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
-  loadingText: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center' },
-  loadErrorBtn: { backgroundColor: Colors.primary, borderRadius: Radius.xl, paddingHorizontal: 28, paddingVertical: 14 },
-  loadErrorBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+    loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
+    loadingText: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: colors.textSecondary, textAlign: 'center' },
+    loadErrorBtn: { backgroundColor: colors.primary, borderRadius: Radius.xl, paddingHorizontal: 28, paddingVertical: 14 },
+    loadErrorBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 
-  // Rest screen between simulation sections
-  restScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  restIcon: { fontSize: 64, marginBottom: 20 },
-  restTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: '#fff', textAlign: 'center', lineHeight: 30, marginBottom: 12 },
-  restNext: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: '#94A3B8', textAlign: 'center', marginBottom: 32 },
-  restCountdownWrap: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 24, borderWidth: 2, borderColor: Colors.primary },
-  restCountdown: { fontFamily: FontFamily.heading, fontSize: 42, color: Colors.primary },
-  restCountdownLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8' },
-  restSkipBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: Radius.lg, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  restSkipText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#fff' },
+    // Rest screen between simulation sections
+    restScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+    restIcon: { fontSize: 64, marginBottom: 20 },
+    restTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: colors.text, textAlign: 'center', lineHeight: 30, marginBottom: 12 },
+    restNext: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: colors.textSecondary, textAlign: 'center', marginBottom: 32 },
+    restCountdownWrap: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 24, borderWidth: 2, borderColor: colors.primary },
+    restCountdown: { fontFamily: FontFamily.heading, fontSize: 42, color: colors.primary },
+    restCountdownLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: colors.textSecondary },
+    restSkipBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: Radius.lg, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+    restSkipText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: colors.text },
 
-  header: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  quitBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quitText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.textSecondary },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTopic: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
-  headerProgress: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
-  timerBadge: {
-    width: 48,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timerText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
+    header: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    quitBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quitText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: colors.textSecondary },
+    headerCenter: { flex: 1, alignItems: 'center' },
+    headerTopic: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: colors.text },
+    headerProgress: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: colors.textSecondary, marginTop: 2 },
+    timerBadge: {
+      width: 48,
+      height: 36,
+      borderRadius: 18,
+      borderWidth: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    timerText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
 
-  progressWrap: { paddingHorizontal: 0 },
+    progressWrap: { paddingHorizontal: 0 },
 
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 24, gap: 14 },
+    scroll: { flex: 1 },
+    scrollContent: { padding: 16, paddingBottom: 24, gap: 14 },
 
-  explanation: {
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    ...Shadow.md,
-  },
-  explanationGrad: { padding: 18 },
-  explanationResult: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize.xl,
-    color: Colors.text,
-    textAlign: 'right',
-    marginBottom: 10,
-  },
-  explanationTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'right',
-    marginBottom: 6,
-  },
-  explanationText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    textAlign: 'right',
-    lineHeight: 24,
-  },
+    explanation: {
+      borderRadius: Radius.xl,
+      overflow: 'hidden',
+      ...Shadow.md,
+    },
+    explanationGrad: { padding: 18 },
+    explanationResult: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize.xl,
+      color: colors.text,
+      textAlign: 'right',
+      marginBottom: 10,
+    },
+    explanationTitle: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'right',
+      marginBottom: 6,
+    },
+    explanationText: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.base,
+      color: colors.text,
+      textAlign: 'right',
+      lineHeight: 24,
+    },
 
-  showExplanationBtn: {
-    backgroundColor: Colors.primaryLighter,
-    borderRadius: Radius.xl,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
-  showExplanationText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: Colors.primary,
-  },
+    showExplanationBtn: {
+      backgroundColor: colors.primaryLighter,
+      borderRadius: Radius.xl,
+      padding: 14,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    showExplanationText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.base,
+      color: colors.primary,
+    },
 
-  autoAdvanceBanner: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: Radius.lg,
-    padding: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  autoAdvanceText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-  },
+    autoAdvanceBanner: {
+      backgroundColor: colors.surfaceSecondary,
+      borderRadius: Radius.lg,
+      padding: 10,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    autoAdvanceText: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+      textAlign: 'center',
+    },
 
-  actions: {
-    padding: 16,
-    paddingBottom: 24,
-    backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  actionsRow: { flexDirection: 'row-reverse', gap: 12 },
-  skipBtn: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  skipText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.textSecondary },
-  confirmBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
-  confirmBtnDisabled: { shadowOpacity: 0 },
-  confirmBtnGrad: { paddingVertical: 16, alignItems: 'center' },
-  confirmText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+    actions: {
+      padding: 16,
+      paddingBottom: 24,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    actionsRow: { flexDirection: 'row-reverse', gap: 12 },
+    skipBtn: {
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      borderRadius: Radius.xl,
+      backgroundColor: colors.surfaceSecondary,
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: 'center',
+      minHeight: 44,
+    },
+    skipText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: colors.textSecondary },
+    confirmBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
+    confirmBtnDisabled: { shadowOpacity: 0 },
+    confirmBtnGrad: { paddingVertical: 16, alignItems: 'center' },
+    confirmText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 
-  nextBtn: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
-  nextBtnGrad: { paddingVertical: 18, alignItems: 'center' },
-  nextText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+    nextBtn: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
+    nextBtnGrad: { paddingVertical: 18, alignItems: 'center' },
+    nextText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
 
-  quickActions: {
-    flexDirection: 'row-reverse',
-    gap: 10,
-  },
-  quickBtn: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minHeight: 44,
-  },
-  quickBtnActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLighter,
-  },
-  quickBtnFav: {
-    borderColor: '#F59E0B',
-    backgroundColor: '#FEF3C7',
-  },
-  quickBtnIcon: { fontSize: 16 },
-  quickBtnLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-  },
+    quickActions: {
+      flexDirection: 'row-reverse',
+      gap: 10,
+    },
+    quickBtn: {
+      flex: 1,
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      borderRadius: Radius.lg,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      minHeight: 44,
+    },
+    quickBtnActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLighter,
+    },
+    quickBtnFav: {
+      borderColor: '#F59E0B',
+      backgroundColor: '#FEF3C7',
+    },
+    quickBtnIcon: { fontSize: 16 },
+    quickBtnLabel: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.xs,
+      color: colors.textSecondary,
+    },
 
-  noteDisplay: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.primary + '40',
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.primary,
-  },
-  noteDisplayLabel: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.primary,
-    textAlign: 'right',
-    marginBottom: 4,
-  },
-  noteDisplayText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.text,
-    textAlign: 'right',
-    lineHeight: 20,
-  },
+    noteDisplay: {
+      backgroundColor: colors.surface,
+      borderRadius: Radius.lg,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.primary + '40',
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+    },
+    noteDisplayLabel: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.xs,
+      color: colors.primary,
+      textAlign: 'right',
+      marginBottom: 4,
+    },
+    noteDisplayText: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.text,
+      textAlign: 'right',
+      lineHeight: 20,
+    },
 
-  // Note modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  noteModal: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius['2xl'],
-    borderTopRightRadius: Radius['2xl'],
-    padding: 24,
-    gap: 16,
-  },
-  noteModalTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: Colors.text,
-    textAlign: 'right',
-  },
-  noteInput: {
-    backgroundColor: Colors.background,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 12,
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  noteModalActions: {
-    flexDirection: 'row-reverse',
-    gap: 12,
-  },
-  noteCancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  noteCancelText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.base,
-    color: Colors.textSecondary,
-  },
-  noteSaveBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-  },
-  noteSaveText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: '#fff',
-  },
-});
+    // Note modal
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'flex-end',
+    },
+    noteModal: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: Radius['2xl'],
+      borderTopRightRadius: Radius['2xl'],
+      padding: 24,
+      gap: 16,
+    },
+    noteModalTitle: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.lg,
+      color: colors.text,
+      textAlign: 'right',
+    },
+    noteInput: {
+      backgroundColor: colors.background,
+      borderRadius: Radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 12,
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.base,
+      color: colors.text,
+      minHeight: 100,
+      textAlignVertical: 'top',
+    },
+    noteModalActions: {
+      flexDirection: 'row-reverse',
+      gap: 12,
+    },
+    noteCancelBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: Radius.xl,
+      backgroundColor: colors.surfaceSecondary,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    noteCancelText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.base,
+      color: colors.textSecondary,
+    },
+    noteSaveBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: Radius.xl,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+    },
+    noteSaveText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.base,
+      color: '#fff',
+    },
+  });
+}

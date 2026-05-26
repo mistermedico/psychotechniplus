@@ -1,4 +1,6 @@
-export const Colors = {
+export type ThemeColors = typeof DarkColors;
+
+export const DarkColors = {
   // Core brand
   primary: '#7C6FF7',
   primaryLight: '#9E99FA',
@@ -92,3 +94,105 @@ export const Colors = {
   glass15: 'rgba(255,255,255,0.15)',
   glass20: 'rgba(255,255,255,0.20)',
 };
+
+export const LightColors: ThemeColors = {
+  // Core brand (unchanged)
+  primary: '#7C6FF7',
+  primaryLight: '#9E99FA',
+  primaryLighter: 'rgba(124,111,247,0.12)',
+  primaryDark: '#5A52D5',
+  primaryGlow: 'rgba(124,111,247,0.30)',
+
+  accent: '#C084FC',
+  accentLight: 'rgba(192,132,252,0.12)',
+  accentGlow: 'rgba(192,132,252,0.25)',
+
+  cyan: '#0EA5E9',
+  cyanLight: 'rgba(14,165,233,0.12)',
+  cyanGlow: 'rgba(14,165,233,0.25)',
+
+  success: '#10B981',
+  successLight: 'rgba(16,185,129,0.12)',
+  successGlow: 'rgba(16,185,129,0.25)',
+
+  danger: '#EF4444',
+  dangerLight: 'rgba(239,68,68,0.12)',
+  dangerGlow: 'rgba(239,68,68,0.25)',
+
+  warning: '#D97706',
+  warningLight: 'rgba(217,119,6,0.12)',
+  warningGlow: 'rgba(217,119,6,0.25)',
+
+  gold: '#D97706',
+  silver: '#64748B',
+
+  // Backgrounds — clean daylight
+  background: '#F4F6FB',
+  backgroundDark: '#E8EDF5',
+  background2: '#EEF1FA',
+  background3: '#E4E8F5',
+
+  // Surfaces
+  surface: 'rgba(0,0,0,0.05)',
+  surfaceSecondary: 'rgba(0,0,0,0.03)',
+  surfaceTertiary: 'rgba(0,0,0,0.02)',
+  surfaceStrong: 'rgba(0,0,0,0.08)',
+  surfaceCard: 'rgba(255,255,255,0.85)',
+  surfaceElevated: 'rgba(255,255,255,0.92)',
+
+  // Borders
+  border: 'rgba(0,0,0,0.10)',
+  borderStrong: 'rgba(0,0,0,0.22)',
+  borderFocus: 'rgba(124,111,247,0.70)',
+  borderGlow: 'rgba(124,111,247,0.30)',
+
+  // Text
+  text: '#0F172A',
+  textSecondary: 'rgba(15,23,42,0.62)',
+  textTertiary: 'rgba(15,23,42,0.38)',
+  textInverse: '#F0F4FF',
+
+  glass: 'rgba(255,255,255,0.90)',
+  glassStrong: 'rgba(255,255,255,0.98)',
+
+  // Target colors (unchanged)
+  targets: {
+    ktzina: '#3B82F6',
+    tayyas: '#0EA5E9',
+    psychometric: '#7C6FF7',
+    hightech: '#10B981',
+    modiin: '#D97706',
+    shabas: '#EF4444',
+  },
+
+  // Gradient pairs
+  gradients: {
+    primary: ['#7C6FF7', '#C084FC'] as [string, string],
+    primaryDeep: ['#5A52D5', '#7C6FF7'] as [string, string],
+    success: ['#34D399', '#10B981'] as [string, string],
+    danger: ['#F87171', '#EF4444'] as [string, string],
+    gold: ['#FBBF24', '#F59E0B'] as [string, string],
+    cyan: ['#22D3EE', '#0EA5E9'] as [string, string],
+    bg: ['#F4F6FB', '#EEF1FA', '#E4E8F5'] as unknown as [string, string],
+    hero: ['#EEF1FA', '#EAE4FA'] as [string, string],
+    ktzina: ['#3B82F6', '#1D4ED8'] as [string, string],
+    tayyas: ['#0EA5E9', '#0284C7'] as [string, string],
+    psychometric: ['#7C6FF7', '#5A52D5'] as [string, string],
+    hightech: ['#34D399', '#10B981'] as [string, string],
+    modiin: ['#FBBF24', '#F59E0B'] as [string, string],
+  },
+
+  // Opacity helpers (dark overlays on light background)
+  glass05: 'rgba(0,0,0,0.03)',
+  glass08: 'rgba(0,0,0,0.05)',
+  glass10: 'rgba(0,0,0,0.07)',
+  glass15: 'rgba(0,0,0,0.10)',
+  glass20: 'rgba(0,0,0,0.14)',
+};
+
+export function getColors(theme: 'dark' | 'light'): ThemeColors {
+  return theme === 'light' ? LightColors : DarkColors;
+}
+
+// Backward-compat default export (dark theme)
+export const Colors = DarkColors;
