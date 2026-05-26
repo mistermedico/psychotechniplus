@@ -155,18 +155,20 @@ export default function ProfileTab() {
 
   const handleSignOut = () => {
     if (signingOut) return;
+    const doSignOut = async () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setSigningOut(true);
+      await signOut().catch(() => null);
+      router.replace('/landing');
+    };
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if (window.confirm('יציאה מהחשבון - האם אתה בטוח?')) doSignOut();
+      return;
+    }
     Alert.alert('יציאה מהחשבון', 'האם אתה בטוח שברצונך לצאת?', [
       { text: 'ביטול', style: 'cancel' },
-      {
-        text: 'יציאה', style: 'destructive',
-        onPress: async () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          setSigningOut(true);
-          await signOut().catch(() => null);
-          router.replace('/landing');
-          // Do NOT setSigningOut(false) after navigate — component is unmounting
-        },
-      },
+      { text: 'יציאה', style: 'destructive', onPress: doSignOut },
     ]);
   };
 
