@@ -156,14 +156,16 @@ export default function ProfileTab() {
   const handleSignOut = () => {
     if (signingOut) return;
     const doSignOut = async () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       setSigningOut(true);
       await signOut().catch(() => null);
-      router.replace('/landing');
+      if (Platform.OS === 'web') {
+        window.location.replace('/');
+      } else {
+        router.replace('/landing');
+      }
     };
     if (Platform.OS === 'web') {
-      // eslint-disable-next-line no-alert
-      if (window.confirm('יציאה מהחשבון - האם אתה בטוח?')) doSignOut();
+      doSignOut();
       return;
     }
     Alert.alert('יציאה מהחשבון', 'האם אתה בטוח שברצונך לצאת?', [
