@@ -87,6 +87,21 @@ export default function PracticeSession() {
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice OR admin forced showTimerAlways)
   const showTimer = isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
 
+  const handleTimeUp = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    if (revealed) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setSelectedId(null);
+    setRevealed(false);
+    setLastAnswerCorrect(false);
+    setShowExplanation(false);
+    explanationAnim.setValue(0);
+    skipQuestion();
+    const hasMore = nextQuestion();
+    if (!hasMore) finishSession();
+  }, [revealed]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Initialize session — simulation mode or free practice
   useEffect(() => {
     let cancelled = false;
@@ -215,21 +230,6 @@ export default function PracticeSession() {
       clearInterval(countId);
     };
   }, [revealed, autoAdvanceDelay]);
-
-  const handleTimeUp = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-    if (revealed) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    setSelectedId(null);
-    setRevealed(false);
-    setLastAnswerCorrect(false);
-    setShowExplanation(false);
-    explanationAnim.setValue(0);
-    skipQuestion();
-    const hasMore = nextQuestion();
-    if (!hasMore) finishSession();
-  }, [revealed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelect = (optId: string) => {
     if (revealed) return;

@@ -274,6 +274,74 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
 };
 
+export type AppControlPreset = 'normal' | 'launch' | 'contentFreeze' | 'maintenance';
+
+export const APP_CONTROL_PRESETS: Record<AppControlPreset, { label: string; config: AppConfig }> = {
+  normal: {
+    label: 'Normal operations',
+    config: DEFAULT_APP_CONFIG,
+  },
+  launch: {
+    label: 'Launch mode',
+    config: {
+      ...DEFAULT_APP_CONFIG,
+      announcementEnabled: true,
+      announcementLevel: 'info',
+      announcementText: 'ברוכים הבאים לפסיכוטכני פלוס - כל הכלים פתוחים לתרגול.',
+      freeSessionsPerDay: 20,
+      sessionCooldownMinutes: 0,
+      featureFlags: {
+        ...DEFAULT_APP_CONFIG.featureFlags,
+        socialSharing: true,
+        dailyChallenge: true,
+      },
+    },
+  },
+  contentFreeze: {
+    label: 'Content review mode',
+    config: {
+      ...DEFAULT_APP_CONFIG,
+      announcementEnabled: true,
+      announcementLevel: 'warning',
+      announcementText: 'אנחנו מעדכנים תוכן ושאלות. חלק מהפיצ׳רים עשויים להיות מוגבלים זמנית.',
+      registrationOpen: true,
+      freeSessionsPerDay: 5,
+      sessionCooldownMinutes: 15,
+      leaderboardVisible: false,
+      featureFlags: {
+        ...DEFAULT_APP_CONFIG.featureFlags,
+        simulations: false,
+        leaderboard: false,
+        socialSharing: false,
+        dailyChallenge: false,
+      },
+    },
+  },
+  maintenance: {
+    label: 'Maintenance mode',
+    config: {
+      ...DEFAULT_APP_CONFIG,
+      maintenanceMode: true,
+      announcementEnabled: true,
+      announcementLevel: 'critical',
+      announcementText: 'האפליקציה בתחזוקה קצרה. נחזור לפעילות מלאה בקרוב.',
+      registrationOpen: false,
+      freeSessionsPerDay: 1,
+      sessionCooldownMinutes: 60,
+      leaderboardVisible: false,
+      featureFlags: {
+        ...DEFAULT_APP_CONFIG.featureFlags,
+        speedMode: false,
+        streakMode: false,
+        simulations: false,
+        leaderboard: false,
+        socialSharing: false,
+        dailyChallenge: false,
+      },
+    },
+  },
+};
+
 export interface PremiumConfig {
   premiumFeatures: {
     speedMode: boolean;
@@ -582,6 +650,8 @@ interface AdminState {
   // Actions — app config
   setAppConfig: (updates: Partial<AppConfig>) => void;
   setFeatureFlag: (flag: keyof AppConfig['featureFlags'], value: boolean) => void;
+  applyAppControlPreset: (preset: AppControlPreset) => void;
+  resetAppConfig: () => void;
 
   // Actions — daily challenges
   addDailyChallenge: (challenge: Omit<DailyChallenge, 'id'>) => DailyChallenge;
@@ -750,6 +820,24 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
       return { appConfig: next };
     });
+  },
+
+  applyAppControlPreset: (preset) => {
+    set(s => {
+      const next = APP_CONTROL_PRESETS[preset].config;
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
+      return { appConfig: next };
+    });
+    get().logActivity(`הופעל פריסט שליטה: ${APP_CONTROL_PRESETS[preset].label}`, 'system');
+  },
+
+  resetAppConfig: () => {
+    set(s => {
+      const next = DEFAULT_APP_CONFIG;
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
+      return { appConfig: next };
+    });
+    get().logActivity('אופסו הגדרות מרכז השליטה לברירת מחדל', 'system');
   },
 
   addDailyChallenge: (challenge) => {

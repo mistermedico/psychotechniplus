@@ -48,7 +48,8 @@ export async function ensureDbSeeded(): Promise<void> {
   try {
     // Always upsert all targets + topics so FK constraints are always satisfied.
     // Upsert is idempotent — safe to run every session.
-    const { TARGETS: T, TOPICS: TOP } = await import('../data/mockData');
+    const T = TARGETS;
+    const TOP = TOPICS;
     const { error: te } = await supabase.from('targets').upsert(
       T.map(t => ({
         id: t.id, name: t.name, slug: t.slug ?? t.id, description: t.description ?? '',

@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
-import { useAdminStore, AppConfig } from '../../store/adminStore';
+import { useAdminStore, AppConfig, AppControlPreset, APP_CONTROL_PRESETS } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -26,13 +26,32 @@ const ANNOUNCEMENT_LEVELS: { value: AppConfig['announcementLevel']; label: strin
   { value: 'critical', label: 'דחוף',   color: Colors.danger },
 ];
 
+const PRESET_META: Array<{ key: AppControlPreset; icon: string; title: string; desc: string; tone: string }> = [
+  { key: 'normal', icon: 'OK', title: 'שגרה', desc: 'כללי שימוש רגילים', tone: Colors.success },
+  { key: 'launch', icon: 'GO', title: 'השקה', desc: 'פותח את רוב היכולות', tone: Colors.primary },
+  { key: 'contentFreeze', icon: 'QA', title: 'בקרת תוכן', desc: 'מגביל תרגול בזמן בדיקות', tone: Colors.warning },
+  { key: 'maintenance', icon: '!', title: 'תחזוקה', desc: 'חוסם כניסה ומכבה פיצ׳רים', tone: Colors.danger },
+];
+
 export default function AppControlScreen() {
-  const { appConfig, setAppConfig, setFeatureFlag } = useAdminStore();
+  const {
+    appConfig, setAppConfig, setFeatureFlag,
+    applyAppControlPreset, resetAppConfig, getStats, activityLog,
+  } = useAdminStore();
 
   const [announcementDraft, setAnnouncementDraft] = useState(appConfig.announcementText);
   const [freeSessionsInput, setFreeSessionsInput] = useState(String(appConfig.freeSessionsPerDay));
   const [cooldownInput, setCooldownInput] = useState(String(appConfig.sessionCooldownMinutes));
   const [showPreview, setShowPreview] = useState(false);
+
+  const stats = getStats();
+  const activeFeatureCount = Object.values(appConfig.featureFlags).filter(Boolean).length;
+  const healthItems = [
+    { label: 'שאלות מאושרות', value: `${stats.validatedCount}/${stats.totalQuestions}`, color: stats.validatedCount > 0 ? Colors.success : Colors.warning },
+    { label: 'ממתינות לאישור', value: String(stats.pendingCount), color: stats.pendingCount > 0 ? Colors.warning : Colors.success },
+    { label: 'פיצ׳רים פעילים', value: `${activeFeatureCount}/${FEATURE_META.length}`, color: activeFeatureCount >= 4 ? Colors.success : Colors.warning },
+    { label: 'פעולות ביומן', value: String(activityLog.length), color: Colors.primary },
+  ];
 
   const handleSaveAnnouncement = () => {
     setAppConfig({ announcementText: announcementDraft.trim() });
@@ -68,6 +87,49 @@ export default function AppControlScreen() {
     } else {
       setAppConfig({ maintenanceMode: false });
     }
+  };
+
+  const handleApplyPreset = (preset: AppControlPreset) => {
+    const presetInfo = PRESET_META.find(p => p.key === preset);
+    Alert.alert(
+      'הפעלת פריסט',
+      `להחיל את פריסט "${presetInfo?.title ?? APP_CONTROL_PRESETS[preset].label}" על מרכז השליטה?`,
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'הפעל',
+          onPress: () => {
+            applyAppControlPreset(preset);
+            const next = APP_CONTROL_PRESETS[preset].config;
+            setAnnouncementDraft(next.announcementText);
+            setFreeSessionsInput(String(next.freeSessionsPerDay));
+            setCooldownInput(String(next.sessionCooldownMinutes));
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        },
+      ],
+    );
+  };
+
+  const handleResetConfig = () => {
+    Alert.alert(
+      'איפוס מרכז השליטה',
+      'להחזיר את מצב האפליקציה, ההכרזה, המגבלות ודגלי הפיצ׳רים לברירת מחדל?',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'אפס',
+          style: 'destructive',
+          onPress: () => {
+            resetAppConfig();
+            setAnnouncementDraft('');
+            setFreeSessionsInput('10');
+            setCooldownInput('0');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        },
+      ],
+    );
   };
 
   const announcementColor =
@@ -110,6 +172,37 @@ export default function AppControlScreen() {
         </View>
 
         {/* ── Registration ── */}
+        <Text style={styles.sectionTitle}>פריסטים תפעוליים</Text>
+        <View style={styles.presetsGrid}>
+          {PRESET_META.map(preset => (
+            <Pressable
+              key={preset.key}
+              onPress={() => handleApplyPreset(preset.key)}
+              style={({ pressed }) => [
+                styles.presetCard,
+                { borderColor: preset.tone + '55' },
+                pressed && { opacity: 0.82 },
+              ]}
+            >
+              <View style={[styles.presetIconWrap, { backgroundColor: preset.tone + '18' }]}>
+                <Text style={[styles.presetIcon, { color: preset.tone }]}>{preset.icon}</Text>
+              </View>
+              <Text style={styles.presetTitle}>{preset.title}</Text>
+              <Text style={styles.presetDesc}>{preset.desc}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>בריאות מערכת</Text>
+        <View style={styles.healthGrid}>
+          {healthItems.map(item => (
+            <View key={item.label} style={styles.healthCard}>
+              <Text style={[styles.healthValue, { color: item.color }]}>{item.value}</Text>
+              <Text style={styles.healthLabel}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>🔐 הרשמות</Text>
@@ -301,7 +394,30 @@ export default function AppControlScreen() {
         </View>
 
         {/* ── Current Status Summary ── */}
-        <Text style={styles.sectionTitle}>📋 סיכום הגדרות פעילות</Text>
+        <Text style={styles.sectionTitle}>פעולות וסיכום הגדרות</Text>
+        <View style={styles.actionsPanel}>
+          <Pressable
+            onPress={() => handleApplyPreset('maintenance')}
+            style={({ pressed }) => [styles.systemActionBtn, { borderColor: Colors.danger + '60' }, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={[styles.systemActionTitle, { color: Colors.danger }]}>כניסה מהירה לתחזוקה</Text>
+            <Text style={styles.systemActionDesc}>חוסם רישום, מכבה פיצ׳רים ומציג הודעה קריטית.</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => handleApplyPreset('normal')}
+            style={({ pressed }) => [styles.systemActionBtn, { borderColor: Colors.success + '60' }, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={[styles.systemActionTitle, { color: Colors.success }]}>חזרה לשגרה</Text>
+            <Text style={styles.systemActionDesc}>מחזיר זמינות מלאה לפי ברירת המחדל.</Text>
+          </Pressable>
+          <Pressable
+            onPress={handleResetConfig}
+            style={({ pressed }) => [styles.resetConfigBtn, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={styles.resetConfigText}>אפס את כל הגדרות מרכז השליטה</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.summaryCard}>
           {[
             { label: 'מצב תחזוקה', value: appConfig.maintenanceMode ? 'פעיל 🔴' : 'כבוי 🟢' },
@@ -357,6 +473,42 @@ const styles = StyleSheet.create({
   statusInfo: { flex: 1, alignItems: 'flex-end' },
   statusTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base },
   statusDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+
+  presetsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
+  presetCard: {
+    width: '47%',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1.5,
+    padding: 14,
+    alignItems: 'flex-end',
+    gap: 6,
+    ...Shadow.sm,
+  },
+  presetIconWrap: {
+    minWidth: 34,
+    height: 28,
+    borderRadius: Radius.full,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
+  presetTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  presetDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', lineHeight: 17 },
+
+  healthGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
+  healthCard: {
+    width: '47%',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+    alignItems: 'flex-end',
+  },
+  healthValue: { fontFamily: FontFamily.heading, fontSize: FontSize.xl },
+  healthLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
 
   card: {
     backgroundColor: Colors.surface, borderRadius: Radius.xl,
@@ -429,6 +581,35 @@ const styles = StyleSheet.create({
   limitInfo: { flex: 1, alignItems: 'flex-end' },
   limitLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
   limitDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, marginTop: 2, textAlign: 'right' },
+
+  actionsPanel: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+    gap: 10,
+    marginBottom: 12,
+    ...Shadow.sm,
+  },
+  systemActionBtn: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    backgroundColor: Colors.background,
+    padding: 12,
+    alignItems: 'flex-end',
+  },
+  systemActionTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, textAlign: 'right' },
+  systemActionDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 3 },
+  resetConfigBtn: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+    alignItems: 'center',
+  },
+  resetConfigText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textSecondary },
 
   summaryCard: {
     backgroundColor: Colors.surface, borderRadius: Radius.xl,
