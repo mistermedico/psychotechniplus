@@ -8,6 +8,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
 
+function withDefaultAppConfig(config: Partial<AppConfig>): AppConfig {
+  return {
+    ...DEFAULT_APP_CONFIG,
+    ...config,
+    featureFlags: {
+      ...DEFAULT_APP_CONFIG.featureFlags,
+      ...(config.featureFlags ?? {}),
+    },
+  };
+}
+
 export const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
 // ── Pending questions (validation queue seed) ──────────────────────────────
@@ -1210,7 +1221,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     AsyncStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(updated)).catch(() => null);
   },
 
-  clearActivityLog: () => set({ activityLog: [] }),
+  clearActivityLog: () => {
+    set({ activityLog: [] });
+    AsyncStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify([])).catch(() => null);
+  },
 
   // ── Promo Codes ────────────────────────────────────────────────────────────
   addPromoCode: (code) => {
@@ -1415,7 +1429,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         if (settings.practiceSettings) set({ practiceSettings: settings.practiceSettings });
         if (settings.examSettings) set({ examSettings: settings.examSettings });
         if (settings.freePracticeLimit) set({ freePracticeLimit: settings.freePracticeLimit });
-        if (settings.appConfig) set({ appConfig: settings.appConfig });
+        if (settings.appConfig) set({ appConfig: withDefaultAppConfig(settings.appConfig) });
       }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הגדרות', e?.message);

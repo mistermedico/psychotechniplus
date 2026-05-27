@@ -1,8 +1,9 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Animated, Platform, Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -50,6 +51,22 @@ const FREE_MODES = [
   },
 ];
 
+const PRACTICE_USAGE_KEY = '@psychotechniplus/practiceUsage';
+
+interface PracticeUsage {
+  date: string;
+  count: number;
+  lastStartedAt: string | null;
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function emptyUsage(): PracticeUsage {
+  return { date: todayKey(), count: 0, lastStartedAt: null };
+}
+
 export default function PracticeTab() {
   const [activeTab, setActiveTab] = useState<PracticeTab>('free');
   const [selectedMode, setSelectedMode] = useState('practice');
@@ -58,10 +75,11 @@ export default function PracticeTab() {
   const tabAnim = useRef(new Animated.Value(0)).current;
   const indicatorLeft = tabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '50%'] });
 
-  const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium } = useUserStore();
+  const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, userId } = useUserStore();
   const { freePracticeLimit, templates, appConfig, practiceSettings } = useAdminStore();
   const featureFlags = appConfig.featureFlags;
   const premiumOnlyModes = practiceSettings.premiumOnlyModes;
+  const [usage, setUsage] = useState<PracticeUsage>(emptyUsage);
 
   const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
   const topics = TOPICS.filter(t => t.targetId === target.id);
@@ -70,6 +88,63 @@ export default function PracticeTab() {
     () => templates.filter(t => t.isActive && t.targetId === target.id),
     [templates, target.id]
   );
+
+  const enabledModes = useMemo(
+    () => FREE_MODES.filter(mode => mode.id !== 'speed' || featureFlags.speedMode !== false),
+    [featureFlags.speedMode]
+  );
+
+  useEffect(() => {
+    if (enabledModes.some(mode => mode.id === selectedMode)) return;
+    setSelectedMode(enabledModes[0]?.id ?? 'practice');
+  }, [enabledModes, selectedMode]);
+
+  useEffect(() => {
+    if (!userId) return;
+    AsyncStorage.getItem(`${PRACTICE_USAGE_KEY}:${userId}`)
+      .then(raw => {
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as PracticeUsage;
+        setUsage(parsed.date === todayKey() ? parsed : emptyUsage());
+      })
+      .catch(() => null);
+  }, [userId]);
+
+  const persistUsage = async (next: PracticeUsage) => {
+    setUsage(next);
+    if (userId) {
+      await AsyncStorage.setItem(`${PRACTICE_USAGE_KEY}:${userId}`, JSON.stringify(next)).catch(() => null);
+    }
+  };
+
+  const getFreeUsageBlock = () => {
+    if (isPremium) return null;
+    const dailyLimit = Math.max(1, appConfig.freeSessionsPerDay);
+    const currentUsage = usage.date === todayKey() ? usage : emptyUsage();
+    if (currentUsage.count >= dailyLimit) {
+      return `הגעת למגבלת ${dailyLimit} סשנים חינמיים להיום. אפשר לשדרג לפרימיום או לחזור מחר.`;
+    }
+    if (appConfig.sessionCooldownMinutes > 0 && currentUsage.lastStartedAt) {
+      const lastStarted = new Date(currentUsage.lastStartedAt).getTime();
+      const nextAllowed = lastStarted + appConfig.sessionCooldownMinutes * 60 * 1000;
+      const remainingMs = nextAllowed - Date.now();
+      if (remainingMs > 0) {
+        const remainingMinutes = Math.ceil(remainingMs / 60000);
+        return `יש להמתין עוד ${remainingMinutes} דקות לפני סשן חינמי נוסף.`;
+      }
+    }
+    return null;
+  };
+
+  const consumeFreeUsage = () => {
+    if (isPremium) return;
+    const currentUsage = usage.date === todayKey() ? usage : emptyUsage();
+    persistUsage({
+      date: todayKey(),
+      count: currentUsage.count + 1,
+      lastStartedAt: new Date().toISOString(),
+    });
+  };
 
   const switchTab = (tab: PracticeTab) => {
     Haptics.selectionAsync();
@@ -84,6 +159,14 @@ export default function PracticeTab() {
 
   const handleStartFree = () => {
     if (!selectedTopicId) return;
+    const usageBlock = getFreeUsageBlock();
+    if (usageBlock) {
+      Alert.alert('מגבלת תרגול חינמי', usageBlock, [
+        { text: 'שדרג', onPress: () => router.push('/paywall') },
+        { text: 'בסדר', style: 'cancel' },
+      ]);
+      return;
+    }
     // Check if mode is premium-only
     if (premiumOnlyModes.includes(selectedMode) && !isPremium) {
       Alert.alert(
@@ -97,6 +180,7 @@ export default function PracticeTab() {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    consumeFreeUsage();
     router.push({
       pathname: '/practice-session',
       params: {
@@ -176,6 +260,10 @@ export default function PracticeTab() {
             canStart={selectedTopicId !== null}
             onStart={handleStartFree}
             showSpeedMode={featureFlags.speedMode}
+            dailyLimit={appConfig.freeSessionsPerDay}
+            dailyUsed={usage.date === todayKey() ? usage.count : 0}
+            cooldownMinutes={appConfig.sessionCooldownMinutes}
+            usageBlock={getFreeUsageBlock()}
           />
         ) : featureFlags.simulations !== false ? (
           <SimulationsPane
@@ -202,6 +290,7 @@ function FreePracticePane({
   selectedDifficulty, setSelectedDifficulty,
   getTopicAccuracy, getTopicLevelLabel,
   isPremium, freePracticeLimit, canStart, onStart, showSpeedMode,
+  dailyLimit, dailyUsed, cooldownMinutes, usageBlock,
 }: {
   topics: typeof TOPICS;
   selectedMode: string; setSelectedMode: (m: string) => void;
@@ -212,6 +301,10 @@ function FreePracticePane({
   isPremium: boolean; freePracticeLimit: number;
   canStart: boolean; onStart: () => void;
   showSpeedMode?: boolean;
+  dailyLimit: number;
+  dailyUsed: number;
+  cooldownMinutes: number;
+  usageBlock: string | null;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -240,6 +333,17 @@ function FreePracticePane({
             </Pressable>
           )}
         </View>
+
+        {!isPremium && (
+          <View style={[styles.quotaCard, usageBlock && styles.quotaCardBlocked]}>
+            <Text style={styles.quotaTitle}>
+              {usageBlock ? 'מגבלת תרגול פעילה' : `נותרו ${Math.max(0, dailyLimit - dailyUsed)} מתוך ${dailyLimit} סשנים היום`}
+            </Text>
+            <Text style={styles.quotaText}>
+              {usageBlock ?? `כל סשן חינמי מוגבל לעד ${freePracticeLimit} שאלות${cooldownMinutes > 0 ? `, עם המתנה של ${cooldownMinutes} דקות בין סשנים` : ''}.`}
+            </Text>
+          </View>
+        )}
 
         {/* Mode label */}
         <Text style={styles.sectionLabel}>מצב תרגול</Text>
@@ -385,16 +489,18 @@ function FreePracticePane({
       <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom + 4, 20) }]}>
         <Pressable
           onPress={onStart}
-          disabled={!canStart}
-          style={({ pressed }) => [{ opacity: pressed && canStart ? 0.75 : 1 }]}
+          disabled={!canStart || !!usageBlock}
+          style={({ pressed }) => [{ opacity: pressed && canStart && !usageBlock ? 0.75 : 1 }]}
         >
           <LinearGradient
-            colors={canStart ? Colors.gradients.primary : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.06)']}
+            colors={canStart && !usageBlock ? Colors.gradients.primary : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.06)']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={[styles.startBtn, !canStart && { shadowOpacity: 0 }]}
+            style={[styles.startBtn, (!canStart || !!usageBlock) && { shadowOpacity: 0 }]}
           >
-            <Text style={[styles.startBtnText, !canStart && { color: 'rgba(255,255,255,0.4)' }]}>
-              {canStart
+            <Text style={[styles.startBtnText, (!canStart || !!usageBlock) && { color: 'rgba(255,255,255,0.4)' }]}>
+              {usageBlock
+                ? 'מגבלת שימוש חינמי פעילה'
+                : canStart
                 ? `התחל תרגול ← (${isPremium ? 'ללא הגבלה' : `עד ${freePracticeLimit}`})`
                 : 'בחר נושא להתחלה'}
             </Text>
@@ -654,6 +760,34 @@ const styles = StyleSheet.create({
   upgradeChipText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
 
   /* ── Section label ── */
+  quotaCard: {
+    backgroundColor: 'rgba(124,111,247,0.12)',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.3)',
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'flex-end',
+  },
+  quotaCardBlocked: {
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderColor: 'rgba(239,68,68,0.35)',
+  },
+  quotaTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: '#F1F5F9',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  quotaText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.65)',
+    textAlign: 'right',
+    lineHeight: 18,
+  },
+
   sectionLabel: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
