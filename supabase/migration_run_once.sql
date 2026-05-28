@@ -59,5 +59,74 @@ begin
 end;
 $$ language plpgsql;
 
+-- 5. Practice analytics sync: indexes + admin monitor views
+create index if not exists practice_sessions_completed_at_idx on practice_sessions(completed_at desc);
+create index if not exists practice_sessions_user_id_idx on practice_sessions(user_id);
+create index if not exists practice_sessions_topic_id_idx on practice_sessions(topic_id);
+create index if not exists practice_sessions_template_id_idx on practice_sessions(template_id);
+
+create or replace view practice_answer_events as
+select
+  ps.id as session_id,
+  ps.user_id,
+  ps.user_name,
+  ps.target_id,
+  ps.topic_id as session_topic_id,
+  ps.mode,
+  ps.template_id,
+  ps.template_name,
+  ps.started_at,
+  ps.completed_at,
+  (answer_item.value ->> 'questionId') as question_id,
+  coalesce(answer_item.value ->> 'selectedAnswerId', '') as selected_answer_id,
+  coalesce(answer_item.value ->> 'correctAnswerId', q.correct_answer) as correct_answer_id,
+  coalesce((answer_item.value ->> 'isCorrect')::boolean, false) as is_correct,
+  coalesce((answer_item.value ->> 'isSkipped')::boolean, false) as is_skipped,
+  coalesce((answer_item.value ->> 'timeSpent')::int, 0) as time_spent_seconds,
+  coalesce((answer_item.value ->> 'difficulty')::int, q.difficulty, 5) as difficulty,
+  q.topic_id as question_topic_id,
+  q.question_type,
+  q.question_text
+from practice_sessions ps
+cross join lateral jsonb_array_elements(coalesce(ps.answers, '[]'::jsonb)) with ordinality as answer_item(value, answer_index)
+left join questions q on q.id = answer_item.value ->> 'questionId';
+
+create or replace view question_usage_stats as
+select
+  question_id,
+  max(question_text) as question_text,
+  max(question_topic_id) as topic_id,
+  count(*)::int as attempts,
+  sum(case when is_correct then 1 else 0 end)::int as correct_count,
+  sum(case when is_skipped then 1 else 0 end)::int as skipped_count,
+  round(avg(time_spent_seconds))::int as avg_time_seconds,
+  round(100.0 * avg(case when is_correct then 1 else 0 end))::int as correct_rate
+from practice_answer_events
+where question_id is not null
+group by question_id;
+
+create or replace view topic_usage_stats as
+select
+  coalesce(question_topic_id, session_topic_id) as topic_id,
+  count(*)::int as attempts,
+  sum(case when is_correct then 1 else 0 end)::int as correct_count,
+  sum(case when is_skipped then 1 else 0 end)::int as skipped_count,
+  round(avg(time_spent_seconds))::int as avg_time_seconds,
+  round(100.0 * avg(case when is_correct then 1 else 0 end))::int as correct_rate
+from practice_answer_events
+group by coalesce(question_topic_id, session_topic_id);
+
+create or replace view exam_usage_stats as
+select
+  coalesce(template_id, mode) as exam_key,
+  max(coalesce(template_name, mode)) as exam_name,
+  count(distinct session_id)::int as sessions,
+  sum(case when is_correct then 1 else 0 end)::int as correct_count,
+  count(*)::int as attempts,
+  round(avg(time_spent_seconds))::int as avg_time_seconds,
+  round(100.0 * avg(case when is_correct then 1 else 0 end))::int as correct_rate
+from practice_answer_events
+group by coalesce(template_id, mode);
+
 -- סיום — הכל בוצע בהצלחה ✓
 select 'migration completed successfully' as status;

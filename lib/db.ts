@@ -471,6 +471,12 @@ export interface SessionRecord {
 export async function saveSessionRecord(record: SessionRecord): Promise<void> {
   if (!record.userId) { logger.error('db:saveSessionRecord', 'userId חסר — סשן לא נשמר'); return; }
   try {
+    await supabase.from('user_profiles').upsert({
+      id: record.userId,
+      name: record.userName ?? '',
+      updated_at: new Date().toISOString(),
+    });
+
     const { error } = await supabase.from('practice_sessions').upsert({
       id: record.id,
       user_id: record.userId,
@@ -510,7 +516,7 @@ export async function loadUserSessionHistory(userId: string, limit = 50): Promis
   }
 }
 
-export async function loadAllSessionHistory(limit = 200): Promise<SessionRecord[]> {
+export async function loadAllSessionHistory(limit = 500): Promise<SessionRecord[]> {
   try {
     const { data } = await supabase
       .from('practice_sessions')
