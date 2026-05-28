@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Switch, TextInput, Alert, Modal,
@@ -8,6 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, AppConfig, AppControlPreset, APP_CONTROL_PRESETS } from '../../store/adminStore';
+import { DEFAULT_PURCHASE_PACKAGES, USE_REAL_PURCHASES } from '../../lib/purchases';
+import { usePurchaseStore } from '../../store/purchaseStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -38,6 +40,7 @@ export default function AppControlScreen() {
     appConfig, setAppConfig, setFeatureFlag,
     applyAppControlPreset, resetAppConfig, getStats, activityLog,
   } = useAdminStore();
+  const { packages, fetchOfferings } = usePurchaseStore();
 
   const [announcementDraft, setAnnouncementDraft] = useState(appConfig.announcementText);
   const [freeSessionsInput, setFreeSessionsInput] = useState(String(appConfig.freeSessionsPerDay));
@@ -45,6 +48,7 @@ export default function AppControlScreen() {
   const [showPreview, setShowPreview] = useState(false);
 
   const stats = getStats();
+  const billingPackages = packages.length > 0 ? packages : DEFAULT_PURCHASE_PACKAGES;
   const activeFeatureCount = Object.values(appConfig.featureFlags).filter(Boolean).length;
   const healthItems = [
     { label: 'שאלות מאושרות', value: `${stats.validatedCount}/${stats.totalQuestions}`, color: stats.validatedCount > 0 ? Colors.success : Colors.warning },
@@ -136,6 +140,12 @@ export default function AppControlScreen() {
     appConfig.announcementLevel === 'critical' ? Colors.danger :
     appConfig.announcementLevel === 'warning' ? Colors.warning : Colors.primary;
 
+  useEffect(() => {
+    if (packages.length === 0) {
+      fetchOfferings().catch(() => null);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
@@ -201,6 +211,28 @@ export default function AppControlScreen() {
               <Text style={styles.healthLabel}>{item.label}</Text>
             </View>
           ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>תוכניות ומחירים</Text>
+        <View style={styles.billingPanel}>
+          <View style={styles.billingHeader}>
+            <Text style={styles.billingMode}>{USE_REAL_PURCHASES ? 'RevenueCat פעיל' : 'מצב פיתוח'}</Text>
+            <Text style={styles.billingTitle}>מקור המחירים של הנחיתה וה-Paywall</Text>
+          </View>
+          {billingPackages.map(pkg => (
+            <View key={pkg.identifier} style={styles.billingPlanRow}>
+              <View style={styles.billingPlanInfo}>
+                <Text style={styles.billingPlanName}>{pkg.description}</Text>
+                <Text style={styles.billingProductId}>{pkg.productIdentifier}</Text>
+              </View>
+              <View style={styles.billingPricePill}>
+                <Text style={styles.billingPriceText}>{pkg.priceString}</Text>
+              </View>
+            </View>
+          ))}
+          <Text style={styles.billingNote}>
+            שינוי מחיר אמיתי מתבצע בחנות/RevenueCat. האפליקציה מציגה כאן את אותו מקור נתונים כדי למנוע פערים במסכים.
+          </Text>
         </View>
 
         <View style={styles.card}>
@@ -509,6 +541,50 @@ const styles = StyleSheet.create({
   },
   healthValue: { fontFamily: FontFamily.heading, fontSize: FontSize.xl },
   healthLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
+
+  billingPanel: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.borderGlow,
+    padding: 14,
+    gap: 10,
+    ...Shadow.sm,
+  },
+  billingHeader: { alignItems: 'flex-end', gap: 4 },
+  billingTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  billingMode: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.primaryLight,
+    backgroundColor: Colors.primaryLighter,
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+  billingPlanRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+  },
+  billingPlanInfo: { flex: 1, alignItems: 'flex-end' },
+  billingPlanName: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  billingProductId: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'right', marginTop: 3 },
+  billingPricePill: {
+    backgroundColor: Colors.primaryLighter,
+    borderRadius: Radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  billingPriceText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primaryLight },
+  billingNote: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', lineHeight: 18 },
 
   card: {
     backgroundColor: Colors.surface, borderRadius: Radius.xl,

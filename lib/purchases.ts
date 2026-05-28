@@ -55,7 +55,7 @@ export interface CustomerInfo {
 
 // ─── Mock data (shown in dev / simulator) ────────────────────────────────────
 
-const MOCK_PACKAGES: PurchasePackage[] = [
+export const DEFAULT_PURCHASE_PACKAGES: PurchasePackage[] = [
   {
     identifier: 'weekly',
     productIdentifier: PRODUCT_IDS.weekly,
@@ -119,11 +119,11 @@ export async function identifyUser(userId: string): Promise<void> {
 }
 
 export async function getOfferings(): Promise<PurchasePackage[]> {
-  if (!USE_REAL_PURCHASES) return MOCK_PACKAGES;
+  if (!USE_REAL_PURCHASES) return DEFAULT_PURCHASE_PACKAGES;
   // Real:
   // const offerings = await Purchases.getOfferings();
   // return (offerings.current?.availablePackages ?? []).map(mapPackage);
-  return MOCK_PACKAGES;
+  return DEFAULT_PURCHASE_PACKAGES;
 }
 
 export async function purchasePackage(

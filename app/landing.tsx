@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
+import { DEFAULT_PURCHASE_PACKAGES } from '../lib/purchases';
+import { usePurchaseStore } from '../store/purchaseStore';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 
@@ -77,6 +79,8 @@ const TESTIMONIALS = [
 ];
 
 export default function LandingScreen() {
+  const { packages, loadError, fetchOfferings } = usePurchaseStore();
+
   // Animation refs
   const navOpacity    = useRef(new Animated.Value(0)).current;
   const heroOpacity   = useRef(new Animated.Value(0)).current;
@@ -95,8 +99,13 @@ export default function LandingScreen() {
   const ctaOpacity    = useRef(new Animated.Value(0)).current;
   const ctaSlide      = useRef(new Animated.Value(16)).current;
   const ctaPressScale = useRef(new Animated.Value(1)).current;
+  const visiblePackages = packages.length > 0 ? packages : DEFAULT_PURCHASE_PACKAGES;
 
   useEffect(() => {
+    if (packages.length === 0) {
+      fetchOfferings().catch(() => null);
+    }
+
     Animated.sequence([
       Animated.timing(navOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.parallel([
@@ -130,6 +139,18 @@ export default function LandingScreen() {
       ]),
     ]).start();
   }, []); // eslint-disable-line
+
+  const getPlanPeriod = (identifier: string) => {
+    if (identifier === 'weekly') return 'לשבוע';
+    if (identifier === 'monthly') return 'לחודש';
+    return 'חד-פעמי';
+  };
+
+  const getPlanBadge = (identifier: string) => {
+    if (identifier === 'monthly') return 'הכי פופולרי';
+    if (identifier === 'lifetime') return 'ללא מנוי מתחדש';
+    return 'גמיש';
+  };
 
   const handleStart = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -342,6 +363,11 @@ export default function LandingScreen() {
               </View>
               <Text style={styles.sectionTitle}>בחר את התוכנית שלך</Text>
             </View>
+            {loadError && packages.length === 0 && (
+              <Text style={styles.pricingSyncNote}>
+                מוצגים מחירי ברירת המחדל עד שהחנות נטענת.
+              </Text>
+            )}
             <View style={styles.pricingRow}>
               {/* Free plan */}
               <View style={styles.pricingCard}>
@@ -359,25 +385,27 @@ export default function LandingScreen() {
                 </View>
               </View>
 
-              {/* Premium plan */}
-              <View style={[styles.pricingCard, styles.pricingCardPremium]}>
-                <LinearGradient
-                  colors={Colors.gradients.primary}
-                  style={styles.pricingPremiumHeader}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                >
-                  <Text style={styles.pricingPremiumName}>פרמיום 💎</Text>
-                  <Text style={styles.pricingPremiumPrice}>₪49 לחודש</Text>
-                </LinearGradient>
-                <View style={styles.pricingFeatures}>
-                  {['כל הנושאים', 'סימולציות מלאות', 'אנליטיקס מלא', 'תמיכה'].map(f => (
-                    <View key={f} style={styles.pricingFeatureRow}>
-                      <Text style={[styles.pricingFeatureDot, { color: Colors.primary }]}>✓</Text>
-                      <Text style={[styles.pricingFeatureText, { color: Colors.text }]}>{f}</Text>
-                    </View>
-                  ))}
+              {visiblePackages.map(pkg => (
+                <View key={pkg.identifier} style={[styles.pricingCard, styles.pricingCardPremium]}>
+                  <LinearGradient
+                    colors={Colors.gradients.primary}
+                    style={styles.pricingPremiumHeader}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.pricingPremiumName}>{pkg.description}</Text>
+                    <Text style={styles.pricingPremiumPrice}>{pkg.priceString} {getPlanPeriod(pkg.identifier)}</Text>
+                    <Text style={styles.pricingBadge}>{getPlanBadge(pkg.identifier)}</Text>
+                  </LinearGradient>
+                  <View style={styles.pricingFeatures}>
+                    {['כל הנושאים', 'סימולציות מלאות', 'אנליטיקס מלא', pkg.isSubscription ? 'מנוי מתחדש' : 'תשלום חד פעמי'].map(f => (
+                      <View key={f} style={styles.pricingFeatureRow}>
+                        <Text style={[styles.pricingFeatureDot, { color: Colors.primary }]}>✓</Text>
+                        <Text style={[styles.pricingFeatureText, { color: Colors.text }]}>{f}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              ))}
             </View>
           </Animated.View>
 
@@ -676,9 +704,10 @@ const styles = StyleSheet.create({
 
   // Pricing
   pricingSection: { paddingHorizontal: 20, marginBottom: 36 },
-  pricingRow: { flexDirection: 'row-reverse', gap: 12 },
+  pricingRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12 },
   pricingCard: {
-    flex: 1,
+    flexBasis: '47%',
+    flexGrow: 1,
     backgroundColor: Colors.surfaceCard,
     borderRadius: Radius.xl,
     overflow: 'hidden',
@@ -710,6 +739,21 @@ const styles = StyleSheet.create({
   pricingPremiumPrice: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
     color: 'rgba(255,255,255,0.80)', textAlign: 'right', marginTop: 2,
+  },
+  pricingBadge: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: '#fff',
+    textAlign: 'right',
+    marginTop: 5,
+    opacity: 0.9,
+  },
+  pricingSyncNote: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.warning,
+    textAlign: 'right',
+    marginBottom: 10,
   },
   pricingFeatures: { padding: 14, gap: 8, alignItems: 'flex-end' },
   pricingFeatureRow: { flexDirection: 'row-reverse', gap: 6, alignItems: 'center' },
