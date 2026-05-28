@@ -370,6 +370,8 @@ export default function PracticeSession() {
       completedAt: new Date().toISOString(),
       answers: finished.answers.map((a: any) => ({
         questionId: a.questionId,
+        selectedAnswerId: a.selectedAnswerId,
+        correctAnswerId: finished.questions.find(q => q.id === a.questionId)?.correctAnswer,
         isCorrect: a.isCorrect,
         isSkipped: a.isSkipped ?? false,
         timeSpent: a.timeSpent,

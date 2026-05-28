@@ -40,6 +40,7 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'display-settings',  icon: '🎨', label: 'תצוגה',            desc: 'ממשק שאלות',             route: '/admin/display-settings',    category: 'exams' },
   // Users
   { id: 'users',              icon: '👥', label: 'משתמשים',         desc: 'צפייה, שדרוג',           route: '/admin/users',               category: 'users' },
+  { id: 'monitor',            icon: '🛰️', label: 'מוניטור',         desc: 'שאלות, פרקים ומבחנים',    route: '/admin/monitor',             category: 'users' },
   { id: 'leaderboard-admin',  icon: '🏅', label: 'לוח מובילים',     desc: 'ניהול דירוג',            route: '/admin/leaderboard-admin',   category: 'users' },
   // Business
   { id: 'revenue',            icon: '📈', label: 'הכנסות',           desc: 'MRR ומנויים',            route: '/admin/revenue',             category: 'business' },
@@ -76,6 +77,7 @@ const QUICK_ACTIONS = [
   { icon: '✅', label: 'אמת שאלות', route: '/admin/validate' },
   { icon: '➕', label: 'הוסף שאלה', route: '/admin/question-editor?mode=add' },
   { icon: '📈', label: 'ביצועים',    route: '/admin/performance' },
+  { icon: '🛰️', label: 'מוניטור',    route: '/admin/monitor' },
   { icon: '👥', label: 'משתמשים',   route: '/admin/users' },
   { icon: '📤', label: 'ייצא',        route: '/admin/export' },
   { icon: '🔔', label: 'שלח הודעה',  route: '/admin/notifications' },

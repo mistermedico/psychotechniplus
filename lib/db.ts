@@ -459,6 +459,8 @@ export interface SessionRecord {
   completedAt: string;
   answers: Array<{
     questionId: string;
+    selectedAnswerId?: string;
+    correctAnswerId?: string;
     isCorrect: boolean;
     isSkipped: boolean;
     timeSpent: number;

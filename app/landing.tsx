@@ -4,6 +4,7 @@ import {
   Animated, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
@@ -171,19 +172,26 @@ export default function LandingScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Ambient orbs */}
+      <LinearGradient colors={['#050816', '#0B1024', '#111827']} style={StyleSheet.absoluteFill} />
+      <View style={styles.meshGrid} />
       <View style={styles.orbPurple} />
       <View style={styles.orbPink} />
       <View style={styles.orbCyan} />
+      <View style={styles.orbGold} />
 
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
 
         {/* ─── Nav Bar ─── */}
-        <Animated.View style={[styles.navBar, { opacity: navOpacity }]}>
-          <Pressable onPress={handleLogin} style={styles.navLogin}>
-            <Text style={styles.navLoginText}>כניסה</Text>
-          </Pressable>
-          <Text style={styles.navAppName}>PsychoTechniPlus</Text>
+        <Animated.View style={[styles.navShell, { opacity: navOpacity }]}>
+          <BlurView intensity={26} tint="dark" style={styles.navBar}>
+            <Pressable onPress={handleLogin} style={styles.navLogin}>
+              <Text style={styles.navLoginText}>כניסה</Text>
+            </Pressable>
+            <View style={styles.navBrand}>
+              <Text style={styles.navBrandMark}>PT+</Text>
+              <Text style={styles.navAppName}>PsychoTechniPlus</Text>
+            </View>
+          </BlurView>
         </Animated.View>
 
         <ScrollView
@@ -204,7 +212,7 @@ export default function LandingScreen() {
                 style={styles.heroBadgeGrad}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.heroBadgeText}>🏆 הכנה לפסיכוטכני</Text>
+                <Text style={styles.heroBadgeText}>מערכת הכנה חכמה לפסיכוטכני</Text>
               </LinearGradient>
             </View>
 
@@ -221,8 +229,29 @@ export default function LandingScreen() {
             </View>
 
             <Text style={styles.appName}>פסיכוטכניPlus</Text>
-            <Text style={styles.tagline}>הדרך החכמה ביותר להגיע לציון שרצית</Text>
+            <Text style={styles.tagline}>הדרך החכמה להגיע לציון שרצית, עם אימון שנראה ומרגיש כמו מוצר פרימיום.</Text>
             <Text style={styles.subTagline}>מנוע אדפטיבי · תרגול חכם · סימולציות מלאות</Text>
+
+            <View style={styles.heroPreview}>
+              <BlurView intensity={28} tint="dark" style={styles.heroPreviewBlur}>
+                <View style={styles.previewHeader}>
+                  <Text style={styles.previewPill}>LIVE ELO</Text>
+                  <Text style={styles.previewTitle}>דיוק אימון בזמן אמת</Text>
+                </View>
+                <View style={styles.previewScoreRow}>
+                  <Text style={styles.previewScore}>87%</Text>
+                  <View style={styles.previewGraph}>
+                    {[42, 58, 49, 76, 64, 88].map((h, i) => (
+                      <View key={i} style={[styles.previewBar, { height: h }]} />
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.previewFooter}>
+                  <Text style={styles.previewFooterText}>חולשה מזוהה: סדרות כמותיות</Text>
+                  <Text style={styles.previewFooterBadge}>תוכנית חדשה נבנתה</Text>
+                </View>
+              </BlurView>
+            </View>
 
             {/* Primary CTA */}
             <Animated.View style={[styles.ctaPrimaryWrap, { transform: [{ scale: ctaPressScale }] }]}>
@@ -460,35 +489,66 @@ export default function LandingScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
+  root: { flex: 1, backgroundColor: '#050816' },
+  meshGrid: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.22,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
 
   // Ambient orbs
   orbPurple: {
     position: 'absolute', width: 360, height: 360,
-    borderRadius: 180, backgroundColor: Colors.primaryGlow,
-    top: -90, left: -90, opacity: 0.20,
+    borderRadius: 180, backgroundColor: Colors.primary,
+    top: -90, left: -90, opacity: 0.22,
   },
   orbPink: {
     position: 'absolute', width: 280, height: 280,
-    borderRadius: 140, backgroundColor: Colors.accentGlow,
-    top: 220, right: -110, opacity: 0.13,
+    borderRadius: 140, backgroundColor: Colors.accent,
+    top: 220, right: -110, opacity: 0.15,
   },
   orbCyan: {
     position: 'absolute', width: 220, height: 220,
-    borderRadius: 110, backgroundColor: Colors.cyanGlow,
-    bottom: 300, left: -70, opacity: 0.08,
+    borderRadius: 110, backgroundColor: Colors.cyan,
+    bottom: 300, left: -70, opacity: 0.13,
+  },
+  orbGold: {
+    position: 'absolute', width: 190, height: 190,
+    borderRadius: 95, backgroundColor: Colors.warning,
+    bottom: 70, right: -80, opacity: 0.10,
   },
 
   // Nav Bar
+  navShell: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: Radius.full,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.13)',
+  },
   navBar: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: 'rgba(8,10,18,0.85)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(8,10,18,0.42)',
+  },
+  navBrand: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  navBrandMark: {
+    fontFamily: FontFamily.bold,
+    fontSize: 11,
+    color: '#fff',
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.full,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    overflow: 'hidden',
   },
   navAppName: {
     fontFamily: FontFamily.bold,
@@ -500,9 +560,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryLighter,
+    backgroundColor: 'rgba(124,111,247,0.18)',
     borderWidth: 1,
-    borderColor: Colors.borderGlow,
+    borderColor: 'rgba(255,255,255,0.16)',
   },
   navLoginText: {
     fontFamily: FontFamily.medium,
@@ -515,7 +575,7 @@ const styles = StyleSheet.create({
   // Hero
   hero: {
     alignItems: 'center',
-    paddingTop: 40,
+    paddingTop: 34,
     paddingBottom: 32,
     paddingHorizontal: 24,
   },
@@ -524,7 +584,8 @@ const styles = StyleSheet.create({
   heroBadgeGrad: {
     paddingHorizontal: 18, paddingVertical: 8,
     borderRadius: Radius.full,
-    borderWidth: 1, borderColor: Colors.borderGlow,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   heroBadgeText: {
     fontFamily: FontFamily.medium, fontSize: FontSize.xs,
@@ -544,20 +605,69 @@ const styles = StyleSheet.create({
   },
 
   appName: {
-    fontFamily: FontFamily.heading, fontSize: 38, color: Colors.text,
+    fontFamily: FontFamily.heading, fontSize: 40, color: Colors.text,
     textAlign: 'center', letterSpacing: -1,
     marginBottom: 10,
   },
   tagline: {
     fontFamily: FontFamily.regular, fontSize: FontSize.base,
     color: Colors.textSecondary, textAlign: 'center',
-    lineHeight: 24, maxWidth: 290,
+    lineHeight: 25, maxWidth: 330,
     marginBottom: 6,
   },
   subTagline: {
     fontFamily: FontFamily.medium, fontSize: FontSize.xs,
     color: Colors.textTertiary, textAlign: 'center',
-    letterSpacing: 0.3, marginBottom: 28,
+    letterSpacing: 0.3, marginBottom: 22,
+  },
+
+  heroPreview: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: Radius['2xl'],
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    marginBottom: 22,
+    ...Shadow.primary,
+  },
+  heroPreviewBlur: {
+    padding: 16,
+    backgroundColor: 'rgba(15,23,42,0.42)',
+  },
+  previewHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  previewTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#F8FAFC', textAlign: 'right' },
+  previewPill: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.cyan,
+    backgroundColor: 'rgba(34,211,238,0.12)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+  previewScoreRow: { flexDirection: 'row-reverse', alignItems: 'flex-end', gap: 16 },
+  previewScore: { fontFamily: FontFamily.heading, fontSize: 46, color: Colors.success },
+  previewGraph: { flex: 1, flexDirection: 'row-reverse', alignItems: 'flex-end', gap: 7, height: 96 },
+  previewBar: {
+    flex: 1,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(124,111,247,0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  previewFooter: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 14 },
+  previewFooterText: { flex: 1, fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: '#CBD5E1', textAlign: 'right' },
+  previewFooterBadge: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: '#111827',
+    backgroundColor: Colors.warning,
+    borderRadius: Radius.full,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    overflow: 'hidden',
   },
 
   // CTA in hero
@@ -588,9 +698,9 @@ const styles = StyleSheet.create({
   // Stats
   statsCard: {
     flexDirection: 'row-reverse',
-    backgroundColor: Colors.surfaceCard,
+    backgroundColor: 'rgba(15,23,42,0.64)',
     marginHorizontal: 20, borderRadius: Radius.xl, padding: 20,
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     marginBottom: 36,
     ...Shadow.md,
   },
@@ -609,10 +719,10 @@ const styles = StyleSheet.create({
   sectionHeader: { marginBottom: 18, alignItems: 'flex-end' },
   sectionTag: {
     alignSelf: 'flex-end',
-    backgroundColor: Colors.primaryLighter,
+    backgroundColor: 'rgba(124,111,247,0.18)',
     borderRadius: Radius.full,
     paddingHorizontal: 12, paddingVertical: 5,
-    borderWidth: 1, borderColor: Colors.borderGlow,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)',
     marginBottom: 8,
   },
   sectionTagText: {
@@ -629,9 +739,9 @@ const styles = StyleSheet.create({
   howSteps: { flexDirection: 'row-reverse', gap: 10 },
   howStep: {
     flex: 1,
-    backgroundColor: Colors.surfaceCard,
+    backgroundColor: 'rgba(15,23,42,0.66)',
     borderRadius: Radius.xl, padding: 14,
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)',
     alignItems: 'flex-end',
   },
   howIconWrap: {
@@ -659,9 +769,9 @@ const styles = StyleSheet.create({
   featuresGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
   featureCard: {
     width: (W - 50) / 2,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(15,23,42,0.66)',
     borderRadius: Radius.xl, padding: 16,
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)',
     alignItems: 'flex-end',
   },
   featureIconWrap: {
@@ -686,7 +796,7 @@ const styles = StyleSheet.create({
     width: W * 0.78,
     borderRadius: Radius.xl,
     overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.borderGlow,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)',
   },
   testimonialGrad: { padding: 20 },
   testimonialStars: {
@@ -708,13 +818,13 @@ const styles = StyleSheet.create({
   pricingCard: {
     flexBasis: '47%',
     flexGrow: 1,
-    backgroundColor: Colors.surfaceCard,
+    backgroundColor: 'rgba(15,23,42,0.70)',
     borderRadius: Radius.xl,
     overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   pricingCardPremium: {
-    borderColor: Colors.borderGlow,
+    borderColor: 'rgba(124,111,247,0.55)',
     ...Shadow.primary,
   },
   pricingHeader: {
