@@ -1,59 +1,38 @@
-/**
- * RevenueCat integration layer.
- *
- * DEV MODE: all functions are mocked — purchases always succeed, checkStatus returns false.
- *
- * TO GO LIVE:
- *  1. npx expo install react-native-purchases
- *  2. Set REVENUECAT_API_KEY_IOS / ANDROID below (from RevenueCat dashboard)
- *  3. Set USE_REAL_PURCHASES = true
- *  4. In RevenueCat dashboard, create an "Offering" called "default" with 3 packages:
- *       - identifier: "weekly"    → product: com.psychotechniplus.premium.weekly  (1-week sub)
- *       - identifier: "monthly"   → product: com.psychotechniplus.premium.monthly (1-month sub)
- *       - identifier: "lifetime"  → product: com.psychotechniplus.premium.lifetime (non-renewing)
- *  5. Create an Entitlement called "premium" and attach all 3 products to it.
- */
+import { Platform } from 'react-native';
+import Purchases, {
+  LOG_LEVEL,
+  type CustomerInfo as RevenueCatCustomerInfo,
+  type PurchasesPackage,
+} from 'react-native-purchases';
+import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+export const USE_REAL_PURCHASES = true;
 
-export const USE_REAL_PURCHASES = false; // flip to true after installing react-native-purchases
+export const REVENUECAT_API_KEY_IOS = 'test_QEWYAtjdTugtGFWGvpOncFXuwYS';
+export const REVENUECAT_API_KEY_ANDROID = 'test_QEWYAtjdTugtGFWGvpOncFXuwYS';
 
-export const REVENUECAT_API_KEY_IOS     = 'YOUR_REVENUECAT_IOS_API_KEY';
-export const REVENUECAT_API_KEY_ANDROID = 'YOUR_REVENUECAT_ANDROID_API_KEY';
+export const PREMIUM_ENTITLEMENT = 'psychotechniplus Pro';
+export const DEFAULT_OFFERING_ID = 'default';
 
-export const PREMIUM_ENTITLEMENT = 'premium';
-
-// Product identifiers — must match exactly in App Store Connect & RevenueCat
 export const PRODUCT_IDS = {
-  weekly:   'com.psychotechniplus.premium.weekly',
-  monthly:  'com.psychotechniplus.premium.monthly',
-  lifetime: 'com.psychotechniplus.premium.lifetime',
+  weekly: 'weekly',
+  monthly: 'monthly',
+  lifetime: 'lifetime',
 } as const;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export type PurchasePackageId = keyof typeof PRODUCT_IDS;
 
 export interface PurchasePackage {
-  identifier: 'weekly' | 'monthly' | 'lifetime';
+  identifier: PurchasePackageId;
   productIdentifier: string;
-  /** Localised price in ₪ */
   price: number;
-  /** Formatted price string shown to user */
   priceString: string;
-  /** Short user-facing label */
   description: string;
   offeringIdentifier: string;
-  /** True for auto-renewing subscriptions */
   isSubscription: boolean;
 }
 
-export interface CustomerInfo {
-  entitlements: {
-    active: Record<string, { identifier: string; isActive: boolean; expirationDate: string | null }>;
-  };
-  activeSubscriptions: string[];
-}
-
-// ─── Mock data (shown in dev / simulator) ────────────────────────────────────
+export type CustomerInfo = RevenueCatCustomerInfo;
 
 export const DEFAULT_PURCHASE_PACKAGES: PurchasePackage[] = [
   {
@@ -61,8 +40,8 @@ export const DEFAULT_PURCHASE_PACKAGES: PurchasePackage[] = [
     productIdentifier: PRODUCT_IDS.weekly,
     price: 49.90,
     priceString: '₪49.90',
-    description: 'פרמיום שבועי',
-    offeringIdentifier: 'default',
+    description: 'פרימיום שבועי',
+    offeringIdentifier: DEFAULT_OFFERING_ID,
     isSubscription: true,
   },
   {
@@ -70,8 +49,8 @@ export const DEFAULT_PURCHASE_PACKAGES: PurchasePackage[] = [
     productIdentifier: PRODUCT_IDS.monthly,
     price: 99.90,
     priceString: '₪99.90',
-    description: 'פרמיום חודשי',
-    offeringIdentifier: 'default',
+    description: 'פרימיום חודשי',
+    offeringIdentifier: DEFAULT_OFFERING_ID,
     isSubscription: true,
   },
   {
@@ -80,115 +59,191 @@ export const DEFAULT_PURCHASE_PACKAGES: PurchasePackage[] = [
     price: 199.00,
     priceString: '₪199',
     description: 'גישה לצמיתות',
-    offeringIdentifier: 'default',
+    offeringIdentifier: DEFAULT_OFFERING_ID,
     isSubscription: false,
   },
 ];
 
-// ─── Real RevenueCat implementation (uncomment when USE_REAL_PURCHASES=true) ──
-//
-// import Purchases, { LOG_LEVEL } from 'react-native-purchases';
-// import { Platform } from 'react-native';
-//
-// function mapPackage(pkg: any): PurchasePackage {
-//   return {
-//     identifier: pkg.packageType === 'LIFETIME' ? 'lifetime'
-//       : pkg.packageType === 'WEEKLY' ? 'weekly' : 'monthly',
-//     productIdentifier: pkg.product.identifier,
-//     price: pkg.product.price,
-//     priceString: pkg.product.priceString,
-//     description: pkg.product.localizedTitle,
-//     offeringIdentifier: pkg.offeringIdentifier,
-//     isSubscription: pkg.packageType !== 'LIFETIME',
-//   };
-// }
+let configured = false;
+let latestCustomerInfo: RevenueCatCustomerInfo | null = null;
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+const isRevenueCatSupported = Platform.OS === 'ios' || Platform.OS === 'android';
+
+function getApiKey(): string {
+  return Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
+}
+
+function normalizePackageIdentifier(pkg: PurchasesPackage): PurchasePackageId | null {
+  const raw = `${pkg.identifier} ${pkg.packageType} ${pkg.product.identifier}`.toLowerCase();
+  if (raw.includes('lifetime')) return 'lifetime';
+  if (raw.includes('monthly')) return 'monthly';
+  if (raw.includes('week')) return 'weekly';
+  return null;
+}
+
+function hasPremiumEntitlement(customerInfo: RevenueCatCustomerInfo | null | undefined): boolean {
+  return !!customerInfo?.entitlements.active[PREMIUM_ENTITLEMENT];
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error && 'message' in error) return String((error as { message?: unknown }).message);
+  return String(error);
+}
+
+function isUserCancelled(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'userCancelled' in error && Boolean((error as { userCancelled?: boolean }).userCancelled);
+}
+
+function mapPackage(pkg: PurchasesPackage): PurchasePackage | null {
+  const identifier = normalizePackageIdentifier(pkg);
+  if (!identifier) return null;
+
+  return {
+    identifier,
+    productIdentifier: pkg.product.identifier,
+    price: pkg.product.price,
+    priceString: pkg.product.priceString,
+    description: pkg.product.title || DEFAULT_PURCHASE_PACKAGES.find(item => item.identifier === identifier)?.description || identifier,
+    offeringIdentifier: pkg.offeringIdentifier,
+    isSubscription: identifier !== 'lifetime',
+  };
+}
+
+function sortPackages(packages: PurchasePackage[]): PurchasePackage[] {
+  const order: PurchasePackageId[] = ['weekly', 'monthly', 'lifetime'];
+  return [...packages].sort((a, b) => order.indexOf(a.identifier) - order.indexOf(b.identifier));
+}
 
 export async function initializePurchases(userId: string): Promise<void> {
-  if (!USE_REAL_PURCHASES) return;
-  // Real:
-  // const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
-  // Purchases.setLogLevel(LOG_LEVEL.ERROR);
-  // Purchases.configure({ apiKey, appUserID: userId });
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
+  if (!configured) {
+    Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.ERROR);
+    Purchases.configure({
+      apiKey: getApiKey(),
+      appUserID: userId,
+      preferredUILocaleOverride: 'he-IL',
+    });
+    Purchases.addCustomerInfoUpdateListener(info => {
+      latestCustomerInfo = info;
+    });
+    configured = true;
+  }
 }
 
 export async function identifyUser(userId: string): Promise<void> {
-  if (!USE_REAL_PURCHASES) return;
-  // Real: await Purchases.logIn(userId);
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
+  const result = await Purchases.logIn(userId);
+  latestCustomerInfo = result.customerInfo;
+}
+
+export async function getCustomerInfo(): Promise<RevenueCatCustomerInfo | null> {
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return latestCustomerInfo;
+  latestCustomerInfo = await Purchases.getCustomerInfo();
+  return latestCustomerInfo;
 }
 
 export async function getOfferings(): Promise<PurchasePackage[]> {
-  if (!USE_REAL_PURCHASES) return DEFAULT_PURCHASE_PACKAGES;
-  // Real:
-  // const offerings = await Purchases.getOfferings();
-  // return (offerings.current?.availablePackages ?? []).map(mapPackage);
-  return DEFAULT_PURCHASE_PACKAGES;
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return DEFAULT_PURCHASE_PACKAGES;
+  const offerings = await Purchases.getOfferings();
+  const availablePackages = offerings.current?.availablePackages ?? offerings.all[DEFAULT_OFFERING_ID]?.availablePackages ?? [];
+  const mapped = availablePackages.map(mapPackage).filter((pkg): pkg is PurchasePackage => Boolean(pkg));
+  return mapped.length > 0 ? sortPackages(mapped) : DEFAULT_PURCHASE_PACKAGES;
 }
 
 export async function purchasePackage(
   pkg: PurchasePackage,
-): Promise<{ success: boolean; customerInfo?: CustomerInfo; cancelled?: boolean; error?: string }> {
-  if (!USE_REAL_PURCHASES) {
-    // Mock: always succeeds after short delay
-    await new Promise(r => setTimeout(r, 800));
-    return {
-      success: true,
-      customerInfo: {
-        entitlements: {
-          active: {
-            [PREMIUM_ENTITLEMENT]: {
-              identifier: PREMIUM_ENTITLEMENT,
-              isActive: true,
-              expirationDate: pkg.isSubscription
-                ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-                : null,
-            },
-          },
-        },
-        activeSubscriptions: pkg.isSubscription ? [pkg.productIdentifier] : [],
-      },
-    };
+): Promise<{ success: boolean; customerInfo?: RevenueCatCustomerInfo; cancelled?: boolean; error?: string }> {
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) {
+    return { success: false, error: 'רכישות אמיתיות זמינות רק ב-iOS/Android development build.' };
   }
-  // Real:
-  // try {
-  //   const rcPkg = (await Purchases.getOfferings()).current?.availablePackages
-  //     .find(p => p.product.identifier === pkg.productIdentifier);
-  //   if (!rcPkg) return { success: false, error: 'מוצר לא נמצא' };
-  //   const { customerInfo } = await Purchases.purchasePackage(rcPkg);
-  //   return { success: true, customerInfo: customerInfo as any };
-  // } catch (e: any) {
-  //   if (e.userCancelled) return { success: false, cancelled: true };
-  //   return { success: false, error: e.message };
-  // }
-  return { success: false, error: 'Not implemented' };
+
+  try {
+    const offerings = await Purchases.getOfferings();
+    const availablePackages = [
+      ...(offerings.current?.availablePackages ?? []),
+      ...(offerings.all[DEFAULT_OFFERING_ID]?.availablePackages ?? []),
+    ];
+    const rcPackage = availablePackages.find(item => {
+      const normalized = normalizePackageIdentifier(item);
+      return normalized === pkg.identifier || item.product.identifier === pkg.productIdentifier;
+    });
+
+    if (!rcPackage) {
+      return { success: false, error: `החבילה ${pkg.identifier} לא נמצאה ב-RevenueCat Offering.` };
+    }
+
+    const result = await Purchases.purchasePackage(rcPackage);
+    latestCustomerInfo = result.customerInfo;
+    return {
+      success: hasPremiumEntitlement(result.customerInfo),
+      customerInfo: result.customerInfo,
+      error: hasPremiumEntitlement(result.customerInfo) ? undefined : `הרכישה הושלמה אבל entitlement ${PREMIUM_ENTITLEMENT} לא פעיל.`,
+    };
+  } catch (error: unknown) {
+    if (isUserCancelled(error)) return { success: false, cancelled: true };
+    return { success: false, error: getErrorMessage(error) };
+  }
 }
 
 export async function restorePurchases(): Promise<{ isPremium: boolean; error?: string }> {
-  if (!USE_REAL_PURCHASES) return { isPremium: false };
-  // Real:
-  // try {
-  //   const info = await Purchases.restorePurchases();
-  //   return { isPremium: !!info.entitlements.active[PREMIUM_ENTITLEMENT]?.isActive };
-  // } catch (e: any) {
-  //   return { isPremium: false, error: e.message };
-  // }
-  return { isPremium: false };
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return { isPremium: false };
+  try {
+    const info = await Purchases.restorePurchases();
+    latestCustomerInfo = info;
+    return { isPremium: hasPremiumEntitlement(info) };
+  } catch (error: unknown) {
+    return { isPremium: false, error: getErrorMessage(error) };
+  }
 }
 
 export async function checkPremiumStatus(): Promise<boolean> {
-  if (!USE_REAL_PURCHASES) return false;
-  // Real:
-  // try {
-  //   const info = await Purchases.getCustomerInfo();
-  //   return !!info.entitlements.active[PREMIUM_ENTITLEMENT]?.isActive;
-  // } catch {
-  //   return false;
-  // }
-  return false;
+  const info = await getCustomerInfo();
+  return hasPremiumEntitlement(info);
+}
+
+export async function presentRevenueCatPaywall(): Promise<{ purchased: boolean; restored: boolean; error?: string }> {
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) {
+    return { purchased: false, restored: false, error: 'RevenueCat Paywall זמין רק ב-iOS/Android development build.' };
+  }
+
+  try {
+    const result = await RevenueCatUI.presentPaywallIfNeeded({
+      requiredEntitlementIdentifier: PREMIUM_ENTITLEMENT,
+      displayCloseButton: true,
+    });
+    await getCustomerInfo();
+    return {
+      purchased: result === PAYWALL_RESULT.PURCHASED,
+      restored: result === PAYWALL_RESULT.RESTORED,
+    };
+  } catch (error: unknown) {
+    return { purchased: false, restored: false, error: getErrorMessage(error) };
+  }
+}
+
+export async function presentCustomerCenter(): Promise<{ success: boolean; error?: string }> {
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) {
+    return { success: false, error: 'RevenueCat Customer Center זמין רק ב-iOS/Android development build.' };
+  }
+
+  try {
+    await RevenueCatUI.presentCustomerCenter({
+      callbacks: {
+        onRestoreCompleted: ({ customerInfo }) => {
+          latestCustomerInfo = customerInfo;
+        },
+      },
+    });
+    await getCustomerInfo();
+    return { success: true };
+  } catch (error: unknown) {
+    return { success: false, error: getErrorMessage(error) };
+  }
 }
 
 export async function logOutPurchases(): Promise<void> {
-  if (!USE_REAL_PURCHASES) return;
-  // Real: await Purchases.logOut().catch(() => null);
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
+  await Purchases.logOut().catch(() => null);
+  latestCustomerInfo = null;
 }

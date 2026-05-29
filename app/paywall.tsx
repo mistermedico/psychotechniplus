@@ -29,7 +29,10 @@ const PLAN_META: Record<string, { label: string; badge?: string; period: string;
 };
 
 export default function PaywallScreen() {
-  const { packages, isPurchasing, isRestoring, loadError, fetchOfferings, purchase, restore } = usePurchaseStore();
+  const {
+    packages, isPurchasing, isRestoring, loadError,
+    fetchOfferings, purchase, restore, showRevenueCatPaywall, showCustomerCenter,
+  } = usePurchaseStore();
   const { isPremium } = useUserStore();
   const [selected, setSelected] = useState<string>('monthly');
 
@@ -84,6 +87,25 @@ export default function PaywallScreen() {
       Alert.alert('שגיאה', result.error);
     } else {
       Alert.alert('לא נמצא מנוי', 'לא נמצאו רכישות קודמות לשחזור עבור חשבון זה.');
+    }
+  };
+
+  const handleRevenueCatPaywall = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const result = await showRevenueCatPaywall();
+    if (result.purchased || result.restored) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('פרימיום הופעל', 'הגישה המלאה הופעלה דרך RevenueCat.', [{ text: 'המשך', onPress: () => router.back() }]);
+    } else if (result.error) {
+      Alert.alert('RevenueCat Paywall', result.error);
+    }
+  };
+
+  const handleCustomerCenter = async () => {
+    Haptics.selectionAsync();
+    const result = await showCustomerCenter();
+    if (!result.success && result.error) {
+      Alert.alert('Customer Center', result.error);
     }
   };
 
@@ -257,6 +279,25 @@ export default function PaywallScreen() {
             <Text style={styles.restoreBtnText}>
               {isRestoring ? 'משחזר רכישות...' : 'שחזר רכישה קודמת'}
             </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleRevenueCatPaywall}
+            disabled={isPurchasing}
+            accessibilityRole="button"
+            accessibilityLabel="פתח RevenueCat Paywall"
+            style={styles.nativePaywallBtn}
+          >
+            <Text style={styles.nativePaywallBtnText}>פתח Paywall של RevenueCat</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleCustomerCenter}
+            accessibilityRole="button"
+            accessibilityLabel="נהל מנוי"
+            style={styles.customerCenterBtn}
+          >
+            <Text style={styles.customerCenterBtnText}>ניהול מנוי / Customer Center</Text>
           </Pressable>
 
           {/* Legal text */}
@@ -450,6 +491,31 @@ const styles = StyleSheet.create({
   restoreBtnText: {
     fontFamily: FontFamily.medium, fontSize: FontSize.sm,
     color: Colors.textTertiary, textDecorationLine: 'underline',
+  },
+  nativePaywallBtn: {
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
+    borderRadius: Radius.lg,
+    paddingVertical: 12,
+    marginBottom: 10,
+    backgroundColor: 'rgba(124,111,247,0.12)',
+  },
+  nativePaywallBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.primaryLight,
+  },
+  customerCenterBtn: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  customerCenterBtnText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.textTertiary,
+    textDecorationLine: 'underline',
   },
 
   legal: {
