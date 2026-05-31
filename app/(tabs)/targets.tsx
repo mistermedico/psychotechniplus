@@ -12,6 +12,7 @@ import { TargetCard } from '../../components/TargetCard';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ThemeColors } from '../../constants/colors';
 import { useColors } from '../../hooks/useColors';
+import { useLayout } from '../../hooks/useLayout';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { LEVEL_LABELS } from '../../utils/adaptive';
@@ -79,6 +80,7 @@ export default function TargetsTab() {
   const [refreshing, setRefreshing] = useState(false);
   const { getTopicAccuracy, getTopicLevel, totalSessions } = useUserStore();
   const colors = useColors();
+  const layout = useLayout();
   const styles = React.useMemo(() => makeStyles(colors), [colors]);
 
   const selected = TARGETS.find(t => t.id === selectedId);
@@ -116,7 +118,13 @@ export default function TargetsTab() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, {
+          paddingBottom: insets.bottom + 24,
+          maxWidth: layout.isWide ? 800 : undefined,
+          alignSelf: 'center' as any,
+          width: '100%',
+          paddingHorizontal: layout.hPad,
+        }]}
         showsVerticalScrollIndicator={false}
         bounces={Platform.OS === 'ios'}
         decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}

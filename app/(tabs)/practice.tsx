@@ -13,6 +13,7 @@ import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore, SmartExamTemplate } from '../../store/adminStore';
 import { useColors } from '../../hooks/useColors';
+import { useLayout } from '../../hooks/useLayout';
 
 type PracticeTab = 'free' | 'simulations';
 
@@ -223,10 +224,13 @@ function FreePracticePane({
   showSpeedMode?: boolean;
 }) {
   const colors = useColors();
+  const layout = useLayout();
   const styles = React.useMemo(() => makeStyles(colors), [colors]);
 
   const insets = useSafeAreaInsets();
-  const TAB_BAR_HEIGHT = 64 + Math.max(insets.bottom, 12);
+  const TAB_BAR_HEIGHT = layout.showSidebar
+    ? Math.max(insets.bottom, 12)
+    : 64 + Math.max(insets.bottom, 12);
 
   const DIFFICULTY_OPTIONS = useMemo(() => getDifficultyOptions(colors), [colors]);
   const FREE_MODES = useMemo(() => getFreeModes(colors), [colors]);
@@ -235,7 +239,13 @@ function FreePracticePane({
     <>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: TAB_BAR_HEIGHT + 100 }]}
+        contentContainerStyle={[styles.content, {
+          paddingBottom: TAB_BAR_HEIGHT + 100,
+          maxWidth: layout.isWide ? 800 : undefined,
+          alignSelf: 'center' as any,
+          width: '100%',
+          paddingHorizontal: layout.hPad,
+        }]}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
@@ -462,6 +472,7 @@ function SimulationsPane({
   isPremium: boolean;
 }) {
   const colors = useColors();
+  const layout = useLayout();
   const styles = React.useMemo(() => makeStyles(colors), [colors]);
 
   const insets = useSafeAreaInsets();
@@ -478,7 +489,13 @@ function SimulationsPane({
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, {
+        paddingBottom: insets.bottom + 24,
+        maxWidth: layout.isWide ? 800 : undefined,
+        alignSelf: 'center' as any,
+        width: '100%',
+        paddingHorizontal: layout.hPad,
+      }]}
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.simHeader}>
