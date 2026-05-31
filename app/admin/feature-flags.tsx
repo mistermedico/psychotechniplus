@@ -7,13 +7,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
-import { useAdminStore } from '../../store/adminStore';
+import { useAdminStore, AppConfig } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 // ── Feature flag metadata ────────────────────────────────────────────────────
 
-type FlagKey = keyof ReturnType<typeof useAdminStore.getState>['appConfig']['featureFlags'];
+type FlagKey = keyof AppConfig['featureFlags'];
 
 const FLAG_META: { key: FlagKey; label: string; desc: string }[] = [
   { key: 'speedMode',       label: 'מצב מהירות',      desc: 'תרגול בטיימר עם בונוס XP' },
