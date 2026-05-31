@@ -50,6 +50,8 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'promo-codes',        icon: '🎟️', label: 'קודי קופון',      desc: 'הנחות וגישה',            route: '/admin/promo-codes',         category: 'business' },
   { id: 'notifications',      icon: '🔔', label: 'הודעות Push',     desc: 'שליחת התראות',           route: '/admin/notifications',       category: 'business' },
   { id: 'announcements',      icon: '📢', label: 'הכרזות',           desc: 'באנר הודעות לאפליקציה',  route: '/admin/announcements',       category: 'business' },
+  { id: 'push-templates',     icon: '📋', label: 'תבניות Push',      desc: 'תבניות הודעה מוכנות',    route: '/admin/push-templates',      category: 'business' },
+  { id: 'faq-manager',        icon: '❓', label: 'ניהול FAQ',         desc: 'שאלות נפוצות',           route: '/admin/faq-manager',         category: 'business' },
   { id: 'app-settings',       icon: '⚙️', label: 'הגדרות אפליקציה',desc: 'פרמטרים גלובליים',       route: '/admin/app-settings',        category: 'business' },
   // System
   { id: 'visit-log', icon: '📍', label: 'יומן ביקורים', desc: 'מעקב ביקורי משתמשים ואורחים', route: '/admin/visit-log', category: 'system' },
@@ -60,6 +62,8 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'daily-challenge',    icon: '🎯', label: 'אתגרים יומיים',    desc: 'בונוס XP',               route: '/admin/daily-challenge',     category: 'system' },
   { id: 'activity-log',       icon: '📋', label: 'יומן פעילות',      desc: 'תיעוד פעולות',           route: '/admin/activity-log',        category: 'system' },
   { id: 'feature-flags',      icon: '🚩', label: 'דגלי פיצ\'ר',      desc: 'toggleים ומגבלות',       route: '/admin/feature-flags',       category: 'system' },
+  { id: 'ab-tests',           icon: '🧪', label: 'A/B Tests',         desc: 'ניסויים ובדיקות',         route: '/admin/ab-tests',            category: 'system' },
+  { id: 'diagnostics',        icon: '🔧', label: 'דיאגנוסטיקה',      desc: 'בדיקות מערכת',            route: '/admin/diagnostics',         category: 'system' },
   { id: 'logs',               icon: '🪵', label: 'לוגים',             desc: 'שגיאות ואירועים',         route: '/admin/logs',                category: 'system' },
 ];
 

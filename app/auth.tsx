@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, Pressable,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
-  ScrollView, Animated, AccessibilityInfo,
+  ScrollView, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,12 +12,405 @@ import { supabase } from '../lib/supabase';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
 import { logUserAction } from '../utils/visitTracker';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
+import { useLayout } from '../hooks/useLayout';
+import { ThemeColors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
 
 type AuthMode = 'login' | 'register';
+type FieldName = 'name' | 'email' | 'password' | 'confirm';
+
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
+    wideContent: { maxWidth: 420, alignSelf: 'center', width: '100%' },
+
+    // Ambient orbs
+    orb: {
+      position: 'absolute',
+      width: 260,
+      height: 260,
+      borderRadius: 130,
+      opacity: 0.10,
+      pointerEvents: 'none',
+    } as any,
+    orbTop: {
+      top: -60,
+      right: -50,
+      backgroundColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 80,
+    },
+    orbBottom: {
+      bottom: 80,
+      left: -80,
+      backgroundColor: colors.accent,
+      shadowColor: colors.accent,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 80,
+    },
+
+    // Logo
+    logoSection: { alignItems: 'center', paddingTop: 20, paddingBottom: 32 },
+    logoOrb: {
+      marginBottom: 18,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.6,
+      shadowRadius: 24,
+      elevation: 16,
+    },
+    logoGrad: {
+      width: 80,
+      height: 80,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    logoEmoji: { fontSize: 40 },
+    appName: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['3xl'],
+      color: colors.text,
+      textAlign: 'center',
+      letterSpacing: -0.5,
+      marginBottom: 6,
+    },
+    logoSub: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+
+    // Form card
+    formCard: {
+      backgroundColor: colors.surfaceCard,
+      borderWidth: 1,
+      borderColor: colors.borderGlow,
+      borderRadius: Radius['3xl'],
+      padding: 22,
+      overflow: 'hidden',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.25,
+      shadowRadius: 32,
+      elevation: 16,
+    },
+    cardGlow: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.primaryLighter,
+    },
+
+    // Tabs — pill-shaped switcher
+    tabs: {
+      flexDirection: 'row-reverse',
+      backgroundColor: colors.surface,
+      borderRadius: 999,
+      padding: 4,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 4,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderRadius: 999,
+      minHeight: 44,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    tabActive: {
+      borderColor: colors.borderGlow,
+    },
+    tabText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.base,
+      color: colors.textTertiary,
+    },
+    tabTextActive: {
+      color: colors.primaryLight,
+      fontFamily: FontFamily.semiBold,
+    },
+
+    // Form
+    form: { gap: 14 },
+
+    // Input wrapper to support left-border accent
+    inputWrapper: {
+      borderRadius: Radius.lg,
+      overflow: 'hidden',
+      borderWidth: 1.5,
+      borderColor: colors.border,
+    },
+    inputWrapperFocused: {
+      borderColor: colors.borderFocus,
+    },
+    inputRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: Radius.lg,
+    },
+    inputIcon: {
+      paddingHorizontal: 14,
+      fontSize: 18,
+    },
+    input: {
+      flex: 1,
+      color: colors.text,
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.base,
+      paddingHorizontal: 4,
+      paddingVertical: 15,
+      minHeight: 52,
+      textAlign: 'right',
+    },
+
+    // Registration closed
+    registrationClosedBox: {
+      backgroundColor: colors.dangerLight,
+      borderRadius: Radius.xl,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.dangerGlow,
+      marginTop: 16,
+    },
+    registrationClosedTitle: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.base,
+      color: colors.danger,
+      textAlign: 'right',
+      marginBottom: 8,
+    },
+    registrationClosedBody: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'right',
+      lineHeight: 20,
+    },
+    registrationClosedBtn: {
+      marginTop: 16,
+      backgroundColor: colors.surface,
+      borderRadius: Radius.lg,
+      padding: 12,
+      alignItems: 'center',
+    },
+    registrationClosedBtnText: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+    },
+
+    // Error
+    errorBox: {
+      flexDirection: 'row-reverse',
+      alignItems: 'flex-start',
+      gap: 8,
+      backgroundColor: colors.dangerLight,
+      borderRadius: Radius.lg,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.dangerGlow,
+    },
+    errorIcon: {
+      fontSize: 16,
+      lineHeight: 22,
+    },
+    errorText: {
+      flex: 1,
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.danger,
+      textAlign: 'right',
+      lineHeight: 22,
+    },
+
+    // Submit button
+    submitBtn: {
+      borderRadius: Radius.xl,
+      overflow: 'hidden',
+      marginTop: 6,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.55,
+      shadowRadius: 20,
+      elevation: 14,
+    },
+    submitGrad: {
+      paddingVertical: 17,
+      alignItems: 'center',
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    submitShimmer: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+    },
+    submitText: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.lg,
+      color: '#fff',
+      letterSpacing: 0.3,
+    },
+
+    // Social proof
+    socialProof: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+      textAlign: 'center',
+      marginTop: 12,
+    },
+
+    hint: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+      textAlign: 'center',
+      marginTop: 4,
+    },
+
+    // Legal
+    legalRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      marginTop: 18,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      gap: 2,
+    },
+    legalText: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.xs,
+      color: colors.textTertiary,
+    },
+    legalLink: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.xs,
+      color: colors.primaryLight,
+      textDecorationLine: 'underline',
+    },
+
+    // Email pending
+    pendingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+    pendingCard: {
+      width: '100%',
+      backgroundColor: colors.surfaceCard,
+      borderWidth: 1,
+      borderColor: colors.borderGlow,
+      borderRadius: Radius['3xl'],
+      padding: 32,
+      alignItems: 'center',
+      overflow: 'hidden',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.30,
+      shadowRadius: 32,
+      elevation: 16,
+    },
+    pendingGlow: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.primaryLighter,
+    },
+    pendingEmoji: { fontSize: 68, marginBottom: 18 },
+    pendingTitle: {
+      fontFamily: FontFamily.heading,
+      fontSize: FontSize['2xl'],
+      color: colors.text,
+      marginBottom: 14,
+      textAlign: 'center',
+    },
+    pendingBody: {
+      fontFamily: FontFamily.regular,
+      fontSize: FontSize.base,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 26,
+      marginBottom: 28,
+    },
+    pendingEmail: { fontFamily: FontFamily.bold, color: colors.primaryLight },
+    pendingBtn: {
+      width: '100%',
+      borderRadius: Radius.xl,
+      overflow: 'hidden',
+      marginBottom: 14,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.50,
+      shadowRadius: 16,
+      elevation: 10,
+    },
+    pendingBtnGrad: { paddingVertical: 17, alignItems: 'center' },
+    pendingBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+    pendingBack: { padding: 12 },
+    pendingBackText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: colors.textTertiary },
+
+    // Announcement
+    announcementCritical: {
+      backgroundColor: colors.dangerLight,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.dangerGlow,
+    },
+    announcementWarning: {
+      backgroundColor: colors.warningLight,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.warningGlow,
+    },
+    announcementInfo: {
+      backgroundColor: colors.primaryLighter,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.borderGlow,
+    },
+    announcementTextCritical: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.danger,
+      textAlign: 'right',
+      lineHeight: 20,
+    },
+    announcementTextWarning: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.warning,
+      textAlign: 'right',
+      lineHeight: 20,
+    },
+    announcementTextInfo: {
+      fontFamily: FontFamily.medium,
+      fontSize: FontSize.sm,
+      color: colors.primaryLight,
+      textAlign: 'right',
+      lineHeight: 20,
+    },
+  });
+}
 
 export default function AuthScreen() {
+  const colors = useColors();
+  const layout = useLayout();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [mode, setMode] = useState<AuthMode>('login');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -27,6 +420,7 @@ export default function AuthScreen() {
   const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
   const [emailPending, setEmailPending] = useState(false);
+  const [focusedField, setFocusedField] = useState<FieldName | null>(null);
 
   const initialize = useUserStore(s => s.initialize);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
@@ -42,6 +436,7 @@ export default function AuthScreen() {
 
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(32)).current;
+  const submitScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -146,9 +541,13 @@ export default function AuthScreen() {
 
   if (emailPending) {
     return (
-      <LinearGradient colors={['#080A12', '#0D1020', '#14102A']} style={{ flex: 1 }}>
+      <LinearGradient colors={colors.gradients.bg as unknown as [string, string, string]} style={{ flex: 1 }}>
         <SafeAreaView style={styles.pendingContainer} edges={['top', 'bottom']}>
-          <Animated.View style={[styles.pendingCard, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+          <Animated.View style={[
+            styles.pendingCard,
+            layout.isWide && { maxWidth: 420, alignSelf: 'center', width: '100%' },
+            { opacity: fadeIn, transform: [{ translateY: slideUp }] },
+          ]}>
             <View style={styles.pendingGlow} />
             <Text style={styles.pendingEmoji}>📧</Text>
             <Text style={styles.pendingTitle}>בדוק את המייל שלך</Text>
@@ -162,7 +561,7 @@ export default function AuthScreen() {
               style={styles.pendingBtn}
             >
               <LinearGradient
-                colors={[Colors.primary, Colors.primaryDark]}
+                colors={colors.gradients.primary}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.pendingBtnGrad}
               >
@@ -201,57 +600,62 @@ export default function AuthScreen() {
     );
   }
 
+  const contentStyle = layout.isWide ? [styles.content, styles.wideContent] : styles.content;
+
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#080A12', '#0D1020', '#14102A']}
+        colors={colors.gradients.bg as unknown as [string, string, string]}
         style={StyleSheet.absoluteFill}
       />
-      {/* Ambient orbs */}
+      {/* Ambient glow orbs */}
       <View style={[styles.orb, styles.orbTop]} />
       <View style={[styles.orb, styles.orbBottom]} />
 
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
-            contentContainerStyle={styles.content}
+            contentContainerStyle={contentStyle}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
             {/* Announcement banner */}
             {announcementEnabled && announcementText ? (
-              <View style={{
-                backgroundColor: announcementLevel === 'critical' ? 'rgba(239,68,68,0.15)' : announcementLevel === 'warning' ? 'rgba(245,158,11,0.15)' : 'rgba(124,111,247,0.15)',
-                borderRadius: 12, padding: 14, marginBottom: 16,
-                borderWidth: 1,
-                borderColor: announcementLevel === 'critical' ? 'rgba(239,68,68,0.4)' : announcementLevel === 'warning' ? 'rgba(245,158,11,0.4)' : 'rgba(124,111,247,0.4)',
-              }}>
-                <Text style={{ fontFamily: 'Heebo_500Medium', fontSize: 14, color: announcementLevel === 'critical' ? '#EF4444' : announcementLevel === 'warning' ? '#F59E0B' : '#7C6FF7', textAlign: 'right', lineHeight: 20 }}>
+              <View style={
+                announcementLevel === 'critical' ? styles.announcementCritical
+                : announcementLevel === 'warning' ? styles.announcementWarning
+                : styles.announcementInfo
+              }>
+                <Text style={
+                  announcementLevel === 'critical' ? styles.announcementTextCritical
+                  : announcementLevel === 'warning' ? styles.announcementTextWarning
+                  : styles.announcementTextInfo
+                }>
                   {announcementLevel === 'critical' ? '🚨 ' : announcementLevel === 'warning' ? '⚠️ ' : 'ℹ️ '}{announcementText}
                 </Text>
               </View>
             ) : null}
 
-            {/* Logo */}
+            {/* Logo / header */}
             <Animated.View style={[styles.logoSection, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
               <View style={styles.logoOrb}>
                 <LinearGradient
-                  colors={[Colors.primary, Colors.accent]}
+                  colors={colors.gradients.primary}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.logoGrad}
                 >
                   <Text style={styles.logoEmoji}>🧠</Text>
                 </LinearGradient>
               </View>
-              <Text style={styles.appName}>פסיכוטכניPlus</Text>
+              <Text style={styles.appName}>PsychoTechni+</Text>
               <Text style={styles.logoSub}>הכנה חכמה למבחן הפסיכוטכני</Text>
             </Animated.View>
 
-            {/* Form Card */}
+            {/* Form card */}
             <Animated.View style={[styles.formCard, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
               <View style={styles.cardGlow} />
 
-              {/* Mode tabs */}
+              {/* Mode tabs — pill switcher */}
               <View style={styles.tabs}>
                 {(['login', 'register'] as AuthMode[]).map((m) => (
                   <Pressable
@@ -264,7 +668,7 @@ export default function AuthScreen() {
                   >
                     {mode === m && (
                       <LinearGradient
-                        colors={[Colors.primaryLighter, 'rgba(124,111,247,0.08)']}
+                        colors={[colors.primaryLighter, 'transparent']}
                         style={StyleSheet.absoluteFill}
                       />
                     )}
@@ -277,111 +681,165 @@ export default function AuthScreen() {
 
               {/* Inputs */}
               {mode === 'register' && !registrationOpen ? (
-                <View style={{ backgroundColor: 'rgba(239,68,68,0.15)', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)', marginTop: 16 }}>
-                  <Text style={{ fontFamily: 'Heebo_700Bold', fontSize: 16, color: '#EF4444', textAlign: 'right', marginBottom: 8 }}>🚫 הרשמות סגורות</Text>
-                  <Text style={{ fontFamily: 'Heebo_400Regular', fontSize: 14, color: '#94A3B8', textAlign: 'right', lineHeight: 20 }}>
+                <View style={styles.registrationClosedBox}>
+                  <Text style={styles.registrationClosedTitle}>🚫 הרשמות סגורות</Text>
+                  <Text style={styles.registrationClosedBody}>
                     הרשמת משתמשים חדשים אינה זמינה כרגע. פנה למנהל האפליקציה.
                   </Text>
-                  <Pressable onPress={() => switchMode('login')} style={{ marginTop: 16, backgroundColor: '#1E293B', borderRadius: 12, padding: 12, alignItems: 'center' }}>
-                    <Text style={{ fontFamily: 'Heebo_500Medium', fontSize: 14, color: '#94A3B8' }}>עבור להתחברות</Text>
+                  <Pressable onPress={() => switchMode('login')} style={styles.registrationClosedBtn}>
+                    <Text style={styles.registrationClosedBtnText}>עבור להתחברות</Text>
                   </Pressable>
                 </View>
               ) : (
                 <View style={styles.form}>
                   {mode === 'register' && (
-                    <TextInput
-                      ref={nameRef}
-                      style={styles.input}
-                      value={displayName}
-                      onChangeText={setDisplayName}
-                      placeholder="שם מלא (אופציונלי)"
-                      placeholderTextColor={Colors.textTertiary}
-                      textAlign="right"
-                      autoCorrect={false}
-                      autoCapitalize="words"
-                      textContentType="name"
-                      autoComplete="name"
-                      returnKeyType="next"
-                      onSubmitEditing={() => emailRef.current?.focus()}
-                      accessibilityLabel="שם מלא"
-                    />
+                    <View style={[
+                      styles.inputWrapper,
+                      focusedField === 'name' && styles.inputWrapperFocused,
+                    ]}>
+                      <View style={styles.inputRow}>
+                        <TextInput
+                          ref={nameRef}
+                          style={styles.input}
+                          value={displayName}
+                          onChangeText={setDisplayName}
+                          placeholder="שם מלא (אופציונלי)"
+                          placeholderTextColor={colors.textTertiary}
+                          textAlign="right"
+                          autoCorrect={false}
+                          autoCapitalize="words"
+                          textContentType="name"
+                          autoComplete="name"
+                          returnKeyType="next"
+                          onSubmitEditing={() => emailRef.current?.focus()}
+                          onFocus={() => setFocusedField('name')}
+                          onBlur={() => setFocusedField(null)}
+                          accessibilityLabel="שם מלא"
+                        />
+                        <Text style={styles.inputIcon}>👤</Text>
+                      </View>
+                    </View>
                   )}
-                  <TextInput
-                    ref={emailRef}
-                    style={styles.input}
-                    value={email}
-                    onChangeText={v => { setEmail(v); setError(''); }}
-                    placeholder="כתובת מייל"
-                    placeholderTextColor={Colors.textTertiary}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    textAlign="right"
-                    textContentType="emailAddress"
-                    autoComplete="email"
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordRef.current?.focus()}
-                    accessibilityLabel="כתובת מייל"
-                  />
-                  <TextInput
-                    ref={passwordRef}
-                    style={styles.input}
-                    value={password}
-                    onChangeText={v => { setPassword(v); setError(''); }}
-                    placeholder="סיסמה (מינימום 6 תווים)"
-                    placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry
-                    textAlign="right"
-                    onSubmitEditing={mode === 'login' ? handleSubmit : () => confirmRef.current?.focus()}
-                    textContentType={mode === 'login' ? 'password' : 'newPassword'}
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                    returnKeyType={mode === 'login' ? 'go' : 'next'}
-                    accessibilityLabel="סיסמה"
-                  />
+
+                  <View style={[
+                    styles.inputWrapper,
+                    focusedField === 'email' && styles.inputWrapperFocused,
+                  ]}>
+                    <View style={styles.inputRow}>
+                      <TextInput
+                        ref={emailRef}
+                        style={styles.input}
+                        value={email}
+                        onChangeText={v => { setEmail(v); setError(''); }}
+                        placeholder="כתובת מייל"
+                        placeholderTextColor={colors.textTertiary}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        textAlign="right"
+                        textContentType="emailAddress"
+                        autoComplete="email"
+                        returnKeyType="next"
+                        onSubmitEditing={() => passwordRef.current?.focus()}
+                        onFocus={() => setFocusedField('email')}
+                        onBlur={() => setFocusedField(null)}
+                        accessibilityLabel="כתובת מייל"
+                      />
+                      <Text style={styles.inputIcon}>📧</Text>
+                    </View>
+                  </View>
+
+                  <View style={[
+                    styles.inputWrapper,
+                    focusedField === 'password' && styles.inputWrapperFocused,
+                  ]}>
+                    <View style={styles.inputRow}>
+                      <TextInput
+                        ref={passwordRef}
+                        style={styles.input}
+                        value={password}
+                        onChangeText={v => { setPassword(v); setError(''); }}
+                        placeholder="סיסמה (מינימום 6 תווים)"
+                        placeholderTextColor={colors.textTertiary}
+                        secureTextEntry
+                        textAlign="right"
+                        onSubmitEditing={mode === 'login' ? handleSubmit : () => confirmRef.current?.focus()}
+                        textContentType={mode === 'login' ? 'password' : 'newPassword'}
+                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                        returnKeyType={mode === 'login' ? 'go' : 'next'}
+                        onFocus={() => setFocusedField('password')}
+                        onBlur={() => setFocusedField(null)}
+                        accessibilityLabel="סיסמה"
+                      />
+                      <Text style={styles.inputIcon}>🔐</Text>
+                    </View>
+                  </View>
+
                   {mode === 'register' && (
-                    <TextInput
-                      ref={confirmRef}
-                      style={styles.input}
-                      value={confirmPassword}
-                      onChangeText={v => { setConfirmPassword(v); setError(''); }}
-                      placeholder="אימות סיסמה"
-                      placeholderTextColor={Colors.textTertiary}
-                      secureTextEntry
-                      textAlign="right"
-                      onSubmitEditing={handleSubmit}
-                      textContentType="newPassword"
-                      autoComplete="new-password"
-                      returnKeyType="go"
-                      accessibilityLabel="אימות סיסמה"
-                    />
+                    <View style={[
+                      styles.inputWrapper,
+                      focusedField === 'confirm' && styles.inputWrapperFocused,
+                    ]}>
+                      <View style={styles.inputRow}>
+                        <TextInput
+                          ref={confirmRef}
+                          style={styles.input}
+                          value={confirmPassword}
+                          onChangeText={v => { setConfirmPassword(v); setError(''); }}
+                          placeholder="אימות סיסמה"
+                          placeholderTextColor={colors.textTertiary}
+                          secureTextEntry
+                          textAlign="right"
+                          onSubmitEditing={handleSubmit}
+                          textContentType="newPassword"
+                          autoComplete="new-password"
+                          returnKeyType="go"
+                          onFocus={() => setFocusedField('confirm')}
+                          onBlur={() => setFocusedField(null)}
+                          accessibilityLabel="אימות סיסמה"
+                        />
+                        <Text style={styles.inputIcon}>🔐</Text>
+                      </View>
+                    </View>
                   )}
 
                   {!!error && (
                     <View style={styles.errorBox}>
-                      <Text style={styles.errorText}>⚠️ {error}</Text>
+                      <Text style={styles.errorText}>{error}</Text>
+                      <Text style={styles.errorIcon}>❌</Text>
                     </View>
                   )}
 
-                  <Pressable
-                    onPress={handleSubmit}
-                    disabled={loading}
-                    accessibilityRole="button"
-                    accessibilityLabel={mode === 'login' ? 'כניסה לחשבון' : 'יצירת חשבון'}
-                    accessibilityState={{ disabled: loading }}
-                    style={({ pressed }) => [styles.submitBtn, { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: loading ? 0.85 : 1 }]}
-                  >
-                    <LinearGradient
-                      colors={[Colors.primary, Colors.primaryDark]}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={styles.submitGrad}
-                    >
-                      <View style={styles.submitShimmer} />
-                      {loading
-                        ? <ActivityIndicator color="#fff" />
-                        : <Text style={styles.submitText}>{mode === 'login' ? 'כניסה ←' : 'יצירת חשבון ←'}</Text>
+                  <Animated.View style={{ transform: [{ scale: submitScale }] }}>
+                    <Pressable
+                      onPress={handleSubmit}
+                      disabled={loading}
+                      accessibilityRole="button"
+                      accessibilityLabel={mode === 'login' ? 'כניסה לחשבון' : 'יצירת חשבון'}
+                      accessibilityState={{ disabled: loading }}
+                      style={[styles.submitBtn, { opacity: loading ? 0.85 : 1 }]}
+                      onPressIn={() =>
+                        Animated.spring(submitScale, { toValue: 0.97, useNativeDriver: true, friction: 8 }).start()
                       }
-                    </LinearGradient>
-                  </Pressable>
+                      onPressOut={() =>
+                        Animated.spring(submitScale, { toValue: 1, useNativeDriver: true, friction: 8 }).start()
+                      }
+                    >
+                      <LinearGradient
+                        colors={colors.gradients.primary}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                        style={styles.submitGrad}
+                      >
+                        <View style={styles.submitShimmer} />
+                        {loading
+                          ? <ActivityIndicator color="#fff" />
+                          : <Text style={styles.submitText}>{mode === 'login' ? 'כניסה ←' : 'יצירת חשבון ←'}</Text>
+                        }
+                      </LinearGradient>
+                    </Pressable>
+                  </Animated.View>
+
+                  <Text style={styles.socialProof}>מצטרפים ל-10,000+ מתאמנים</Text>
 
                   <Text style={styles.hint}>
                     {mode === 'login'
@@ -409,261 +867,3 @@ export default function AuthScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
-
-  // Orbs
-  orb: {
-    position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    opacity: 0.10,
-    pointerEvents: 'none',
-  },
-  orbTop: {
-    top: -60, right: -50,
-    backgroundColor: Colors.primary,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 80,
-  },
-  orbBottom: {
-    bottom: 80, left: -80,
-    backgroundColor: Colors.accent,
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 80,
-  },
-
-  // Logo
-  logoSection: { alignItems: 'center', paddingTop: 20, paddingBottom: 32 },
-  logoOrb: {
-    marginBottom: 18,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    elevation: 16,
-  },
-  logoGrad: {
-    width: 80, height: 80,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoEmoji: { fontSize: 40 },
-  appName: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['3xl'],
-    color: Colors.text,
-    textAlign: 'center',
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  logoSub: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-
-  // Card
-  formCard: {
-    backgroundColor: 'rgba(255,255,255,0.055)',
-    borderWidth: 1,
-    borderColor: 'rgba(124,111,247,0.22)',
-    borderRadius: Radius['3xl'],
-    padding: 22,
-    overflow: 'hidden',
-    shadowColor: '#7C6FF7',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 32,
-    elevation: 16,
-  },
-  cardGlow: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(124,111,247,0.03)',
-  },
-
-  // Tabs
-  tabs: {
-    flexDirection: 'row-reverse',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: Radius.xl,
-    padding: 4,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: Radius.lg,
-    minHeight: 44,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  tabActive: {
-    borderColor: 'rgba(124,111,247,0.40)',
-  },
-  tabText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.base,
-    color: Colors.textTertiary,
-  },
-  tabTextActive: {
-    color: Colors.primaryLight,
-    fontFamily: FontFamily.semiBold,
-  },
-
-  // Form
-  form: { gap: 12 },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    color: Colors.text,
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.base,
-    borderRadius: Radius.lg,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    minHeight: 52,
-  },
-
-  errorBox: {
-    backgroundColor: Colors.dangerLight,
-    borderRadius: Radius.lg,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.dangerGlow,
-  },
-  errorText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: Colors.danger,
-    textAlign: 'right',
-  },
-
-  submitBtn: {
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    marginTop: 6,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.55,
-    shadowRadius: 20,
-    elevation: 14,
-  },
-  submitGrad: {
-    paddingVertical: 17,
-    alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  submitShimmer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  submitText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: '#fff',
-    letterSpacing: 0.3,
-  },
-
-  hint: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-
-  // Legal
-  legalRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginTop: 18,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    gap: 2,
-  },
-  legalText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-  },
-  legalLink: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.primaryLight,
-    textDecorationLine: 'underline',
-  },
-
-  // Email pending
-  pendingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  pendingCard: {
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.055)',
-    borderWidth: 1,
-    borderColor: 'rgba(124,111,247,0.22)',
-    borderRadius: Radius['3xl'],
-    padding: 32,
-    alignItems: 'center',
-    overflow: 'hidden',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.30,
-    shadowRadius: 32,
-    elevation: 16,
-  },
-  pendingGlow: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(124,111,247,0.04)',
-  },
-  pendingEmoji: { fontSize: 68, marginBottom: 18 },
-  pendingTitle: {
-    fontFamily: FontFamily.heading,
-    fontSize: FontSize['2xl'],
-    color: Colors.text,
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  pendingBody: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.base,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 26,
-    marginBottom: 28,
-  },
-  pendingEmail: { fontFamily: FontFamily.bold, color: Colors.primaryLight },
-  pendingBtn: {
-    width: '100%',
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    marginBottom: 14,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.50,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  pendingBtnGrad: { paddingVertical: 17, alignItems: 'center' },
-  pendingBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
-  pendingBack: { padding: 12 },
-  pendingBackText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textTertiary },
-});

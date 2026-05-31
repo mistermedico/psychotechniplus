@@ -37,6 +37,10 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/content-report': 'דוח תוכן',
   '/admin/user-segments': 'פילוח משתמשים',
   '/admin/badge-manager': 'ניהול תגים',
+  '/admin/push-templates': 'תבניות Push',
+  '/admin/faq-manager': 'ניהול FAQ',
+  '/admin/ab-tests': 'A/B Tests',
+  '/admin/diagnostics': 'דיאגנוסטיקה',
 };
 
 export default function AdminLayout() {
@@ -113,6 +117,10 @@ export default function AdminLayout() {
       <Stack.Screen name="content-report"     options={{ title: '📉 דוח תוכן' }} />
       <Stack.Screen name="user-segments"      options={{ title: '🔬 פילוח משתמשים' }} />
       <Stack.Screen name="badge-manager"      options={{ title: '🏅 ניהול תגים' }} />
+      <Stack.Screen name="push-templates"    options={{ title: '📋 תבניות Push' }} />
+      <Stack.Screen name="faq-manager"       options={{ title: '❓ ניהול FAQ' }} />
+      <Stack.Screen name="ab-tests"          options={{ title: '🧪 A/B Tests' }} />
+      <Stack.Screen name="diagnostics"       options={{ title: '🔧 דיאגנוסטיקה' }} />
     </Stack>
   );
 }

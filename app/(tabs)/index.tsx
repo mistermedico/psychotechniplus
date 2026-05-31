@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Dimensions, Animated,
@@ -39,7 +39,7 @@ const BADGE_INFO: Record<string, { icon: string; label: string }> = {
 export default function Dashboard() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const styles = React.useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const layout = useLayout();
 
@@ -69,6 +69,10 @@ export default function Dashboard() {
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(24)).current;
   const streakScale = useRef(new Animated.Value(1)).current;
+  // Challenge lightning pulse
+  const challengePulse = useRef(new Animated.Value(1)).current;
+  // Rocket float animation (first-time CTA)
+  const rocketFloat = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -87,6 +91,32 @@ export default function Dashboard() {
       return () => pulse.stop();
     }
   }, [streak]); // eslint-disable-line
+
+  useEffect(() => {
+    // Challenge emoji pulsing
+    const challengeAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(challengePulse, { toValue: 1.25, duration: 700, useNativeDriver: true }),
+        Animated.timing(challengePulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.delay(400),
+      ]),
+    );
+    challengeAnim.start();
+
+    // Rocket gentle float
+    const floatAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(rocketFloat, { toValue: -6, duration: 1600, useNativeDriver: true }),
+        Animated.timing(rocketFloat, { toValue: 6, duration: 1600, useNativeDriver: true }),
+      ]),
+    );
+    floatAnim.start();
+
+    return () => {
+      challengeAnim.stop();
+      floatAnim.stop();
+    };
+  }, []); // eslint-disable-line
 
   const go = (topicId: string, opts?: { questionLimit?: string; mode?: string }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -209,8 +239,16 @@ export default function Dashboard() {
           {/* ── Bento Grid: Topics ── */}
           <Animated.View style={[styles.section, { opacity: fadeIn }]}>
             <View style={styles.sectionHead}>
+              {/* RTL accent bar — right side of title */}
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.sectionTitle}>תרגול מהיר</Text>
+                <LinearGradient
+                  colors={colors.gradients.primary}
+                  start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                  style={styles.sectionAccentBar}
+                />
+              </View>
               <Text style={styles.sectionTag}>בחר נושא</Text>
-              <Text style={styles.sectionTitle}>תרגול מהיר</Text>
             </View>
             <ScrollView
               horizontal
@@ -234,6 +272,8 @@ export default function Dashboard() {
                       style={styles.topicGrad}
                     >
                       <View style={[styles.topicGlow, { shadowColor: meta.glow }]} />
+                      {/* Subtle shimmer stripe */}
+                      <View style={styles.topicShimmer} />
                       <Text style={styles.topicIcon}>{meta.icon}</Text>
                       <Text style={styles.topicName}>{t.name}</Text>
                       <View style={styles.topicChip}>
@@ -249,8 +289,15 @@ export default function Dashboard() {
           {/* ── Stats Bento ── */}
           <Animated.View style={[styles.section, { opacity: fadeIn }]}>
             <View style={styles.sectionHead}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.sectionTitle}>הסטטיסטיקות שלי</Text>
+                <LinearGradient
+                  colors={colors.gradients.primary}
+                  start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                  style={styles.sectionAccentBar}
+                />
+              </View>
               <Text style={styles.sectionTag}>ביצועים</Text>
-              <Text style={styles.sectionTitle}>הסטטיסטיקות שלי</Text>
             </View>
             <View style={styles.bentoGrid}>
               <View style={[styles.bentoCard, styles.bentoWide]}>
@@ -308,6 +355,10 @@ export default function Dashboard() {
                 style={styles.challengeGrad}
               >
                 <View style={styles.challengeShimmer} />
+                {/* "Today only" badge */}
+                <View style={styles.todayBadge}>
+                  <Text style={styles.todayBadgeText}>היום בלבד</Text>
+                </View>
                 <View style={styles.challengeRight}>
                   <Text style={styles.challengeTitle}>אתגר יומי</Text>
                   <Text style={styles.challengeSub}>
@@ -316,7 +367,9 @@ export default function Dashboard() {
                       : '10 שאלות · מיוחד להיום ← '}
                   </Text>
                 </View>
-                <Text style={styles.challengeEmoji}>⚡</Text>
+                <Animated.Text style={[styles.challengeEmoji, { transform: [{ scale: challengePulse }] }]}>
+                  ⚡
+                </Animated.Text>
               </LinearGradient>
             </Pressable>
           </Animated.View>
@@ -325,8 +378,15 @@ export default function Dashboard() {
           {recentBadges.length > 0 && (
             <Animated.View style={[styles.section, { opacity: fadeIn }]}>
               <View style={styles.sectionHead}>
+                <View style={styles.sectionTitleRow}>
+                  <Text style={styles.sectionTitle}>הישגים אחרונים</Text>
+                  <LinearGradient
+                    colors={colors.gradients.primary}
+                    start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                    style={styles.sectionAccentBar}
+                  />
+                </View>
                 <Text style={styles.sectionTag}>הישגים</Text>
-                <Text style={styles.sectionTitle}>הישגים אחרונים</Text>
               </View>
               <View style={styles.badgesRow}>
                 {recentBadges.map(badge => {
@@ -352,14 +412,21 @@ export default function Dashboard() {
             <Animated.View style={[styles.section, { opacity: fadeIn }]}>
               <View style={styles.firstCard}>
                 <View style={styles.firstGlow} />
-                <Text style={styles.firstEmoji}>🚀</Text>
+                <Animated.Text style={[styles.firstEmoji, { transform: [{ translateY: rocketFloat }] }]}>
+                  🚀
+                </Animated.Text>
                 <Text style={styles.firstTitle}>מוכן להתחיל?</Text>
                 <Text style={styles.firstSub}>סיים את הסשן הראשון שלך ורוויח את התג הראשון!</Text>
                 <Pressable
                   onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
                   style={({ pressed }) => [styles.firstBtn, { opacity: pressed ? 0.85 : 1 }]}
                 >
-                  <LinearGradient colors={['#7C6FF7', '#C084FC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.firstBtnGrad}>
+                  <LinearGradient
+                    colors={['#7C6FF7', '#9E99FA', '#C084FC']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={styles.firstBtnGrad}
+                  >
+                    <View style={styles.firstBtnShimmer} />
                     <Text style={styles.firstBtnText}>התחל עכשיו ←</Text>
                   </LinearGradient>
                 </Pressable>
@@ -588,6 +655,17 @@ function makeStyles(colors: ThemeColors) {
     // Section
     section: { paddingHorizontal: 16, marginTop: 22 },
     sectionHead: { alignItems: 'flex-end', marginBottom: 12 },
+    // RTL: title + accent bar on the RIGHT side of title text
+    sectionTitleRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      gap: 8,
+    },
+    sectionAccentBar: {
+      width: 3,
+      height: 20,
+      borderRadius: 2,
+    },
     sectionTag: {
       fontFamily: FontFamily.semiBold,
       fontSize: FontSize.xs,
@@ -616,7 +694,7 @@ function makeStyles(colors: ThemeColors) {
     },
     topicGrad: {
       padding: 16,
-      minHeight: 148,
+      minHeight: 168,
       justifyContent: 'space-between',
     },
     topicGlow: {
@@ -626,13 +704,23 @@ function makeStyles(colors: ThemeColors) {
       shadowOpacity: 0.8,
       shadowRadius: 30,
     },
+    // Diagonal shimmer stripe (subtle white at 10% opacity)
+    topicShimmer: {
+      position: 'absolute',
+      top: -20,
+      left: -10,
+      width: 40,
+      height: 200,
+      backgroundColor: 'rgba(255,255,255,0.10)',
+      transform: [{ rotate: '20deg' }],
+    },
     topicIcon: { fontSize: 28, textAlign: 'right', marginBottom: 6 },
     topicName: {
-      fontFamily: FontFamily.bold,
+      fontFamily: FontFamily.heading,
       fontSize: FontSize.sm,
       color: '#fff',
       textAlign: 'right',
-      lineHeight: 18,
+      lineHeight: 20,
       flex: 1,
     },
     topicChip: {
@@ -710,6 +798,23 @@ function makeStyles(colors: ThemeColors) {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: 'rgba(255,255,255,0.06)',
     },
+    // "Today only" badge — absolute top-right corner
+    todayBadge: {
+      position: 'absolute',
+      top: 10, left: 12,
+      backgroundColor: 'rgba(0,0,0,0.30)',
+      borderRadius: Radius.full,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.25)',
+    },
+    todayBadgeText: {
+      fontFamily: FontFamily.bold,
+      fontSize: 10,
+      color: '#fff',
+      letterSpacing: 0.3,
+    },
     challengeRight: { flex: 1, alignItems: 'flex-end' },
     challengeTitle: {
       fontFamily: FontFamily.bold,
@@ -778,7 +883,7 @@ function makeStyles(colors: ThemeColors) {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: 'rgba(124,111,247,0.04)',
     },
-    firstEmoji: { fontSize: 56, marginBottom: 12 },
+    firstEmoji: { fontSize: 72, marginBottom: 12 },
     firstTitle: {
       fontFamily: FontFamily.heading,
       fontSize: FontSize['2xl'],
@@ -794,8 +899,26 @@ function makeStyles(colors: ThemeColors) {
       lineHeight: 22,
       marginBottom: 20,
     },
-    firstBtn: { borderRadius: Radius.full, overflow: 'hidden' },
-    firstBtnGrad: { paddingHorizontal: 28, paddingVertical: 14, alignItems: 'center' },
+    firstBtn: {
+      borderRadius: Radius.full,
+      overflow: 'hidden',
+      shadowColor: '#7C6FF7',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.50,
+      shadowRadius: 18,
+      elevation: 12,
+    },
+    firstBtnGrad: {
+      paddingHorizontal: 32,
+      paddingVertical: 16,
+      alignItems: 'center',
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    firstBtnShimmer: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255,255,255,0.10)',
+    },
     firstBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
   });
 }
