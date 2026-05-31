@@ -79,7 +79,9 @@ export default function Dashboard() {
       Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
     ]).start();
+  }, []); // eslint-disable-line
 
+  useEffect(() => {
     if (streak > 0) {
       const pulse = Animated.loop(
         Animated.sequence([

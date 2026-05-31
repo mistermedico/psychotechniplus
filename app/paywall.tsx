@@ -46,6 +46,7 @@ export default function PaywallScreen() {
   const [selected, setSelected] = useState<string>('monthly');
   const [promoInput, setPromoInput] = useState('');
   const [promoApplying, setPromoApplying] = useState(false);
+  const [offeringsLoaded, setOfferingsLoaded] = useState(packages.length > 0);
 
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -70,11 +71,20 @@ export default function PaywallScreen() {
     pulse.start();
 
     if (packages.length === 0) {
-      fetchOfferings().catch(() => null);
+      fetchOfferings().catch(() => null).finally(() => setOfferingsLoaded(true));
     }
 
     return () => pulse.stop();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-select the recommended plan when packages load
+  useEffect(() => {
+    if (packages.length > 0) {
+      const recommended = packages.find(p => PLAN_META[p.identifier]?.isRecommended);
+      if (recommended) setSelected(recommended.identifier);
+      setOfferingsLoaded(true);
+    }
+  }, [packages.length]); // eslint-disable-line
 
   // Already premium — close paywall
   useEffect(() => {
@@ -238,8 +248,16 @@ export default function PaywallScreen() {
               </View>
             )}
 
-            {packages.length === 0 && !loadError && (
+            {packages.length === 0 && !loadError && !offeringsLoaded && (
               <ActivityIndicator color={colors.primaryLight} style={{ marginVertical: 24 }} />
+            )}
+            {packages.length === 0 && !loadError && offeringsLoaded && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerText}>אין תוכניות זמינות כרגע. נסה שוב מאוחר יותר.</Text>
+                <Pressable onPress={() => { setOfferingsLoaded(false); fetchOfferings().catch(() => null).finally(() => setOfferingsLoaded(true)); }} style={styles.retryBtn}>
+                  <Text style={styles.retryBtnText}>נסה שוב</Text>
+                </Pressable>
+              </View>
             )}
 
             {packages.map(pkg => {

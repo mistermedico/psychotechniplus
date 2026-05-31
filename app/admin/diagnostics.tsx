@@ -42,80 +42,85 @@ export default function DiagnosticsScreen() {
   const { questions, appConfig } = useAdminStore();
   const [checks, setChecks] = useState<DiagCheck[]>(INITIAL_CHECKS);
   const [running, setRunning] = useState(false);
+  const runningRef = React.useRef(false);
 
   const setCheck = useCallback((id: string, partial: Partial<DiagCheck>) => {
     setChecks(prev => prev.map(c => (c.id === id ? { ...c, ...partial } : c)));
   }, []);
 
   const runChecks = useCallback(async () => {
-    if (running) return;
+    if (runningRef.current) return;
+    runningRef.current = true;
     setRunning(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Reset all to running
-    setChecks(INITIAL_CHECKS.map(c => ({ ...c, status: 'running' as CheckStatus })));
-
-    // 1. Supabase Connection
     try {
-      const t0 = Date.now();
-      const { error } = await supabase.from('questions').select('count').limit(1);
-      const latencyMs = Date.now() - t0;
-      if (error) throw error;
-      setCheck('supabase', { status: 'pass', value: `${latencyMs}ms`, latencyMs });
-    } catch (e: any) {
-      setCheck('supabase', { status: 'fail', value: e?.message ?? 'שגיאה' });
+      // Reset all to running
+      setChecks(INITIAL_CHECKS.map(c => ({ ...c, status: 'running' as CheckStatus })));
+
+      // 1. Supabase Connection
+      try {
+        const t0 = Date.now();
+        const { error } = await supabase.from('questions').select('count').limit(1);
+        const latencyMs = Date.now() - t0;
+        if (error) throw error;
+        setCheck('supabase', { status: 'pass', value: `${latencyMs}ms`, latencyMs });
+      } catch (e: any) {
+        setCheck('supabase', { status: 'fail', value: e?.message ?? 'שגיאה' });
+      }
+
+      // 2. Auth Status
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        const val = session?.user?.email
+          ? `מחובר: ${session.user.email}`
+          : 'לא מחובר';
+        setCheck('auth', { status: session ? 'pass' : 'fail', value: val });
+      } catch (e: any) {
+        setCheck('auth', { status: 'fail', value: e?.message ?? 'שגיאה' });
+      }
+
+      // 3. AsyncStorage read/write
+      const TEST_KEY = '@psychotechniplus/diag/test';
+      try {
+        const t0 = Date.now();
+        await AsyncStorage.setItem(TEST_KEY, 'ok');
+        const val = await AsyncStorage.getItem(TEST_KEY);
+        await AsyncStorage.removeItem(TEST_KEY);
+        const latencyMs = Date.now() - t0;
+        if (val !== 'ok') throw new Error('value mismatch');
+        setCheck('storage', { status: 'pass', value: `${latencyMs}ms`, latencyMs });
+      } catch (e: any) {
+        setCheck('storage', { status: 'fail', value: e?.message ?? 'שגיאה' });
+      }
+
+      // 4. Questions store — synchronous snapshot
+      const qCount = questions.length;
+      setCheck('questions', {
+        status: qCount > 0 ? 'pass' : 'fail',
+        value: `${qCount} שאלות`,
+      });
+
+      // 5. App Config
+      const flagCount = Object.keys(appConfig.featureFlags ?? {}).length;
+      const maintenance = appConfig.maintenanceMode ? 'פעיל ⚠️' : 'כבוי';
+      setCheck('config', {
+        status: 'pass',
+        value: `תחזוקה: ${maintenance} | דגלים: ${flagCount}`,
+      });
+
+      // 6. Build info
+      const now = new Date().toLocaleDateString('he-IL');
+      setCheck('build', {
+        status: 'pass',
+        value: `${Platform.OS} | Expo SDK 52 | ${now}`,
+      });
+    } finally {
+      runningRef.current = false;
+      setRunning(false);
     }
-
-    // 2. Auth Status
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      const val = session?.user?.email
-        ? `מחובר: ${session.user.email}`
-        : 'לא מחובר';
-      setCheck('auth', { status: session ? 'pass' : 'fail', value: val });
-    } catch (e: any) {
-      setCheck('auth', { status: 'fail', value: e?.message ?? 'שגיאה' });
-    }
-
-    // 3. AsyncStorage read/write
-    const TEST_KEY = '@psychotechniplus/diag/test';
-    try {
-      const t0 = Date.now();
-      await AsyncStorage.setItem(TEST_KEY, 'ok');
-      const val = await AsyncStorage.getItem(TEST_KEY);
-      await AsyncStorage.removeItem(TEST_KEY);
-      const latencyMs = Date.now() - t0;
-      if (val !== 'ok') throw new Error('value mismatch');
-      setCheck('storage', { status: 'pass', value: `${latencyMs}ms`, latencyMs });
-    } catch (e: any) {
-      setCheck('storage', { status: 'fail', value: e?.message ?? 'שגיאה' });
-    }
-
-    // 4. Questions store — synchronous snapshot
-    const qCount = questions.length;
-    setCheck('questions', {
-      status: qCount > 0 ? 'pass' : 'fail',
-      value: `${qCount} שאלות`,
-    });
-
-    // 5. App Config
-    const flagCount = Object.keys(appConfig.featureFlags ?? {}).length;
-    const maintenance = appConfig.maintenanceMode ? 'פעיל ⚠️' : 'כבוי';
-    setCheck('config', {
-      status: 'pass',
-      value: `תחזוקה: ${maintenance} | דגלים: ${flagCount}`,
-    });
-
-    // 6. Build info
-    const now = new Date().toLocaleDateString('he-IL');
-    setCheck('build', {
-      status: 'pass',
-      value: `${Platform.OS} | Expo SDK 52 | ${now}`,
-    });
-
-    setRunning(false);
-  }, [running, questions, appConfig, setCheck]);
+  }, [questions, appConfig, setCheck]);
 
   return (
     <SafeAreaView style={styles.root} edges={['bottom']}>

@@ -190,10 +190,10 @@ export default function FaqManagerScreen() {
     setShowForm(false);
   };
 
-  const visibleItems = items
-    .slice()
-    .sort((a, b) => a.order - b.order)
-    .filter(it => activeCategory === 'הכל' || it.category === activeCategory);
+  const sortedItems = items.slice().sort((a, b) => a.order - b.order);
+  const visibleItems = activeCategory === 'הכל'
+    ? sortedItems
+    : sortedItems.filter(it => it.category === activeCategory);
 
   if (loading) {
     return (
@@ -323,9 +323,10 @@ export default function FaqManagerScreen() {
           </View>
         )}
 
-        {visibleItems.map((item, idx) => {
+        {visibleItems.map((item) => {
           const isExpanded = expandedId === item.id;
           const catColor = CATEGORY_COLORS[item.category] ?? '#7C6FF7';
+          const fullIdx = sortedItems.findIndex(it => it.id === item.id);
           return (
             <View key={item.id} style={styles.faqCard}>
               {/* Header */}
@@ -356,16 +357,16 @@ export default function FaqManagerScreen() {
                 <View style={styles.faqReorder}>
                   <Pressable
                     onPress={() => handleMove(item.id, 'up')}
-                    disabled={idx === 0}
-                    style={[styles.reorderBtn, idx === 0 && { opacity: 0.3 }]}
+                    disabled={fullIdx === 0}
+                    style={[styles.reorderBtn, fullIdx === 0 && { opacity: 0.3 }]}
                   >
                     <Text style={styles.reorderText}>▲</Text>
                   </Pressable>
                   <Text style={styles.orderNum}>{item.order}</Text>
                   <Pressable
                     onPress={() => handleMove(item.id, 'down')}
-                    disabled={idx === visibleItems.length - 1}
-                    style={[styles.reorderBtn, idx === visibleItems.length - 1 && { opacity: 0.3 }]}
+                    disabled={fullIdx === sortedItems.length - 1}
+                    style={[styles.reorderBtn, fullIdx === sortedItems.length - 1 && { opacity: 0.3 }]}
                   >
                     <Text style={styles.reorderText}>▼</Text>
                   </Pressable>

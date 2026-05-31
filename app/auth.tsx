@@ -583,6 +583,7 @@ export default function AuthScreen() {
                 } catch {
                   setEmailPending(false);
                   setMode('register');
+                  setError('שגיאה בשליחה מחדש — נסה שוב');
                 } finally {
                   setResending(false);
                 }

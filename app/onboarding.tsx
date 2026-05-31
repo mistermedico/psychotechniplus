@@ -391,12 +391,11 @@ function StepWelcome({
         <View style={[styles.inputWrapper, focused && styles.inputWrapperFocused]}>
           <View style={styles.inputRow}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { textAlign: 'right' }]}
               placeholder="הכנס/י שם..."
               placeholderTextColor={colors.textTertiary}
               value={name}
               onChangeText={setName}
-              textAlign="right"
               autoFocus
               returnKeyType="go"
               onSubmitEditing={onNext}
