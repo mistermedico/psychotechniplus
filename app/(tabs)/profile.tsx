@@ -14,6 +14,7 @@ import { useSettingsStore, DifficultyOption } from '../../store/settingsStore';
 import { TARGETS } from '../../data/mockData';
 import { ThemeColors } from '../../constants/colors';
 import { useColors } from '../../hooks/useColors';
+import { useLayout } from '../../hooks/useLayout';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 
 // ── SettingRow layout (no color values) ────────────────────────────────────
@@ -98,6 +99,7 @@ const ACHIEVEMENT_BADGE_DEFS = [
 
 export default function ProfileTab() {
   const colors = useColors();
+  const layout = useLayout();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
 
@@ -296,7 +298,13 @@ export default function ProfileTab() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
+          contentContainerStyle={[styles.content, {
+            paddingBottom: insets.bottom + 90,
+            maxWidth: layout.isWide ? 600 : undefined,
+            alignSelf: 'center' as any,
+            width: '100%',
+            paddingHorizontal: layout.hPad,
+          }]}
           showsVerticalScrollIndicator={false}
         >
           {/* ── Profile Hero ── */}

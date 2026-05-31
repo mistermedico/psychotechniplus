@@ -326,6 +326,7 @@ export default function ProgressTab() {
         <View style={styles.badgesGrid}>
           {ALL_BADGES.map(badge => {
             const earned = earnedBadgeTypes.has(badge.type as any);
+            const badgeColWidth = `${(100 / layout.numCols) - 2}%` as any;
             return (
               <View
                 key={badge.type}
@@ -333,6 +334,7 @@ export default function ProgressTab() {
                   styles.badgeCard,
                   !earned && styles.badgeCardLocked,
                   earned && styles.badgeCardEarned,
+                  { width: badgeColWidth },
                 ]}
               >
                 <Text style={[styles.badgeIcon, !earned && { opacity: 0.3 }]}>
