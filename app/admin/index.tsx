@@ -41,10 +41,12 @@ const ADMIN_SECTIONS: NavSection[] = [
   // Users
   { id: 'users',              icon: '👥', label: 'משתמשים',         desc: 'צפייה, שדרוג',           route: '/admin/users',               category: 'users' },
   { id: 'leaderboard-admin',  icon: '🏅', label: 'לוח מובילים',     desc: 'ניהול דירוג',            route: '/admin/leaderboard-admin',   category: 'users' },
+  { id: 'inbox-admin',        icon: '✉️', label: 'הודעות Inbox',    desc: 'הרכב ושלח הודעות',       route: '/admin/inbox-admin',         category: 'users' },
   // Business
   { id: 'revenue',            icon: '📈', label: 'הכנסות',           desc: 'MRR ומנויים',            route: '/admin/revenue',             category: 'business' },
   { id: 'promo-codes',        icon: '🎟️', label: 'קודי קופון',      desc: 'הנחות וגישה',            route: '/admin/promo-codes',         category: 'business' },
   { id: 'notifications',      icon: '🔔', label: 'הודעות Push',     desc: 'שליחת התראות',           route: '/admin/notifications',       category: 'business' },
+  { id: 'announcements',      icon: '📢', label: 'הכרזות',           desc: 'באנר הודעות לאפליקציה',  route: '/admin/announcements',       category: 'business' },
   { id: 'app-settings',       icon: '⚙️', label: 'הגדרות אפליקציה',desc: 'פרמטרים גלובליים',       route: '/admin/app-settings',        category: 'business' },
   // System
   { id: 'visit-log', icon: '📍', label: 'יומן ביקורים', desc: 'מעקב ביקורי משתמשים ואורחים', route: '/admin/visit-log', category: 'system' },
@@ -54,6 +56,7 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'session-settings',   icon: '🎛️', label: 'הגדרות סשן',      desc: 'תרגול ומבחנים',          route: '/admin/session-settings',    category: 'system' },
   { id: 'daily-challenge',    icon: '🎯', label: 'אתגרים יומיים',    desc: 'בונוס XP',               route: '/admin/daily-challenge',     category: 'system' },
   { id: 'activity-log',       icon: '📋', label: 'יומן פעילות',      desc: 'תיעוד פעולות',           route: '/admin/activity-log',        category: 'system' },
+  { id: 'feature-flags',      icon: '🚩', label: 'דגלי פיצ\'ר',      desc: 'toggleים ומגבלות',       route: '/admin/feature-flags',       category: 'system' },
   { id: 'logs',               icon: '🪵', label: 'לוגים',             desc: 'שגיאות ואירועים',         route: '/admin/logs',                category: 'system' },
 ];
 

@@ -30,6 +30,9 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/notifications': 'הודעות Push',
   '/admin/promo-codes': 'קודי קופון',
   '/admin/activity-log': 'יומן פעילות',
+  '/admin/feature-flags': 'דגלי פיצ\'ר',
+  '/admin/inbox-admin': 'הודעות Inbox',
+  '/admin/announcements': 'הכרזות',
   '/admin/visit-log': 'יומן ביקורים',
 };
 
@@ -99,7 +102,10 @@ export default function AdminLayout() {
       <Stack.Screen name="notifications"       options={{ title: '🔔 הודעות Push' }} />
       <Stack.Screen name="promo-codes"         options={{ title: '🎟️ קודי קופון' }} />
       <Stack.Screen name="activity-log"        options={{ title: '📋 יומן פעילות' }} />
-      <Stack.Screen name="visit-log" options={{ title: '📍 יומן ביקורים' }} />
+      <Stack.Screen name="visit-log"          options={{ title: '📍 יומן ביקורים' }} />
+      <Stack.Screen name="feature-flags"      options={{ title: '🚩 דגלי פיצ\'ר' }} />
+      <Stack.Screen name="inbox-admin"        options={{ title: '✉️ הודעות Inbox' }} />
+      <Stack.Screen name="announcements"      options={{ title: '📢 הכרזות' }} />
       <Stack.Screen name="logs"               options={{ title: '🪵 לוגים' }} />
     </Stack>
   );
