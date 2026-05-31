@@ -1,11 +1,12 @@
 import React, { useRef, useEffect } from 'react';
-import { Tabs, usePathname } from 'expo-router';
+import { Tabs, router, usePathname } from 'expo-router';
 import { Platform, StyleSheet, View, Text, Animated, Pressable } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { FontFamily } from '../../constants/theme';
 import { useColors } from '../../hooks/useColors';
+import { useLayout, SIDEBAR_WIDTH } from '../../hooks/useLayout';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAdminStore } from '../../store/adminStore';
 import { useUserStore } from '../../store/userStore';
@@ -101,6 +102,14 @@ function AnnouncementBanner() {
   );
 }
 
+const TAB_ITEMS = [
+  { icon: '🏠', label: 'בית', route: '/(tabs)/' as const, matchSegments: ['/', '/index', ''] },
+  { icon: '🎯', label: 'מסלולים', route: '/(tabs)/targets' as const, matchSegments: ['/targets'] },
+  { icon: '✏️', label: 'תרגול', route: '/(tabs)/practice' as const, matchSegments: ['/practice'] },
+  { icon: '📊', label: 'התקדמות', route: '/(tabs)/progress' as const, matchSegments: ['/progress'] },
+  { icon: '👤', label: 'פרופיל', route: '/(tabs)/profile' as const, matchSegments: ['/profile'] },
+] as const;
+
 const TAB_SCREEN_NAMES: Record<string, string> = {
   '/(tabs)': 'דף הבית',
   '/(tabs)/index': 'דף הבית',
@@ -110,12 +119,90 @@ const TAB_SCREEN_NAMES: Record<string, string> = {
   '/(tabs)/targets': 'מסלולים',
 };
 
+function WebSidebar() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+
+  function isTabActive(matchSegments: readonly string[]): boolean {
+    return matchSegments.some(seg => {
+      if (seg === '/' || seg === '' || seg === '/index') {
+        return pathname === '/' || pathname === '' || pathname === '/index';
+      }
+      return pathname === seg || pathname.startsWith(seg + '/');
+    });
+  }
+
+  return (
+    <View
+      style={[
+        styles.sidebar,
+        {
+          backgroundColor: colors.background,
+          borderLeftWidth: 1,
+          borderLeftColor: colors.border,
+          paddingTop: Math.max(insets.top, 16),
+          paddingBottom: Math.max(insets.bottom, 16),
+          width: SIDEBAR_WIDTH,
+        },
+      ]}
+    >
+      {/* App logo / name */}
+      <View style={styles.sidebarLogoContainer}>
+        <Text style={[styles.sidebarLogoText, { color: colors.primary }]}>
+          PsychoTechni+
+        </Text>
+      </View>
+
+      {/* Divider */}
+      <View style={[styles.sidebarDivider, { backgroundColor: colors.border }]} />
+
+      {/* Nav items */}
+      <View style={styles.sidebarNav}>
+        {TAB_ITEMS.map(item => {
+          const active = isTabActive(item.matchSegments);
+          return (
+            <Pressable
+              key={item.route}
+              onPress={() => router.navigate(item.route)}
+              style={({ pressed }) => [
+                styles.sidebarItem,
+                active && { backgroundColor: colors.primaryLighter },
+                pressed && !active && { backgroundColor: colors.surface },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={item.label}
+            >
+              <Text style={[styles.sidebarItemIcon, !active && { opacity: 0.5 }]}>
+                {item.icon}
+              </Text>
+              <Text
+                style={[
+                  styles.sidebarItemLabel,
+                  {
+                    color: active ? colors.primary : colors.textSecondary,
+                    fontFamily: active ? FontFamily.semiBold : FontFamily.regular,
+                    opacity: active ? 1 : 0.7,
+                  },
+                ]}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const TAB_HEIGHT = 64;
   const BAR_HEIGHT = TAB_HEIGHT + Math.max(insets.bottom, 12);
   const theme = useSettingsStore(s => s.theme);
   const colors = useColors();
+  const { showSidebar } = useLayout();
   const pathname = usePathname();
   const lastTrackedTab = useRef<string | null>(null);
 
@@ -143,76 +230,83 @@ export default function TabLayout() {
   return (
     <View style={{ flex: 1 }}>
       <AnnouncementBanner />
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarBackground: () => (
-          <View style={StyleSheet.absoluteFill}>
-            {Platform.OS === 'ios' ? (
-              <BlurView tint={theme === 'light' ? 'light' : 'dark'} intensity={80} style={[StyleSheet.absoluteFill, styles.blurBase]} />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'light' ? 'rgba(244,246,251,0.97)' : 'rgba(8,10,18,0.97)' }]} />
-            )}
-            <View style={styles.topBorder} />
-          </View>
-        ),
-        tabBarStyle: {
-          position: 'absolute',
-          borderTopWidth: 0,
-          height: BAR_HEIGHT,
-          paddingBottom: Math.max(insets.bottom, 12),
-          paddingTop: 8,
-          backgroundColor: 'transparent',
-          elevation: 0,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -6 },
-          shadowOpacity: 0.45,
-          shadowRadius: 24,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="🏠" label="בית" focused={focused} />,
-          tabBarAccessibilityLabel: 'בית',
-        }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
-      />
-      <Tabs.Screen
-        name="targets"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="🎯" label="מסלולים" focused={focused} />,
-          tabBarAccessibilityLabel: 'מסלולים',
-        }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
-      />
-      <Tabs.Screen
-        name="practice"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="✏️" label="תרגול" focused={focused} />,
-          tabBarAccessibilityLabel: 'תרגול',
-        }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
-      />
-      <Tabs.Screen
-        name="progress"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="📊" label="התקדמות" focused={focused} />,
-          tabBarAccessibilityLabel: 'התקדמות',
-        }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="👤" label="פרופיל" focused={focused} />,
-          tabBarAccessibilityLabel: 'פרופיל',
-        }}
-        listeners={{ tabPress: () => Haptics.selectionAsync() }}
-      />
-    </Tabs>
+      <View style={{ flex: 1 }}>
+        <View style={showSidebar ? { flex: 1, paddingRight: SIDEBAR_WIDTH } : { flex: 1 }}>
+          <Tabs
+            screenOptions={{
+              headerShown: false,
+              tabBarShowLabel: false,
+              tabBarBackground: () => (
+                <View style={StyleSheet.absoluteFill}>
+                  {Platform.OS === 'ios' ? (
+                    <BlurView tint={theme === 'light' ? 'light' : 'dark'} intensity={80} style={[StyleSheet.absoluteFill, styles.blurBase]} />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'light' ? 'rgba(244,246,251,0.97)' : 'rgba(8,10,18,0.97)' }]} />
+                  )}
+                  <View style={styles.topBorder} />
+                </View>
+              ),
+              tabBarStyle: showSidebar
+                ? { display: 'none' as any }
+                : {
+                    position: 'absolute',
+                    borderTopWidth: 0,
+                    height: BAR_HEIGHT,
+                    paddingBottom: Math.max(insets.bottom, 12),
+                    paddingTop: 8,
+                    backgroundColor: 'transparent',
+                    elevation: 0,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: -6 },
+                    shadowOpacity: 0.45,
+                    shadowRadius: 24,
+                  },
+            }}
+          >
+            <Tabs.Screen
+              name="index"
+              options={{
+                tabBarIcon: ({ focused }) => <TabIcon icon="🏠" label="בית" focused={focused} />,
+                tabBarAccessibilityLabel: 'בית',
+              }}
+              listeners={{ tabPress: () => Haptics.selectionAsync() }}
+            />
+            <Tabs.Screen
+              name="targets"
+              options={{
+                tabBarIcon: ({ focused }) => <TabIcon icon="🎯" label="מסלולים" focused={focused} />,
+                tabBarAccessibilityLabel: 'מסלולים',
+              }}
+              listeners={{ tabPress: () => Haptics.selectionAsync() }}
+            />
+            <Tabs.Screen
+              name="practice"
+              options={{
+                tabBarIcon: ({ focused }) => <TabIcon icon="✏️" label="תרגול" focused={focused} />,
+                tabBarAccessibilityLabel: 'תרגול',
+              }}
+              listeners={{ tabPress: () => Haptics.selectionAsync() }}
+            />
+            <Tabs.Screen
+              name="progress"
+              options={{
+                tabBarIcon: ({ focused }) => <TabIcon icon="📊" label="התקדמות" focused={focused} />,
+                tabBarAccessibilityLabel: 'התקדמות',
+              }}
+              listeners={{ tabPress: () => Haptics.selectionAsync() }}
+            />
+            <Tabs.Screen
+              name="profile"
+              options={{
+                tabBarIcon: ({ focused }) => <TabIcon icon="👤" label="פרופיל" focused={focused} />,
+                tabBarAccessibilityLabel: 'פרופיל',
+              }}
+              listeners={{ tabPress: () => Haptics.selectionAsync() }}
+            />
+          </Tabs>
+        </View>
+        {showSidebar && <WebSidebar />}
+      </View>
     </View>
   );
 }
@@ -269,5 +363,48 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#9E99FA',
     letterSpacing: 0.3,
+  },
+  // Sidebar styles
+  sidebar: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  sidebarLogoContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'flex-end',
+  },
+  sidebarLogoText: {
+    fontSize: 18,
+    fontFamily: FontFamily.semiBold,
+    textAlign: 'right',
+    letterSpacing: 0.3,
+  },
+  sidebarDivider: {
+    height: 1,
+    marginHorizontal: 12,
+    marginBottom: 8,
+  },
+  sidebarNav: {
+    flex: 1,
+    paddingHorizontal: 8,
+    gap: 4,
+  },
+  sidebarItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 10,
+  },
+  sidebarItemIcon: {
+    fontSize: 20,
+  },
+  sidebarItemLabel: {
+    fontSize: 15,
+    textAlign: 'right',
   },
 });

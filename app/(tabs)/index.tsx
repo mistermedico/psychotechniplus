@@ -14,6 +14,7 @@ import { ThemeColors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { useColors } from '../../hooks/useColors';
+import { useLayout } from '../../hooks/useLayout';
 
 const { width: W } = Dimensions.get('window');
 
@@ -39,6 +40,8 @@ export default function Dashboard() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const styles = React.useMemo(() => makeStyles(colors), [colors]);
+
+  const layout = useLayout();
 
   const {
     name, streak, level, xp, badges,
@@ -105,7 +108,13 @@ export default function Dashboard() {
 
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
+          contentContainerStyle={[styles.content, {
+            paddingBottom: insets.bottom + 90,
+            maxWidth: layout.isWide ? 800 : undefined,
+            alignSelf: 'center' as any,
+            width: '100%',
+            paddingHorizontal: layout.hPad,
+          }]}
           showsVerticalScrollIndicator={false}
         >
           {/* ── Header ── */}

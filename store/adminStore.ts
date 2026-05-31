@@ -236,6 +236,10 @@ export interface AppConfig {
   freeSessionsPerDay: number;
   sessionCooldownMinutes: number;
   leaderboardVisible: boolean;
+  minAppVersion: string;
+  supportEmail: string;
+  maxFreeQuestionsTotal: number;
+  registrationMessage: string;
   featureFlags: {
     speedMode: boolean;
     streakMode: boolean;
@@ -243,6 +247,9 @@ export interface AppConfig {
     leaderboard: boolean;
     socialSharing: boolean;
     dailyChallenge: boolean;
+    adaptiveLearning: boolean;
+    aiHints: boolean;
+    referralProgram: boolean;
   };
 }
 
@@ -269,6 +276,10 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   freeSessionsPerDay: 10,
   sessionCooldownMinutes: 0,
   leaderboardVisible: true,
+  minAppVersion: '1.0.0',
+  supportEmail: 'support@psychotechniplus.com',
+  maxFreeQuestionsTotal: 500,
+  registrationMessage: '',
   featureFlags: {
     speedMode: true,
     streakMode: true,
@@ -276,6 +287,9 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     leaderboard: true,
     socialSharing: false,
     dailyChallenge: false,
+    adaptiveLearning: true,
+    aiHints: false,
+    referralProgram: false,
   },
 };
 

@@ -17,6 +17,7 @@ import { TOPICS } from '../../data/mockData';
 import { ProgressBar } from '../../components/ProgressBar';
 import { StatCard } from '../../components/StatCard';
 import { useColors } from '../../hooks/useColors';
+import { useLayout } from '../../hooks/useLayout';
 import { ThemeColors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
@@ -40,6 +41,7 @@ const DAY_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 export default function ProgressTab() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
+  const layout = useLayout();
   const styles = React.useMemo(() => makeStyles(colors), [colors]);
   const {
     name, level, xp, streak, longestStreak,
@@ -119,7 +121,13 @@ export default function ProgressTab() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, {
+          paddingBottom: insets.bottom + 24,
+          maxWidth: layout.isWide ? 800 : undefined,
+          alignSelf: 'center' as any,
+          width: '100%',
+          paddingHorizontal: layout.hPad,
+        }]}
         showsVerticalScrollIndicator={false}
         bounces={Platform.OS === 'ios'}
         decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
