@@ -78,6 +78,24 @@ function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggl
   );
 }
 
+// ── SectionCard ─────────────────────────────────────────────────────────────
+
+function SectionCard({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+  const colors = useColors();
+  return (
+    <View style={{ marginBottom: 20, borderRadius: 20, overflow: 'hidden', backgroundColor: colors.surfaceCard, borderWidth: 1, borderColor: colors.border }}>
+      <LinearGradient
+        colors={[colors.surfaceStrong, colors.surface]}
+        style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}
+      >
+        <Text style={{ fontSize: 20 }}>{icon}</Text>
+        <Text style={{ fontFamily: FontFamily.semiBold, fontSize: FontSize.base, color: colors.text, textAlign: 'right', flex: 1 }}>{title}</Text>
+      </LinearGradient>
+      {children}
+    </View>
+  );
+}
+
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const DIFFICULTY_LABELS: Record<string, string> = {
@@ -310,16 +328,31 @@ export default function ProfileTab() {
           {/* ── Profile Hero ── */}
           <View style={styles.profileHero}>
             <View style={styles.avatarWrap}>
+              {/* Gradient ring — outer */}
               <LinearGradient
-                colors={[colors.primary, colors.accent]}
+                colors={[colors.primary, colors.accent, colors.cyan]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={styles.avatarGradient}
+                style={styles.avatarRing}
               >
-                <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
+                {/* 2px gap between ring and avatar */}
+                <View style={styles.avatarRingInner}>
+                  <LinearGradient
+                    colors={[colors.primary, colors.accent]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.avatarGradient}
+                  >
+                    <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
+                  </LinearGradient>
+                </View>
               </LinearGradient>
               <View style={styles.levelBadge}>
                 <Text style={styles.levelBadgeText}>{level}</Text>
               </View>
+              {isPremium && (
+                <View style={styles.premiumAvatarBadge}>
+                  <Text style={styles.premiumAvatarBadgeText}>פרמיום</Text>
+                </View>
+              )}
             </View>
 
             <Text style={styles.profileName}>{name || 'מתאמן'}</Text>
@@ -428,13 +461,13 @@ export default function ProfileTab() {
             </View>
           </Pressable>
 
-          {/* ── Settings ── */}
+          {/* ── Settings: appearance group ── */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTag}>SETTINGS</Text>
             <Text style={styles.sectionTitle}>הגדרות</Text>
           </View>
 
-          <View style={styles.settingsCard}>
+          <SectionCard title="עיצוב ותצוגה" icon="🎨">
             <SettingRow icon="📬" label="הודעות" value={inboxUnreadCount > 0 ? `${inboxUnreadCount} חדשות` : undefined} onPress={() => { Haptics.selectionAsync(); router.push('/inbox'); }} />
             <SettingRow icon="💡" label="עזרה ומדריך" value="מדריך למשתמש" onPress={() => { Haptics.selectionAsync(); router.push('/help'); }} />
             <SettingRow icon="🔔" label="התראות" value="הגדרות מכשיר" onPress={handleNotifications} />
@@ -453,7 +486,7 @@ export default function ProfileTab() {
             {showAdmin && (
               <SettingRow icon="🖥️" label="הגדרות תצוגה מתקדמות" onPress={() => { Haptics.selectionAsync(); router.push('/admin/display-settings'); }} isLast />
             )}
-          </View>
+          </SectionCard>
 
           {/* ── Account ── */}
           <View style={styles.sectionHeaderRow}>
@@ -461,13 +494,13 @@ export default function ProfileTab() {
             <Text style={styles.sectionTitle}>חשבון</Text>
           </View>
 
-          <View style={styles.settingsCard}>
+          <SectionCard title="חשבון" icon="👤">
             <SettingRow icon="⭐" label="שאלות מועדפות" value="בקרוב" onPress={() => { Haptics.selectionAsync(); Alert.alert('שאלות מועדפות 🌟', 'פיצ\'ר זה בפיתוח.\n\nבקרוב תוכל לסמן שאלות כמועדפות ולתרגל אותן בנפרד.'); }} />
             <SettingRow icon="📝" label="ההיסטוריה שלי" onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/progress'); }} />
             <SettingRow icon="💬" label="צור קשר ותמיכה" onPress={handleContact} />
             <SettingRow icon="🔒" label="מדיניות פרטיות" onPress={() => { Haptics.selectionAsync(); router.push('/privacy'); }} />
             <SettingRow icon="📄" label="תנאי שימוש" onPress={() => { Haptics.selectionAsync(); router.push('/terms'); }} isLast />
-          </View>
+          </SectionCard>
 
           {/* ── Danger Zone ── */}
           <View style={styles.sectionHeaderRow}>
@@ -475,31 +508,33 @@ export default function ProfileTab() {
             <Text style={[styles.sectionTitle, { color: colors.danger }]}>פעולות חשבון</Text>
           </View>
 
-          <View style={styles.settingsCard}>
+          <SectionCard title="פעולות חשבון" icon="⚠️">
             <SettingRow icon="🚪" label={signingOut ? 'יוצא...' : 'יציאה מהחשבון'} onPress={handleSignOut} danger disabled={signingOut} />
             <SettingRow icon="🗑️" label="איפוס כל הנתונים" onPress={handleReset} danger />
             <SettingRow icon="⛔" label={deletingAccount ? 'מוחק חשבון...' : 'מחיקת חשבון לצמיתות'} onPress={handleDeleteAccount} danger disabled={deletingAccount} isLast />
-          </View>
+          </SectionCard>
 
           {/* ── Premium banner ── */}
           {!isPremium && (
-            <Pressable
-              style={({ pressed }) => [styles.premiumBanner, { opacity: pressed ? 0.82 : 1 }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/paywall'); }}
-            >
-              <LinearGradient
-                colors={['#92400E', '#D97706', '#FBBF24']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.premiumBannerGrad}
+            <SectionCard title="שדרג לפרמיום" icon="💎">
+              <Pressable
+                style={({ pressed }) => [styles.premiumBanner, { opacity: pressed ? 0.82 : 1 }]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/paywall'); }}
               >
-                <Text style={styles.premiumBannerChevron}>‹</Text>
-                <View style={styles.premiumBannerText}>
-                  <Text style={styles.premiumBannerTitle}>שדרג לפרמיום 💎</Text>
-                  <Text style={styles.premiumBannerSub}>תרגול ללא הגבלה, כל הנושאים, סימולציות</Text>
-                </View>
-                <Text style={styles.premiumBannerEmoji}>👑</Text>
-              </LinearGradient>
-            </Pressable>
+                <LinearGradient
+                  colors={['#92400E', '#D97706', '#FBBF24']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={styles.premiumBannerGrad}
+                >
+                  <Text style={styles.premiumBannerChevron}>‹</Text>
+                  <View style={styles.premiumBannerText}>
+                    <Text style={styles.premiumBannerTitle}>שדרג לפרמיום 💎</Text>
+                    <Text style={styles.premiumBannerSub}>תרגול ללא הגבלה, כל הנושאים, סימולציות</Text>
+                  </View>
+                  <Text style={styles.premiumBannerEmoji}>👑</Text>
+                </LinearGradient>
+              </Pressable>
+            </SectionCard>
           )}
 
           <Pressable onPress={handleVersionTap} style={styles.versionWrap}>
@@ -537,21 +572,38 @@ function makeStyles(colors: ThemeColors) {
       alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 4,
     },
     avatarWrap: { position: 'relative', marginBottom: 14 },
-    avatarGradient: {
-      width: 90, height: 90, borderRadius: 45,
+    // Gradient ring around avatar (outer)
+    avatarRing: {
+      width: 92, height: 92, borderRadius: 46,
       alignItems: 'center', justifyContent: 'center',
-      borderWidth: 2, borderColor: colors.primaryGlow,
-      shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.45, shadowRadius: 18, elevation: 12,
+      shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.55, shadowRadius: 22, elevation: 16,
     },
-    avatarEmoji: { fontSize: 38 },
+    // 2px gap between ring and avatar (background-colored inner shell)
+    avatarRingInner: {
+      width: 86, height: 86, borderRadius: 43,
+      backgroundColor: colors.background,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    avatarGradient: {
+      width: 80, height: 80, borderRadius: 40,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    avatarEmoji: { fontSize: 34 },
     levelBadge: {
-      position: 'absolute', bottom: -4, right: -4,
+      position: 'absolute', bottom: -2, right: -2,
       backgroundColor: colors.warning, borderRadius: Radius.full,
       width: 26, height: 26, alignItems: 'center', justifyContent: 'center',
       borderWidth: 2, borderColor: colors.background,
     },
     levelBadgeText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
+    premiumAvatarBadge: {
+      position: 'absolute', bottom: -2, left: -2,
+      backgroundColor: '#D97706', borderRadius: Radius.full,
+      paddingHorizontal: 7, paddingVertical: 3,
+      borderWidth: 1.5, borderColor: colors.background,
+    },
+    premiumAvatarBadgeText: { fontFamily: FontFamily.bold, fontSize: 9, color: '#fff' },
 
     profileName: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: colors.text, marginBottom: 3, textAlign: 'center' },
     profileEloTitle: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: colors.primaryLight, marginBottom: 3, textAlign: 'center' },
@@ -631,9 +683,9 @@ function makeStyles(colors: ThemeColors) {
       borderRadius: Radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.border,
     },
 
-    // Premium banner
+    // Premium banner (inside SectionCard)
     premiumBanner: {
-      marginHorizontal: 20, marginTop: 26, borderRadius: Radius.xl, overflow: 'hidden',
+      borderRadius: 0, overflow: 'hidden',
       shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 10,
     },
     premiumBannerGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 18, gap: 14 },

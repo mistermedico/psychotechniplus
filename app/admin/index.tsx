@@ -33,6 +33,7 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'ai-generator',       icon: '📝', label: 'מחולל שאלות',     desc: 'מבוסס תבניות',          route: '/admin/ai-generator',        category: 'content' },
   { id: 'export',             icon: '📤', label: 'ייצוא',            desc: 'ייצוא JSON',             route: '/admin/export',              category: 'content' },
   { id: 'topics-admin',       icon: '📚', label: 'נושאים',          desc: 'ניהול Topics',           route: '/admin/topics-admin',        category: 'content' },
+  { id: 'content-report',     icon: '📉', label: 'דוח תוכן',        desc: 'ביצועי שאלות',           route: '/admin/content-report',      category: 'content' },
   // Exams
   { id: 'simulation-builder', icon: '🏗️', label: 'סימולציה',        desc: 'תבניות מבחן',           route: '/admin/simulation-builder',  category: 'exams' },
   { id: 'topic-exam-map',     icon: '🗺️', label: 'מפת נושאים',     desc: 'שיוך נושא↔מבחן',        route: '/admin/topic-exam-map',      category: 'exams' },
@@ -42,6 +43,8 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'users',              icon: '👥', label: 'משתמשים',         desc: 'צפייה, שדרוג',           route: '/admin/users',               category: 'users' },
   { id: 'leaderboard-admin',  icon: '🏅', label: 'לוח מובילים',     desc: 'ניהול דירוג',            route: '/admin/leaderboard-admin',   category: 'users' },
   { id: 'inbox-admin',        icon: '✉️', label: 'הודעות Inbox',    desc: 'הרכב ושלח הודעות',       route: '/admin/inbox-admin',         category: 'users' },
+  { id: 'user-segments',      icon: '🔬', label: 'פילוח משתמשים',  desc: 'קבוצות וסגמנטים',        route: '/admin/user-segments',       category: 'users' },
+  { id: 'badge-manager',      icon: '🏅', label: 'ניהול תגים',      desc: 'תגי הישג',               route: '/admin/badge-manager',       category: 'users' },
   // Business
   { id: 'revenue',            icon: '📈', label: 'הכנסות',           desc: 'MRR ומנויים',            route: '/admin/revenue',             category: 'business' },
   { id: 'promo-codes',        icon: '🎟️', label: 'קודי קופון',      desc: 'הנחות וגישה',            route: '/admin/promo-codes',         category: 'business' },

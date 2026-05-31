@@ -289,9 +289,30 @@ function FreePracticePane({
           ))}
         </ScrollView>
 
-        {/* Mode detail card */}
+        {/* Mode detail card — gradient background + colored border strip + glow */}
         {FREE_MODES.filter(m => m.id === selectedMode).map(mode => (
-          <View key={mode.id} style={styles.modeDetailCard}>
+          <View
+            key={mode.id}
+            style={[
+              styles.modeDetailCard,
+              {
+                borderColor: mode.color + '55',
+                shadowColor: mode.color,
+                shadowOpacity: 0.30,
+                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 8,
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[mode.gradient[0] + '33', mode.gradient[1] + '14'] as [string, string]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
+            />
+            {/* 3px colored left/right accent strip (RTL — start/right side) */}
+            <View style={[styles.modeDetailStrip, { backgroundColor: mode.color }]} />
             <Text style={styles.modeDetailIcon}>{mode.icon}</Text>
             <View style={styles.modeDetailText}>
               <Text style={[styles.modeDetailLabel, { color: mode.color }]}>{mode.label}</Text>
@@ -313,12 +334,23 @@ function FreePracticePane({
                     onPress={() => { Haptics.selectionAsync(); setSelectedDifficulty(opt.id); }}
                     style={({ pressed }) => [
                       styles.difficultyChip,
-                      isActive && { borderColor: opt.color, backgroundColor: opt.color + '22' },
+                      isActive && {
+                        borderColor: opt.color,
+                        backgroundColor: opt.color + '33',
+                        shadowColor: opt.color,
+                        shadowOpacity: 0.25,
+                        shadowRadius: 8,
+                        shadowOffset: { width: 0, height: 2 },
+                        elevation: 4,
+                      },
                       { opacity: pressed ? 0.75 : 1 },
                     ]}
                   >
-                    <Text style={styles.difficultyChipIcon}>{opt.icon}</Text>
-                    <Text style={[styles.difficultyChipLabel, isActive && { color: opt.color }]}>
+                    <Text style={[styles.difficultyChipIcon, isActive && { fontSize: 22 }]}>{opt.icon}</Text>
+                    <Text style={[
+                      styles.difficultyChipLabel,
+                      isActive && { color: opt.color, fontFamily: FontFamily.bold },
+                    ]}>
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -351,17 +383,27 @@ function FreePracticePane({
                 }}
                 style={({ pressed }) => [
                   styles.topicCard,
-                  isSelected && { borderColor: topic.color, borderWidth: 2 },
+                  isSelected && {
+                    borderColor: topic.color,
+                    borderWidth: 2,
+                    shadowColor: topic.color,
+                    shadowOpacity: 0.22,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 3 },
+                    elevation: 6,
+                  },
                   isLocked && styles.topicCardLocked,
                   { opacity: pressed && !isLocked ? 0.75 : 1 },
                 ]}
               >
-                {isSelected && (
+                {isSelected ? (
                   <LinearGradient
-                    colors={[topic.color + '30', topic.color + '10']}
+                    colors={[topic.color + '40', topic.color + '18', 'transparent'] as any}
+                    start={{ x: 1, y: 0 }}
+                    end={{ x: 0, y: 1 }}
                     style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
                   />
-                )}
+                ) : null}
                 {isLocked && (
                   <View style={styles.lockBadge}>
                     <Text style={styles.lockBadgeText}>💎</Text>
@@ -370,6 +412,12 @@ function FreePracticePane({
                 {isSelected && !isLocked && (
                   <View style={[styles.checkBadge, { backgroundColor: topic.color }]}>
                     <Text style={styles.checkBadgeText}>✓</Text>
+                  </View>
+                )}
+                {/* Accuracy % badge in top-left corner when not locked */}
+                {!isLocked && accuracy > 0 && !isSelected && (
+                  <View style={[styles.accuracyBadge, { backgroundColor: topic.color + '22', borderColor: topic.color + '55' }]}>
+                    <Text style={[styles.accuracyBadgeText, { color: topic.color }]}>{Math.round(accuracy * 100)}%</Text>
                   </View>
                 )}
                 <Text style={styles.topicCardIcon}>{topic.icon}</Text>
@@ -759,8 +807,20 @@ function makeStyles(colors: ThemeColors) {
       marginBottom: 8,
       gap: 14,
       alignItems: 'center',
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderColor: colors.border,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    // 3px colored accent strip on the right (RTL start) side
+    modeDetailStrip: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      width: 3,
+      borderTopRightRadius: Radius.xl,
+      borderBottomRightRadius: Radius.xl,
     },
     modeDetailIcon: { fontSize: 32 },
     modeDetailText: { flex: 1, alignItems: 'flex-end' },
@@ -802,6 +862,17 @@ function makeStyles(colors: ThemeColors) {
       justifyContent: 'center',
     },
     checkBadgeText: { fontFamily: FontFamily.bold, fontSize: 11, color: '#fff' },
+    // Small accuracy % badge shown in top-left when not selected and has data
+    accuracyBadge: {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      borderRadius: Radius.full,
+      borderWidth: 1,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    accuracyBadgeText: { fontFamily: FontFamily.bold, fontSize: 10 },
     topicCardIcon: { fontSize: 36, marginBottom: 8 },
     topicCardName: {
       fontFamily: FontFamily.bold,

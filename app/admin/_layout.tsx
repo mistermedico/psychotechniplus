@@ -34,6 +34,9 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/inbox-admin': 'הודעות Inbox',
   '/admin/announcements': 'הכרזות',
   '/admin/visit-log': 'יומן ביקורים',
+  '/admin/content-report': 'דוח תוכן',
+  '/admin/user-segments': 'פילוח משתמשים',
+  '/admin/badge-manager': 'ניהול תגים',
 };
 
 export default function AdminLayout() {
@@ -107,6 +110,9 @@ export default function AdminLayout() {
       <Stack.Screen name="inbox-admin"        options={{ title: '✉️ הודעות Inbox' }} />
       <Stack.Screen name="announcements"      options={{ title: '📢 הכרזות' }} />
       <Stack.Screen name="logs"               options={{ title: '🪵 לוגים' }} />
+      <Stack.Screen name="content-report"     options={{ title: '📉 דוח תוכן' }} />
+      <Stack.Screen name="user-segments"      options={{ title: '🔬 פילוח משתמשים' }} />
+      <Stack.Screen name="badge-manager"      options={{ title: '🏅 ניהול תגים' }} />
     </Stack>
   );
 }

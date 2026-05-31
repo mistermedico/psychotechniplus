@@ -139,6 +139,11 @@ export default function ProgressTab() {
           end={{ x: 1, y: 1 }}
           style={styles.hero}
         >
+          {/* Decorative geometric shapes — absolute positioned */}
+          <View style={styles.heroDecorCircle1} pointerEvents="none" />
+          <View style={styles.heroDecorCircle2} pointerEvents="none" />
+          <View style={styles.heroDecorCircle3} pointerEvents="none" />
+
           {/* Top row: streak badge + name/label */}
           <View style={styles.heroTop}>
             <View style={styles.streakBadge}>
@@ -150,10 +155,15 @@ export default function ProgressTab() {
             </View>
           </View>
 
-          {/* Accuracy stat — prominent */}
+          {/* Accuracy stat — even larger and more dramatic */}
           <View style={styles.accuracyRow}>
             <Text style={styles.accuracyValue}>{accuracy}%</Text>
-            <Text style={styles.accuracyLabel}>דיוק כולל</Text>
+            <View style={styles.accuracyLabelRow}>
+              <Text style={styles.accuracyLabel}>דיוק כולל</Text>
+              {accuracy >= 70 && (
+                <Text style={styles.accuracyTrend}> ↑</Text>
+              )}
+            </View>
           </View>
 
           {/* Level info row */}
@@ -181,16 +191,16 @@ export default function ProgressTab() {
 
         <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTranslateY }] }}>
           <View style={styles.statsGrid}>
-            <StatCard icon="🎯" label="סשנים" value={totalSessions} color={colors.primary} />
-            <StatCard icon="✅" label="נכון" value={totalCorrect} color={colors.success} />
+            <EnhancedStatCard icon="🎯" label="סשנים" value={totalSessions} color={colors.primary} gradientColors={colors.gradients.primary} />
+            <EnhancedStatCard icon="✅" label="נכון" value={totalCorrect} color={colors.success} gradientColors={colors.gradients.success} />
           </View>
           <View style={[styles.statsGrid, { marginTop: 10 }]}>
-            <StatCard icon="📊" label="דיוק" value={`${accuracy}%`} color={colors.accent} />
-            <StatCard icon="🔥" label="רצף" value={`${streak} ימים`} color={colors.warning} />
+            <EnhancedStatCard icon="📊" label="דיוק" value={`${accuracy}%`} color={colors.accent} gradientColors={['#C084FC', '#8B5CF6']} />
+            <EnhancedStatCard icon="🔥" label="רצף" value={`${streak} ימים`} color={colors.warning} gradientColors={colors.gradients.gold} />
           </View>
           <View style={[styles.statsGrid, { marginTop: 10 }]}>
-            <StatCard icon="🏅" label="רצף שיא" value={`${longestStreak} ימים`} color={colors.gold} />
-            <StatCard icon="📝" label="סה״כ שאלות" value={totalAnswered} color={colors.textSecondary} />
+            <EnhancedStatCard icon="🏅" label="רצף שיא" value={`${longestStreak} ימים`} color={colors.gold} gradientColors={colors.gradients.gold} />
+            <EnhancedStatCard icon="📝" label="סה״כ שאלות" value={totalAnswered} color={colors.cyan} gradientColors={colors.gradients.cyan} />
           </View>
         </Animated.View>
 
@@ -277,6 +287,7 @@ export default function ProgressTab() {
             const accuracy = getTopicAccuracy(topic.id);
             const level = getTopicLevel(topic.id);
             const isLast = idx === topics.length - 1;
+            const accuracyPct = accuracy > 0 ? Math.round(accuracy * 100) : 0;
             return (
               <View
                 key={topic.id}
@@ -286,8 +297,11 @@ export default function ProgressTab() {
                   isLast && { borderBottomWidth: 0 },
                 ]}
               >
+                {/* Right side: icon + name + level label */}
                 <View style={styles.eloLeft}>
-                  <Text style={styles.eloIcon}>{topic.icon}</Text>
+                  <View style={[styles.eloIconCircle, { backgroundColor: topic.color + '22', borderColor: topic.color + '55' }]}>
+                    <Text style={styles.eloIcon}>{topic.icon}</Text>
+                  </View>
                   <View>
                     <Text style={styles.eloTopicName}>{topic.name}</Text>
                     <Text style={[styles.eloTitle, { color: topic.color }]}>
@@ -295,12 +309,27 @@ export default function ProgressTab() {
                     </Text>
                   </View>
                 </View>
+
+                {/* Left side: accuracy % + gradient bar */}
                 <View style={styles.eloRight}>
-                  <Text style={[styles.eloValue, { color: topic.color }]}>
-                    {accuracy > 0 ? `${Math.round(accuracy * 100)}%` : '—'}
-                  </Text>
+                  <View style={styles.eloValueRow}>
+                    <Text style={[styles.eloValue, { color: topic.color }]}>
+                      {accuracy > 0 ? `${accuracyPct}%` : '—'}
+                    </Text>
+                    {accuracy > 0 && (
+                      <Text style={[styles.eloTrend, { color: colors.success }]}> ↑</Text>
+                    )}
+                  </View>
                   <View style={styles.eloBar}>
-                    <ProgressBar progress={accuracy} color={topic.color} height={5} />
+                    {/* Gradient fill bar */}
+                    <View style={styles.eloBarTrack}>
+                      <LinearGradient
+                        colors={[topic.color + 'CC', topic.color + '55'] as [string, string]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[styles.eloBarFill, { width: `${Math.round(accuracy * 100)}%` as any }]}
+                      />
+                    </View>
                   </View>
                 </View>
               </View>
