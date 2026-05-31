@@ -79,7 +79,7 @@ export default function BadgeManagerScreen() {
   const [awardDialog, setAwardDialog] = useState<BadgeDef | null>(null);
 
   function toggleBadge(id: string) {
-    setEnabledMap(prev => {
+    setEnabledMap((prev: Record<string, boolean>) => {
       const next = { ...prev, [id]: !prev[id] };
       logActivity(
         `תג ${id} ${next[id] ? 'הופעל' : 'הושבת'}`,

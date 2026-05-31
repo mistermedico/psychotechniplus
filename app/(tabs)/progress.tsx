@@ -390,6 +390,69 @@ export default function ProgressTab() {
   );
 }
 
+// ── Enhanced stat card with gradient background ─────────────────────────────
+function EnhancedStatCard({
+  icon, label, value, color, gradientColors,
+}: {
+  icon: string; label: string; value: string | number;
+  color: string; gradientColors: [string, string];
+}) {
+  return (
+    <View style={enhStatStyles.card}>
+      <LinearGradient
+        colors={[gradientColors[0] + '28', gradientColors[1] + '10'] as [string, string]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
+      />
+      <View style={[enhStatStyles.iconCircle, { backgroundColor: color + '22' }]}>
+        <Text style={enhStatStyles.icon}>{icon}</Text>
+      </View>
+      <Text style={[enhStatStyles.value, { color }]}>{value}</Text>
+      <Text style={enhStatStyles.label}>{label}</Text>
+      <Text style={[enhStatStyles.trend, { color: '#34D399' }]}>↑</Text>
+    </View>
+  );
+}
+const enhStatStyles = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: Radius.xl,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    overflow: 'hidden',
+    position: 'relative',
+    minWidth: 80,
+  },
+  iconCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+  },
+  icon: { fontSize: 20 },
+  value: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize['3xl'],
+    textAlign: 'center',
+  },
+  label: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: 'rgba(240,244,255,0.45)',
+    textAlign: 'center',
+    marginTop: 3,
+  },
+  trend: {
+    position: 'absolute',
+    top: 8,
+    left: 10,
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+  },
+});
+
 function makeStyles(colors: ThemeColors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: 'transparent' },
@@ -441,9 +504,42 @@ function makeStyles(colors: ThemeColors) {
       marginHorizontal: 20,
       marginTop: 12,
       borderRadius: Radius['2xl'],
-      padding: 24,
+      paddingHorizontal: 24,
+      paddingVertical: 36,
       ...Shadow.primary,
+      overflow: 'hidden',
     },
+    // Decorative background geometric shapes
+    heroDecorCircle1: {
+      position: 'absolute',
+      top: -40,
+      left: -40,
+      width: 160,
+      height: 160,
+      borderRadius: 80,
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      pointerEvents: 'none',
+    } as any,
+    heroDecorCircle2: {
+      position: 'absolute',
+      bottom: -50,
+      right: -30,
+      width: 200,
+      height: 200,
+      borderRadius: 100,
+      backgroundColor: 'rgba(255,255,255,0.04)',
+      pointerEvents: 'none',
+    } as any,
+    heroDecorCircle3: {
+      position: 'absolute',
+      top: 30,
+      left: 80,
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      pointerEvents: 'none',
+    } as any,
     heroTop: {
       flexDirection: 'row-reverse',
       justifyContent: 'space-between',
@@ -487,17 +583,26 @@ function makeStyles(colors: ThemeColors) {
     },
     accuracyValue: {
       fontFamily: FontFamily.heading,
-      fontSize: 52,
+      fontSize: 72,
       color: '#fff',
-      lineHeight: 56,
+      lineHeight: 76,
       textAlign: 'right',
+    },
+    accuracyLabelRow: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      marginTop: 2,
     },
     accuracyLabel: {
       fontFamily: FontFamily.regular,
       fontSize: FontSize.sm,
       color: 'rgba(255,255,255,0.65)',
       textAlign: 'right',
-      marginTop: 2,
+    },
+    accuracyTrend: {
+      fontFamily: FontFamily.bold,
+      fontSize: FontSize.base,
+      color: '#34D399',
     },
 
     // Level row inside hero
@@ -658,7 +763,12 @@ function makeStyles(colors: ThemeColors) {
       // borderRightWidth and borderRightColor applied inline per topic
     },
     eloLeft: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 },
-    eloIcon: { fontSize: 22 },
+    eloIconCircle: {
+      width: 38, height: 38, borderRadius: 19,
+      alignItems: 'center', justifyContent: 'center',
+      borderWidth: 1,
+    },
+    eloIcon: { fontSize: 20 },
     eloTopicName: {
       fontFamily: FontFamily.medium,
       fontSize: FontSize.base,
@@ -670,9 +780,22 @@ function makeStyles(colors: ThemeColors) {
       fontSize: FontSize.xs,
       textAlign: 'right',
     },
-    eloRight: { alignItems: 'flex-start', width: 100 },
+    eloRight: { alignItems: 'flex-start', width: 110 },
+    eloValueRow: { flexDirection: 'row', alignItems: 'baseline' },
     eloValue: { fontFamily: FontFamily.bold, fontSize: FontSize.xl },
-    eloBar: { width: 90, marginTop: 4 },
+    eloTrend: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
+    eloBar: { width: 100, marginTop: 6 },
+    eloBarTrack: {
+      width: '100%',
+      height: 9,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      borderRadius: 5,
+      overflow: 'hidden',
+    },
+    eloBarFill: {
+      height: '100%',
+      borderRadius: 5,
+    },
     emptyText: {
       fontFamily: FontFamily.regular,
       fontSize: FontSize.sm,
