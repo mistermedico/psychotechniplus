@@ -563,12 +563,14 @@ export default function LandingScreen() {
     ]).start();
 
     // Gentle float loop for geometric shapes
-    Animated.loop(
+    const floatLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, { toValue: 1, duration: 2800, useNativeDriver: true }),
         Animated.timing(floatAnim, { toValue: 0, duration: 2800, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    floatLoop.start();
+    return () => floatLoop.stop();
   }, []); // eslint-disable-line
 
   const floatY  = floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });

@@ -56,7 +56,7 @@ export default function UsersScreen() {
         .select('*')
         .order('total_sessions', { ascending: false });
 
-      if (pe) { logger.error('users:load', 'שגיאה בטעינת משתמשים', pe.message); return; }
+      if (pe) { logger.error('users:load', 'שגיאה בטעינת משתמשים', pe.message); setLoading(false); setRefreshing(false); return; }
       if (!profiles?.length) { setUsers([]); return; }
 
       const combined: RealUser[] = profiles.map(p => ({

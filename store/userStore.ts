@@ -87,7 +87,7 @@ const INITIAL_STATE = {
   isAuthenticated: false,
 };
 
-function xpForLevel(level: number): number { return level * 100; }
+function xpForLevel(level: number): number { return Math.max(1, level) * 100; }
 
 export const useUserStore = create<UserState>((set, get) => ({
   ...INITIAL_STATE,
@@ -164,6 +164,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     await logOutPurchases().catch(() => null);
     await supabase.auth.signOut().catch(() => null);
     useAdminStore.getState().logActivity('משתמש התנתק', 'user');
+    useAdminStore.getState().setIsAdmin(false);
     set({ ...INITIAL_STATE, isLoaded: true });
   },
 
@@ -193,7 +194,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     const { userId } = get();
     if (userId) saveUserProfile(userId, {
       name, selected_target_id: targetId, has_completed_onboarding: true,
-    });
+    }).catch(e => logger.error('userStore:completeOnboarding', 'שגיאה בשמירת פרופיל', e?.message));
     logger.success('userStore:completeOnboarding', `אונבורדינג הושלם — ${name}, מסלול: ${targetId}`);
     useAdminStore.getState().logActivity(`${name} השלים אונבורדינג — מסלול: ${targetId}`, 'user');
   },
@@ -242,8 +243,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   updateStreak: () => {
     set(state => {
-      const today = new Date().toDateString();
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
       if (state.lastPracticedDate === today) return {};
       const newStreak = state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
       const updates = {
@@ -287,8 +288,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       let newLevel = state.level;
       while (newXp >= xpForLevel(newLevel)) { newXp -= xpForLevel(newLevel); newLevel++; }
 
-      const today = new Date().toDateString();
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
       const newStreak = state.lastPracticedDate === today
         ? state.streak
         : state.lastPracticedDate === yesterday ? state.streak + 1 : 1;

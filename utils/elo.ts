@@ -23,7 +23,8 @@ export function updateQuestionElo(
   isCorrect: boolean
 ): number {
   const expected = expectedScore(currentElo, playerElo);
-  const actual = isCorrect ? 1 : 0;
+  // From the question's perspective: it "wins" when the player gets it wrong
+  const actual = isCorrect ? 0 : 1;
   return Math.round(currentElo + K_FACTOR * (actual - expected));
 }
 
@@ -78,8 +79,8 @@ export function eloToProgress(elo: number): number {
   const thresholds = [0, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1750, 1900, 2100];
   const level = eloToLevel(elo);
   if (level >= 10) return 1;
-  const low = thresholds[level];
-  const high = thresholds[level + 1];
+  const low = thresholds[level - 1];
+  const high = thresholds[level];
   if (high === low) return 0;
   return Math.max(0, Math.min(1, (elo - low) / (high - low)));
 }

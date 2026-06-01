@@ -134,7 +134,9 @@ export default function JsonImportScreen() {
           questionText: item.questionText,
           readingPassage: item.readingPassage,
           options: item.options.map(o => ({
-            id: o.id, text: o.text, isCorrect: o.isCorrect, analysisTag: o.analysisTag,
+            id: o.id, text: o.text,
+            isCorrect: o.isCorrect ?? (o.id === item.correctAnswer),
+            analysisTag: o.analysisTag,
           })),
           correctAnswer: item.correctAnswer,
           explanation: item.explanation ?? '',

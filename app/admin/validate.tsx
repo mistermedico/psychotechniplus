@@ -97,7 +97,7 @@ export default function ValidateQueue() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     animateOut('approve', () => {
       validateQuestion(q.id, 'validated');
-      setCurrentIdx(i => Math.max(0, i >= pending.length - 1 ? 0 : i));
+      setCurrentIdx(i => Math.max(0, i >= queue.length - 1 ? 0 : i));
     });
   };
 
@@ -105,7 +105,7 @@ export default function ValidateQueue() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     animateOut('reject', () => {
       validateQuestion(q.id, 'rejected');
-      setCurrentIdx(i => Math.max(0, i >= pending.length - 1 ? 0 : i));
+      setCurrentIdx(i => Math.max(0, i >= queue.length - 1 ? 0 : i));
     });
   };
 

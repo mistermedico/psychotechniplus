@@ -432,8 +432,18 @@ export default function PracticeSession() {
     });
   };
 
+  const clearAllTimers = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    if (restTimerRef.current) clearInterval(restTimerRef.current);
+    timerRef.current = null;
+    autoAdvanceRef.current = null;
+    restTimerRef.current = null;
+  };
+
   const handleQuit = () => {
     if (Platform.OS === 'web') {
+      clearAllTimers();
       endSession();
       router.back();
       return;
@@ -444,6 +454,7 @@ export default function PracticeSession() {
         text: 'יציאה',
         style: 'destructive',
         onPress: () => {
+          clearAllTimers();
           endSession();
           router.back();
         },

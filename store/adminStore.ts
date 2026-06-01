@@ -928,14 +928,11 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   updateQuestion: (id, updates) => {
-    set(s => {
-      const updated = s.questions.map(q => (q.id === id ? { ...q, ...updates } : q));
-      const q = updated.find(x => x.id === id);
-      if (q) dbUpsert(q).then(r => {
-        if (r.error) logger.error('adminStore:updateQuestion', `שגיאה בעדכון שאלה ${id}`, r.error);
-        else logger.success('adminStore:updateQuestion', `שאלה עודכנה: ${id}`);
-      });
-      return { questions: updated };
+    set(s => ({ questions: s.questions.map(q => (q.id === id ? { ...q, ...updates } : q)) }));
+    const q = get().questions.find(x => x.id === id);
+    if (q) dbUpsert(q).then(r => {
+      if (r.error) logger.error('adminStore:updateQuestion', `שגיאה בעדכון שאלה ${id}`, r.error);
+      else logger.success('adminStore:updateQuestion', `שאלה עודכנה: ${id}`);
     });
     get().logActivity(`עדכן שאלה ${id}`, 'question');
   },
@@ -962,18 +959,17 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   validateQuestion: (id, status) => {
-    set(s => {
-      const updated = s.questions.map(q =>
+    set(s => ({
+      questions: s.questions.map(q =>
         q.id === id
           ? { ...q, validationStatus: status, smartPracticeEligible: status === 'validated', generalPracticeEligible: status === 'validated' }
           : q
-      );
-      const q = updated.find(x => x.id === id);
-      if (q) dbUpsert(q).then(r => {
-        if (r.error) logger.error('adminStore:validateQuestion', `שגיאה באימות שאלה ${id} → ${status}`, r.error);
-        else logger.success('adminStore:validateQuestion', `שאלה ${id} → ${status}`);
-      });
-      return { questions: updated };
+      ),
+    }));
+    const q = get().questions.find(x => x.id === id);
+    if (q) dbUpsert(q).then(r => {
+      if (r.error) logger.error('adminStore:validateQuestion', `שגיאה באימות שאלה ${id} → ${status}`, r.error);
+      else logger.success('adminStore:validateQuestion', `שאלה ${id} → ${status}`);
     });
     get().logActivity(`אימת שאלה ${id} → ${status}`, 'question');
   },
