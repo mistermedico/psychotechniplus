@@ -68,8 +68,17 @@ export default function PromoCodesScreen() {
   const handleCreate = () => {
     if (!newCode.trim()) { Alert.alert('שגיאה', 'הזן קוד קופון'); return; }
     const val = parseFloat(discountValue);
-    if (discountType !== 'full_access' && (isNaN(val) || val <= 0)) {
-      Alert.alert('שגיאה', 'הזן ערך הנחה תקין');
+    if (discountType === 'percent' && (isNaN(val) || val <= 0 || val > 100)) {
+      Alert.alert('שגיאה', 'הנחה באחוזים חייבת להיות בין 1 ל-100');
+      return;
+    }
+    if (discountType === 'days_free' && (isNaN(val) || val <= 0)) {
+      Alert.alert('שגיאה', 'הזן מספר ימים תקין');
+      return;
+    }
+    const expiryTrimmed = expiresAt.trim();
+    if (expiryTrimmed && !/^\d{4}-\d{2}-\d{2}$/.test(expiryTrimmed)) {
+      Alert.alert('שגיאה', 'תאריך תפוגה חייב להיות בפורמט YYYY-MM-DD');
       return;
     }
     addPromoCode({
@@ -78,7 +87,7 @@ export default function PromoCodesScreen() {
       discountType,
       discountValue: discountType === 'full_access' ? 100 : val,
       maxUses: parseInt(maxUses) || 0,
-      expiresAt: expiresAt.trim() || null,
+      expiresAt: expiryTrimmed || null,
       isActive: true,
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

@@ -156,9 +156,8 @@ export default function QuestionEditor() {
       Alert.alert('שגיאה', 'טקסט השאלה קצר מדי (מינימום 10 תווים)');
       return;
     }
-    const optionsNeedText = !imageOnlyMode && !options.every(o => !!o.imageUrl);
-    if (optionsNeedText && options.some(o => !o.text.trim())) {
-      Alert.alert('שגיאה', 'נא למלא את כל האפשרויות');
+    if (options.some(o => !o.text.trim() && !o.imageUrl)) {
+      Alert.alert('שגיאה', 'כל אפשרות חייבת להכיל טקסט או תמונה');
       return;
     }
     const correctOpt = options.find(o => o.isCorrect);

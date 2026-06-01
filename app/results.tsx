@@ -24,9 +24,9 @@ export default function Results() {
     stability: string; bonusXp?: string;
   }>();
 
-  const score = parseInt(params.score ?? '0');
-  const correct = parseInt(params.correct ?? '0');
-  const total = parseInt(params.total ?? '0');
+  const score = Math.max(0, parseInt(params.score ?? '0') || 0);
+  const correct = parseInt(params.correct ?? '0') || 0;
+  const total = parseInt(params.total ?? '0') || 0;
   const timeSpent = parseInt(params.timeSpent ?? '0');
   const percentile = parseInt(params.percentile ?? '50');
   const difficultyScore = parseInt(params.difficultyScore ?? '0');

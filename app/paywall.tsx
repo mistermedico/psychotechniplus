@@ -299,7 +299,7 @@ export default function PaywallScreen() {
                           <View style={styles.planInfo}>
                             <Text style={[styles.planName, { color: colors.text }]}>{meta.label}</Text>
                             <Text style={styles.planPeriod}>
-                              {pkg.isSubscription ? 'מתחדש אוטומטית' : 'תשלום חד-פעמי · לא מתחדש'}
+                              {pkg.isSubscription ? 'מנוי · ביטול בכל עת' : 'תשלום חד-פעמי · לא מתחדש'}
                             </Text>
                           </View>
                           <View style={styles.planPriceWrap}>
@@ -323,7 +323,7 @@ export default function PaywallScreen() {
                         <View style={styles.planInfo}>
                           <Text style={styles.planName}>{meta.label}</Text>
                           <Text style={styles.planPeriod}>
-                            {pkg.isSubscription ? 'מתחדש אוטומטית' : 'תשלום חד-פעמי · לא מתחדש'}
+                            {pkg.isSubscription ? 'מנוי · ביטול בכל עת' : 'תשלום חד-פעמי · לא מתחדש'}
                           </Text>
                         </View>
                         <View style={styles.planPriceWrap}>
@@ -367,11 +367,6 @@ export default function PaywallScreen() {
               }
             </LinearGradient>
           </Pressable>
-
-          {/* "Cancel anytime" note for subscriptions */}
-          {selectedPkg?.isSubscription && (
-            <Text style={styles.cancelNote}>✓ ביטול בכל עת — ללא מחויבות</Text>
-          )}
 
           {/* Trust badges */}
           <View style={styles.trustRow}>

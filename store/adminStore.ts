@@ -1398,12 +1398,14 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     // (ensureDbSeeded in _layout.tsx already handles targets+topics)
     try {
       const { data: check } = await supabase.from('questions')
-        .select('id').eq('id', PENDING_SEED[0].id).limit(1);
-      if (!check?.length) {
-        for (const q of PENDING_SEED) {
+        .select('id').in('id', PENDING_SEED.map(q => q.id));
+      const existingIds = new Set((check ?? []).map((r: any) => r.id));
+      const missing = PENDING_SEED.filter(q => !existingIds.has(q.id));
+      if (missing.length > 0) {
+        for (const q of missing) {
           await dbUpsert(q);
         }
-        logger.success('adminStore:loadAdminData', `נזרעו ${PENDING_SEED.length} שאלות ממתינות`);
+        logger.success('adminStore:loadAdminData', `נזרעו ${missing.length} שאלות ממתינות חסרות`);
       }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בהזרעת שאלות ממתינות', e?.message);

@@ -331,7 +331,8 @@ function UserDetailScreen({
       .eq('user_id', user.id)
       .order('completed_at', { ascending: false })
       .limit(20)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) logger.error('users:detail', 'שגיאה בטעינת סשנים', error.message);
         setSessions(data ?? []);
         setLoadingSessions(false);
       });

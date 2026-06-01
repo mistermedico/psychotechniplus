@@ -87,6 +87,8 @@ export default function PracticeSession() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishingRef = useRef(false);
+  // Sync ref keeps the guard in handleTimeUp free of stale closure
+  const revealedRef = useRef(false);
 
   const topic = getTopicById(topicId ?? '');
   const target = getTargetById(targetId ?? '');
@@ -122,7 +124,12 @@ export default function PracticeSession() {
         mode: 'simulation',
         questions: generated.allQuestions,
       });
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+        if (restTimerRef.current) clearInterval(restTimerRef.current);
+      };
     }
 
     // FREE / ADAPTIVE PRACTICE MODE
@@ -183,9 +190,10 @@ export default function PracticeSession() {
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-    if (revealed) return;
+    if (revealedRef.current) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     setSelectedId(null);
+    revealedRef.current = false;
     setRevealed(false);
     setLastAnswerCorrect(false);
     setShowExplanation(false);
@@ -193,7 +201,7 @@ export default function PracticeSession() {
     skipQuestion();
     const hasMore = nextQuestion();
     if (!hasMore) finishSession();
-  }, [revealed, skipQuestion, nextQuestion, explanationAnim]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [skipQuestion, nextQuestion, explanationAnim]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Speed mode timer (only in speed mode — showTimerInPractice shows timer but doesn't auto-skip)
   useEffect(() => {
@@ -264,6 +272,7 @@ export default function PracticeSession() {
     }
 
     setLastAnswerCorrect(isCorrect);
+    revealedRef.current = true;
     setRevealed(true);
 
     // Only auto-show explanation if setting is on
@@ -288,6 +297,7 @@ export default function PracticeSession() {
 
   const resetQuestionState = () => {
     setSelectedId(null);
+    revealedRef.current = false;
     setRevealed(false);
     setLastAnswerCorrect(false);
     setShowExplanation(false);

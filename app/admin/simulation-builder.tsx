@@ -396,12 +396,12 @@ export default function SimulationBuilder() {
               <Text style={styles.summaryLine}>
                 זמן ממוצע לשאלה: ~{totalQ > 0 ? Math.round((parseInt(timeLimitMinutes) || 45) * 60 / totalQ) : 0} שניות
               </Text>
-              {rules.map(r => {
+              {rules.map((r, i) => {
                 const t = TOPICS.find(x => x.id === r.topicId);
                 const avail = questionsPerTopic[r.topicId] ?? 0;
                 const shortage = r.count > avail;
                 return (
-                  <Text key={r.id} style={[styles.summaryLine, shortage && { color: Colors.danger }]}>
+                  <Text key={r.id || `rule_${i}`} style={[styles.summaryLine, shortage && { color: Colors.danger }]}>
                     {t?.icon} {t?.name}: {r.count} שאלות (ניתן: {avail}){shortage ? ' ⚠️ חסר' : ''}
                   </Text>
                 );
@@ -498,12 +498,12 @@ export default function SimulationBuilder() {
 
               {/* Rules summary */}
               <View style={styles.rulesSummary}>
-                {t.rules.map(r => {
+                {t.rules.map((r, i) => {
                   const topic = TOPICS.find(x => x.id === r.topicId);
                   const avail = questionsPerTopic[r.topicId] ?? 0;
                   const shortage = r.count > avail;
                   return (
-                    <Text key={r.id} style={[styles.ruleSummaryText, shortage && { color: Colors.warning }]}>
+                    <Text key={r.id || `rule_${i}`} style={[styles.ruleSummaryText, shortage && { color: Colors.warning }]}>
                       {topic?.icon} {topic?.name}: {r.count} שאלות (רמה {r.minDifficulty}-{r.maxDifficulty})
                       {r.useAdaptive ? ' 🧠' : ''}{shortage ? ' ⚠️' : ''}
                     </Text>
