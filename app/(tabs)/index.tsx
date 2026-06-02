@@ -59,7 +59,7 @@ export default function Dashboard() {
   const mainTopic = targetTopics[0] ?? null;
   const title = mainTopic ? LEVEL_LABELS[getTopicLevel(mainTopic.id)] : LEVEL_LABELS['beginner'];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
-  const xpPercent = Math.min(100, Math.round((xp / (level * 100)) * 100));
+  const xpPercent = level > 0 ? Math.min(100, Math.round((xp / (level * 100)) * 100)) : 0;
   const recentBadges = badges.slice(-3);
 
   const hour = new Date().getHours();

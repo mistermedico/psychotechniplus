@@ -53,7 +53,7 @@ export default function ProgressTab() {
   const topics = TOPICS.filter(t => t.targetId === selectedTargetId);
   const earnedBadgeTypes = new Set(badges.map(b => b.badgeType));
   const earnedCount = badges.filter(b => BADGE_INFO[b.badgeType]).length;
-  const xpForNext = level * 100;
+  const xpForNext = Math.max(1, level) * 100;
   const xpPercent = Math.min(100, Math.round((xp / xpForNext) * 100));
 
   // XP bar animated entrance — 0 → actual value over 800ms

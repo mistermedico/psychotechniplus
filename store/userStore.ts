@@ -149,12 +149,19 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     set({ isLoaded: true, isSyncing: false });
 
-    // Load persisted read message IDs
+    // Restore persisted data from AsyncStorage
     try {
-      const savedReads = await AsyncStorage.getItem(`@psychotechniplus/user/${userId}/readMessages`);
+      const [savedReads, onboardedFlag] = await Promise.all([
+        AsyncStorage.getItem(`@psychotechniplus/user/${userId}/readMessages`),
+        AsyncStorage.getItem(`@psychotechniplus/user/${userId}/onboarded`),
+      ]);
       if (savedReads) {
         const parsed: string[] = JSON.parse(savedReads);
         if (parsed.length > 0) set({ readMessageIds: parsed });
+      }
+      // Fallback: treat onboarding as completed if local flag exists, even if Supabase save failed
+      if (onboardedFlag && !get().hasCompletedOnboarding) {
+        set({ hasCompletedOnboarding: true });
       }
     } catch {}
   },
@@ -192,9 +199,13 @@ export const useUserStore = create<UserState>((set, get) => ({
   completeOnboarding: (name, targetId) => {
     set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true });
     const { userId } = get();
-    if (userId) saveUserProfile(userId, {
-      name, selected_target_id: targetId, has_completed_onboarding: true,
-    }).catch(e => logger.error('userStore:completeOnboarding', 'שגיאה בשמירת פרופיל', e?.message));
+    if (userId) {
+      // Local backup so a Supabase save failure doesn't cause a re-onboarding loop on next cold boot
+      AsyncStorage.setItem(`@psychotechniplus/user/${userId}/onboarded`, '1').catch(() => null);
+      saveUserProfile(userId, {
+        name, selected_target_id: targetId, has_completed_onboarding: true,
+      }).catch(e => logger.error('userStore:completeOnboarding', 'שגיאה בשמירת פרופיל', e?.message));
+    }
     logger.success('userStore:completeOnboarding', `אונבורדינג הושלם — ${name}, מסלול: ${targetId}`);
     useAdminStore.getState().logActivity(`${name} השלים אונבורדינג — מסלול: ${targetId}`, 'user');
   },

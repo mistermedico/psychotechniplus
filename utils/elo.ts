@@ -38,13 +38,13 @@ export function selectAdaptiveQuestion(
   if (unanswered.length === 0) return null;
 
   const optimal = unanswered.filter(
-    q => Math.abs(q.psychometricStats.elo - userElo) <= 150
+    q => q.psychometricStats && Math.abs(q.psychometricStats.elo - userElo) <= 150
   );
   const pool = optimal.length > 0 ? optimal : unanswered;
 
   // Weighted random: prefer questions closer to user ELO
   const weights = pool.map(q => {
-    const diff = Math.abs(q.psychometricStats.elo - userElo);
+    const diff = q.psychometricStats ? Math.abs(q.psychometricStats.elo - userElo) : 200;
     return Math.max(1, 200 - diff);
   });
   const totalWeight = weights.reduce((s, w) => s + w, 0);

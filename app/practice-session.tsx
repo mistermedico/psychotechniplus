@@ -89,6 +89,8 @@ export default function PracticeSession() {
   const finishingRef = useRef(false);
   // Sync ref keeps the guard in handleTimeUp free of stale closure
   const revealedRef = useRef(false);
+  // Always-current ref for handleNext — prevents stale closure in auto-advance setTimeout
+  const handleNextRef = useRef<() => void>(() => {});
 
   const topic = getTopicById(topicId ?? '');
   const target = getTargetById(targetId ?? '');
@@ -230,13 +232,16 @@ export default function PracticeSession() {
     return () => clearInterval(id);
   }, [session?.currentIndex, revealed, isSpeedMode]);
 
+  // Keep handleNextRef current so auto-advance timeout always calls the latest version
+  useEffect(() => { handleNextRef.current = handleNext; });
+
   // Auto-advance after answer is revealed — also drives the live countdown banner
   useEffect(() => {
     if (!revealed || autoAdvanceDelay === 0) return;
     setAutoAdvanceCountdown(autoAdvanceDelay);
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     autoAdvanceRef.current = setTimeout(() => {
-      handleNext();
+      handleNextRef.current();
     }, autoAdvanceDelay * 1000);
     const countId = setInterval(() => {
       setAutoAdvanceCountdown(prev => Math.max(0, prev - 1));

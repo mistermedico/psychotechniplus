@@ -177,7 +177,13 @@ export default function ProfileTab() {
     if (signingOut) return;
     const doSignOut = async () => {
       setSigningOut(true);
-      await signOut().catch(() => null);
+      try {
+        await signOut();
+      } catch {
+        setSigningOut(false);
+        Alert.alert('שגיאה', 'לא ניתן להתנתק כרגע — נסה שוב');
+        return;
+      }
       if (Platform.OS === 'web') {
         window.location.replace('/');
       } else {

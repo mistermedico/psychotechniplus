@@ -77,8 +77,15 @@ export default function PromoCodesScreen() {
       return;
     }
     const expiryTrimmed = expiresAt.trim();
-    if (expiryTrimmed && !/^\d{4}-\d{2}-\d{2}$/.test(expiryTrimmed)) {
-      Alert.alert('שגיאה', 'תאריך תפוגה חייב להיות בפורמט YYYY-MM-DD');
+    if (expiryTrimmed) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryTrimmed) || isNaN(new Date(expiryTrimmed).getTime())) {
+        Alert.alert('שגיאה', 'תאריך תפוגה לא תקין — השתמש בפורמט YYYY-MM-DD עם ערכים אמיתיים');
+        return;
+      }
+    }
+    const maxUsesNum = parseInt(maxUses) || 0;
+    if (maxUsesNum < 0) {
+      Alert.alert('שגיאה', 'מספר שימושים מקסימלי לא יכול להיות שלילי');
       return;
     }
     addPromoCode({
@@ -86,7 +93,7 @@ export default function PromoCodesScreen() {
       description: description.trim(),
       discountType,
       discountValue: discountType === 'full_access' ? 100 : val,
-      maxUses: parseInt(maxUses) || 0,
+      maxUses: maxUsesNum,
       expiresAt: expiryTrimmed || null,
       isActive: true,
     });

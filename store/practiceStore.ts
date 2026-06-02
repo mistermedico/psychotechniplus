@@ -82,16 +82,13 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       questionDifficulty: question.difficulty,
     };
 
-    // Update adaptive level based on session performance so far
-    const updatedAnswers = [...session.answers, answer];
-    const history = updatedAnswers.map(a => ({ isCorrect: a.isCorrect, difficulty: a.questionDifficulty }));
-    const newLevel = computeAdaptiveLevel(history, session.adaptiveLevel);
-
-    set(state => ({
-      session: state.session
-        ? { ...state.session, answers: updatedAnswers, adaptiveLevel: newLevel }
-        : null,
-    }));
+    set(state => {
+      if (!state.session) return {};
+      const newAnswers = [...state.session.answers, answer];
+      const history = newAnswers.map(a => ({ isCorrect: a.isCorrect, difficulty: a.questionDifficulty }));
+      const newLevel = computeAdaptiveLevel(history, state.session.adaptiveLevel);
+      return { session: { ...state.session, answers: newAnswers, adaptiveLevel: newLevel } };
+    });
 
     return { isCorrect, timeSpent, correctAnswerId: question.correctAnswer };
   },
@@ -121,13 +118,13 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   nextQuestion: () => {
     const { session } = get();
     if (!session) return false;
-    const next = session.currentIndex + 1;
-    if (next >= session.questions.length) return false;
-    set(state => ({
-      session: state.session
-        ? { ...state.session, currentIndex: next, questionStartedAt: new Date() }
-        : null,
-    }));
+    if (session.currentIndex + 1 >= session.questions.length) return false;
+    set(state => {
+      if (!state.session) return {};
+      const next = state.session.currentIndex + 1;
+      if (next >= state.session.questions.length) return {};
+      return { session: { ...state.session, currentIndex: next, questionStartedAt: new Date() } };
+    });
     return true;
   },
 

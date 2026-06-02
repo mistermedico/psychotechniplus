@@ -27,12 +27,12 @@ export default function Results() {
   const score = Math.max(0, parseInt(params.score ?? '0') || 0);
   const correct = parseInt(params.correct ?? '0') || 0;
   const total = parseInt(params.total ?? '0') || 0;
-  const timeSpent = parseInt(params.timeSpent ?? '0');
-  const percentile = parseInt(params.percentile ?? '50');
-  const difficultyScore = parseInt(params.difficultyScore ?? '0');
-  const speedScore = parseInt(params.speedScore ?? '0');
-  const stability = parseInt(params.stability ?? '100');
-  const bonusXp = parseInt(params.bonusXp ?? '0');
+  const timeSpent = parseInt(params.timeSpent ?? '0') || 0;
+  const percentile = parseInt(params.percentile ?? '50') || 50;
+  const difficultyScore = parseInt(params.difficultyScore ?? '0') || 0;
+  const speedScore = parseInt(params.speedScore ?? '0') || 0;
+  const stability = parseInt(params.stability ?? '100') || 100;
+  const bonusXp = parseInt(params.bonusXp ?? '0') || 0;
 
   const topic = getTopicById(params.topicId ?? '');
   const { label, color } = getPerformanceLevel(score);
