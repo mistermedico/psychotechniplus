@@ -302,14 +302,6 @@ function MessageCard({ msg, onDelete }: { msg: InboxMessage; onDelete: () => voi
   );
 }
 
-// This needs to match what's used above in TYPE_ICON_MAP
-const TYPE_ICON_MAP: Record<string, string> = {
-  info: 'ℹ️',
-  update: '🔄',
-  achievement: '🏆',
-  warning: '⚠️',
-};
-
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
