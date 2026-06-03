@@ -264,26 +264,10 @@ export default function TabLayout() {
             }}
           >
             <Tabs.Screen
-              name="index"
+              name="profile"
               options={{
-                tabBarIcon: ({ focused }) => <TabIcon icon="🏠" label="בית" focused={focused} />,
-                tabBarAccessibilityLabel: 'בית',
-              }}
-              listeners={{ tabPress: () => Haptics.selectionAsync() }}
-            />
-            <Tabs.Screen
-              name="targets"
-              options={{
-                tabBarIcon: ({ focused }) => <TabIcon icon="🎯" label="מסלולים" focused={focused} />,
-                tabBarAccessibilityLabel: 'מסלולים',
-              }}
-              listeners={{ tabPress: () => Haptics.selectionAsync() }}
-            />
-            <Tabs.Screen
-              name="practice"
-              options={{
-                tabBarIcon: ({ focused }) => <TabIcon icon="✏️" label="תרגול" focused={focused} />,
-                tabBarAccessibilityLabel: 'תרגול',
+                tabBarIcon: ({ focused }) => <TabIcon icon="👤" label="פרופיל" focused={focused} />,
+                tabBarAccessibilityLabel: 'פרופיל',
               }}
               listeners={{ tabPress: () => Haptics.selectionAsync() }}
             />
@@ -296,10 +280,26 @@ export default function TabLayout() {
               listeners={{ tabPress: () => Haptics.selectionAsync() }}
             />
             <Tabs.Screen
-              name="profile"
+              name="practice"
               options={{
-                tabBarIcon: ({ focused }) => <TabIcon icon="👤" label="פרופיל" focused={focused} />,
-                tabBarAccessibilityLabel: 'פרופיל',
+                tabBarIcon: ({ focused }) => <TabIcon icon="✏️" label="תרגול" focused={focused} />,
+                tabBarAccessibilityLabel: 'תרגול',
+              }}
+              listeners={{ tabPress: () => Haptics.selectionAsync() }}
+            />
+            <Tabs.Screen
+              name="targets"
+              options={{
+                tabBarIcon: ({ focused }) => <TabIcon icon="🎯" label="מסלולים" focused={focused} />,
+                tabBarAccessibilityLabel: 'מסלולים',
+              }}
+              listeners={{ tabPress: () => Haptics.selectionAsync() }}
+            />
+            <Tabs.Screen
+              name="index"
+              options={{
+                tabBarIcon: ({ focused }) => <TabIcon icon="🏠" label="בית" focused={focused} />,
+                tabBarAccessibilityLabel: 'בית',
               }}
               listeners={{ tabPress: () => Haptics.selectionAsync() }}
             />

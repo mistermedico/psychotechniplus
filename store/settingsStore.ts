@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS: DisplaySettings = {
   questionFontSize: 'medium',
   showExplanationAuto: true,
   hapticsEnabled: true,
-  theme: 'dark',
+  theme: 'light',
   defaultDifficulty: 'auto',
 };
 
