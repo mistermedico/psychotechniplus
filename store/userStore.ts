@@ -10,6 +10,10 @@ import { useAdminStore } from './adminStore';
 import { logOutPurchases } from '../lib/purchases';
 import { PerformanceLevel, computeAdaptiveLevel, LEVEL_LABELS } from '../utils/adaptive';
 
+const PREMIUM_REVIEW_EMAILS = new Set([
+  'apple-review@psychotechniplus.app',
+]);
+
 export interface TopicPerformanceEntry {
   isCorrect: boolean;
   difficulty: number;
@@ -118,7 +122,9 @@ export const useUserStore = create<UserState>((set, get) => ({
       } catch {}
     }
 
-    set({ userId, isAuthenticated: true, email: sessionEmail });
+    const isReviewPremium = PREMIUM_REVIEW_EMAILS.has(sessionEmail.toLowerCase());
+
+    set({ userId, isAuthenticated: true, email: sessionEmail, isPremium: isReviewPremium });
 
     const [profile, badges] = await Promise.all([
       loadUserProfile(userId),
@@ -130,6 +136,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         name: profile.name,
         selectedTargetId: profile.selected_target_id,
         hasCompletedOnboarding: profile.has_completed_onboarding,
+        isPremium: isReviewPremium || !!profile.is_premium,
         streak: profile.streak,
         longestStreak: profile.longest_streak,
         lastPracticedDate: profile.last_practiced_date,
@@ -305,7 +312,11 @@ export const useUserStore = create<UserState>((set, get) => ({
     useAdminStore.getState().logActivity(`סשן הושלם — ${correct}/${total} נכון, XP+${xpGain}`, 'session');
   },
 
-  setPremium: (val) => set({ isPremium: val }),
+  setPremium: (val) => {
+    set({ isPremium: val });
+    const { userId } = get();
+    if (userId) saveUserProfile(userId, { is_premium: val });
+  },
 
   reset: () => {
     const { userId } = get();

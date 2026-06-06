@@ -168,6 +168,7 @@ export interface UserProfileRow {
   name: string;
   selected_target_id: string | null;
   has_completed_onboarding: boolean;
+  is_premium?: boolean;
   streak: number;
   longest_streak: number;
   last_practiced_date: string | null;
@@ -300,6 +301,25 @@ export async function seedDatabase(): Promise<{ ok: boolean; message: string }> 
 
 // ── Row mappers ────────────────────────────────────────────────────────────
 
+function targetToRow(t: Target) {
+  return {
+    id: t.id,
+    name: t.name,
+    slug: t.slug ?? t.id,
+    description: t.description ?? '',
+    icon: t.icon,
+    color: t.color,
+    gradient_colors: t.gradientColors ?? [],
+    order_index: t.order ?? 0,
+    total_questions: t.totalQuestions ?? 0,
+    free_questions_count: t.freeQuestionsCount ?? 0,
+    is_premium_only: t.isPremiumOnly ?? false,
+    is_active: t.isActive ?? true,
+    coming_soon: t.comingSoon ?? false,
+    access_settings: t.accessSettings ?? {},
+  };
+}
+
 function questionToRow(q: Question) {
   return {
     id: q.id,
@@ -364,6 +384,17 @@ function rowToTopic(row: any): Topic {
   };
 }
 
+// ── Target persistence ─────────────────────────────────────────────────────
+
+export async function upsertTarget(t: Target): Promise<void> {
+  try {
+    const { error } = await supabase.from('targets').upsert(targetToRow(t));
+    if (error) logger.error('db:upsertTarget', `שגיאה בשמירת מסלול ${t.id}`, error.message);
+  } catch (e: any) {
+    logger.error('db:upsertTarget', `חריגה בשמירת מסלול ${t.id}`, e?.message);
+  }
+}
+
 // ── Topic persistence ──────────────────────────────────────────────────────
 
 export async function upsertTopic(t: Topic): Promise<void> {
@@ -394,22 +425,62 @@ export async function deleteTopicFromDB(id: string): Promise<void> {
   }
 }
 
-// ── Template persistence (AsyncStorage) ───────────────────────────────────
+// ── Admin cloud state + local fallback ─────────────────────────────────────
+
+export async function saveAdminState(key: string, value: unknown): Promise<void> {
+  try {
+    const { error } = await supabase.from('admin_state').upsert({
+      key,
+      value,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) logger.info('db:saveAdminState', `שמירה מקומית בלבד עבור ${key}: ${error.message}`);
+  } catch (e: any) {
+    logger.info('db:saveAdminState', `שמירה מקומית בלבד עבור ${key}: ${e?.message}`);
+  }
+}
+
+export async function loadAdminState<T>(key: string): Promise<T | null> {
+  try {
+    const { data, error } = await supabase
+      .from('admin_state')
+      .select('value')
+      .eq('key', key)
+      .maybeSingle();
+    if (error) {
+      logger.info('db:loadAdminState', `טעינה מקומית בלבד עבור ${key}: ${error.message}`);
+      return null;
+    }
+    return (data?.value ?? null) as T | null;
+  } catch (e: any) {
+    logger.info('db:loadAdminState', `טעינה מקומית בלבד עבור ${key}: ${e?.message}`);
+    return null;
+  }
+}
+
+// ── Template persistence (Supabase + AsyncStorage fallback) ────────────────
 
 const TEMPLATES_KEY = '@psychotechniplus/admin/templates';
 
 export async function saveTemplates(templates: any[]): Promise<void> {
   try {
-    const serialized = JSON.stringify(templates.map(t => ({
+    const normalized = templates.map(t => ({
       ...t,
       createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt,
-    })));
+    }));
+    await saveAdminState('templates', normalized);
+    const serialized = JSON.stringify(normalized);
     await asyncSet(TEMPLATES_KEY, serialized);
   } catch {}
 }
 
 export async function loadTemplates(): Promise<any[] | null> {
   try {
+    const remote = await loadAdminState<any[]>('templates');
+    if (remote && remote.length > 0) {
+      await asyncSet(TEMPLATES_KEY, JSON.stringify(remote)).catch(() => null);
+      return remote.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) }));
+    }
     const raw = await asyncGet(TEMPLATES_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
@@ -419,18 +490,24 @@ export async function loadTemplates(): Promise<any[] | null> {
   }
 }
 
-// ── Admin settings persistence (AsyncStorage) ─────────────────────────────
+// ── Admin settings persistence (Supabase + AsyncStorage fallback) ──────────
 
 const ADMIN_SETTINGS_KEY = '@psychotechniplus/admin/settings';
 
 export async function saveAdminSettings(settings: Record<string, any>): Promise<void> {
   try {
+    await saveAdminState('settings', settings);
     await asyncSet(ADMIN_SETTINGS_KEY, JSON.stringify(settings));
   } catch {}
 }
 
 export async function loadAdminSettings(): Promise<Record<string, any> | null> {
   try {
+    const remote = await loadAdminState<Record<string, any>>('settings');
+    if (remote) {
+      await asyncSet(ADMIN_SETTINGS_KEY, JSON.stringify(remote)).catch(() => null);
+      return remote;
+    }
     const raw = await asyncGet(ADMIN_SETTINGS_KEY);
     if (!raw) return null;
     return JSON.parse(raw);

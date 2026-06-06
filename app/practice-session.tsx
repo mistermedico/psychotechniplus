@@ -21,6 +21,7 @@ import { calcAllScores } from '../utils/scoring';
 import { SessionMode } from '../data/types';
 import { generateSmartExamQuestions, GeneratedExamSection } from '../utils/smartExam';
 import { logger } from '../utils/logger';
+import { canAccessMode, canAccessQuestion, canAccessTopic, getSessionQuestionLimit } from '../lib/accessControl';
 
 const { width: W } = Dimensions.get('window');
 const SPEED_LIMIT = 60; // seconds per question in speed mode
@@ -43,7 +44,7 @@ export default function PracticeSession() {
   } = usePracticeStore();
 
   const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium } = useUserStore();
-  const { templates, questions: adminQuestions, practiceSettings, freePracticeLimit, addSessionRecord } = useAdminStore();
+  const { templates, questions: adminQuestions, practiceSettings, freePracticeLimit, premiumConfig, addSessionRecord } = useAdminStore();
 
   const {
     showTimerInPractice,
@@ -107,6 +108,11 @@ export default function PracticeSession() {
     let cancelled = false;
 
     if (isSimulation && templateId) {
+      if (!canAccessMode('simulation', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)) {
+        Alert.alert('פרימיום בלבד', 'מבחן זה נעול לפי הגדרות המנהל.');
+        router.back();
+        return;
+      }
       const template = templates.find(t => t.id === templateId);
       if (!template) {
         Alert.alert('שגיאה', 'תבנית המבחן לא נמצאה');
@@ -114,7 +120,12 @@ export default function PracticeSession() {
         return;
       }
       const generated = generateSmartExamQuestions(
-        template, adminQuestions.filter(q => q.validationStatus === 'validated'), {}
+        template,
+        adminQuestions.filter(q =>
+          q.validationStatus === 'validated' &&
+          canAccessQuestion(q, isPremium)
+        ),
+        {}
       );
       if (generated.allQuestions.length === 0) {
         Alert.alert('שגיאה', 'לא נמצאו שאלות מתאימות למבחן זה. נסה לאמת שאלות קודם.');
@@ -135,6 +146,16 @@ export default function PracticeSession() {
     // FREE / ADAPTIVE PRACTICE MODE
     const limit = questionLimit ? parseInt(questionLimit) : 10;
     const userLevel = getTopicLevel(topicId ?? '');
+    if (topic && !canAccessTopic(topic, isPremium, premiumConfig)) {
+      Alert.alert('פרימיום בלבד', 'הנושא הזה נעול לפי הגדרות המנהל.');
+      router.back();
+      return;
+    }
+    if (!canAccessMode(mode ?? 'practice', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)) {
+      Alert.alert('פרימיום בלבד', 'מצב התרגול הזה נעול לפי הגדרות המנהל.');
+      router.back();
+      return;
+    }
 
     const loadTimeout = setTimeout(() => {
       if (cancelled) return;
@@ -150,11 +171,22 @@ export default function PracticeSession() {
         return;
       }
       // Apply difficulty filter if provided
-      let filtered = questions;
+      let filtered = questions.filter(q => canAccessQuestion(q, isPremium));
+      if (filtered.length === 0) {
+        Alert.alert('פרימיום בלבד', 'כל השאלות הזמינות לנושא הזה נעולות כרגע.');
+        router.back();
+        return;
+      }
       if (difficulty === 'easy') filtered = questions.filter(q => q.difficulty <= 4);
       else if (difficulty === 'medium') filtered = questions.filter(q => q.difficulty >= 3 && q.difficulty <= 7);
       else if (difficulty === 'hard') filtered = questions.filter(q => q.difficulty >= 6);
-      if (filtered.length === 0) filtered = questions; // fallback to all
+      filtered = filtered.filter(q => canAccessQuestion(q, isPremium));
+      if (filtered.length === 0) filtered = questions.filter(q => canAccessQuestion(q, isPremium)); // fallback to all allowed
+      if (filtered.length === 0) {
+        Alert.alert('פרימיום בלבד', 'אין שאלות זמינות להרשאה הנוכחית.');
+        router.back();
+        return;
+      }
       // Apply free user difficulty cap
       let questionPool = filtered;
       if (!isPremium) {
@@ -162,7 +194,13 @@ export default function PracticeSession() {
         if (capped.length > 0) questionPool = capped;
       }
       // Apply free user question limit
-      const effectiveLimit = !isPremium ? Math.min(limit, freePracticeLimit) : limit;
+      const effectiveLimit = getSessionQuestionLimit(
+        limit,
+        isPremium,
+        freePracticeLimit,
+        premiumConfig,
+        practiceSettings.premiumUserQuestionLimit,
+      );
       // Shuffle answer options if admin setting is enabled
       if (practiceSettings.shuffleAnswerOptions) {
         questionPool = questionPool.map(q => ({

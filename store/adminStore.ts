@@ -1,12 +1,39 @@
 import { create } from 'zustand';
 import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
-import { TOPICS, TARGETS } from '../data/mockData';
-import { fetchAllQuestions, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics } from '../lib/db';
+import { TOPICS, TARGETS, QUESTIONS } from '../data/mockData';
+import { fetchAllQuestions, fetchTargets, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTarget as dbUpsertTarget, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics, saveAdminState, loadAdminState } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
+const ADMIN_COLLECTIONS_KEY = 'collections';
+
+function pickAdminCollections(s: any) {
+  return {
+    dailyChallenges: s.dailyChallenges,
+    userNotes: s.userNotes,
+    promoCodes: s.promoCodes,
+    pushNotifications: s.pushNotifications,
+    revenueSnapshots: s.revenueSnapshots,
+    activityLog: s.activityLog,
+    generationSessions: s.generationSessions,
+    generationPresets: s.generationPresets,
+  };
+}
+
+function saveAdminCollections(s: any) {
+  saveAdminState(ADMIN_COLLECTIONS_KEY, pickAdminCollections(s));
+}
+
+function normalizeAdminCollections(collections: any) {
+  if (!collections || typeof collections !== 'object') return null;
+  const next: any = {};
+  for (const key of Object.keys(pickAdminCollections({}))) {
+    if (Array.isArray(collections[key])) next[key] = collections[key];
+  }
+  return Object.keys(next).length > 0 ? next : null;
+}
 
 function withDefaultAppConfig(config: Partial<AppConfig>): AppConfig {
   return {
@@ -128,6 +155,11 @@ const PENDING_SEED: Question[] = [
     smartPracticeEligible: false,
     generalPracticeEligible: false,
   },
+];
+
+const LOCAL_QUESTION_BANK: Question[] = [
+  ...QUESTIONS,
+  ...PENDING_SEED.filter(q => !QUESTIONS.some(existing => existing.id === q.id)),
 ];
 
 export interface SimulationRule {
@@ -375,14 +407,14 @@ export interface PremiumConfig {
 
 export const DEFAULT_PREMIUM_CONFIG: PremiumConfig = {
   premiumFeatures: {
-    speedMode: false,
-    streakMode: false,
+    speedMode: true,
+    streakMode: true,
     simulations: true,
     unlimitedQuestions: true,
     adaptiveAlgorithm: true,
     detailedAnalytics: true,
     dailyChallenge: true,
-    allTopics: false,
+    allTopics: true,
   },
   freeUserDailyQuestionLimit: 30,
   freeUserMaxDifficulty: 6,
@@ -392,6 +424,18 @@ export const DEFAULT_PREMIUM_CONFIG: PremiumConfig = {
   paywallTitle: 'שדרג לפרמיום',
   paywallSubtitle: 'קבל גישה מלאה לכל הכלים',
 };
+
+function withDefaultPremiumConfig(config?: Partial<PremiumConfig>): PremiumConfig {
+  return {
+    ...DEFAULT_PREMIUM_CONFIG,
+    ...(config ?? {}),
+    premiumFeatures: {
+      ...DEFAULT_PREMIUM_CONFIG.premiumFeatures,
+      ...(config?.premiumFeatures ?? {}),
+    },
+    freePremiumTopics: config?.freePremiumTopics ?? DEFAULT_PREMIUM_CONFIG.freePremiumTopics,
+  };
+}
 
 interface AdminStats {
   totalQuestions: number;
@@ -647,6 +691,7 @@ interface AdminState {
   selectedQuestionIds: string[];
   practiceSettings: PracticeSessionSettings;
   examSettings: ExamSessionSettings;
+  premiumConfig: PremiumConfig;
   sessionHistory: SessionRecord[];
   appConfig: AppConfig;
   dailyChallenges: DailyChallenge[];
@@ -678,6 +723,7 @@ interface AdminState {
   setFreePracticeLimit: (n: number) => void;
   setPracticeSettings: (updates: Partial<PracticeSessionSettings>) => void;
   setExamSettings: (updates: Partial<ExamSessionSettings>) => void;
+  setPremiumConfig: (updates: Partial<PremiumConfig>) => void;
   addSessionRecord: (record: SessionRecord) => void;
   loadSessionHistory: (userId?: string) => Promise<void>;
   getSessionsByUser: (userId: string) => SessionRecord[];
@@ -789,18 +835,238 @@ const SEED_TEMPLATES: SmartExamTemplate[] = [
     createdAt: new Date('2025-01-15'),
     isActive: true,
   },
+  {
+    id: 'tmpl_psycho_quick_001',
+    name: 'מבחן פסיכוטכני קצר',
+    description: '20 שאלות ממוקדות לכל ארבעת התחומים - מתאים לאבחון מהיר לפני תרגול.',
+    targetId: 'target_psychometric',
+    totalQuestions: 20,
+    timeLimitMinutes: 25,
+    rules: [
+      { id: 'r1', topicId: 'topic_quantitative', count: 5, minDifficulty: 2, maxDifficulty: 7, useAdaptive: true },
+      { id: 'r2', topicId: 'topic_verbal', count: 5, minDifficulty: 2, maxDifficulty: 7, useAdaptive: true },
+      { id: 'r3', topicId: 'topic_logic', count: 5, minDifficulty: 2, maxDifficulty: 8, useAdaptive: true },
+      { id: 'r4', topicId: 'topic_spatial', count: 5, minDifficulty: 2, maxDifficulty: 7, useAdaptive: true },
+    ],
+    smartRules: [
+      { id: 'sr1', name: 'כמותי', topicId: 'topic_quantitative', count: 5, minDifficulty: 2, maxDifficulty: 7, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr2', name: 'מילולי', topicId: 'topic_verbal', count: 5, minDifficulty: 2, maxDifficulty: 7, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr3', name: 'לוגיקה', topicId: 'topic_logic', count: 5, minDifficulty: 2, maxDifficulty: 8, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr4', name: 'צורות ומרחב', topicId: 'topic_spatial', count: 5, minDifficulty: 2, maxDifficulty: 7, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+    ],
+    topicTimeSettings: {
+      topic_quantitative: 75,
+      topic_verbal: 70,
+      topic_logic: 75,
+      topic_spatial: 65,
+    },
+    restTimeBetweenRules: 15,
+    restScreenMessage: 'נשימה קצרה וממשיכים לחלק הבא.',
+    passingScore: 65,
+    createdAt: new Date('2026-06-04'),
+    isActive: true,
+  },
+  {
+    id: 'tmpl_psycho_logic_quant_001',
+    name: 'מבחן לוגי-כמותי',
+    description: '30 שאלות בקצב מבחן: יחסים, סדרות, הסקה וטבלאות.',
+    targetId: 'target_psychometric',
+    totalQuestions: 30,
+    timeLimitMinutes: 35,
+    rules: [
+      { id: 'r1', topicId: 'topic_quantitative', count: 15, minDifficulty: 3, maxDifficulty: 9, useAdaptive: true },
+      { id: 'r2', topicId: 'topic_logic', count: 15, minDifficulty: 3, maxDifficulty: 9, useAdaptive: true },
+    ],
+    smartRules: [
+      { id: 'sr1', name: 'חשיבה כמותית', topicId: 'topic_quantitative', count: 15, minDifficulty: 3, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr2', name: 'חשיבה לוגית', topicId: 'topic_logic', count: 15, minDifficulty: 3, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+    ],
+    topicTimeSettings: {
+      topic_quantitative: 70,
+      topic_logic: 70,
+    },
+    restTimeBetweenRules: 20,
+    passingScore: 70,
+    createdAt: new Date('2026-06-04'),
+    isActive: true,
+  },
+  {
+    id: 'tmpl_psycho_spatial_verbal_001',
+    name: 'מבחן מילולי ומרחבי',
+    description: '24 שאלות לתרגול אנלוגיות, השלמות משפטים, צורות וסיבובים.',
+    targetId: 'target_psychometric',
+    totalQuestions: 24,
+    timeLimitMinutes: 30,
+    rules: [
+      { id: 'r1', topicId: 'topic_verbal', count: 12, minDifficulty: 2, maxDifficulty: 8, useAdaptive: true },
+      { id: 'r2', topicId: 'topic_spatial', count: 12, minDifficulty: 2, maxDifficulty: 8, useAdaptive: true },
+    ],
+    smartRules: [
+      { id: 'sr1', name: 'חשיבה מילולית', topicId: 'topic_verbal', count: 12, minDifficulty: 2, maxDifficulty: 8, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr2', name: 'צורות ומרחב', topicId: 'topic_spatial', count: 12, minDifficulty: 2, maxDifficulty: 8, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+    ],
+    topicTimeSettings: {
+      topic_verbal: 70,
+      topic_spatial: 75,
+    },
+    restTimeBetweenRules: 20,
+    passingScore: 68,
+    createdAt: new Date('2026-06-04'),
+    isActive: true,
+  },
+  {
+    id: 'tmpl_adaptive_full_psychotech_001',
+    name: 'מבחן פסיכוטכני אדפטיבי מלא',
+    description: 'סימולציה מלאה בארבעה חלקים: כמותי, מילולי, לוגי וצורני. האלגוריתם בוחר שאלות לפי קושי ו-ELO לכל תחום.',
+    targetId: 'target_psychometric',
+    totalQuestions: 48,
+    timeLimitMinutes: 62,
+    rules: [
+      { id: 'r_quant', topicId: 'topic_quantitative', count: 14, minDifficulty: 2, maxDifficulty: 9, useAdaptive: true },
+      { id: 'r_verbal', topicId: 'topic_verbal', count: 12, minDifficulty: 2, maxDifficulty: 9, useAdaptive: true },
+      { id: 'r_logic', topicId: 'topic_logic', count: 12, minDifficulty: 3, maxDifficulty: 10, useAdaptive: true },
+      { id: 'r_spatial', topicId: 'topic_spatial', count: 10, minDifficulty: 2, maxDifficulty: 9, useAdaptive: true },
+    ],
+    smartRules: [
+      { id: 'sr_quant_warmup', name: 'כמותי - חימום והאצה', topicId: 'topic_quantitative', count: 14, minDifficulty: 2, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_verbal_precision', name: 'מילולי - דיוק והבנה', topicId: 'topic_verbal', count: 12, minDifficulty: 2, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_logic_pressure', name: 'לוגיקה - הסקה בלחץ זמן', topicId: 'topic_logic', count: 12, minDifficulty: 3, maxDifficulty: 10, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_spatial_rotation', name: 'צורני - תפיסה מרחבית', topicId: 'topic_spatial', count: 10, minDifficulty: 2, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+    ],
+    topicTimeSettings: {
+      topic_quantitative: 75,
+      topic_verbal: 65,
+      topic_logic: 70,
+      topic_spatial: 60,
+    },
+    restTimeBetweenRules: 25,
+    restScreenMessage: 'סיימת חלק. קח נשימה, שחרר את הידיים, ועבור לחלק הבא בקצב יציב.',
+    passingScore: 68,
+    createdAt: new Date('2026-06-04'),
+    isActive: true,
+  },
+  {
+    id: 'tmpl_adaptive_screening_001',
+    name: 'אבחון פסיכוטכני אדפטיבי קצר',
+    description: '24 שאלות לאבחון מהיר של נקודות חוזק וחולשה. מתאים לפתיחת תכנית תרגול אישית.',
+    targetId: 'target_psychometric',
+    totalQuestions: 24,
+    timeLimitMinutes: 28,
+    rules: [
+      { id: 'r_quant', topicId: 'topic_quantitative', count: 6, minDifficulty: 1, maxDifficulty: 7, useAdaptive: true },
+      { id: 'r_verbal', topicId: 'topic_verbal', count: 6, minDifficulty: 1, maxDifficulty: 7, useAdaptive: true },
+      { id: 'r_logic', topicId: 'topic_logic', count: 6, minDifficulty: 2, maxDifficulty: 8, useAdaptive: true },
+      { id: 'r_spatial', topicId: 'topic_spatial', count: 6, minDifficulty: 1, maxDifficulty: 7, useAdaptive: true },
+    ],
+    smartRules: [
+      { id: 'sr_quant_diag', name: 'כמותי - אבחון', topicId: 'topic_quantitative', count: 6, minDifficulty: 1, maxDifficulty: 7, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_verbal_diag', name: 'מילולי - אבחון', topicId: 'topic_verbal', count: 6, minDifficulty: 1, maxDifficulty: 7, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_logic_diag', name: 'לוגיקה - אבחון', topicId: 'topic_logic', count: 6, minDifficulty: 2, maxDifficulty: 8, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_spatial_diag', name: 'צורני - אבחון', topicId: 'topic_spatial', count: 6, minDifficulty: 1, maxDifficulty: 7, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+    ],
+    topicTimeSettings: {
+      topic_quantitative: 70,
+      topic_verbal: 60,
+      topic_logic: 70,
+      topic_spatial: 55,
+    },
+    restTimeBetweenRules: 15,
+    passingScore: 60,
+    createdAt: new Date('2026-06-04'),
+    isActive: true,
+  },
+  {
+    id: 'tmpl_adaptive_logic_quant_advanced_001',
+    name: 'מבחן אדפטיבי כמותי-לוגי מתקדם',
+    description: 'מבחן עומק למועמדים חזקים: יחסים, סדרות, טבלאות והסקה. הקושי עולה לפי ביצוע.',
+    targetId: 'target_psychometric',
+    totalQuestions: 36,
+    timeLimitMinutes: 45,
+    rules: [
+      { id: 'r_quant', topicId: 'topic_quantitative', count: 18, minDifficulty: 4, maxDifficulty: 10, useAdaptive: true },
+      { id: 'r_logic', topicId: 'topic_logic', count: 18, minDifficulty: 4, maxDifficulty: 10, useAdaptive: true },
+    ],
+    smartRules: [
+      { id: 'sr_quant_advanced', name: 'כמותי מתקדם', topicId: 'topic_quantitative', count: 18, minDifficulty: 4, maxDifficulty: 10, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_logic_advanced', name: 'לוגיקה מתקדמת', topicId: 'topic_logic', count: 18, minDifficulty: 4, maxDifficulty: 10, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+    ],
+    topicTimeSettings: {
+      topic_quantitative: 80,
+      topic_logic: 75,
+    },
+    restTimeBetweenRules: 30,
+    restScreenMessage: 'החלק הבא דורש ריכוז גבוה. בדוק שאתה עובד מסודר ולא מנחש מהר מדי.',
+    passingScore: 72,
+    createdAt: new Date('2026-06-04'),
+    isActive: true,
+  },
+  {
+    id: 'tmpl_adaptive_verbal_spatial_001',
+    name: 'מבחן אדפטיבי מילולי-צורני',
+    description: 'שילוב של הבנת יחסים מילוליים, השלמות ותפיסה מרחבית. מתאים לשיפור דיוק תחת זמן.',
+    targetId: 'target_psychometric',
+    totalQuestions: 32,
+    timeLimitMinutes: 38,
+    rules: [
+      { id: 'r_verbal', topicId: 'topic_verbal', count: 16, minDifficulty: 2, maxDifficulty: 9, useAdaptive: true },
+      { id: 'r_spatial', topicId: 'topic_spatial', count: 16, minDifficulty: 2, maxDifficulty: 9, useAdaptive: true },
+    ],
+    smartRules: [
+      { id: 'sr_verbal_adaptive', name: 'מילולי אדפטיבי', topicId: 'topic_verbal', count: 16, minDifficulty: 2, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_spatial_adaptive', name: 'צורני אדפטיבי', topicId: 'topic_spatial', count: 16, minDifficulty: 2, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+    ],
+    topicTimeSettings: {
+      topic_verbal: 62,
+      topic_spatial: 58,
+    },
+    restTimeBetweenRules: 20,
+    passingScore: 66,
+    createdAt: new Date('2026-06-04'),
+    isActive: true,
+  },
+  {
+    id: 'tmpl_adaptive_final_sprint_001',
+    name: 'ספרינט פסיכוטכני אדפטיבי',
+    description: 'מבחן קצר ומהיר לפני מיון: 20 שאלות, זמן צפוף, בחירה אדפטיבית מכל התחומים.',
+    targetId: 'target_psychometric',
+    totalQuestions: 20,
+    timeLimitMinutes: 20,
+    rules: [
+      { id: 'r_quant', topicId: 'topic_quantitative', count: 5, minDifficulty: 3, maxDifficulty: 9, useAdaptive: true },
+      { id: 'r_verbal', topicId: 'topic_verbal', count: 5, minDifficulty: 3, maxDifficulty: 9, useAdaptive: true },
+      { id: 'r_logic', topicId: 'topic_logic', count: 5, minDifficulty: 3, maxDifficulty: 9, useAdaptive: true },
+      { id: 'r_spatial', topicId: 'topic_spatial', count: 5, minDifficulty: 3, maxDifficulty: 9, useAdaptive: true },
+    ],
+    smartRules: [
+      { id: 'sr_quant_sprint', name: 'כמותי מהיר', topicId: 'topic_quantitative', count: 5, minDifficulty: 3, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_verbal_sprint', name: 'מילולי מהיר', topicId: 'topic_verbal', count: 5, minDifficulty: 3, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_logic_sprint', name: 'לוגי מהיר', topicId: 'topic_logic', count: 5, minDifficulty: 3, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_spatial_sprint', name: 'צורני מהיר', topicId: 'topic_spatial', count: 5, minDifficulty: 3, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+    ],
+    topicTimeSettings: {
+      topic_quantitative: 60,
+      topic_verbal: 50,
+      topic_logic: 58,
+      topic_spatial: 48,
+    },
+    restTimeBetweenRules: 8,
+    passingScore: 64,
+    createdAt: new Date('2026-06-04'),
+    isActive: true,
+  },
 ];
 
 export const useAdminStore = create<AdminState>((set, get) => ({
   isAdmin: false,
   freePracticeLimit: 30,
-  questions: [...PENDING_SEED],
+  questions: [...LOCAL_QUESTION_BANK],
   topics: [...TOPICS],
   targets: [...TARGETS],
   templates: SEED_TEMPLATES,
   selectedQuestionIds: [],
   practiceSettings: DEFAULT_PRACTICE_SETTINGS,
   examSettings: DEFAULT_EXAM_SETTINGS,
+  premiumConfig: DEFAULT_PREMIUM_CONFIG,
   sessionHistory: [],
   appConfig: DEFAULT_APP_CONFIG,
   dailyChallenges: [],
@@ -820,7 +1086,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   setAppConfig: (updates) => {
     set(s => {
       const next = { ...s.appConfig, ...updates };
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: next });
       return { appConfig: next };
     });
   },
@@ -828,7 +1094,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   setFeatureFlag: (flag, value) => {
     set(s => {
       const next = { ...s.appConfig, featureFlags: { ...s.appConfig.featureFlags, [flag]: value } };
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: next });
       return { appConfig: next };
     });
   },
@@ -836,7 +1102,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   applyAppControlPreset: (preset) => {
     set(s => {
       const next = APP_CONTROL_PRESETS[preset].config;
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: next });
       return { appConfig: next };
     });
     get().logActivity(`הופעל פריסט שליטה: ${APP_CONTROL_PRESETS[preset].label}`, 'system');
@@ -845,7 +1111,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   resetAppConfig: () => {
     set(s => {
       const next = DEFAULT_APP_CONFIG;
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: next });
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: next });
       return { appConfig: next };
     });
     get().logActivity('אופסו הגדרות מרכז השליטה לברירת מחדל', 'system');
@@ -854,24 +1120,31 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   addDailyChallenge: (challenge) => {
     const newC: DailyChallenge = { ...challenge, id: `dc_${Date.now()}` };
     set(s => ({ dailyChallenges: [...s.dailyChallenges, newC] }));
+    saveAdminCollections(get());
     return newC;
   },
 
-  updateDailyChallenge: (id, updates) =>
+  updateDailyChallenge: (id, updates) => {
     set(s => ({
       dailyChallenges: s.dailyChallenges.map(c => c.id === id ? { ...c, ...updates } : c),
-    })),
+    }));
+    saveAdminCollections(get());
+  },
 
-  removeDailyChallenge: (id) =>
-    set(s => ({ dailyChallenges: s.dailyChallenges.filter(c => c.id !== id) })),
+  removeDailyChallenge: (id) => {
+    set(s => ({ dailyChallenges: s.dailyChallenges.filter(c => c.id !== id) }));
+    saveAdminCollections(get());
+  },
 
-  setUserNote: (userId, note) =>
+  setUserNote: (userId, note) => {
     set(s => ({
       userNotes: [
         ...s.userNotes.filter(n => n.userId !== userId),
         { userId, note, updatedAt: new Date().toISOString() },
       ],
-    })),
+    }));
+    saveAdminCollections(get());
+  },
 
   getUserNote: (userId) => get().userNotes.find(n => n.userId === userId)?.note ?? '',
 
@@ -881,13 +1154,13 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     const val = Math.max(5, Math.min(200, n));
     set({ freePracticeLimit: val });
     const s = get();
-    saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, freePracticeLimit: val, appConfig: s.appConfig });
+    saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: val, appConfig: s.appConfig });
   },
 
   setPracticeSettings: (updates) => {
     set(s => {
       const next = { ...s.practiceSettings, ...updates };
-      saveAdminSettings({ practiceSettings: next, examSettings: s.examSettings, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
+      saveAdminSettings({ practiceSettings: next, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
       return { practiceSettings: next };
     });
   },
@@ -895,8 +1168,22 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   setExamSettings: (updates) => {
     set(s => {
       const next = { ...s.examSettings, ...updates };
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: next, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: next, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
       return { examSettings: next };
+    });
+  },
+  setPremiumConfig: (updates) => {
+    set(s => {
+      const next = withDefaultPremiumConfig({
+        ...s.premiumConfig,
+        ...updates,
+        premiumFeatures: {
+          ...s.premiumConfig.premiumFeatures,
+          ...(updates.premiumFeatures ?? {}),
+        },
+      });
+      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: next, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
+      return { premiumConfig: next };
     });
   },
   addSessionRecord: (record) => {
@@ -1131,9 +1418,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   updateTarget: (id, updates) => {
-    set(s => ({
-      targets: s.targets.map(t => (t.id === id ? { ...t, ...updates } : t)),
-    }));
+    set(s => {
+      const targets = s.targets.map(t => (t.id === id ? { ...t, ...updates } : t));
+      const target = targets.find(t => t.id === id);
+      if (target) dbUpsertTarget(target);
+      return { targets };
+    });
   },
 
   addTemplate: (t) => {
@@ -1169,43 +1459,51 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   addTopicRuleToTemplate: (templateId, rule) => {
-    set(s => ({
-      templates: s.templates.map(t =>
+    set(s => {
+      const templates = s.templates.map(t =>
         t.id === templateId
           ? { ...t, rules: [...t.rules.filter(r => r.id !== rule.id), rule] }
           : t
-      ),
-    }));
+      );
+      saveTemplates(templates);
+      return { templates };
+    });
   },
 
   removeTopicRuleFromTemplate: (templateId, ruleId) => {
-    set(s => ({
-      templates: s.templates.map(t =>
+    set(s => {
+      const templates = s.templates.map(t =>
         t.id === templateId
           ? { ...t, rules: t.rules.filter(r => r.id !== ruleId) }
           : t
-      ),
-    }));
+      );
+      saveTemplates(templates);
+      return { templates };
+    });
   },
 
   pinQuestionToTemplate: (templateId, questionId) => {
-    set(s => ({
-      templates: s.templates.map(t =>
+    set(s => {
+      const templates = s.templates.map(t =>
         t.id === templateId
           ? { ...t, pinnedQuestionIds: [...new Set([...(t.pinnedQuestionIds ?? []), questionId])] }
           : t
-      ),
-    }));
+      );
+      saveTemplates(templates);
+      return { templates };
+    });
   },
 
   unpinQuestionFromTemplate: (templateId, questionId) => {
-    set(s => ({
-      templates: s.templates.map(t =>
+    set(s => {
+      const templates = s.templates.map(t =>
         t.id === templateId
           ? { ...t, pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(id => id !== questionId) }
           : t
-      ),
-    }));
+      );
+      saveTemplates(templates);
+      return { templates };
+    });
   },
 
   // ── Activity Log ──────────────────────────────────────────────────────────
@@ -1219,11 +1517,13 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => ({ activityLog: [entry, ...s.activityLog].slice(0, 500) }));
     const updated = get().activityLog;
     AsyncStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(updated)).catch(() => null);
+    saveAdminCollections(get());
   },
 
   clearActivityLog: () => {
     set({ activityLog: [] });
     AsyncStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify([])).catch(() => null);
+    saveAdminCollections(get());
   },
 
   // ── Promo Codes ────────────────────────────────────────────────────────────
@@ -1235,16 +1535,20 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       usedCount: 0,
     };
     set(s => ({ promoCodes: [...s.promoCodes, newCode] }));
+    saveAdminCollections(get());
     get().logActivity(`הוסיף קוד קופון ${newCode.code}`, 'promo');
     return newCode;
   },
 
-  updatePromoCode: (id, updates) =>
-    set(s => ({ promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, ...updates } : c) })),
+  updatePromoCode: (id, updates) => {
+    set(s => ({ promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, ...updates } : c) }));
+    saveAdminCollections(get());
+  },
 
   deletePromoCode: (id) => {
     const code = get().promoCodes.find(c => c.id === id);
     set(s => ({ promoCodes: s.promoCodes.filter(c => c.id !== id) }));
+    saveAdminCollections(get());
     if (code) get().logActivity(`מחק קוד קופון ${code.code}`, 'promo');
   },
 
@@ -1255,6 +1559,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => ({
       promoCodes: s.promoCodes.map(c => c.id === id ? { ...c, isActive: newIsActive } : c),
     }));
+    saveAdminCollections(get());
     get().logActivity(`${newIsActive ? 'הפעיל' : 'הסתיר'} קוד קופון ${code.code}`, 'promo');
   },
 
@@ -1268,16 +1573,20 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       openRate: null,
     };
     set(s => ({ pushNotifications: [...s.pushNotifications, newNotif] }));
+    saveAdminCollections(get());
     get().logActivity(`יצר הודעת Push: ${newNotif.title}`, 'notification');
     return newNotif;
   },
 
-  updatePushNotification: (id, updates) =>
-    set(s => ({ pushNotifications: s.pushNotifications.map(n => n.id === id ? { ...n, ...updates } : n) })),
+  updatePushNotification: (id, updates) => {
+    set(s => ({ pushNotifications: s.pushNotifications.map(n => n.id === id ? { ...n, ...updates } : n) }));
+    saveAdminCollections(get());
+  },
 
   deletePushNotification: (id) => {
     const notif = get().pushNotifications.find(n => n.id === id);
     set(s => ({ pushNotifications: s.pushNotifications.filter(n => n.id !== id) }));
+    saveAdminCollections(get());
     if (notif) get().logActivity(`מחק הודעת Push: ${notif.title}`, 'notification');
   },
 
@@ -1290,6 +1599,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           : n
       ),
     }));
+    saveAdminCollections(get());
     if (notif) get().logActivity(`שלח הודעת Push לכלל המשתמשים: ${notif.title}`, 'notification');
   },
 
@@ -1302,6 +1612,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(state => ({
       generationSessions: [newSession, ...state.generationSessions].slice(0, 20),
     }));
+    saveAdminCollections(get());
   },
 
   addGenerationPreset: (p) => {
@@ -1310,11 +1621,13 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       id: `preset_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     };
     set(state => ({ generationPresets: [...state.generationPresets, newPreset] }));
+    saveAdminCollections(get());
     return newPreset;
   },
 
   deleteGenerationPreset: (id) => {
     set(state => ({ generationPresets: state.generationPresets.filter(p => p.id !== id) }));
+    saveAdminCollections(get());
   },
 
   getStats: () => {
@@ -1373,31 +1686,36 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       logger.error('adminStore:loadAdminData', 'שגיאה בהזרעת שאלות ממתינות', e?.message);
     }
 
-    // 1. Load all questions from Supabase (includes any admin-created ones).
-    // Merge with local state: local 'validated'/'rejected' questions take precedence
-    // over Supabase to avoid overwriting optimistic updates that haven't flushed yet.
+    // 1. Load all questions from Supabase (source of truth), then append any
+    // locally-created questions that have not synced yet.
     try {
       const remote = await fetchAllQuestions();
       if (remote.length > 0) {
         set(s => {
-          const localOverrides = new Map(
-            s.questions
-              .filter(q => q.validationStatus === 'validated' || q.validationStatus === 'rejected')
-              .map(q => [q.id, q])
-          );
-          const merged = remote.map(q => localOverrides.get(q.id) ?? q);
-          // Append any locally-created questions not yet in Supabase
           const remoteIds = new Set(remote.map(q => q.id));
           const localOnly = s.questions.filter(q => !remoteIds.has(q.id));
           logger.success('adminStore:loadAdminData', `נטענו ${remote.length} שאלות (${localOnly.length} מקומיות בלבד)`);
-          return { questions: [...merged, ...localOnly] };
+          return { questions: [...remote, ...localOnly] };
         });
       }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת שאלות', e?.message);
     }
 
-    // 2. Load topics from Supabase (includes admin-created topics), merge with local
+    // 2. Load targets and topics from Supabase (includes admin-created content), merge with local
+    try {
+      const remoteTargets = await fetchTargets();
+      if (remoteTargets.length > 0) {
+        set(s => {
+          const remoteIds = new Set(remoteTargets.map(t => t.id));
+          const localOnly = s.targets.filter(t => !remoteIds.has(t.id));
+          return { targets: [...remoteTargets, ...localOnly] };
+        });
+      }
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת מסלולים', e?.message);
+    }
+
     try {
       const remoteTopics = await fetchTopics();
       if (remoteTopics.length > 0) {
@@ -1417,7 +1735,11 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     // 3. Load simulation templates from AsyncStorage
     try {
       const templates = await loadTemplates();
-      if (templates && templates.length > 0) set({ templates });
+      if (templates && templates.length > 0) {
+        set({ templates });
+      } else {
+        saveTemplates(get().templates);
+      }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת תבניות', e?.message);
     }
@@ -1428,14 +1750,36 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       if (settings) {
         if (settings.practiceSettings) set({ practiceSettings: settings.practiceSettings });
         if (settings.examSettings) set({ examSettings: settings.examSettings });
+        if (settings.premiumConfig) set({ premiumConfig: withDefaultPremiumConfig(settings.premiumConfig) });
         if (settings.freePracticeLimit) set({ freePracticeLimit: settings.freePracticeLimit });
         if (settings.appConfig) set({ appConfig: withDefaultAppConfig(settings.appConfig) });
+      } else {
+        const s = get();
+        saveAdminSettings({
+          practiceSettings: s.practiceSettings,
+          examSettings: s.examSettings,
+          premiumConfig: s.premiumConfig,
+          freePracticeLimit: s.freePracticeLimit,
+          appConfig: s.appConfig,
+        });
       }
     } catch (e: any) {
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הגדרות', e?.message);
     }
 
-    // 5. Load persisted activityLog from AsyncStorage
+    // 5. Load synced admin collections from Supabase when available.
+    try {
+      const collections = normalizeAdminCollections(await loadAdminState<any>(ADMIN_COLLECTIONS_KEY));
+      if (collections) {
+        set(collections);
+      } else {
+        saveAdminCollections(get());
+      }
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת אוספי אדמין', e?.message);
+    }
+
+    // 6. Load persisted activityLog from AsyncStorage
     try {
       const saved = await AsyncStorage.getItem(ACTIVITY_LOG_KEY);
       if (saved) {
@@ -1456,3 +1800,4 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   getPendingQuestions: () => get().questions.filter(q => q.validationStatus === 'pending'),
   getQuestionsByStatus: (status) => get().questions.filter(q => q.validationStatus === status),
 }));
+

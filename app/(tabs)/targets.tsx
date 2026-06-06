@@ -13,7 +13,9 @@ import { ProgressBar } from '../../components/ProgressBar';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
+import { useAdminStore } from '../../store/adminStore';
 import { LEVEL_LABELS } from '../../utils/adaptive';
+import { canAccessMode, canAccessTopic } from '../../lib/accessControl';
 
 // Animated topics container that springs in when a target is expanded
 function AnimatedTopicsContainer({
@@ -76,7 +78,8 @@ export default function TargetsTab() {
   const insets = useSafeAreaInsets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const { getTopicAccuracy, getTopicLevel, totalSessions } = useUserStore();
+  const { getTopicAccuracy, getTopicLevel, totalSessions, isPremium } = useUserStore();
+  const { premiumConfig, practiceSettings } = useAdminStore();
 
   const selected = TARGETS.find(t => t.id === selectedId);
   const selectedTopics = selected ? TOPICS.filter(t => t.targetId === selected.id) : [];
@@ -172,13 +175,14 @@ export default function TargetsTab() {
                       const topicLevel = getTopicLevel(topic.id);
                       const topicPct = Math.round(topicAccuracy * 100);
                       const isLast = index === selectedTopics.length - 1;
+                      const isLocked = !canAccessTopic(topic, isPremium, premiumConfig);
 
                       return (
                         <View
                           key={topic.id}
                           style={[
                             styles.topicRow,
-                            topic.isPremiumOnly && styles.topicLocked,
+                            isLocked && styles.topicLocked,
                             isLast && styles.topicRowLast,
                           ]}
                         >
@@ -206,7 +210,7 @@ export default function TargetsTab() {
                           </View>
 
                           {/* Left side: "תרגל ←" chip or 💎 lock */}
-                          {topic.isPremiumOnly ? (
+                          {isLocked ? (
                             <Text style={styles.lockIcon}>💎</Text>
                           ) : (
                             <Pressable
@@ -244,7 +248,11 @@ export default function TargetsTab() {
                       pressed && { opacity: 0.85 },
                     ]}
                     onPress={() => {
-                      const firstFreeTopic = selectedTopics.find(t => !t.isPremiumOnly);
+                      if (!canAccessMode('adaptive', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)) {
+                        Alert.alert('פרימיום בלבד', 'תרגול אדפטיבי נעול לפי הגדרות המנהל.');
+                        return;
+                      }
+                      const firstFreeTopic = selectedTopics.find(t => canAccessTopic(t, isPremium, premiumConfig));
                       if (!firstFreeTopic) {
                         Alert.alert('תרגול אדפטיבי', 'כל הנושאים במסלול זה דורשים מנוי פרמיום.');
                         return;

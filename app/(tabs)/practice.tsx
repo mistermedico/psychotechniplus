@@ -12,7 +12,8 @@ import { TARGETS, TOPICS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
-import { useAdminStore, SmartExamTemplate } from '../../store/adminStore';
+import { useAdminStore, SmartExamTemplate, PremiumConfig } from '../../store/adminStore';
+import { canAccessMode, canAccessPremiumFeature, canAccessTopic } from '../../lib/accessControl';
 
 type PracticeTab = 'free' | 'simulations';
 
@@ -52,6 +53,8 @@ const FREE_MODES = [
 ];
 
 const PRACTICE_USAGE_KEY = '@psychotechniplus/practiceUsage';
+const TAB_BAR_OVERLAY_HEIGHT = 88;
+const START_BAR_HEIGHT = 112;
 
 interface PracticeUsage {
   date: string;
@@ -76,7 +79,7 @@ export default function PracticeTab() {
   const indicatorLeft = tabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '50%'] });
 
   const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, userId } = useUserStore();
-  const { freePracticeLimit, templates, appConfig, practiceSettings } = useAdminStore();
+  const { freePracticeLimit, templates, appConfig, practiceSettings, premiumConfig } = useAdminStore();
   const featureFlags = appConfig.featureFlags;
   const premiumOnlyModes = practiceSettings.premiumOnlyModes;
   const [usage, setUsage] = useState<PracticeUsage>(emptyUsage);
@@ -90,8 +93,11 @@ export default function PracticeTab() {
   );
 
   const enabledModes = useMemo(
-    () => FREE_MODES.filter(mode => mode.id !== 'speed' || featureFlags.speedMode !== false),
-    [featureFlags.speedMode]
+    () => FREE_MODES.filter(mode =>
+      (mode.id !== 'speed' || featureFlags.speedMode !== false) &&
+      canAccessMode(mode.id, isPremium, premiumConfig, premiumOnlyModes)
+    ),
+    [featureFlags.speedMode, isPremium, premiumConfig, premiumOnlyModes]
   );
 
   useEffect(() => {
@@ -119,7 +125,7 @@ export default function PracticeTab() {
 
   const getFreeUsageBlock = () => {
     if (isPremium) return null;
-    const dailyLimit = Math.max(1, appConfig.freeSessionsPerDay);
+    const dailyLimit = Math.max(1, premiumConfig.freeUserSessionLimit);
     const currentUsage = usage.date === todayKey() ? usage : emptyUsage();
     if (currentUsage.count >= dailyLimit) {
       return `הגעת למגבלת ${dailyLimit} סשנים חינמיים להיום. אפשר לשדרג לפרימיום או לחזור מחר.`;
@@ -159,6 +165,14 @@ export default function PracticeTab() {
 
   const handleStartFree = () => {
     if (!selectedTopicId) return;
+    const selectedTopic = topics.find(t => t.id === selectedTopicId);
+    if (selectedTopic && !canAccessTopic(selectedTopic, isPremium, premiumConfig)) {
+      Alert.alert('פרימיום בלבד', 'הנושא הזה נעול לפי הגדרות המנהל.', [
+        { text: 'שדרג', onPress: () => router.push('/paywall') },
+        { text: 'ביטול', style: 'cancel' },
+      ]);
+      return;
+    }
     const usageBlock = getFreeUsageBlock();
     if (usageBlock) {
       Alert.alert('מגבלת תרגול חינמי', usageBlock, [
@@ -168,7 +182,7 @@ export default function PracticeTab() {
       return;
     }
     // Check if mode is premium-only
-    if (premiumOnlyModes.includes(selectedMode) && !isPremium) {
+    if (!canAccessMode(selectedMode, isPremium, premiumConfig, premiumOnlyModes)) {
       Alert.alert(
         'פרמיום בלבד',
         'מצב זה זמין למנויי פרמיום בלבד. שדרג את החשבון שלך.',
@@ -196,6 +210,13 @@ export default function PracticeTab() {
   const handleStartSimulation = (templateId: string) => {
     const tmpl = templates.find(t => t.id === templateId);
     if (!tmpl) return;
+    if (!canAccessPremiumFeature('simulations', isPremium, premiumConfig)) {
+      Alert.alert('פרימיום בלבד', 'מבחנים חכמים נעולים לפי הגדרות המנהל.', [
+        { text: 'שדרג', onPress: () => router.push('/paywall') },
+        { text: 'ביטול', style: 'cancel' },
+      ]);
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     router.push({
       pathname: '/practice-session',
@@ -222,13 +243,13 @@ export default function PracticeTab() {
 
           <View style={styles.tabBarWrap}>
             <View style={styles.tabBar}>
-              <Animated.View style={[styles.tabIndicator, { left: indicatorLeft }]} />
-              <Pressable onPress={() => switchTab('free')} style={styles.tabBtn}>
+              <Animated.View pointerEvents="none" style={[styles.tabIndicator, { left: indicatorLeft }]} />
+              <Pressable hitSlop={8} onPress={() => switchTab('free')} style={styles.tabBtn}>
                 <Text style={[styles.tabBtnText, activeTab === 'free' && styles.tabBtnTextActive]}>
                   📖 תרגול חופשי
                 </Text>
               </Pressable>
-              <Pressable onPress={() => switchTab('simulations')} style={styles.tabBtn}>
+              <Pressable hitSlop={8} onPress={() => switchTab('simulations')} style={styles.tabBtn}>
                 <View style={styles.tabBtnInner}>
                   <Text style={[styles.tabBtnText, activeTab === 'simulations' && styles.tabBtnTextActive]}>
                     🏗️ מבחנים חכמים
@@ -260,10 +281,11 @@ export default function PracticeTab() {
             canStart={selectedTopicId !== null}
             onStart={handleStartFree}
             showSpeedMode={featureFlags.speedMode}
-            dailyLimit={appConfig.freeSessionsPerDay}
+            dailyLimit={premiumConfig.freeUserSessionLimit}
             dailyUsed={usage.date === todayKey() ? usage.count : 0}
             cooldownMinutes={appConfig.sessionCooldownMinutes}
             usageBlock={getFreeUsageBlock()}
+            premiumConfig={premiumConfig}
           />
         ) : featureFlags.simulations !== false ? (
           <SimulationsPane
@@ -271,6 +293,7 @@ export default function PracticeTab() {
             target={target}
             onStart={handleStartSimulation}
             isPremium={isPremium}
+            canStartSimulations={canAccessPremiumFeature('simulations', isPremium, premiumConfig)}
           />
         ) : (
           <View style={styles.emptyState}>
@@ -291,6 +314,7 @@ function FreePracticePane({
   getTopicAccuracy, getTopicLevelLabel,
   isPremium, freePracticeLimit, canStart, onStart, showSpeedMode,
   dailyLimit, dailyUsed, cooldownMinutes, usageBlock,
+  premiumConfig,
 }: {
   topics: typeof TOPICS;
   selectedMode: string; setSelectedMode: (m: string) => void;
@@ -305,13 +329,14 @@ function FreePracticePane({
   dailyUsed: number;
   cooldownMinutes: number;
   usageBlock: string | null;
+  premiumConfig: PremiumConfig;
 }) {
   const insets = useSafeAreaInsets();
   return (
     <>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + TAB_BAR_OVERLAY_HEIGHT + START_BAR_HEIGHT }]}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
@@ -412,7 +437,7 @@ function FreePracticePane({
             const accuracy = getTopicAccuracy(topic.id);
             const levelLabel = getTopicLevelLabel(topic.id);
             const isSelected = selectedTopicId === topic.id;
-            const isLocked = topic.isPremiumOnly && !isPremium;
+            const isLocked = !canAccessTopic(topic, isPremium, premiumConfig);
             return (
               <Pressable
                 key={topic.id}
@@ -486,7 +511,7 @@ function FreePracticePane({
       </ScrollView>
 
       {/* Sticky start button */}
-      <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom + 4, 20) }]}>
+      <View style={[styles.stickyBar, { bottom: TAB_BAR_OVERLAY_HEIGHT, paddingBottom: Math.max(insets.bottom + 4, 18) }]}>
         <Pressable
           onPress={onStart}
           disabled={!canStart || !!usageBlock}
@@ -540,12 +565,13 @@ function ModeChip({
 }
 
 function SimulationsPane({
-  templates, target, onStart,
+  templates, target, onStart, canStartSimulations,
 }: {
   templates: SmartExamTemplate[];
   target: typeof TARGETS[0];
   onStart: (id: string) => void;
   isPremium: boolean;
+  canStartSimulations: boolean;
 }) {
   const insets = useSafeAreaInsets();
   if (templates.length === 0) {
@@ -561,7 +587,7 @@ function SimulationsPane({
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + TAB_BAR_OVERLAY_HEIGHT + 32 }]}
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.simHeader}>
@@ -626,11 +652,15 @@ function SimulationsPane({
 
               <Pressable
                 onPress={() => onStart(tmpl.id)}
-                style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
+                disabled={!canStartSimulations}
+                style={({ pressed }) => [{ opacity: pressed && canStartSimulations ? 0.75 : 1 }]}
               >
-                <LinearGradient colors={Colors.gradients.primary} style={styles.simStartGrad}>
+                <LinearGradient
+                  colors={canStartSimulations ? Colors.gradients.primary : ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.07)']}
+                  style={styles.simStartGrad}
+                >
                   <Text style={styles.simStartText}>
-                    🚀 התחל מבחן — {totalQ} שאלות, {tmpl.timeLimitMinutes} דקות
+                    {canStartSimulations ? 'התחל מבחן' : 'נעול לפרימיום'} - {totalQ} שאלות, {tmpl.timeLimitMinutes} דקות
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -681,6 +711,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
     gap: 10,
+    zIndex: 20,
+    elevation: 20,
   },
   homeBtn: {
     width: 44,
@@ -694,7 +726,7 @@ const styles = StyleSheet.create({
   },
   homeBtnText: { fontSize: 18 },
 
-  tabBarWrap: { flex: 1 },
+  tabBarWrap: { flex: 1, zIndex: 21 },
   tabBar: {
     flexDirection: 'row-reverse',
     backgroundColor: 'rgba(255,255,255,0.06)',
@@ -703,6 +735,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    zIndex: 22,
   },
   tabIndicator: {
     position: 'absolute',
@@ -719,7 +752,8 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1,
+    zIndex: 23,
+    elevation: 23,
   },
   tabBtnInner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   tabBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.45)' },
@@ -941,7 +975,6 @@ const styles = StyleSheet.create({
   /* ── Sticky start button ── */
   stickyBar: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: 'rgba(6,9,18,0.85)',
@@ -949,6 +982,8 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 20,
     paddingTop: 12,
+    zIndex: 30,
+    elevation: 30,
   },
   startBtn: { borderRadius: Radius.xl, paddingVertical: 18, alignItems: 'center' },
   startBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
@@ -1018,3 +1053,4 @@ const styles = StyleSheet.create({
   simStartGrad: { borderRadius: Radius.xl, paddingVertical: 16, alignItems: 'center' },
   simStartText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 });
+

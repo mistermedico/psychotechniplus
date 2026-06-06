@@ -77,6 +77,7 @@ create table if not exists user_profiles (
   name text default '',
   selected_target_id text,
   has_completed_onboarding boolean default false,
+  is_premium boolean default false,
   streak int default 0,
   longest_streak int default 0,
   last_practiced_date text,
@@ -91,6 +92,23 @@ create table if not exists user_profiles (
 
 create trigger user_profiles_updated_at
   before update on user_profiles
+  for each row execute function update_updated_at();
+
+alter table user_profiles
+  add column if not exists is_premium boolean default false;
+
+-- ── Admin State ────────────────────────────────────────────────────────────
+-- Stores admin templates/settings in Supabase so local admin changes sync
+-- across machines. The app still keeps AsyncStorage as an offline fallback.
+create table if not exists admin_state (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz default now()
+);
+
+drop trigger if exists admin_state_updated_at on admin_state;
+create trigger admin_state_updated_at
+  before update on admin_state
   for each row execute function update_updated_at();
 
 -- ── User ELOs ──────────────────────────────────────────────────────────────
@@ -145,6 +163,7 @@ alter table questions enable row level security;
 alter table user_profiles enable row level security;
 alter table user_elos enable row level security;
 alter table user_badges enable row level security;
+alter table admin_state enable row level security;
 
 create policy "allow_all_targets"       on targets       for all using (true) with check (true);
 create policy "allow_all_topics"        on topics        for all using (true) with check (true);
@@ -152,6 +171,7 @@ create policy "allow_all_questions"     on questions     for all using (true) wi
 create policy "allow_all_user_profiles" on user_profiles for all using (true) with check (true);
 create policy "allow_all_user_elos"     on user_elos     for all using (true) with check (true);
 create policy "allow_all_user_badges"   on user_badges   for all using (true) with check (true);
+create policy "allow_all_admin_state"   on admin_state   for all using (true) with check (true);
 
 -- ─── Practice monitor indexes & views ────────────────────────────────────────
 create index if not exists practice_sessions_completed_at_idx on practice_sessions(completed_at desc);

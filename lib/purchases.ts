@@ -8,16 +8,19 @@ import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 
 export const USE_REAL_PURCHASES = true;
 
-export const REVENUECAT_API_KEY_IOS = 'test_QEWYAtjdTugtGFWGvpOncFXuwYS';
-export const REVENUECAT_API_KEY_ANDROID = 'test_QEWYAtjdTugtGFWGvpOncFXuwYS';
+export const REVENUECAT_API_KEY_IOS =
+  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? 'test_QEWYAtjdTugtGFWGvpOncFXuwYS';
+export const REVENUECAT_API_KEY_ANDROID =
+  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ?? 'test_QEWYAtjdTugtGFWGvpOncFXuwYS';
 
-export const PREMIUM_ENTITLEMENT = 'psychotechniplus Pro';
+export const PREMIUM_ENTITLEMENT = 'premium';
+export const LEGACY_PREMIUM_ENTITLEMENTS = ['psychotechniplus Pro'];
 export const DEFAULT_OFFERING_ID = 'default';
 
 export const PRODUCT_IDS = {
-  weekly: 'weekly',
-  monthly: 'monthly',
-  lifetime: 'lifetime',
+  weekly: 'com.psychotechniplus.premium.weekly',
+  monthly: 'com.psychotechniplus.premium.monthly',
+  lifetime: 'com.psychotechniplus.premium.lifetime',
 } as const;
 
 export type PurchasePackageId = keyof typeof PRODUCT_IDS;
@@ -82,7 +85,10 @@ function normalizePackageIdentifier(pkg: PurchasesPackage): PurchasePackageId | 
 }
 
 function hasPremiumEntitlement(customerInfo: RevenueCatCustomerInfo | null | undefined): boolean {
-  return !!customerInfo?.entitlements.active[PREMIUM_ENTITLEMENT];
+  if (!customerInfo) return false;
+  return [PREMIUM_ENTITLEMENT, ...LEGACY_PREMIUM_ENTITLEMENTS].some(
+    entitlement => !!customerInfo.entitlements.active[entitlement],
+  );
 }
 
 function getErrorMessage(error: unknown): string {

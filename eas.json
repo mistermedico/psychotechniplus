@@ -28,8 +28,8 @@
     "production": {
       "ios": {
         "appleId": "YOUR_APPLE_ID@email.com",
-        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+        "ascAppId": "6776568241",
+        "appleTeamId": "9TST6XQ266"
       }
     }
   }
