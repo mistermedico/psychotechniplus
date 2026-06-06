@@ -1,4 +1,4 @@
-import { Stack, router, usePathname } from 'expo-router';
+import { Stack, router, usePathname, useRootNavigationState } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
@@ -36,14 +36,16 @@ const PAGE_NAMES: Record<string, string> = {
 export default function AdminLayout() {
   const { isAdmin, logActivity } = useAdminStore();
   const pathname = usePathname();
+  const rootNavigationState = useRootNavigationState();
   const lastLoggedPath = useRef<string | null>(null);
 
   // Auth guard
   useEffect(() => {
+    if (!rootNavigationState?.key) return;
     if (!isAdmin && pathname !== '/admin') {
       router.replace('/admin');
     }
-  }, [isAdmin, pathname]);
+  }, [isAdmin, pathname, rootNavigationState?.key]);
 
   // Page visit logging — only when path actually changes and admin is logged in
   useEffect(() => {

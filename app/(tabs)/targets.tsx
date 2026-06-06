@@ -17,6 +17,8 @@ import { useAdminStore } from '../../store/adminStore';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { canAccessMode, canAccessTopic } from '../../lib/accessControl';
 
+const BOTTOM_TAB_CLEARANCE = 112;
+
 // Animated topics container that springs in when a target is expanded
 function AnimatedTopicsContainer({
   visible,
@@ -116,7 +118,7 @@ export default function TargetsTab() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + BOTTOM_TAB_CLEARANCE }]}
         showsVerticalScrollIndicator={false}
         bounces={Platform.OS === 'ios'}
         decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}

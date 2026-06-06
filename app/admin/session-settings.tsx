@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Switch, Alert, TextInput,
@@ -12,10 +12,10 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 const ALL_MODES = [
-  { id: 'practice', label: '׳×׳¨׳’׳•׳' },
-  { id: 'speed', label: '׳׳”׳™׳¨׳•׳×' },
-  { id: 'adaptive', label: '׳׳“׳₪׳˜׳™׳‘׳™' },
-  { id: 'review', label: '׳—׳–׳¨׳”' },
+  { id: 'practice', label: 'תרגול' },
+  { id: 'speed', label: 'מהירות' },
+  { id: 'adaptive', label: 'אדפטיבי' },
+  { id: 'review', label: 'חזרה' },
 ];
 
 export default function SessionSettingsScreen() {
@@ -68,13 +68,13 @@ export default function SessionSettingsScreen() {
     const fdl = parseInt(freeDailyLimit, 10);
     const fsl = parseInt(freeSessionLimit, 10);
     const td = parseInt(trialDays, 10);
-    if (isNaN(fl) || fl < 5 || fl > 200) { Alert.alert('׳©׳’׳™׳׳”', '׳׳’׳‘׳׳× ׳©׳׳׳•׳× ׳—׳™׳ ׳׳™: 5-200'); return; }
-    if (isNaN(fmd) || fmd < 1 || fmd > 10) { Alert.alert('׳©׳’׳™׳׳”', '׳§׳•׳©׳™ ׳׳§׳¡׳™׳׳׳™ ׳׳—׳™׳ ׳׳™: 1-10'); return; }
-    if (isNaN(pl) || pl < 1) { Alert.alert('׳©׳’׳™׳׳”', '׳׳’׳‘׳׳× ׳©׳׳׳•׳× ׳₪׳¨׳׳™׳•׳ ׳—׳™׳™׳‘׳× ׳׳”׳™׳•׳× ׳׳¡׳₪׳¨ ׳—׳™׳•׳‘׳™'); return; }
-    if (isNaN(ss) || ss < 10 || ss > 300) { Alert.alert('׳©׳’׳™׳׳”', '׳–׳׳ ׳׳”׳™׳¨׳•׳×: 10-300 ׳©׳ ׳™׳•׳×'); return; }
-    if (isNaN(aa) || aa < 0 || aa > 30) { Alert.alert('׳©׳’׳™׳׳”', '׳§׳™׳“׳•׳ ׳׳•׳˜׳•׳׳˜׳™: 0-30 ׳©׳ ׳™׳•׳× (0 = ׳›׳‘׳•׳™)'); return; }
-    if (isNaN(ps) || ps < 0 || ps > 100) { Alert.alert('׳©׳’׳™׳׳”', '׳¦׳™׳•׳ ׳¢׳•׳‘׳¨: 0-100'); return; }
-    if (isNaN(rt) || rt < 0 || rt > 300) { Alert.alert('׳©׳’׳™׳׳”', '׳–׳׳ ׳׳ ׳•׳—׳”: 0-300 ׳©׳ ׳™׳•׳×'); return; }
+    if (isNaN(fl) || fl < 5 || fl > 200) { Alert.alert('שגיאה', 'מגבלת שאלות חינמי: 5-200'); return; }
+    if (isNaN(fmd) || fmd < 1 || fmd > 10) { Alert.alert('שגיאה', 'קושי מקסימלי לחינמי: 1-10'); return; }
+    if (isNaN(pl) || pl < 1) { Alert.alert('שגיאה', 'מגבלת שאלות פרמיום חייבת להיות מספר חיובי'); return; }
+    if (isNaN(ss) || ss < 10 || ss > 300) { Alert.alert('שגיאה', 'זמן מהירות: 10-300 שניות'); return; }
+    if (isNaN(aa) || aa < 0 || aa > 30) { Alert.alert('שגיאה', 'קידום אוטומטי: 0-30 שניות (0 = כבוי)'); return; }
+    if (isNaN(ps) || ps < 0 || ps > 100) { Alert.alert('שגיאה', 'ציון עובר: 0-100'); return; }
+    if (isNaN(rt) || rt < 0 || rt > 300) { Alert.alert('שגיאה', 'זמן מנוחה: 0-300 שניות'); return; }
 
     if (isNaN(fdl) || fdl < 1 || fdl > 500) { Alert.alert('שגיאה', 'מגבלת שאלות יומית לחינמי: 1-500'); return; }
     if (isNaN(fsl) || fsl < 1 || fsl > 50) { Alert.alert('שגיאה', 'מגבלת סשנים יומית לחינמי: 1-50'); return; }
@@ -108,78 +108,78 @@ export default function SessionSettingsScreen() {
     });
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('׳ ׳©׳׳¨', '׳”׳’׳“׳¨׳•׳× ׳”׳¡׳©׳ ׳¢׳•׳“׳›׳ ׳•. ׳›׳ ׳”׳¡׳©׳ ׳™׳ ׳”׳—׳“׳©׳™׳ ׳™׳©׳×׳׳©׳• ׳‘׳”׳’׳“׳¨׳•׳× ׳׳׳•.');
+    Alert.alert('נשמר', 'הגדרות הסשן עודכנו. כל הסשנים החדשים ישתמשו בהגדרות אלו.');
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>׳—׳–׳¨׳”</Text>
+          <Text style={styles.backText}>חזרה</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>׳”׳’׳“׳¨׳•׳× ׳¡׳©׳</Text>
-        <Text style={styles.headerSub}>׳©׳׳™׳˜׳” ׳׳׳׳” ׳‘׳×׳¨׳’׳•׳, ׳׳‘׳—׳ ׳™׳ ׳•׳’׳™׳©׳” ׳׳×׳›׳•׳ ׳•׳×</Text>
+        <Text style={styles.headerTitle}>הגדרות סשן</Text>
+        <Text style={styles.headerSub}>שליטה מלאה בתרגול, מבחנים וגישה לתכונות</Text>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Free vs Premium tiers */}
-        <SectionHeader title="נ†“ ׳׳©׳×׳׳©׳™׳ ׳—׳™׳ ׳׳™׳™׳" />
+        <SectionHeader title="🆓 משתמשים חינמיים" />
         <View style={styles.card}>
-          <RowInput label="׳׳§׳¡׳™׳׳•׳ ׳©׳׳׳•׳× ׳׳¡׳©׳" value={freeLimit} onChange={setFreeLimit} suffix="׳©׳׳׳•׳×" hint="5ג€“200" />
+          <RowInput label="מקסימום שאלות לסשן" value={freeLimit} onChange={setFreeLimit} suffix="שאלות" hint="5–200" />
           <Div />
-          <RowInput label="׳¨׳׳× ׳§׳•׳©׳™ ׳׳§׳¡׳™׳׳׳™׳×" value={freeMaxDiff} onChange={setFreeMaxDiff} suffix="/10" hint="1ג€“10" />
+          <RowInput label="רמת קושי מקסימלית" value={freeMaxDiff} onChange={setFreeMaxDiff} suffix="/10" hint="1–10" />
         </View>
 
-        <SectionHeader title="נ’ ׳׳©׳×׳׳©׳™ ׳₪׳¨׳׳™׳•׳" />
+        <SectionHeader title="💎 משתמשי פרמיום" />
         <View style={styles.card}>
-          <RowInput label="׳׳§׳¡׳™׳׳•׳ ׳©׳׳׳•׳× ׳׳¡׳©׳" value={premiumLimit} onChange={setPremiumLimit} suffix="׳©׳׳׳•׳×" hint="999=׳׳׳ ׳”׳’׳‘׳׳”" />
+          <RowInput label="מקסימום שאלות לסשן" value={premiumLimit} onChange={setPremiumLimit} suffix="שאלות" hint="999=ללא הגבלה" />
           <Div />
           <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
             <Text style={{ fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', lineHeight: 18 }}>
-              נ’¡ ׳₪׳¨׳׳™׳•׳ ׳׳§׳‘׳ ׳’׳™׳©׳” ׳׳›׳ ׳”׳ ׳•׳©׳׳™׳ ׳•׳”׳׳¦׳‘׳™׳ ׳©׳׳™׳ ׳ ׳ ׳¢׳•׳׳™׳ ׳׳—׳™׳ ׳׳™׳™׳. ׳”׳’׳“׳¨ ׳ ׳•׳©׳׳™׳ ׳₪׳¨׳׳™׳•׳ ׳‘׳ ׳™׳”׳•׳ ׳ ׳•׳©׳׳™׳.
+              💡 פרמיום מקבל גישה לכל הנושאים והמצבים שאינם נעולים לחינמיים. הגדר נושאים פרמיום בניהול נושאים.
             </Text>
           </View>
         </View>
 
         {/* Session speed */}
-        <SectionHeader title="ג¡ ׳׳¦׳‘ ׳׳”׳™׳¨׳•׳×" />
+        <SectionHeader title="⚡ מצב מהירות" />
         <View style={styles.card}>
-          <RowInput label="׳©׳ ׳™׳•׳× ׳׳©׳׳׳”" value={speedSecs} onChange={setSpeedSecs} suffix="׳©׳ ׳™׳•׳×" hint="10ג€“300" />
+          <RowInput label="שניות לשאלה" value={speedSecs} onChange={setSpeedSecs} suffix="שניות" hint="10–300" />
         </View>
 
         {/* Display */}
-        <SectionHeader title="׳”׳’׳“׳¨׳•׳× ׳×׳¦׳•׳’׳”" />
+        <SectionHeader title="הגדרות תצוגה" />
         <View style={styles.card}>
-          <SwitchRow label="׳”׳¦׳’ ׳”׳¡׳‘׳¨ ׳׳•׳˜׳•׳׳˜׳™ ׳׳—׳¨׳™ ׳×׳©׳•׳‘׳”" value={showExplauto} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowExplauto(v); }} />
+          <SwitchRow label="הצג הסבר אוטומטי אחרי תשובה" value={showExplauto} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowExplauto(v); }} />
           <Div />
-          <RowInput label="׳§׳™׳“׳•׳ ׳׳•׳˜׳•׳׳˜׳™ ׳׳©׳׳׳” ׳”׳‘׳׳”" value={autoAdvance} onChange={setAutoAdvance} suffix="׳©׳ ׳™׳•׳×" hint="0=׳›׳‘׳•׳™" />
+          <RowInput label="קידום אוטומטי לשאלה הבאה" value={autoAdvance} onChange={setAutoAdvance} suffix="שניות" hint="0=כבוי" />
           <Div />
-          <SwitchRow label="׳¢׳¨׳‘׳‘ ׳¡׳“׳¨ ׳×׳©׳•׳‘׳•׳×" value={shuffleOpts} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShuffleOpts(v); }} />
+          <SwitchRow label="ערבב סדר תשובות" value={shuffleOpts} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShuffleOpts(v); }} />
           <Div />
-          <SwitchRow label="׳”׳¦׳’ ׳˜׳™׳™׳׳¨ ׳×׳׳™׳“ (׳’׳ ׳‘׳×׳¨׳’׳•׳)" value={showTimerAlways} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowTimerAlways(v); }} />
+          <SwitchRow label="הצג טיימר תמיד (גם בתרגול)" value={showTimerAlways} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowTimerAlways(v); }} />
         </View>
 
         {/* Exams */}
-        <SectionHeader title="׳”׳’׳“׳¨׳•׳× ׳׳‘׳—׳ ׳™׳ ׳—׳›׳׳™׳" />
+        <SectionHeader title="הגדרות מבחנים חכמים" />
         <View style={styles.card}>
-          <RowInput label="׳¦׳™׳•׳ ׳¢׳•׳‘׳¨ ׳‘׳¨׳™׳¨׳× ׳׳—׳“׳" value={passingScore} onChange={setPassingScore} suffix="%" hint="0-100" />
+          <RowInput label="ציון עובר ברירת מחדל" value={passingScore} onChange={setPassingScore} suffix="%" hint="0-100" />
           <Div />
-          <RowInput label="׳–׳׳ ׳׳ ׳•׳—׳” ׳‘׳™׳ ׳—׳׳§׳™׳" value={restTime} onChange={setRestTime} suffix="׳©׳ ׳™׳•׳×" hint="0=׳׳׳" />
+          <RowInput label="זמן מנוחה בין חלקים" value={restTime} onChange={setRestTime} suffix="שניות" hint="0=ללא" />
           <Div />
-          <SwitchRow label="׳׳₪׳©׳¨ ׳“׳™׳׳•׳’ ׳‘׳׳‘׳—׳" value={allowSkip} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAllowSkip(v); }} />
+          <SwitchRow label="אפשר דילוג במבחן" value={allowSkip} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAllowSkip(v); }} />
           <Div />
-          <SwitchRow label="׳”׳¦׳’ ׳“׳™׳¨׳•׳’ ׳׳—׳•׳–׳•׳ ׳‘׳×׳•׳¦׳׳•׳×" value={showPercentile} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPercentile(v); }} />
+          <SwitchRow label="הצג דירוג אחוזון בתוצאות" value={showPercentile} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPercentile(v); }} />
           <Div />
-          <SwitchRow label="׳”׳¦׳’ ׳₪׳™׳¨׳•׳˜ ׳ ׳™׳§׳•׳“ ׳׳₪׳•׳¨׳˜" value={showDetailed} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowDetailed(v); }} />
+          <SwitchRow label="הצג פירוט ניקוד מפורט" value={showDetailed} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowDetailed(v); }} />
           <Div />
-          <SwitchRow label="׳”׳¦׳’ ׳×׳©׳•׳‘׳•׳× ׳ ׳›׳•׳ ׳•׳× ׳׳—׳¨׳™ ׳׳‘׳—׳" value={showCorrect} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowCorrect(v); }} />
+          <SwitchRow label="הצג תשובות נכונות אחרי מבחן" value={showCorrect} onChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowCorrect(v); }} />
         </View>
 
         {/* Premium gating */}
-        <SectionHeader title="׳ ׳¢׳™׳׳× ׳׳¦׳‘׳™׳ ׳׳₪׳¨׳׳™׳•׳ ׳‘׳׳‘׳“" />
+        <SectionHeader title="נעילת מצבים לפרמיום בלבד" />
         <View style={styles.card}>
-          <Text style={styles.gatingDesc}>׳‘׳—׳¨ ׳׳¦׳‘׳™׳ ׳©׳™׳”׳™׳• ׳–׳׳™׳ ׳™׳ ׳׳₪׳¨׳׳™׳•׳ ׳‘׳׳‘׳“. ׳׳¦׳‘ "׳×׳¨׳’׳•׳" ׳×׳׳™׳“ ׳™׳”׳™׳” ׳–׳׳™׳ ׳׳›׳•׳׳.</Text>
+          <Text style={styles.gatingDesc}>בחר מצבים שיהיו זמינים לפרמיום בלבד. מצב "תרגול" תמיד יהיה זמין לכולם.</Text>
           <View style={styles.modeChips}>
             {ALL_MODES.filter(m => m.id !== 'practice').map(m => {
               const active = premiumModes.includes(m.id);
@@ -190,7 +190,7 @@ export default function SessionSettingsScreen() {
                   style={[styles.modeChip, active && styles.modeChipActive]}
                 >
                   <Text style={[styles.modeChipText, active && { color: '#fff' }]}>
-                    {active ? 'נ”’ ' : ''}{m.label}
+                    {active ? '🔒 ' : ''}{m.label}
                   </Text>
                 </Pressable>
               );
@@ -227,12 +227,12 @@ export default function SessionSettingsScreen() {
           style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.85 }]}
         >
           <LinearGradient colors={Colors.gradients.primary} style={styles.saveBtnGrad}>
-            <Text style={styles.saveBtnText}>׳©׳׳•׳¨ ׳”׳›׳ - ׳”׳’׳“׳¨׳•׳× ׳₪׳¢׳™׳׳•׳× ׳׳™׳™׳“׳™׳×</Text>
+            <Text style={styles.saveBtnText}>שמור הכל - הגדרות פעילות מיידית</Text>
           </LinearGradient>
         </Pressable>
 
         <Text style={styles.syncNote}>
-          ׳”׳’׳“׳¨׳•׳× ׳ ׳©׳׳¨׳•׳× ׳׳™׳™׳“׳™׳× ׳‘׳–׳™׳›׳¨׳•׳ ׳•׳׳•׳₪׳¢׳׳•׳× ׳¢׳ ׳›׳ ׳”׳¡׳©׳ ׳™׳ ׳”׳—׳“׳©׳™׳. ׳׳¡׳ ׳›׳¨׳•׳ ׳‘׳™׳ ׳׳›׳©׳™׳¨׳™׳ ׳—׳‘׳¨ ׳׳¡׳“ ׳ ׳×׳•׳ ׳™׳.
+          הגדרות נשמרות מיידית בזיכרון ומופעלות על כל הסשנים החדשים. לסנכרון בין מכשירים חבר מסד נתונים.
         </Text>
 
       </ScrollView>

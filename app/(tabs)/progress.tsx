@@ -32,6 +32,7 @@ const BADGE_INFO: Record<string, { icon: string; label: string; desc: string }> 
 };
 
 const ALL_BADGES = Object.entries(BADGE_INFO).map(([type, info]) => ({ type, ...info }));
+const BOTTOM_TAB_CLEARANCE = 112;
 
 // Hebrew day-of-week letters (א = Sunday ... ש = Saturday)
 const DAY_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
@@ -87,7 +88,7 @@ export default function ProgressTab() {
     return (
       <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.emptyStateContainer}>
+        <View style={[styles.emptyStateContainer, { paddingBottom: insets.bottom + BOTTOM_TAB_CLEARANCE }]}>
           <Text style={styles.emptyStateEmoji}>🎯</Text>
           <Text style={styles.emptyStateTitle}>עוד אין נתונים</Text>
           <Text style={styles.emptyStateBody}>
@@ -116,7 +117,7 @@ export default function ProgressTab() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + BOTTOM_TAB_CLEARANCE }]}
         showsVerticalScrollIndicator={false}
         bounces={Platform.OS === 'ios'}
         decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
