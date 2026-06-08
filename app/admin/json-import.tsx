@@ -215,6 +215,7 @@ export default function JsonImportScreen() {
           placeholder={`[{ "questionText": "...", ... }]`}
           placeholderTextColor={Colors.textTertiary}
           multiline
+          textAlign="left"
           textAlignVertical="top"
           autoCorrect={false}
           autoCapitalize="none"
@@ -332,7 +333,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    textAlign: 'right',
+    textAlign: 'left',
+    writingDirection: 'ltr',
     marginBottom: 8,
     ...Shadow.sm,
   },

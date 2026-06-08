@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
-import { I18nManager, Platform } from 'react-native';
+import { I18nManager, Platform, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -24,6 +24,15 @@ if (!I18nManager.isRTL) {
   if (Platform.OS !== 'web') {
     // Reload needed on device; on Expo Go it applies immediately
   }
+}
+
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  document.documentElement.setAttribute('dir', 'rtl');
+  document.documentElement.style.direction = 'rtl';
+  document.documentElement.style.backgroundColor = '#080A12';
+  document.body.style.direction = 'rtl';
+  document.body.style.backgroundColor = '#080A12';
+  document.body.style.color = '#F0F4FF';
 }
 
 SplashScreen.preventAutoHideAsync();
@@ -68,7 +77,7 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
@@ -94,3 +103,11 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#080A12',
+    writingDirection: 'rtl',
+  },
+});

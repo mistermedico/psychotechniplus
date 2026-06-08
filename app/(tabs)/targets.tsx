@@ -352,10 +352,12 @@ const styles = StyleSheet.create({
   // Coming-soon overlay covers the entire card
   comingSoonOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(8,10,18,0.72)',
     borderRadius: Radius.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
     zIndex: 10,
   },
   comingSoonBadge: {

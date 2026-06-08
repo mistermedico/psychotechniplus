@@ -700,8 +700,8 @@ export default function PracticeSession() {
             <LinearGradient
               colors={
                 lastAnswerCorrect
-                  ? [Colors.successLight, '#fff']
-                  : [Colors.dangerLight, '#fff']
+                  ? ['rgba(52, 211, 153, 0.18)', 'rgba(10, 14, 28, 0.98)']
+                  : ['rgba(248, 113, 113, 0.18)', 'rgba(10, 14, 28, 0.98)']
               }
               style={styles.explanationGrad}
             >
@@ -836,6 +836,9 @@ const styles = StyleSheet.create({
   explanation: {
     borderRadius: Radius.xl,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
     ...Shadow.md,
   },
   explanationGrad: { padding: 18 },
@@ -858,6 +861,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     color: Colors.text,
     textAlign: 'right',
+    writingDirection: 'rtl',
     lineHeight: 24,
   },
 
