@@ -3,7 +3,7 @@ import { UserBadge, BadgeType } from '../data/types';
 import { supabase } from '../lib/supabase';
 import {
   getOrCreateUserId, loadUserProfile, saveUserProfile,
-  loadUserBadges, saveUserBadge,
+  loadUserBadges, saveUserBadge, loadUserElos, saveUserElo,
 } from '../lib/db';
 import { logger } from '../utils/logger';
 import { useAdminStore } from './adminStore';
@@ -17,6 +17,7 @@ const PREMIUM_REVIEW_EMAILS = new Set([
 export interface TopicPerformanceEntry {
   isCorrect: boolean;
   difficulty: number;
+  date?: string;
 }
 
 export interface TopicPerformance {
@@ -89,6 +90,17 @@ const INITIAL_STATE = {
 
 function xpForLevel(level: number): number { return level * 100; }
 
+function levelToElo(level: PerformanceLevel): number {
+  if (level === 'advanced') return 1600;
+  if (level === 'intermediate') return 1300;
+  return 1000;
+}
+
+function clampDifficulty(value: unknown): number {
+  const n = typeof value === 'number' && Number.isFinite(value) ? value : 3;
+  return Math.max(1, Math.min(10, Math.round(n)));
+}
+
 export const useUserStore = create<UserState>((set, get) => ({
   ...INITIAL_STATE,
 
@@ -126,9 +138,10 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     set({ userId, isAuthenticated: true, email: sessionEmail, isPremium: isReviewPremium });
 
-    const [profile, badges] = await Promise.all([
+    const [profile, badges, savedTopicPerformance] = await Promise.all([
       loadUserProfile(userId),
       loadUserBadges(userId),
+      loadUserElos(userId),
     ]);
 
     if (profile) {
@@ -149,6 +162,28 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
 
     if (badges.length > 0) set({ badges });
+
+    const topicPerformance = Object.entries(savedTopicPerformance).reduce<Record<string, TopicPerformance>>(
+      (acc, [topicId, value]) => {
+        const rawHistory = Array.isArray(value.history) ? value.history : [];
+        const history = rawHistory
+          .filter((entry: any) => typeof entry.isCorrect === 'boolean')
+          .map((entry: any) => ({
+            isCorrect: !!entry.isCorrect,
+            difficulty: clampDifficulty(entry.difficulty),
+            date: typeof entry.date === 'string' ? entry.date : undefined,
+          }))
+          .slice(-40);
+        if (history.length === 0) return acc;
+        acc[topicId] = {
+          history,
+          currentLevel: computeAdaptiveLevel(history, 'beginner'),
+        };
+        return acc;
+      },
+      {},
+    );
+    if (Object.keys(topicPerformance).length > 0) set({ topicPerformance });
 
     set({ isLoaded: true, isSyncing: false });
   },
@@ -193,17 +228,27 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   recordAnswer: (topicId, difficulty, isCorrect) => {
-    set(state => {
-      const current = state.topicPerformance[topicId] ?? { history: [], currentLevel: 'beginner' as PerformanceLevel };
-      const newHistory = [...current.history.slice(-39), { isCorrect, difficulty }];
-      const newLevel = computeAdaptiveLevel(newHistory, current.currentLevel);
-      return {
-        topicPerformance: {
-          ...state.topicPerformance,
-          [topicId]: { history: newHistory, currentLevel: newLevel },
-        },
-      };
+    const { topicPerformance, userId } = get();
+    const current = topicPerformance[topicId] ?? { history: [], currentLevel: 'beginner' as PerformanceLevel };
+    const now = new Date().toISOString();
+    const newHistory = [...current.history.slice(-39), { isCorrect, difficulty: clampDifficulty(difficulty), date: now }];
+    const newLevel = computeAdaptiveLevel(newHistory, current.currentLevel);
+
+    set({
+      topicPerformance: {
+        ...topicPerformance,
+        [topicId]: { history: newHistory, currentLevel: newLevel },
+      },
     });
+
+    if (userId) {
+      saveUserElo(
+        userId,
+        topicId,
+        levelToElo(newLevel),
+        newHistory.map(entry => ({ ...entry, date: entry.date ?? now })),
+      );
+    }
   },
 
   getTopicAccuracy: (topicId) => {
@@ -245,11 +290,13 @@ export const useUserStore = create<UserState>((set, get) => ({
         longestStreak: Math.max(newStreak, state.longestStreak),
         lastPracticedDate: today,
       };
-      saveUserProfile(state.userId, {
-        streak: updates.streak,
-        longest_streak: updates.longestStreak,
-        last_practiced_date: today,
-      });
+      if (state.userId) {
+        saveUserProfile(state.userId, {
+          streak: updates.streak,
+          longest_streak: updates.longestStreak,
+          last_practiced_date: today,
+        });
+      }
       return updates;
     });
   },
@@ -264,7 +311,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       earnedAt: new Date(),
     };
     set(state => ({ badges: [...state.badges, badge] }));
-    saveUserBadge(badge);
+    if (badge.userId) saveUserBadge(badge);
     useAdminStore.getState().logActivity(`תג הושג: ${type}`, 'user');
     return badge;
   },
@@ -288,16 +335,18 @@ export const useUserStore = create<UserState>((set, get) => ({
         : state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
       const longestStreak = Math.max(newStreak, state.longestStreak);
 
-      saveUserProfile(state.userId, {
-        total_sessions: totalSessions,
-        total_correct: totalCorrect,
-        total_answered: totalAnswered,
-        xp: newXp,
-        level: newLevel,
-        streak: newStreak,
-        longest_streak: longestStreak,
-        last_practiced_date: today,
-      });
+      if (state.userId) {
+        saveUserProfile(state.userId, {
+          total_sessions: totalSessions,
+          total_correct: totalCorrect,
+          total_answered: totalAnswered,
+          xp: newXp,
+          level: newLevel,
+          streak: newStreak,
+          longest_streak: longestStreak,
+          last_practiced_date: today,
+        });
+      }
 
       return {
         totalSessions, totalCorrect, totalAnswered,

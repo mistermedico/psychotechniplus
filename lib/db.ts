@@ -201,12 +201,19 @@ export async function saveUserProfile(userId: string, profile: Partial<UserProfi
 
 // ── User ELOs ──────────────────────────────────────────────────────────────
 
-export async function loadUserElos(userId: string): Promise<Record<string, { elo: number; history: { elo: number; date: string }[] }>> {
+export type UserEloHistoryEntry = {
+  date: string;
+  elo?: number;
+  isCorrect?: boolean;
+  difficulty?: number;
+};
+
+export async function loadUserElos(userId: string): Promise<Record<string, { elo: number; history: UserEloHistoryEntry[] }>> {
   try {
     const { data, error } = await supabase.from('user_elos').select('*').eq('user_id', userId);
     if (error) { logger.error('db:loadUserElos', 'שגיאה בטעינת ELO', error.message); return {}; }
     if (!data) return {};
-    const result: Record<string, { elo: number; history: { elo: number; date: string }[] }> = {};
+    const result: Record<string, { elo: number; history: UserEloHistoryEntry[] }> = {};
     data.forEach(row => { result[row.topic_id] = { elo: row.elo, history: row.history ?? [] }; });
     return result;
   } catch (e: any) {
@@ -215,7 +222,7 @@ export async function loadUserElos(userId: string): Promise<Record<string, { elo
   }
 }
 
-export async function saveUserElo(userId: string, topicId: string, elo: number, history: { elo: number; date: string }[]): Promise<void> {
+export async function saveUserElo(userId: string, topicId: string, elo: number, history: UserEloHistoryEntry[]): Promise<void> {
   try {
     const { error } = await supabase.from('user_elos').upsert(
       { user_id: userId, topic_id: topicId, elo, history, updated_at: new Date().toISOString() },
