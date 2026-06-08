@@ -330,6 +330,20 @@ export default function ProfileTab() {
               </View>
             )}
 
+            <Pressable
+              onPress={handleSignOut}
+              disabled={signingOut}
+              style={({ pressed }) => [
+                styles.heroSignOutBtn,
+                pressed && !signingOut && { opacity: 0.78 },
+                signingOut && { opacity: 0.5 },
+              ]}
+            >
+              <Text style={styles.heroSignOutText}>
+                {signingOut ? 'יוצא...' : 'יציאה מהחשבון'}
+              </Text>
+            </Pressable>
+
             <View style={styles.heroStats}>
               {[
                 { val: String(totalAnswered), lbl: 'שאלות' },
@@ -638,6 +652,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
   },
   freePillText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
+  heroSignOutBtn: {
+    alignSelf: 'center',
+    marginTop: -8,
+    marginBottom: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.35)',
+  },
+  heroSignOutText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.danger,
+    textAlign: 'center',
+  },
 
   heroStats: {
     flexDirection: 'row-reverse',

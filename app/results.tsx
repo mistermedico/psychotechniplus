@@ -242,7 +242,7 @@ const scoreRowStyles = StyleSheet.create({
   row: { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 16 },
   rowLast: { borderBottomWidth: 0 },
   right: { flex: 1, alignItems: 'flex-end' },
-  left: { width: 80, alignItems: 'flex-start' },
+  left: { width: 80, alignItems: 'flex-end' },
   value: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, textAlign: 'right' },
   barTrack: { height: 5, width: 70, backgroundColor: Colors.surfaceTertiary, borderRadius: 3, marginTop: 6, overflow: 'hidden' },
   barFill: { height: 5, borderRadius: 3 },

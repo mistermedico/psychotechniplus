@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     textAlign: 'right',
   },
-  eloRight: { alignItems: 'flex-start', width: 100 },
+  eloRight: { alignItems: 'flex-end', width: 100 },
   eloValue: { fontFamily: FontFamily.bold, fontSize: FontSize.xl },
   eloBar: { width: 90, marginTop: 4 },
   emptyText: {
@@ -675,8 +675,8 @@ const styles = StyleSheet.create({
   badgeCardLocked: { backgroundColor: Colors.surfaceSecondary },
   badgeCardEarned: {
     backgroundColor: Colors.success + '08',
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.success,
+    borderRightWidth: 3,
+    borderRightColor: Colors.success,
     borderColor: Colors.border,
   },
   badgeIcon: { fontSize: 32, marginBottom: 6 },
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
   earnedBadge: {
     position: 'absolute',
     top: 8,
-    left: 8,
+    right: 8,
     width: 20,
     height: 20,
     borderRadius: 10,

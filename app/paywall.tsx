@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   },
 
   closeBtn: {
-    alignSelf: 'flex-start', width: 44, height: 44, borderRadius: 22,
+    alignSelf: 'flex-end', width: 44, height: 44, borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center',
     marginTop: 12, marginBottom: 4,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',

@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
 
   // Legal
   legalRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'center',
     alignItems: 'center',
     flexWrap: 'wrap',
@@ -597,12 +597,14 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
     color: Colors.textTertiary,
+    textAlign: 'right',
   },
   legalLink: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.xs,
     color: Colors.primaryLight,
     textDecorationLine: 'underline',
+    textAlign: 'right',
   },
 
   // Email pending

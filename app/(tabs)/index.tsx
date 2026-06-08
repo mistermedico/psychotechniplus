@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topicChip: {
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     width: 28, height: 28,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.22)',
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
   },
   bentoAccent: {
     position: 'absolute',
-    left: 0, top: 0, bottom: 0,
+    right: 0, top: 0, bottom: 0,
     width: 3,
     borderRadius: 2,
   },

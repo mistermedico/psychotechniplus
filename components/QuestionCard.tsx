@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   difficultyBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     backgroundColor: Colors.primaryLighter,
     borderRadius: Radius.full,
     paddingHorizontal: 10,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   eloBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     backgroundColor: Colors.warningLight,
     borderRadius: Radius.full,
     paddingHorizontal: 10,
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
 
   // 2×2 grid for image options
   optionsGrid: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     flexWrap: 'wrap',
     gap: 8,
   },
