@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAdminStore, SessionRecord } from '../../store/adminStore';
@@ -7,6 +7,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 type TabKey = 'questions' | 'topics' | 'exams' | 'sessions';
+type ModeFilter = 'all' | 'practice' | 'simulation' | 'speed' | 'adaptive';
 
 interface UsageRow {
   id: string;
@@ -24,6 +25,8 @@ export default function PracticeMonitorScreen() {
   const [tab, setTab] = useState<TabKey>('questions');
   const [loading, setLoading] = useState(false);
   const [selectedSession, setSelectedSession] = useState<SessionRecord | null>(null);
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [modeFilter, setModeFilter] = useState<ModeFilter>('all');
 
   useEffect(() => {
     setLoading(true);
@@ -36,6 +39,23 @@ export default function PracticeMonitorScreen() {
     tab === 'topics' ? data.topics :
     tab === 'exams' ? data.exams : [];
 
+  const filteredSessions = useMemo(() => {
+    const q = sessionSearch.trim().toLowerCase();
+    return sessionHistory.filter(session => {
+      if (modeFilter !== 'all' && session.mode !== modeFilter) return false;
+      if (!q) return true;
+      return [
+        session.id,
+        session.userId,
+        session.userName,
+        session.templateName,
+        session.mode,
+        session.targetId,
+        session.topicId,
+      ].filter(Boolean).some(value => String(value).toLowerCase().includes(q));
+    });
+  }, [sessionHistory, sessionSearch, modeFilter]);
+
   const totalAnswers = sessionHistory.reduce((sum, s) => sum + s.totalQuestions, 0);
   const avgScore = sessionHistory.length
     ? Math.round(sessionHistory.reduce((sum, s) => sum + s.score, 0) / sessionHistory.length)
@@ -43,6 +63,8 @@ export default function PracticeMonitorScreen() {
   const avgTime = totalAnswers
     ? Math.round(sessionHistory.reduce((sum, s) => sum + s.timeSpentSeconds, 0) / totalAnswers)
     : 0;
+  const lowScoreSessions = sessionHistory.filter(s => s.score < 55).length;
+  const skippedHeavySessions = sessionHistory.filter(s => s.totalQuestions > 0 && s.skippedQuestions / s.totalQuestions >= 0.25).length;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -68,6 +90,8 @@ export default function PracticeMonitorScreen() {
           <Kpi label="תשובות" value={String(totalAnswers)} tone={Colors.cyan} />
           <Kpi label="ציון ממוצע" value={`${avgScore}`} tone={Colors.success} />
           <Kpi label="זמן לשאלה" value={`${avgTime}s`} tone={Colors.warning} />
+          <Kpi label="סשנים חלשים" value={String(lowScoreSessions)} tone={lowScoreSessions ? Colors.danger : Colors.success} />
+          <Kpi label="הרבה דילוגים" value={String(skippedHeavySessions)} tone={skippedHeavySessions ? Colors.warning : Colors.success} />
         </View>
 
         <Text style={styles.sectionTitle}>התראות אוטומטיות</Text>
@@ -97,6 +121,34 @@ export default function PracticeMonitorScreen() {
           ))}
         </View>
 
+        <View style={styles.sessionTools}>
+          <TextInput
+            style={styles.sessionSearch}
+            value={sessionSearch}
+            onChangeText={setSessionSearch}
+            placeholder="חפש משתמש, מבחן, מזהה סשן או פרק..."
+            placeholderTextColor="#64748B"
+            textAlign="right"
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modeFilters}>
+            {([
+              ['all', 'הכל'],
+              ['practice', 'תרגול'],
+              ['simulation', 'מבחנים'],
+              ['adaptive', 'אדפטיבי'],
+              ['speed', 'מהירות'],
+            ] as Array<[ModeFilter, string]>).map(([value, label]) => (
+              <Pressable
+                key={value}
+                onPress={() => setModeFilter(value)}
+                style={[styles.modeChip, modeFilter === value && styles.modeChipActive]}
+              >
+                <Text style={[styles.modeChipText, modeFilter === value && styles.modeChipTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
         {tab !== 'sessions' ? (
           <View style={styles.tableCard}>
             {activeRows.length === 0 ? (
@@ -105,7 +157,7 @@ export default function PracticeMonitorScreen() {
           </View>
         ) : (
           <View style={styles.tableCard}>
-            {sessionHistory.length === 0 ? <EmptyState /> : sessionHistory.slice(0, 30).map(s => (
+            {filteredSessions.length === 0 ? <EmptyState /> : filteredSessions.slice(0, 80).map(s => (
               <Pressable
                 key={s.id}
                 onPress={() => setSelectedSession(selectedSession?.id === s.id ? null : s)}
@@ -336,6 +388,23 @@ const styles = StyleSheet.create({
   tabBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primaryLight },
   tabText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#94A3B8' },
   tabTextActive: { color: '#fff' },
+  sessionTools: { marginHorizontal: 16, marginBottom: 10, gap: 8 },
+  sessionSearch: {
+    backgroundColor: '#111827',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#E2E8F0',
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+  },
+  modeFilters: { flexDirection: 'row-reverse', gap: 8 },
+  modeChip: { backgroundColor: '#111827', borderRadius: Radius.full, borderWidth: 1, borderColor: '#1F2937', paddingHorizontal: 12, paddingVertical: 7 },
+  modeChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primaryLight },
+  modeChipText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#94A3B8' },
+  modeChipTextActive: { color: '#fff' },
   tableCard: { marginHorizontal: 16, backgroundColor: 'rgba(15,23,42,0.88)', borderRadius: Radius.xl, borderWidth: 1, borderColor: 'rgba(148,163,184,0.18)', overflow: 'hidden' },
   usageRow: { flexDirection: 'row-reverse', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(148,163,184,0.12)' },
   scoreDial: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#0B1220', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1F2937' },

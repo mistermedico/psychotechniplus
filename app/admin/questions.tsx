@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
 import { TOPICS } from '../../data/mockData';
-import { Question, ValidationStatus } from '../../data/types';
+import { AccessLevel, Question, QuestionType, ValidationStatus } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
@@ -29,14 +29,28 @@ const STATUS_LABELS: Record<ValidationStatus, string> = {
 
 const SORT_OPTIONS = ['חדש → ישן', 'ישן → חדש', 'קושי ↑', 'קושי ↓', 'גישה חופשית', 'גישה פרמיום'];
 
+const TYPE_LABELS: Partial<Record<QuestionType, string>> = {
+  quantitative: 'כמותי',
+  logic: 'לוגי',
+  verbal: 'מילולי',
+  shapes: 'מרחבי',
+  fill_in_the_blank: 'השלמה',
+  reading_comprehension: 'הבנת הנקרא',
+  multiple_choice: 'רב ברירה',
+};
+
 export default function QuestionsAdmin() {
   const insets = useSafeAreaInsets();
   const { questions, topics, selectedQuestionIds, toggleSelectQuestion, clearSelection,
-    selectAll, deleteQuestions, bulkValidate, deleteQuestion, addQuestion } = useAdminStore();
+    selectAll, deleteQuestions, bulkValidate, deleteQuestion, addQuestion,
+    setQuestionsAccessLevel, setQuestionsAdaptiveEligibility } = useAdminStore();
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<ValidationStatus | 'all'>('all');
   const [filterTopicId, setFilterTopicId] = useState<string>('all');
+  const [filterAccess, setFilterAccess] = useState<AccessLevel | 'all'>('all');
+  const [filterType, setFilterType] = useState<QuestionType | 'all'>('all');
+  const [filterPool, setFilterPool] = useState<'all' | 'smart' | 'general' | 'missing'>('all');
   const [sortIdx, setSortIdx] = useState(0);
   const [bulkMode, setBulkMode] = useState(false);
 
@@ -45,10 +59,16 @@ export default function QuestionsAdmin() {
     if (search.trim()) {
       const s = search.toLowerCase();
       q = q.filter(x => x.questionText.toLowerCase().includes(s) ||
-        x.explanation?.toLowerCase().includes(s));
+        x.explanation?.toLowerCase().includes(s) ||
+        x.id.toLowerCase().includes(s));
     }
     if (filterStatus !== 'all') q = q.filter(x => x.validationStatus === filterStatus);
     if (filterTopicId !== 'all') q = q.filter(x => x.topicId === filterTopicId);
+    if (filterAccess !== 'all') q = q.filter(x => x.accessLevel === filterAccess);
+    if (filterType !== 'all') q = q.filter(x => x.questionType === filterType);
+    if (filterPool === 'smart') q = q.filter(x => x.smartPracticeEligible);
+    if (filterPool === 'general') q = q.filter(x => x.generalPracticeEligible);
+    if (filterPool === 'missing') q = q.filter(x => !x.smartPracticeEligible && !x.generalPracticeEligible);
 
     switch (sortIdx) {
       case 0: q = q.slice().reverse(); break;
@@ -59,7 +79,16 @@ export default function QuestionsAdmin() {
       case 5: q = q.slice().sort((a, b) => (a.accessLevel === 'premium' ? -1 : 1) - (b.accessLevel === 'premium' ? -1 : 1)); break;
     }
     return q;
-  }, [questions, search, filterStatus, filterTopicId, sortIdx]);
+  }, [questions, search, filterStatus, filterTopicId, filterAccess, filterType, filterPool, sortIdx]);
+
+  const audit = useMemo(() => {
+    const validated = questions.filter(q => q.validationStatus === 'validated').length;
+    const premium = questions.filter(q => q.accessLevel === 'premium').length;
+    const smart = questions.filter(q => q.smartPracticeEligible).length;
+    const missingPool = questions.filter(q => !q.smartPracticeEligible && !q.generalPracticeEligible).length;
+    const avgDifficulty = questions.length ? (questions.reduce((sum, q) => sum + q.difficulty, 0) / questions.length).toFixed(1) : '0.0';
+    return { validated, premium, smart, missingPool, avgDifficulty };
+  }, [questions]);
 
   const handleBulkAction = (action: 'approve' | 'reject' | 'delete') => {
     if (selectedQuestionIds.length === 0) return;
@@ -92,6 +121,20 @@ export default function QuestionsAdmin() {
       generalPracticeEligible: false,
     });
     Alert.alert('שוכפל', 'עותק נוצר כטיוטה');
+  };
+
+  const applyBulkAccess = (level: AccessLevel) => {
+    if (selectedQuestionIds.length === 0) return;
+    setQuestionsAccessLevel(selectedQuestionIds, level);
+    clearSelection();
+    setBulkMode(false);
+  };
+
+  const applyBulkPool = (smart: boolean, general: boolean) => {
+    if (selectedQuestionIds.length === 0) return;
+    setQuestionsAdaptiveEligibility(selectedQuestionIds, smart, general);
+    clearSelection();
+    setBulkMode(false);
   };
 
   const renderItem = ({ item }: { item: Question }) => {
@@ -233,6 +276,19 @@ export default function QuestionsAdmin() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.auditScroll}
+        contentContainerStyle={styles.auditGrid}
+      >
+        <AuditPill label="מאושרות" value={`${audit.validated}/${questions.length}`} color={Colors.success} />
+        <AuditPill label="פרימיום" value={audit.premium} color={Colors.warning} />
+        <AuditPill label="פול חכם" value={audit.smart} color={Colors.primary} />
+        <AuditPill label="ללא פול" value={audit.missingPool} color={audit.missingPool ? Colors.danger : Colors.success} />
+        <AuditPill label="קושי ממוצע" value={audit.avgDifficulty} color={Colors.accent} />
+      </ScrollView>
+
       {/* Search */}
       <View style={styles.searchBar}>
         <TextInput
@@ -268,6 +324,57 @@ export default function QuestionsAdmin() {
               {s === 'all' ? 'הכל' : STATUS_LABELS[s]}
               {s === 'pending' && pendingCount > 0 ? ` (${pendingCount})` : ''}
             </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScrollWrap}
+        contentContainerStyle={styles.filterRow}
+      >
+        {([
+          ['all', 'כל הגישות'],
+          ['free', 'חינמי'],
+          ['premium', 'פרימיום'],
+        ] as Array<[AccessLevel | 'all', string]>).map(([value, label]) => (
+          <Pressable
+            key={value}
+            onPress={() => setFilterAccess(value)}
+            style={[styles.filterChip, filterAccess === value && styles.filterChipActive]}
+          >
+            <Text style={[styles.filterChipText, filterAccess === value && { color: '#fff' }]}>{label}</Text>
+          </Pressable>
+        ))}
+        {([
+          ['all', 'כל הסוגים'],
+          ['quantitative', TYPE_LABELS.quantitative ?? 'כמותי'],
+          ['logic', TYPE_LABELS.logic ?? 'לוגי'],
+          ['verbal', TYPE_LABELS.verbal ?? 'מילולי'],
+          ['shapes', TYPE_LABELS.shapes ?? 'מרחבי'],
+          ['fill_in_the_blank', TYPE_LABELS.fill_in_the_blank ?? 'השלמה'],
+        ] as Array<[QuestionType | 'all', string]>).map(([value, label]) => (
+          <Pressable
+            key={value}
+            onPress={() => setFilterType(value)}
+            style={[styles.filterChip, filterType === value && styles.filterChipActive]}
+          >
+            <Text style={[styles.filterChipText, filterType === value && { color: '#fff' }]}>{label}</Text>
+          </Pressable>
+        ))}
+        {([
+          ['all', 'כל הפולים'],
+          ['smart', 'אדפטיבי'],
+          ['general', 'כללי'],
+          ['missing', 'ללא פול'],
+        ] as Array<[typeof filterPool, string]>).map(([value, label]) => (
+          <Pressable
+            key={value}
+            onPress={() => setFilterPool(value)}
+            style={[styles.filterChip, filterPool === value && styles.filterChipActive]}
+          >
+            <Text style={[styles.filterChipText, filterPool === value && { color: '#fff' }]}>{label}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -336,6 +443,28 @@ export default function QuestionsAdmin() {
         </ScrollView>
       )}
 
+      {bulkMode && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.bulkBarWrap}
+          contentContainerStyle={styles.bulkBar}
+        >
+          <Pressable onPress={() => applyBulkAccess('premium')} style={[styles.bulkAction, { backgroundColor: Colors.warningLight }]}>
+            <Text style={[styles.bulkActionText, { color: Colors.warning }]}>פרימיום</Text>
+          </Pressable>
+          <Pressable onPress={() => applyBulkAccess('free')} style={[styles.bulkAction, { backgroundColor: Colors.successLight }]}>
+            <Text style={[styles.bulkActionText, { color: Colors.success }]}>חינמי</Text>
+          </Pressable>
+          <Pressable onPress={() => applyBulkPool(true, true)} style={[styles.bulkAction, { backgroundColor: Colors.primaryLighter }]}>
+            <Text style={[styles.bulkActionText, { color: Colors.primary }]}>פול חכם</Text>
+          </Pressable>
+          <Pressable onPress={() => applyBulkPool(false, true)} style={[styles.bulkAction, { backgroundColor: Colors.surfaceSecondary }]}>
+            <Text style={[styles.bulkActionText, { color: Colors.textSecondary }]}>פול כללי</Text>
+          </Pressable>
+        </ScrollView>
+      )}
+
       {/* Count + pending indicator */}
       <View style={styles.summaryRow}>
         <Text style={styles.resultCount}>{filtered.length} מתוך {questions.length} שאלות</Text>
@@ -366,8 +495,23 @@ export default function QuestionsAdmin() {
   );
 }
 
+function AuditPill({ label, value, color }: { label: string; value: string | number; color: string }) {
+  return (
+    <View style={[styles.auditPill, { borderColor: color + '55', backgroundColor: color + '12' }]}>
+      <Text style={[styles.auditValue, { color }]}>{value}</Text>
+      <Text style={styles.auditLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+
+  auditScroll: { maxHeight: 76, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  auditGrid: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 12, paddingVertical: 10 },
+  auditPill: { minWidth: 96, borderRadius: Radius.lg, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'flex-end' },
+  auditValue: { fontFamily: FontFamily.bold, fontSize: FontSize.base },
+  auditLabel: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, marginTop: 2 },
 
   searchBar: { padding: 12, paddingBottom: 8 },
   searchInput: {

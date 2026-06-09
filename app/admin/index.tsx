@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
   const {
     isAdmin, login, logout, setIsAdmin, getStats, getPendingQuestions,
     seedToSupabase, loadQuestionsFromSupabase,
-    revenueSnapshots, activityLog,
+    revenueSnapshots, activityLog, questions, topics, templates, sessionHistory,
   } = useAdminStore();
 
   const [email, setEmail] = useState('mrmedico111@gmail.com');
@@ -138,6 +138,20 @@ export default function AdminDashboard() {
 
   const today = new Date().toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const recentActivity = activityLog.slice(0, 5);
+
+  const contentHealth = useMemo(() => {
+    const validatedPerTopic = topics.map(topic => ({
+      topic,
+      count: questions.filter(q => q.topicId === topic.id && q.validationStatus === 'validated').length,
+    }));
+    const lowCoverageTopics = validatedPerTopic.filter(row => row.count < 20).length;
+    const countByTopic = Object.fromEntries(validatedPerTopic.map(row => [row.topic.id, row.count]));
+    const templateShortages = templates.filter(template =>
+      template.rules.some(rule => (countByTopic[rule.topicId] ?? 0) < rule.count)
+    ).length;
+    const weakSessions = sessionHistory.filter(session => session.score < 55).length;
+    return { lowCoverageTopics, templateShortages, weakSessions };
+  }, [questions, topics, templates, sessionHistory]);
 
   const categorized = (['content', 'exams', 'users', 'business', 'system'] as NavCategory[]).map(cat => ({
     cat,
@@ -218,6 +232,28 @@ export default function AdminDashboard() {
             <Text style={[styles.glassCardValue, { color: Colors.accent }]}>{approvedPct}%</Text>
             <Text style={styles.glassCardSub}>קושי ממוצע: {stats.avgDifficulty}</Text>
           </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>בריאות תוכן וניטור</Text>
+        <View style={styles.healthGrid}>
+          <Pressable onPress={() => router.push('/admin/topics-admin' as any)} style={styles.healthCard}>
+            <Text style={[styles.healthValue, { color: contentHealth.lowCoverageTopics ? Colors.warning : Colors.success }]}>
+              {contentHealth.lowCoverageTopics}
+            </Text>
+            <Text style={styles.healthLabel}>פרקים עם פחות מ-20 שאלות מאושרות</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/admin/simulation-builder' as any)} style={styles.healthCard}>
+            <Text style={[styles.healthValue, { color: contentHealth.templateShortages ? Colors.danger : Colors.success }]}>
+              {contentHealth.templateShortages}
+            </Text>
+            <Text style={styles.healthLabel}>מבחנים עם מחסור לפי כללים</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/admin/monitor' as any)} style={styles.healthCard}>
+            <Text style={[styles.healthValue, { color: contentHealth.weakSessions ? Colors.warning : Colors.success }]}>
+              {contentHealth.weakSessions}
+            </Text>
+            <Text style={styles.healthLabel}>הגשות חלשות לבדיקה</Text>
+          </Pressable>
         </View>
 
         {/* Quick Actions */}
@@ -509,6 +545,37 @@ const styles = StyleSheet.create({
   glassCardTitle: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: '#94A3B8', textAlign: 'right' },
   glassCardValue: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], textAlign: 'right' },
   glassCardSub: { fontFamily: FontFamily.regular, fontSize: 10, color: '#64748B', textAlign: 'right' },
+
+  healthGrid: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  healthCard: {
+    flex: 1,
+    minWidth: 110,
+    backgroundColor: '#1E293B',
+    borderRadius: Radius.xl,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'flex-end',
+    ...Shadow.sm,
+  },
+  healthValue: {
+    fontFamily: FontFamily.heading,
+    fontSize: FontSize['2xl'],
+    textAlign: 'right',
+  },
+  healthLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: '#94A3B8',
+    textAlign: 'right',
+    marginTop: 4,
+    lineHeight: 16,
+  },
 
   // Quick Actions
   quickActionsRow: { paddingHorizontal: 16, gap: 10, flexDirection: 'row-reverse' },
