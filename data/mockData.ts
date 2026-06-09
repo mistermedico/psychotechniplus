@@ -1,4 +1,5 @@
 import { Target, Topic, Question } from './types';
+import { EXPANDED_PSYCHOTECHNIC_QUESTIONS } from './expandedPsychotechnicQuestions';
 
 // ── Targets ────────────────────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ export const TOPICS: Topic[] = [
 // ── Questions ──────────────────────────────────────────────────────────────
 // 5 questions per topic = 25 total for Sprint 1
 
-export const QUESTIONS: Question[] = [
+const BASE_QUESTIONS: Question[] = [
 
   // ── חשיבה כמותית ──────────────────────────────────────────────────────
 
@@ -6293,6 +6294,11 @@ export const QUESTIONS: Question[] = [
     smartPracticeEligible: true,
     generalPracticeEligible: true,
   },
+];
+
+export const QUESTIONS: Question[] = [
+  ...BASE_QUESTIONS,
+  ...EXPANDED_PSYCHOTECHNIC_QUESTIONS,
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
