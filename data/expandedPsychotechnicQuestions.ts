@@ -1,4 +1,4 @@
-import { Question, QuestionType } from './types';
+import { Question, QuestionType, ValidationStatus } from './types';
 
 type GeneratedQuestionSeed = {
   topicId: string;
@@ -11,6 +11,7 @@ type GeneratedQuestionSeed = {
   difficulty: number;
   targetIds: string[];
   mediaUrl?: string;
+  validationStatus?: ValidationStatus;
 };
 
 const TOPIC_TARGETS: Record<string, string[]> = {
@@ -26,6 +27,7 @@ function difficultyToElo(difficulty: number): number {
 
 function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
   const correctId = ['a', 'b', 'c', 'd'][seed.correctIndex];
+  const validationStatus = seed.validationStatus ?? 'validated';
   return {
     id: `q_exp_${seed.prefix}_${String(index + 1).padStart(3, '0')}`,
     targetIds: seed.targetIds,
@@ -48,9 +50,9 @@ function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
       guessProbability: 0.25,
     },
     accessLevel: seed.difficulty >= 8 ? 'premium' : 'free',
-    validationStatus: 'validated',
-    smartPracticeEligible: true,
-    generalPracticeEligible: true,
+    validationStatus,
+    smartPracticeEligible: validationStatus === 'validated',
+    generalPracticeEligible: validationStatus === 'validated',
   };
 }
 
@@ -826,6 +828,217 @@ function massiveSpatialQuestions(): GeneratedQuestionSeed[] {
   return seeds;
 }
 
+function pendingAdminValidationQuestions(): GeneratedQuestionSeed[] {
+  const seeds: GeneratedQuestionSeed[] = [];
+
+  for (let i = 0; i < 36; i++) {
+    const total = 240 + i * 15;
+    const part = [12, 15, 18, 20, 25, 30][i % 6];
+    const answer = Math.round((total * part) / 100);
+    seeds.push({
+      topicId: 'topic_quantitative',
+      prefix: 'admin_pending_quant_percent',
+      questionType: 'quantitative',
+      questionText: `במבחן פסיכוטכני נשאל: כמה הם ${part}% מתוך ${total}?`,
+      options: [String(answer), String(answer + 9), String(Math.max(1, answer - 7)), String(answer + 18)],
+      correctIndex: 0,
+      explanation: `${part}% מתוך ${total} הם ${total} כפול ${part / 100}, כלומר ${answer}.`,
+      difficulty: 2 + (i % 7),
+      targetIds: TOPIC_TARGETS.topic_quantitative,
+      validationStatus: 'pending',
+    });
+  }
+
+  for (let i = 0; i < 32; i++) {
+    const a = 6 + (i % 8);
+    const b = 4 + (i % 6);
+    const c = 2 + (i % 5);
+    const answer = a * b + c * (i % 4 + 2);
+    seeds.push({
+      topicId: 'topic_quantitative',
+      prefix: 'admin_pending_quant_expression',
+      questionType: 'quantitative',
+      questionText: `חשב במהירות: ${a} × ${b} + ${c} × ${(i % 4) + 2} = ?`,
+      options: [String(answer), String(answer + a), String(answer - b), String(answer + c + b)],
+      correctIndex: 0,
+      explanation: `קודם כפל: ${a}×${b}=${a * b}, וגם ${c}×${(i % 4) + 2}=${c * ((i % 4) + 2)}. סכום: ${answer}.`,
+      difficulty: 2 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_quantitative,
+      validationStatus: 'pending',
+    });
+  }
+
+  for (let i = 0; i < 28; i++) {
+    const first = 18 + i;
+    const second = 22 + (i % 9) * 2;
+    const third = 26 + (i % 7) * 3;
+    const avg = Math.round((first + second + third) / 3);
+    seeds.push({
+      topicId: 'topic_quantitative',
+      prefix: 'admin_pending_quant_average',
+      questionType: 'quantitative',
+      questionText: `ממוצע שלושת המספרים ${first}, ${second}, ${third} הוא בקירוב:`,
+      options: [String(avg), String(avg + 3), String(Math.max(1, avg - 4)), String(avg + 7)],
+      correctIndex: 0,
+      explanation: `מחברים את שלושת המספרים ומחלקים ב-3: (${first}+${second}+${third})/3 ≈ ${avg}.`,
+      difficulty: 3 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_quantitative,
+      validationStatus: 'pending',
+    });
+  }
+
+  for (let i = 0; i < 42; i++) {
+    const start = 3 + (i % 9);
+    const step = 2 + (i % 6);
+    const nums = [start, start + step, start + step * 2, start + step * 3, start + step * 4];
+    const answer = start + step * 5;
+    seeds.push({
+      topicId: 'topic_logic',
+      prefix: 'admin_pending_logic_series_linear',
+      questionType: 'logic',
+      questionText: `השלם את הסדרה: ${nums.join(', ')}, ___`,
+      options: [String(answer), String(answer + step), String(answer - 1), String(answer + 3)],
+      correctIndex: 0,
+      explanation: `הסדרה עולה בקפיצה קבועה של ${step}, לכן האיבר הבא הוא ${answer}.`,
+      difficulty: 2 + (i % 5),
+      targetIds: TOPIC_TARGETS.topic_logic,
+      validationStatus: 'pending',
+    });
+  }
+
+  for (let i = 0; i < 34; i++) {
+    const base = 2 + (i % 5);
+    const nums = [base, base * 2, base * 4, base * 8, base * 16];
+    const answer = base * 32;
+    seeds.push({
+      topicId: 'topic_logic',
+      prefix: 'admin_pending_logic_series_geo',
+      questionType: 'logic',
+      questionText: `איזה מספר ממשיך את הדפוס? ${nums.join(', ')}, ___`,
+      options: [String(answer), String(answer / 2), String(answer + base), String(answer - base * 3)],
+      correctIndex: 0,
+      explanation: `בכל צעד מכפילים פי 2, לכן אחרי ${base * 16} מגיע ${answer}.`,
+      difficulty: 3 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_logic,
+      validationStatus: 'pending',
+    });
+  }
+
+  const logicRelations = [
+    ['כל הטייסים עוברים מבחן. נועם טייס.', 'נועם עבר מבחן', 'המסקנה נובעת ישירות מהכלל הכללי.'],
+    ['כל מי שעבר סינון קיבל זימון. דנה לא קיבלה זימון.', 'דנה לא עברה סינון', 'אם עברה סינון היתה מקבלת זימון; לכן לפי שלילת התוצאה לא עברה.'],
+    ['אין חיילים בקבוצה ב׳. רועי חייל.', 'רועי לא בקבוצה ב׳', 'הקבוצה אינה מכילה חיילים ולכן רועי לא יכול להיות בה.'],
+    ['כל המהירים מדויקים. חלק מהמדויקים רגועים.', 'לא ניתן לדעת אם כל המהירים רגועים', 'קיים קשר בין מהירים למדייקים, אך לא בין כולם לרגועים.'],
+  ];
+  for (let i = 0; i < 28; i++) {
+    const row = logicRelations[i % logicRelations.length];
+    seeds.push({
+      topicId: 'topic_logic',
+      prefix: 'admin_pending_logic_inference',
+      questionType: 'logic',
+      questionText: `${row[0]} איזו מסקנה נכונה?`,
+      options: [row[1], 'המסקנה ההפוכה נכונה', 'אין שום מידע רלוונטי', 'כל התשובות נכונות'],
+      correctIndex: 0,
+      explanation: row[2],
+      difficulty: 4 + (i % 5),
+      targetIds: TOPIC_TARGETS.topic_logic,
+      validationStatus: 'pending',
+    });
+  }
+
+  const analogies = [
+    ['רופא', 'מרפאה', 'מורה', 'כיתה', 'בעל מקצוע פועל במקום עבודתו המרכזי.'],
+    ['מצפן', 'כיוון', 'שעון', 'זמן', 'כלי שמודד/מציג מושג מופשט.'],
+    ['מפתח', 'מנעול', 'סיסמה', 'חשבון', 'אמצעי פתיחה או גישה.'],
+    ['ספר', 'קריאה', 'מפה', 'ניווט', 'אובייקט המשמש לפעולה מרכזית.'],
+    ['זרע', 'עץ', 'רעיון', 'תוכנית', 'דבר ראשוני שמתפתח לתוצר מורכב.'],
+  ];
+  for (let i = 0; i < 45; i++) {
+    const a = analogies[i % analogies.length];
+    seeds.push({
+      topicId: 'topic_verbal',
+      prefix: 'admin_pending_verbal_analogy',
+      questionType: 'verbal',
+      questionText: `${a[0]} : ${a[1]} כמו ${a[2]} : ?`,
+      options: [a[3], 'מספר', 'צבע', 'מרחק'],
+      correctIndex: 0,
+      explanation: a[4],
+      difficulty: 2 + (i % 7),
+      targetIds: TOPIC_TARGETS.topic_verbal,
+      validationStatus: 'pending',
+    });
+  }
+
+  const sentenceCompletions = [
+    ['למרות שהמשימה היתה מורכבת, הצוות פעל באופן ___ ולכן סיים בזמן.', 'שיטתי', 'אקראי', 'מהוסס', 'מרושל', 'המילה שיטתי מתאימה להשלמת פעולה מורכבת בזמן.'],
+    ['הנתון החדש לא סתר את ההשערה, אלא דווקא ___ אותה.', 'חיזק', 'ביטל', 'הסתיר', 'עיכב', 'המילה חיזק מתאימה לניגוד "לא סתר אלא".'],
+    ['כדי להצליח במבחן מהיר נדרש לא רק ידע, אלא גם ___ בקצב העבודה.', 'שליטה', 'היסוס', 'פיזור', 'עומס', 'שליטה בקצב היא תנאי להצלחה תחת זמן.'],
+    ['ההסבר היה קצר אך ___, ולכן רוב המשתתפים הבינו אותו.', 'מדויק', 'מעורפל', 'סותר', 'חסר', 'הבנה גבוהה נובעת מהסבר מדויק.'],
+  ];
+  for (let i = 0; i < 36; i++) {
+    const s = sentenceCompletions[i % sentenceCompletions.length];
+    seeds.push({
+      topicId: 'topic_verbal',
+      prefix: 'admin_pending_verbal_completion',
+      questionType: 'fill_in_the_blank',
+      questionText: s[0],
+      options: [s[1], s[2], s[3], s[4]],
+      correctIndex: 0,
+      explanation: s[5],
+      difficulty: 3 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_verbal,
+      validationStatus: 'pending',
+    });
+  }
+
+  const rotations = [
+    ['▲', 'ימינה ב-90°', '▶', 'משולש שפונה למעלה יפנה ימינה לאחר סיבוב של 90 מעלות.'],
+    ['▶', 'שמאלה ב-90°', '▲', 'סיבוב שמאלה מחזיר את החץ/משולש כלפי מעלה.'],
+    ['└', 'ימינה ב-90°', '┌', 'הפינה התחתונה-שמאלית הופכת לפינה עליונה-שמאלית.'],
+    ['┐', '180°', '└', 'סיבוב של 180 מעלות מחליף פינות באלכסון.'],
+    ['▰', '90°', '▯', 'מלבן אופקי הופך למלבן אנכי.'],
+  ];
+  for (let i = 0; i < 48; i++) {
+    const r = rotations[i % rotations.length];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'admin_pending_spatial_rotation',
+      questionType: 'shapes',
+      questionText: `איזו צורה מתקבלת אם מסובבים את ${r[0]} ${r[1]}?`,
+      options: [r[2], r[0], '◆', '●'],
+      correctIndex: 0,
+      explanation: r[3],
+      difficulty: 2 + (i % 7),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  const cubeNets = [
+    ['שש פאות ברצף: ארבע בשורה, אחת מעל השנייה ואחת מתחת לשנייה השנייה', 'כן', 'זוהי פריסה תקינה של קובייה עם רצועה מרכזית ושתיים צמודות.'],
+    ['שש פאות כולן בשורה אחת', 'לא', 'שש פאות בשורה אחת אינן יכולות להתקפל לקובייה סגורה.'],
+    ['צלב של ארבע פאות אנכיות ופאה אחת מכל צד של המרכז', 'כן', 'מבנה צלב סטנדרטי מתקפל לקובייה.'],
+    ['ריבוע 2×3 מלא', 'לא', 'מלבן 2×3 מלא יוצר חפיפות בעת קיפול לקובייה.'],
+  ];
+  for (let i = 0; i < 36; i++) {
+    const n = cubeNets[i % cubeNets.length];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'admin_pending_spatial_nets',
+      questionType: 'shapes',
+      questionText: `האם הפריסה הבאה יכולה ליצור קובייה? ${n[0]}`,
+      options: [n[1], n[1] === 'כן' ? 'לא' : 'כן', 'רק אם מסובבים', 'אי אפשר לדעת'],
+      correctIndex: 0,
+      explanation: n[2],
+      difficulty: 4 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  return seeds;
+}
+
 const RAW_EXPANDED_QUESTIONS: GeneratedQuestionSeed[] = [
   ...seriesQuestions(),
   ...quantitativeQuestions(),
@@ -839,6 +1052,7 @@ const RAW_EXPANDED_QUESTIONS: GeneratedQuestionSeed[] = [
   ...massiveLogicQuestions(),
   ...massiveVerbalQuestions(),
   ...massiveSpatialQuestions(),
+  ...pendingAdminValidationQuestions(),
 ];
 
 export const EXPANDED_PSYCHOTECHNIC_QUESTIONS: Question[] = RAW_EXPANDED_QUESTIONS.map(createQuestion);

@@ -245,6 +245,21 @@ async function upsertTemplates(supabase) {
   return templates.length;
 }
 
+async function verifyQuestions(supabase, questionIds) {
+  const batchSize = 80;
+  let count = 0;
+  for (let i = 0; i < questionIds.length; i += batchSize) {
+    const batch = questionIds.slice(i, i + batchSize);
+    const result = await supabase
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .in('id', batch);
+    if (result.error) throw result.error;
+    count += result.count ?? 0;
+  }
+  return count;
+}
+
 (async () => {
   const { url, key } = readSupabaseConfig();
   const supabase = createClient(url, key);
@@ -252,12 +267,7 @@ async function upsertTemplates(supabase) {
 
   const savedQuestions = await upsertQuestions(supabase, questions);
   const totalTemplates = await upsertTemplates(supabase);
-  const verify = await supabase
-    .from('questions')
-    .select('topic_id', { count: 'exact', head: false })
-    .in('id', questions.map((q) => q.id));
-
-  if (verify.error) throw verify.error;
+  const verifiedExpandedRows = await verifyQuestions(supabase, questions.map((q) => q.id));
 
   const byTopic = questions.reduce((acc, question) => {
     acc[question.topicId] = (acc[question.topicId] ?? 0) + 1;
@@ -266,7 +276,7 @@ async function upsertTemplates(supabase) {
 
   console.log(JSON.stringify({
     savedQuestions,
-    verifiedExpandedRows: verify.count,
+    verifiedExpandedRows,
     byTopic,
     addedTemplates: expandedTemplates.length,
     totalTemplates,

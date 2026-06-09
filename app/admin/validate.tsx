@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated, Alert, ScrollView, Image,
-  TextInput, KeyboardAvoidingView, Platform,
+  TextInput, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
-import { TOPICS } from '../../data/mockData';
-import { Question, QuestionOption, QuestionType, AccessLevel } from '../../data/types';
+import { TOPICS, TARGETS } from '../../data/mockData';
+import { Question, QuestionOption, QuestionType, AccessLevel, ValidationStatus } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
@@ -31,7 +31,11 @@ const QUESTION_TYPES: { type: QuestionType; label: string }[] = [
 // ── Edit draft type ────────────────────────────────────────────────────────
 
 interface EditDraft {
+  targetIds: string[];
   questionText: string;
+  readingPassage?: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio';
   options: QuestionOption[];
   correctAnswer: string;
   explanation: string;
@@ -39,11 +43,19 @@ interface EditDraft {
   topicId: string;
   questionType: QuestionType;
   accessLevel: AccessLevel;
+  validationStatus: ValidationStatus;
+  psychometricStats: Question['psychometricStats'];
+  smartPracticeEligible: boolean;
+  generalPracticeEligible: boolean;
 }
 
 function questionToDraft(q: Question): EditDraft {
   return {
+    targetIds: [...q.targetIds],
     questionText: q.questionText,
+    readingPassage: q.readingPassage,
+    mediaUrl: q.mediaUrl,
+    mediaType: q.mediaType,
     options: q.options.map(o => ({ ...o })),
     correctAnswer: q.correctAnswer,
     explanation: q.explanation,
@@ -51,6 +63,10 @@ function questionToDraft(q: Question): EditDraft {
     topicId: q.topicId,
     questionType: q.questionType,
     accessLevel: q.accessLevel,
+    validationStatus: q.validationStatus,
+    psychometricStats: { ...q.psychometricStats },
+    smartPracticeEligible: q.smartPracticeEligible,
+    generalPracticeEligible: q.generalPracticeEligible,
   };
 }
 
@@ -59,7 +75,7 @@ function questionToDraft(q: Question): EditDraft {
 export default function ValidateQueue() {
   const {
     getPendingQuestions, validateQuestion, getQuestionsByStatus, bulkValidate,
-    addQuestion, updateQuestion,
+    addQuestion, updateQuestion, deleteQuestion,
     bgGenRunning, bgGenProgress, setBgGenRunning, setBgGenProgress,
   } = useAdminStore();
 
@@ -127,18 +143,56 @@ export default function ValidateQueue() {
     setEditMode(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = (markValidated = false) => {
     if (!current || !editDraft) return;
+    if (!editDraft.questionText.trim()) {
+      Alert.alert('שגיאה', 'חסר טקסט שאלה');
+      return;
+    }
+    if (!editDraft.explanation.trim()) {
+      Alert.alert('שגיאה', 'חסר הסבר לשאלה');
+      return;
+    }
+    if (editDraft.targetIds.length === 0) {
+      Alert.alert('שגיאה', 'יש לבחור לפחות מסלול אחד');
+      return;
+    }
+    const hasEmptyOptions = editDraft.options.some(o => !o.text.trim() && !o.imageUrl);
+    if (editDraft.options.length < 2 || hasEmptyOptions) {
+      Alert.alert('שגיאה', 'יש למלא לפחות שתי אפשרויות תקינות');
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     // Fix correctAnswer to match the option marked isCorrect
     const correctOpt = editDraft.options.find(o => o.isCorrect);
+    const validationStatus = markValidated ? 'validated' : editDraft.validationStatus;
     const finalDraft = {
       ...editDraft,
       correctAnswer: correctOpt?.id ?? editDraft.correctAnswer,
+      validationStatus,
+      smartPracticeEligible: validationStatus === 'validated' ? editDraft.smartPracticeEligible : false,
+      generalPracticeEligible: validationStatus === 'validated' ? editDraft.generalPracticeEligible : false,
     };
     updateQuestion(current.id, finalDraft);
     setEditMode(false);
     setEditDraft(null);
+  };
+
+  const handleDeleteCurrent = (q: Question) => {
+    Alert.alert('מחיקת שאלה', 'למחוק את השאלה מהמערכת ומהמאגר?', [
+      { text: 'ביטול', style: 'cancel' },
+      {
+        text: 'מחק',
+        style: 'destructive',
+        onPress: () => {
+          deleteQuestion(q.id);
+          setEditMode(false);
+          setEditDraft(null);
+          setCurrentIdx(i => Math.max(0, Math.min(i, queue.length - 2)));
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        },
+      },
+    ]);
   };
 
   const handleCancelEdit = () => {
@@ -282,11 +336,25 @@ export default function ValidateQueue() {
                     <Text style={styles.skipText}>ביטול</Text>
                   </Pressable>
                   <Pressable
-                    onPress={handleSaveEdit}
+                    onPress={() => current && handleDeleteCurrent(current)}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.75 }]}
+                  >
+                    <Text style={styles.deleteText}>מחק</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleSaveEdit(false)}
                     style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.85 }]}
                   >
                     <LinearGradient colors={Colors.gradients.primary} style={styles.saveBtnGrad}>
                       <Text style={styles.saveBtnText}>💾 שמור שינויים</Text>
+                    </LinearGradient>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleSaveEdit(true)}
+                    style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.85 }]}
+                  >
+                    <LinearGradient colors={Colors.gradients.success} style={styles.saveBtnGrad}>
+                      <Text style={styles.saveBtnText}>שמור ואמת</Text>
                     </LinearGradient>
                   </Pressable>
                 </>
@@ -312,6 +380,12 @@ export default function ValidateQueue() {
                     <Text style={styles.editText}>✏️ ערוך</Text>
                   </Pressable>
                   <Pressable
+                    onPress={() => current && handleDeleteCurrent(current)}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.deleteText}>מחק</Text>
+                  </Pressable>
+                  <Pressable
                     onPress={() => !isAnimating && handleApprove(current)}
                     style={({ pressed }) => [styles.approveBtn, (pressed || isAnimating) && { transform: [{ scale: 0.95 }] }]}
                   >
@@ -332,6 +406,12 @@ export default function ValidateQueue() {
                     style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.7 }]}
                   >
                     <Text style={styles.editText}>✏️ ערוך</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => current && handleDeleteCurrent(current)}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.deleteText}>מחק</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => !isAnimating && current && handleReApprove(current)}
@@ -403,6 +483,40 @@ function QuestionEditForm({
     });
   };
 
+  const updateOptionField = (optId: string, updates: Partial<QuestionOption>) => {
+    onChange({
+      ...draft,
+      options: draft.options.map(o => o.id === optId ? { ...o, ...updates } : o),
+    });
+  };
+
+  const addOption = () => {
+    if (draft.options.length >= 6) return;
+    const nextId = String.fromCharCode(97 + draft.options.length);
+    onChange({
+      ...draft,
+      options: [...draft.options, { id: nextId, text: '', isCorrect: false }],
+    });
+  };
+
+  const removeOption = (optId: string) => {
+    if (draft.options.length <= 2) return;
+    const nextOptions = draft.options.filter(o => o.id !== optId);
+    const nextCorrect = nextOptions.some(o => o.id === draft.correctAnswer) ? draft.correctAnswer : nextOptions[0]?.id ?? '';
+    onChange({
+      ...draft,
+      correctAnswer: nextCorrect,
+      options: nextOptions.map(o => ({ ...o, isCorrect: o.id === nextCorrect })),
+    });
+  };
+
+  const toggleTarget = (targetId: string) => {
+    const targetIds = draft.targetIds.includes(targetId)
+      ? draft.targetIds.filter(id => id !== targetId)
+      : [...draft.targetIds, targetId];
+    onChange({ ...draft, targetIds });
+  };
+
   return (
     <ScrollView
       style={editStyles.scroll}
@@ -423,26 +537,84 @@ function QuestionEditForm({
         placeholderTextColor="rgba(255,255,255,0.25)"
       />
 
+      <Text style={editStyles.sectionLabel}>קטע קריאה / נתון מקדים</Text>
+      <TextInput
+        style={[editStyles.textInput, editStyles.multiline]}
+        value={draft.readingPassage ?? ''}
+        onChangeText={v => onChange({ ...draft, readingPassage: v || undefined })}
+        multiline
+        numberOfLines={3}
+        textAlign="right"
+        textAlignVertical="top"
+        placeholder="אופציונלי: קטע קריאה, טבלה מילולית או נתון מקדים..."
+        placeholderTextColor="rgba(255,255,255,0.25)"
+      />
+
+      <Text style={editStyles.sectionLabel}>מדיה לשאלה</Text>
+      <TextInput
+        style={editStyles.textInput}
+        value={draft.mediaUrl ?? ''}
+        onChangeText={v => onChange({ ...draft, mediaUrl: v || undefined, mediaType: v ? (draft.mediaType ?? 'image') : undefined })}
+        textAlign="right"
+        placeholder="כתובת תמונה / וידאו / אודיו"
+        placeholderTextColor="rgba(255,255,255,0.25)"
+      />
+      <View style={editStyles.chipsRow}>
+        {(['image', 'video', 'audio'] as const).map(type => (
+          <Pressable
+            key={type}
+            onPress={() => onChange({ ...draft, mediaType: type })}
+            style={[editStyles.chip, draft.mediaType === type && { backgroundColor: Colors.primaryLighter, borderColor: Colors.primary }]}
+          >
+            <Text style={editStyles.chipText}>{type}</Text>
+          </Pressable>
+        ))}
+      </View>
+
       <Text style={editStyles.sectionLabel}>תשובות</Text>
       {draft.options.map(opt => (
-        <View key={opt.id} style={[editStyles.optionRow, opt.isCorrect && editStyles.optionRowCorrect]}>
-          <Pressable
-            onPress={() => setCorrectAnswer(opt.id)}
-            style={[editStyles.radioBtn, opt.isCorrect && editStyles.radioBtnActive]}
-          >
-            {opt.isCorrect && <View style={editStyles.radioDot} />}
-          </Pressable>
-          <Text style={editStyles.optionLetter}>{opt.id.toUpperCase()}</Text>
+        <View key={opt.id} style={[editStyles.optionCard, opt.isCorrect && editStyles.optionRowCorrect]}>
+          <View style={editStyles.optionRow}>
+            <Pressable
+              onPress={() => setCorrectAnswer(opt.id)}
+              style={[editStyles.radioBtn, opt.isCorrect && editStyles.radioBtnActive]}
+            >
+              {opt.isCorrect && <View style={editStyles.radioDot} />}
+            </Pressable>
+            <Text style={editStyles.optionLetter}>{opt.id.toUpperCase()}</Text>
+            <TextInput
+              style={editStyles.optionInput}
+              value={opt.text}
+              onChangeText={v => updateOptionText(opt.id, v)}
+              textAlign="right"
+              placeholder={`אפשרות ${opt.id.toUpperCase()}`}
+              placeholderTextColor="rgba(255,255,255,0.2)"
+            />
+            <Pressable onPress={() => removeOption(opt.id)} style={editStyles.removeOptionBtn}>
+              <Text style={editStyles.removeOptionText}>מחק</Text>
+            </Pressable>
+          </View>
           <TextInput
-            style={editStyles.optionInput}
-            value={opt.text}
-            onChangeText={v => updateOptionText(opt.id, v)}
+            style={[editStyles.textInput, editStyles.compactInput]}
+            value={opt.imageUrl ?? ''}
+            onChangeText={v => updateOptionField(opt.id, { imageUrl: v || undefined })}
             textAlign="right"
-            placeholder={`אפשרות ${opt.id.toUpperCase()}`}
+            placeholder="תמונת תשובה אופציונלית"
+            placeholderTextColor="rgba(255,255,255,0.2)"
+          />
+          <TextInput
+            style={[editStyles.textInput, editStyles.compactInput]}
+            value={opt.analysisTag ?? ''}
+            onChangeText={v => updateOptionField(opt.id, { analysisTag: v || undefined })}
+            textAlign="right"
+            placeholder="תג ניתוח אופציונלי"
             placeholderTextColor="rgba(255,255,255,0.2)"
           />
         </View>
       ))}
+      <Pressable onPress={addOption} style={editStyles.addOptionBtn}>
+        <Text style={editStyles.addOptionText}>+ הוסף אפשרות</Text>
+      </Pressable>
 
       <Text style={editStyles.sectionLabel}>הסבר</Text>
       <TextInput
@@ -482,7 +654,11 @@ function QuestionEditForm({
           {topics.map(t => (
             <Pressable
               key={t.id}
-              onPress={() => onChange({ ...draft, topicId: t.id })}
+              onPress={() => onChange({
+                ...draft,
+                topicId: t.id,
+                targetIds: t.targetId && !draft.targetIds.includes(t.targetId) ? [...draft.targetIds, t.targetId] : draft.targetIds,
+              })}
               style={[editStyles.chip, draft.topicId === t.id && { backgroundColor: Colors.primaryLighter, borderColor: Colors.primary }]}
             >
               <Text style={editStyles.chipText}>{t.icon} {t.name}</Text>
@@ -506,6 +682,21 @@ function QuestionEditForm({
         </View>
       </ScrollView>
 
+      <Text style={editStyles.sectionLabel}>מסלולים</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={editStyles.chipsScroll}>
+        <View style={editStyles.chipsRow}>
+          {TARGETS.map(t => (
+            <Pressable
+              key={t.id}
+              onPress={() => toggleTarget(t.id)}
+              style={[editStyles.chip, draft.targetIds.includes(t.id) && { backgroundColor: t.color + '22', borderColor: t.color }]}
+            >
+              <Text style={editStyles.chipText}>{t.icon} {t.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
+
       <Text style={editStyles.sectionLabel}>רמת גישה</Text>
       <View style={editStyles.chipsRow}>
         {(['free', 'premium'] as AccessLevel[]).map(level => (
@@ -523,6 +714,77 @@ function QuestionEditForm({
             <Text style={editStyles.chipText}>{level === 'free' ? '🆓 חינמי' : '💎 פרמיום'}</Text>
           </Pressable>
         ))}
+      </View>
+
+      <Text style={editStyles.sectionLabel}>סטטוס אימות</Text>
+      <View style={editStyles.chipsRow}>
+        {([
+          ['draft', 'טיוטה'],
+          ['pending', 'ממתינה'],
+          ['validated', 'מאומתת'],
+          ['rejected', 'נדחתה'],
+        ] as Array<[ValidationStatus, string]>).map(([status, label]) => (
+          <Pressable
+            key={status}
+            onPress={() => onChange({
+              ...draft,
+              validationStatus: status,
+              smartPracticeEligible: status === 'validated' ? draft.smartPracticeEligible : false,
+              generalPracticeEligible: status === 'validated' ? draft.generalPracticeEligible : false,
+            })}
+            style={[editStyles.chip, draft.validationStatus === status && { backgroundColor: Colors.primaryLighter, borderColor: Colors.primary }]}
+          >
+            <Text style={editStyles.chipText}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={editStyles.switchRow}>
+        <Text style={editStyles.switchLabel}>זמינה לתרגול אדפטיבי</Text>
+        <Switch
+          value={draft.smartPracticeEligible}
+          onValueChange={v => onChange({ ...draft, smartPracticeEligible: v })}
+          trackColor={{ true: Colors.primary, false: Colors.border }}
+        />
+      </View>
+      <View style={editStyles.switchRow}>
+        <Text style={editStyles.switchLabel}>זמינה לתרגול כללי</Text>
+        <Switch
+          value={draft.generalPracticeEligible}
+          onValueChange={v => onChange({ ...draft, generalPracticeEligible: v })}
+          trackColor={{ true: Colors.success, false: Colors.border }}
+        />
+      </View>
+
+      <Text style={editStyles.sectionLabel}>נתונים פסיכומטריים</Text>
+      <View style={editStyles.metricGrid}>
+        <TextInput
+          style={[editStyles.textInput, editStyles.metricInput]}
+          value={String(draft.psychometricStats.elo)}
+          onChangeText={v => onChange({ ...draft, psychometricStats: { ...draft.psychometricStats, elo: parseInt(v) || 0 } })}
+          keyboardType="number-pad"
+          textAlign="center"
+          placeholder="ELO"
+          placeholderTextColor="rgba(255,255,255,0.25)"
+        />
+        <TextInput
+          style={[editStyles.textInput, editStyles.metricInput]}
+          value={String(draft.psychometricStats.discrimination)}
+          onChangeText={v => onChange({ ...draft, psychometricStats: { ...draft.psychometricStats, discrimination: Number(v) || 0 } })}
+          keyboardType="decimal-pad"
+          textAlign="center"
+          placeholder="הבחנה"
+          placeholderTextColor="rgba(255,255,255,0.25)"
+        />
+        <TextInput
+          style={[editStyles.textInput, editStyles.metricInput]}
+          value={String(draft.psychometricStats.guessProbability)}
+          onChangeText={v => onChange({ ...draft, psychometricStats: { ...draft.psychometricStats, guessProbability: Number(v) || 0 } })}
+          keyboardType="decimal-pad"
+          textAlign="center"
+          placeholder="ניחוש"
+          placeholderTextColor="rgba(255,255,255,0.25)"
+        />
       </View>
 
       <View style={{ height: 32 }} />
@@ -658,16 +920,22 @@ const editStyles = StyleSheet.create({
     textAlign: 'right',
   },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
+  compactInput: { minHeight: 38, paddingVertical: 8, fontSize: FontSize.xs, marginTop: 6 },
 
-  optionRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
+  optionCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
-    padding: 10,
-    marginBottom: 6,
+    padding: 8,
+    marginBottom: 8,
+  },
+  optionRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderRadius: Radius.lg,
+    padding: 4,
     gap: 10,
   },
   optionRowCorrect: {
@@ -695,6 +963,10 @@ const editStyles = StyleSheet.create({
     textAlign: 'right',
     padding: 4,
   },
+  removeOptionBtn: { borderRadius: Radius.full, backgroundColor: Colors.dangerLight, paddingHorizontal: 8, paddingVertical: 5 },
+  removeOptionText: { fontFamily: FontFamily.bold, fontSize: 10, color: Colors.danger },
+  addOptionBtn: { borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.primary, backgroundColor: Colors.primaryLighter, padding: 10, alignItems: 'center', marginTop: 4 },
+  addOptionText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primary },
 
   diffRow: { flexDirection: 'row-reverse', gap: 6, flexWrap: 'wrap' },
   diffChip: {
@@ -720,6 +992,10 @@ const editStyles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.15)',
   },
   chipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
+  switchRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, marginTop: 6 },
+  switchLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  metricGrid: { flexDirection: 'row-reverse', gap: 8 },
+  metricInput: { flex: 1, textAlign: 'center' },
 });
 
 const styles = StyleSheet.create({
@@ -772,6 +1048,8 @@ const styles = StyleSheet.create({
 
   editBtn: { height: 48, paddingHorizontal: 14, backgroundColor: Colors.primaryLighter, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
   editText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
+  deleteBtn: { height: 48, paddingHorizontal: 14, backgroundColor: Colors.dangerLight, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.danger + '55' },
+  deleteText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.danger },
 
   approveBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successLight, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.success },
   approveIcon: { fontSize: 20 },
