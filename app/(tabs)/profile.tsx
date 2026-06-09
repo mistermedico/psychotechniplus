@@ -124,25 +124,63 @@ export default function ProfileTab() {
 
   const avatarEmoji = ['🧠', '🎯', '🚀', '💎', '🌟'][Math.min(level - 1, 4)];
 
+  const webConfirm = (message: string) => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+    return window.confirm(message);
+  };
+
+  const webAlert = (message: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(message);
+      return true;
+    }
+    return false;
+  };
+
   const handleSignOut = () => {
     if (signingOut) return;
+    const performSignOut = async () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setSigningOut(true);
+      await signOut().catch(() => null);
+      router.replace('/landing');
+      setSigningOut(false);
+    };
+    if (Platform.OS === 'web') {
+      if (webConfirm('האם אתה בטוח שברצונך לצאת מהחשבון?')) {
+        performSignOut();
+      }
+      return;
+    }
     Alert.alert('יציאה מהחשבון', 'האם אתה בטוח שברצונך לצאת?', [
       { text: 'ביטול', style: 'cancel' },
       {
         text: 'יציאה', style: 'destructive',
-        onPress: async () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          setSigningOut(true);
-          router.replace('/landing');
-          await signOut().catch(() => null);
-          setSigningOut(false);
-        },
+        onPress: performSignOut,
       },
     ]);
   };
 
   const handleDeleteAccount = () => {
     if (deletingAccount) return;
+    const performDelete = async () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setDeletingAccount(true);
+      const result = await deleteAccount().catch(() => ({ success: false, error: 'אירעה שגיאה. נסה שנית.' }));
+      if (result.success) {
+        router.replace('/landing');
+      } else {
+        setDeletingAccount(false);
+        const message = result.error ?? 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.';
+        if (!webAlert(message)) Alert.alert('שגיאה', message);
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (webConfirm('פעולה זו תמחק את כל הנתונים שלך לצמיתות ולא ניתן לבטלה. האם אתה בטוח?')) {
+        performDelete();
+      }
+      return;
+    }
     Alert.alert(
       'מחיקת חשבון לצמיתות',
       'פעולה זו תמחק את כל הנתונים שלך לצמיתות ולא ניתן לבטלה. האם אתה בטוח?',
@@ -150,23 +188,24 @@ export default function ProfileTab() {
         { text: 'ביטול', style: 'cancel' },
         {
           text: 'מחק חשבון', style: 'destructive',
-          onPress: async () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            setDeletingAccount(true);
-            const result = await deleteAccount().catch(() => ({ success: false, error: 'אירעה שגיאה. נסה שנית.' }));
-            if (result.success) {
-              router.replace('/landing');
-            } else {
-              setDeletingAccount(false);
-              Alert.alert('שגיאה', result.error ?? 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.');
-            }
-          },
+          onPress: performDelete,
         },
       ]
     );
   };
 
   const handleReset = () => {
+    const performReset = () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      reset();
+      router.replace('/onboarding');
+    };
+    if (Platform.OS === 'web') {
+      if (webConfirm('האם אתה בטוח? כל ההתקדמות תימחק.')) {
+        performReset();
+      }
+      return;
+    }
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -178,9 +217,7 @@ export default function ProfileTab() {
         },
         (buttonIndex) => {
           if (buttonIndex === 1) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            reset();
-            router.replace('/onboarding');
+            performReset();
           }
         }
       );
@@ -189,11 +226,7 @@ export default function ProfileTab() {
         { text: 'ביטול', style: 'cancel' },
         {
           text: 'איפוס', style: 'destructive',
-          onPress: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            reset();
-            router.replace('/onboarding');
-          },
+          onPress: performReset,
         },
       ]);
     }
