@@ -39,6 +39,17 @@ const TYPE_LABELS: Partial<Record<QuestionType, string>> = {
   multiple_choice: 'רב ברירה',
 };
 
+type QualityFilter = 'all' | 'missingExplanation' | 'weakOptions' | 'invalidAnswer' | 'difficulty';
+
+function hasQualityIssue(q: Question, issue: Exclude<QualityFilter, 'all'>) {
+  if (issue === 'missingExplanation') return !q.explanation?.trim() || q.explanation.trim().length < 12;
+  if (issue === 'weakOptions') return q.options.length > 0 && q.options.length < 4;
+  if (issue === 'difficulty') return q.difficulty < 1 || q.difficulty > 10;
+  const markedCorrect = q.options.filter(option => option.isCorrect).length;
+  const answerMatchesOption = q.options.some(option => option.id === q.correctAnswer || option.text === q.correctAnswer);
+  return q.options.length > 0 && (markedCorrect > 1 || (markedCorrect === 0 && !answerMatchesOption));
+}
+
 export default function QuestionsAdmin() {
   const insets = useSafeAreaInsets();
   const { questions, topics, selectedQuestionIds, toggleSelectQuestion, clearSelection,
@@ -51,6 +62,7 @@ export default function QuestionsAdmin() {
   const [filterAccess, setFilterAccess] = useState<AccessLevel | 'all'>('all');
   const [filterType, setFilterType] = useState<QuestionType | 'all'>('all');
   const [filterPool, setFilterPool] = useState<'all' | 'smart' | 'general' | 'missing'>('all');
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>('all');
   const [sortIdx, setSortIdx] = useState(0);
   const [bulkMode, setBulkMode] = useState(false);
 
@@ -69,6 +81,7 @@ export default function QuestionsAdmin() {
     if (filterPool === 'smart') q = q.filter(x => x.smartPracticeEligible);
     if (filterPool === 'general') q = q.filter(x => x.generalPracticeEligible);
     if (filterPool === 'missing') q = q.filter(x => !x.smartPracticeEligible && !x.generalPracticeEligible);
+    if (qualityFilter !== 'all') q = q.filter(x => hasQualityIssue(x, qualityFilter));
 
     switch (sortIdx) {
       case 0: q = q.slice().reverse(); break;
@@ -79,15 +92,21 @@ export default function QuestionsAdmin() {
       case 5: q = q.slice().sort((a, b) => (a.accessLevel === 'premium' ? -1 : 1) - (b.accessLevel === 'premium' ? -1 : 1)); break;
     }
     return q;
-  }, [questions, search, filterStatus, filterTopicId, filterAccess, filterType, filterPool, sortIdx]);
+  }, [questions, search, filterStatus, filterTopicId, filterAccess, filterType, filterPool, qualityFilter, sortIdx]);
 
   const audit = useMemo(() => {
     const validated = questions.filter(q => q.validationStatus === 'validated').length;
     const premium = questions.filter(q => q.accessLevel === 'premium').length;
     const smart = questions.filter(q => q.smartPracticeEligible).length;
     const missingPool = questions.filter(q => !q.smartPracticeEligible && !q.generalPracticeEligible).length;
+    const qualityIssues = questions.filter(q =>
+      hasQualityIssue(q, 'missingExplanation') ||
+      hasQualityIssue(q, 'weakOptions') ||
+      hasQualityIssue(q, 'invalidAnswer') ||
+      hasQualityIssue(q, 'difficulty')
+    ).length;
     const avgDifficulty = questions.length ? (questions.reduce((sum, q) => sum + q.difficulty, 0) / questions.length).toFixed(1) : '0.0';
-    return { validated, premium, smart, missingPool, avgDifficulty };
+    return { validated, premium, smart, missingPool, qualityIssues, avgDifficulty };
   }, [questions]);
 
   const handleBulkAction = (action: 'approve' | 'reject' | 'delete') => {
@@ -140,6 +159,12 @@ export default function QuestionsAdmin() {
   const renderItem = ({ item }: { item: Question }) => {
     const topic = TOPICS.find(t => t.id === item.topicId);
     const isSelected = selectedQuestionIds.includes(item.id);
+    const itemQualityIssues = ([
+      ['missingExplanation', 'הסבר חסר'],
+      ['weakOptions', 'מעט אפשרויות'],
+      ['invalidAnswer', 'תשובה לבדיקה'],
+      ['difficulty', 'קושי חריג'],
+    ] as Array<[Exclude<QualityFilter, 'all'>, string]>).filter(([issue]) => hasQualityIssue(item, issue));
 
     return (
       <Pressable
@@ -200,6 +225,16 @@ export default function QuestionsAdmin() {
           </Text>
           {item.mediaUrl && <Text style={styles.imageBadge}>🖼️</Text>}
         </View>
+
+        {itemQualityIssues.length > 0 && (
+          <View style={styles.qualityRow}>
+            {itemQualityIssues.map(([issue, label]) => (
+              <View key={issue} style={styles.qualityBadge}>
+                <Text style={styles.qualityBadgeText}>{label}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Topic + type */}
         <View style={styles.cardFooter}>
@@ -286,6 +321,7 @@ export default function QuestionsAdmin() {
         <AuditPill label="פרימיום" value={audit.premium} color={Colors.warning} />
         <AuditPill label="פול חכם" value={audit.smart} color={Colors.primary} />
         <AuditPill label="ללא פול" value={audit.missingPool} color={audit.missingPool ? Colors.danger : Colors.success} />
+        <AuditPill label="בעיות איכות" value={audit.qualityIssues} color={audit.qualityIssues ? Colors.warning : Colors.success} />
         <AuditPill label="קושי ממוצע" value={audit.avgDifficulty} color={Colors.accent} />
       </ScrollView>
 
@@ -375,6 +411,29 @@ export default function QuestionsAdmin() {
             style={[styles.filterChip, filterPool === value && styles.filterChipActive]}
           >
             <Text style={[styles.filterChipText, filterPool === value && { color: '#fff' }]}>{label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScrollWrap}
+        contentContainerStyle={styles.filterRow}
+      >
+        {([
+          ['all', 'כל השאלות'],
+          ['missingExplanation', 'בלי הסבר תקין'],
+          ['weakOptions', 'מעט אפשרויות'],
+          ['invalidAnswer', 'תשובה בעייתית'],
+          ['difficulty', 'קושי חריג'],
+        ] as Array<[QualityFilter, string]>).map(([value, label]) => (
+          <Pressable
+            key={value}
+            onPress={() => setQualityFilter(value)}
+            style={[styles.filterChip, qualityFilter === value && styles.filterChipActive]}
+          >
+            <Text style={[styles.filterChipText, qualityFilter === value && { color: '#fff' }]}>{label}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -595,6 +654,9 @@ const styles = StyleSheet.create({
   questionTextRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', marginBottom: 8, gap: 6 },
   questionText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, lineHeight: 20 },
   imageBadge: { fontSize: 14 },
+  qualityRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  qualityBadge: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: Colors.warningLight, borderWidth: 1, borderColor: Colors.warning + '44' },
+  qualityBadgeText: { fontFamily: FontFamily.bold, fontSize: 10, color: Colors.warning, textAlign: 'right' },
 
   cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   footerMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },

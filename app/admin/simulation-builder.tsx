@@ -17,6 +17,7 @@ export default function SimulationBuilder() {
   const [editId, setEditId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [search, setSearch] = useState('');
+  const [templateFilter, setTemplateFilter] = useState<'all' | 'active' | 'inactive' | 'shortage'>('all');
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -137,6 +138,52 @@ export default function SimulationBuilder() {
     return map;
   }, [questions]);
 
+  const getTemplateAudit = (template: Pick<SmartExamTemplate, 'rules' | 'totalQuestions' | 'timeLimitMinutes'>) => {
+    const shortages = template.rules.filter(rule => rule.count > (questionsPerTopic[rule.topicId] ?? 0));
+    const adaptiveRules = template.rules.filter(rule => rule.useAdaptive).length;
+    const avgSeconds = template.totalQuestions > 0 ? Math.round((template.timeLimitMinutes * 60) / template.totalQuestions) : 0;
+    const strictRules = template.rules.filter(rule => rule.minDifficulty >= 8 || rule.maxDifficulty <= 3).length;
+    return { shortages, adaptiveRules, avgSeconds, strictRules };
+  };
+
+  const contentAudit = useMemo(() => {
+    const rows = templates.map(template => ({ template, audit: getTemplateAudit(template) }));
+    const shortageCount = rows.filter(row => row.audit.shortages.length > 0).length;
+    const inactiveCount = rows.filter(row => !row.template.isActive).length;
+    const tooFastCount = rows.filter(row => row.audit.avgSeconds > 0 && row.audit.avgSeconds < 45).length;
+    const adaptiveReadyCount = rows.filter(row => row.template.rules.length > 0 && row.audit.adaptiveRules === row.template.rules.length).length;
+    return { shortageCount, inactiveCount, tooFastCount, adaptiveReadyCount };
+  }, [templates, questionsPerTopic]);
+
+  const fixTemplateShortages = (template: SmartExamTemplate) => {
+    const fixedRules = template.rules.map(rule => {
+      const available = questionsPerTopic[rule.topicId] ?? 0;
+      return available > 0 && rule.count > available ? { ...rule, count: available } : rule;
+    });
+    const totalQuestions = fixedRules.reduce((sum, rule) => sum + rule.count, 0);
+    updateTemplate(template.id, { rules: fixedRules, totalQuestions });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const applyBalancedTiming = () => {
+    const suggestedMinutes = Math.max(5, Math.ceil((totalQ * 75) / 60));
+    setTimeLimitMinutes(String(suggestedMinutes));
+    markDirty();
+  };
+
+  const fixCurrentRuleShortages = () => {
+    setRules(prev => prev.map(rule => {
+      const available = questionsPerTopic[rule.topicId] ?? 0;
+      return available > 0 && rule.count > available ? { ...rule, count: available } : rule;
+    }));
+    markDirty();
+  };
+
+  const setCurrentRulesAdaptive = () => {
+    setRules(prev => prev.map(rule => ({ ...rule, useAdaptive: true })));
+    markDirty();
+  };
+
   const handleSave = () => {
     const trimName = name.trim();
     if (!trimName) { Alert.alert('שגיאה', 'נא להזין שם לתבנית'); return; }
@@ -171,12 +218,30 @@ export default function SimulationBuilder() {
   };
 
   const filteredTemplates = useMemo(() => {
-    if (!search.trim()) return templates;
+    let list = templates;
+    if (templateFilter === 'active') list = list.filter(t => t.isActive);
+    if (templateFilter === 'inactive') list = list.filter(t => !t.isActive);
+    if (templateFilter === 'shortage') list = list.filter(t => getTemplateAudit(t).shortages.length > 0);
+    if (!search.trim()) return list;
     const q = search.toLowerCase();
-    return templates.filter(t =>
+    return list.filter(t =>
       t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)
     );
-  }, [templates, search]);
+  }, [templates, search, templateFilter, questionsPerTopic]);
+
+  const bulkUpdateVisibleTemplates = (updates: Partial<SmartExamTemplate>, label: string) => {
+    if (filteredTemplates.length === 0) return;
+    Alert.alert(label, `לעדכן ${filteredTemplates.length} מבחנים מוצגים?`, [
+      { text: 'ביטול', style: 'cancel' },
+      {
+        text: 'עדכן',
+        onPress: () => {
+          filteredTemplates.forEach(template => updateTemplate(template.id, updates));
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
+      },
+    ]);
+  };
 
   if (showForm) {
     return (
@@ -255,6 +320,18 @@ export default function SimulationBuilder() {
               <Text style={styles.totalQ}>סה״כ: {totalQ} שאלות</Text>
               <Pressable onPress={addRule} style={styles.addRuleBtn}>
                 <Text style={styles.addRuleText}>+ הוסף כלל</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.formTools}>
+              <Pressable onPress={setCurrentRulesAdaptive} style={[styles.formToolBtn, { borderColor: Colors.primary + '66' }]}>
+                <Text style={[styles.formToolText, { color: Colors.primary }]}>הפוך הכל לאדפטיבי</Text>
+              </Pressable>
+              <Pressable onPress={fixCurrentRuleShortages} style={[styles.formToolBtn, { borderColor: Colors.warning + '66' }]}>
+                <Text style={[styles.formToolText, { color: Colors.warning }]}>תקן מחסורי שאלות</Text>
+              </Pressable>
+              <Pressable onPress={applyBalancedTiming} style={[styles.formToolBtn, { borderColor: Colors.success + '66' }]}>
+                <Text style={[styles.formToolText, { color: Colors.success }]}>זמן מומלץ</Text>
               </Pressable>
             </View>
 
@@ -440,6 +517,16 @@ export default function SimulationBuilder() {
           <StatPill icon="⏸" label="מושבתות" value={templates.filter(t => !t.isActive).length} />
         </View>
 
+        <View style={styles.auditPanel}>
+          <Text style={styles.auditTitle}>בקרת מבחנים</Text>
+          <View style={styles.auditGrid}>
+            <AuditBox label="מחסור בשאלות" value={contentAudit.shortageCount} color={contentAudit.shortageCount ? Colors.danger : Colors.success} />
+            <AuditBox label="מבחנים מושבתים" value={contentAudit.inactiveCount} color={contentAudit.inactiveCount ? Colors.warning : Colors.success} />
+            <AuditBox label="זמן צפוף מדי" value={contentAudit.tooFastCount} color={contentAudit.tooFastCount ? Colors.warning : Colors.success} />
+            <AuditBox label="אדפטיבי מלא" value={contentAudit.adaptiveReadyCount} color={Colors.primary} />
+          </View>
+        </View>
+
         <View style={styles.listHeader}>
           <Text style={styles.listTitle}>תבניות קיימות</Text>
           <Pressable onPress={openNew} style={styles.newBtn}>
@@ -462,6 +549,32 @@ export default function SimulationBuilder() {
           )}
         </View>
 
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateFilters}>
+          {([
+            ['all', 'הכל'],
+            ['active', 'פעילים'],
+            ['inactive', 'מושבתים'],
+            ['shortage', 'עם מחסור'],
+          ] as Array<[typeof templateFilter, string]>).map(([value, label]) => (
+            <Pressable
+              key={value}
+              onPress={() => setTemplateFilter(value)}
+              style={[styles.templateFilterChip, templateFilter === value && styles.templateFilterChipActive]}
+            >
+              <Text style={[styles.templateFilterText, templateFilter === value && styles.templateFilterTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <View style={styles.bulkTemplateBar}>
+          <Pressable onPress={() => bulkUpdateVisibleTemplates({ isActive: true }, 'הפעלת מבחנים')} style={[styles.bulkTemplateBtn, { backgroundColor: Colors.successLight }]}>
+            <Text style={[styles.bulkTemplateText, { color: Colors.success }]}>הפעל מוצגים</Text>
+          </Pressable>
+          <Pressable onPress={() => bulkUpdateVisibleTemplates({ isActive: false }, 'השבתת מבחנים')} style={[styles.bulkTemplateBtn, { backgroundColor: Colors.warningLight }]}>
+            <Text style={[styles.bulkTemplateText, { color: Colors.warning }]}>השבת מוצגים</Text>
+          </Pressable>
+        </View>
+
         {filteredTemplates.length === 0 && (
           <View style={styles.emptyRules}>
             <Text style={styles.emptyRulesIcon}>🏗️</Text>
@@ -473,6 +586,7 @@ export default function SimulationBuilder() {
 
         {filteredTemplates.map(t => {
           const target = TARGETS.find(x => x.id === t.targetId);
+          const audit = getTemplateAudit(t);
           return (
             <View key={t.id} style={styles.templateCard}>
               <View style={styles.templateHeader}>
@@ -494,6 +608,13 @@ export default function SimulationBuilder() {
                 <StatPill icon="⏱️" label="דקות" value={t.timeLimitMinutes} />
                 <StatPill icon="📊" label="מעבר%" value={t.passingScore} />
                 <StatPill icon="📋" label="כללים" value={t.rules.length} />
+              </View>
+
+              <View style={styles.templateHealthRow}>
+                <HealthPill label="מחסור" value={audit.shortages.length} color={audit.shortages.length ? Colors.danger : Colors.success} />
+                <HealthPill label="ש׳ לשאלה" value={audit.avgSeconds} color={audit.avgSeconds < 45 ? Colors.warning : Colors.primary} />
+                <HealthPill label="כללים אדפטיביים" value={`${audit.adaptiveRules}/${t.rules.length}`} color={Colors.primary} />
+                <HealthPill label="קשיחות חריגה" value={audit.strictRules} color={audit.strictRules ? Colors.warning : Colors.success} />
               </View>
 
               {/* Rules summary */}
@@ -535,6 +656,14 @@ export default function SimulationBuilder() {
                     {t.isActive ? '⏸ השבת' : '▶ הפעל'}
                   </Text>
                 </Pressable>
+                {audit.shortages.length > 0 && (
+                  <Pressable
+                    onPress={() => fixTemplateShortages(t)}
+                    style={[styles.tAction, { backgroundColor: Colors.warningLight }]}
+                  >
+                    <Text style={[styles.tActionText, { color: Colors.warning }]}>תקן מחסור</Text>
+                  </Pressable>
+                )}
                 <Pressable
                   onPress={() => openEdit(t)}
                   style={[styles.tAction, { backgroundColor: Colors.primaryLighter, flex: 1 }]}
@@ -569,6 +698,24 @@ function StatPill({ icon, label, value }: { icon: string; label: string; value: 
   );
 }
 
+function AuditBox({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <View style={[styles.auditBox, { borderColor: color + '55', backgroundColor: color + '12' }]}>
+      <Text style={[styles.auditBoxValue, { color }]}>{value}</Text>
+      <Text style={styles.auditBoxLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function HealthPill({ label, value, color }: { label: string; value: string | number; color: string }) {
+  return (
+    <View style={[styles.healthPill, { borderColor: color + '44' }]}>
+      <Text style={[styles.healthPillValue, { color }]}>{value}</Text>
+      <Text style={styles.healthPillLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const fsStyles = StyleSheet.create({
   container: { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: 16, marginBottom: 12, ...Shadow.sm, borderWidth: 1, borderColor: Colors.border },
   title: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right', marginBottom: 12 },
@@ -591,6 +738,12 @@ const styles = StyleSheet.create({
   heroDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.85)', textAlign: 'right', lineHeight: 20, marginTop: 6 },
 
   statsRow: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  auditPanel: { marginHorizontal: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: 12, ...Shadow.sm },
+  auditTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right', marginBottom: 10 },
+  auditGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  auditBox: { flex: 1, minWidth: 118, borderRadius: Radius.lg, borderWidth: 1, padding: 10, alignItems: 'flex-end' },
+  auditBoxValue: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, textAlign: 'right' },
+  auditBoxLabel: { fontFamily: FontFamily.medium, fontSize: 10, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
 
   listHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
   listTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text },
@@ -600,6 +753,14 @@ const styles = StyleSheet.create({
   searchWrap: { flexDirection: 'row-reverse', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
   searchInput: { flex: 1, padding: 10, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text },
   searchClear: { padding: 10 },
+  templateFilters: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
+  templateFilterChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.full, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  templateFilterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  templateFilterText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textSecondary },
+  templateFilterTextActive: { color: '#fff' },
+  bulkTemplateBar: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 16, marginBottom: 10 },
+  bulkTemplateBtn: { flex: 1, borderRadius: Radius.lg, paddingVertical: 9, alignItems: 'center' },
+  bulkTemplateText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
 
   templateCard: { backgroundColor: Colors.surface, marginHorizontal: 16, borderRadius: Radius.xl, padding: 16, marginBottom: 12, ...Shadow.md, borderWidth: 1, borderColor: Colors.border },
   templateHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 6 },
@@ -610,6 +771,10 @@ const styles = StyleSheet.create({
   templateTarget: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right' },
   templateDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', marginBottom: 10, lineHeight: 18 },
   templateStats: { flexDirection: 'row-reverse', gap: 6, marginBottom: 10 },
+  templateHealthRow: { flexDirection: 'row-reverse', gap: 6, flexWrap: 'wrap', marginBottom: 10 },
+  healthPill: { minWidth: 86, flexGrow: 1, borderRadius: Radius.lg, borderWidth: 1, backgroundColor: Colors.surfaceSecondary, paddingHorizontal: 8, paddingVertical: 7, alignItems: 'flex-end' },
+  healthPillValue: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, textAlign: 'right' },
+  healthPillLabel: { fontFamily: FontFamily.regular, fontSize: 9, color: Colors.textTertiary, textAlign: 'right', marginTop: 1 },
   rulesSummary: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 10, marginBottom: 10 },
   ruleSummaryText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', lineHeight: 18 },
   templateActions: { flexDirection: 'row-reverse', gap: 6, flexWrap: 'wrap' },
@@ -640,6 +805,9 @@ const styles = StyleSheet.create({
   totalQ: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.primary },
   addRuleBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 6 },
   addRuleText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
+  formTools: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  formToolBtn: { flexGrow: 1, borderRadius: Radius.lg, borderWidth: 1, backgroundColor: Colors.surfaceSecondary, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center' },
+  formToolText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'center' },
 
   ruleCard: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: Colors.border },
   ruleHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 8 },
