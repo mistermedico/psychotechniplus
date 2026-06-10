@@ -25,9 +25,38 @@ function difficultyToElo(difficulty: number): number {
   return 900 + difficulty * 85;
 }
 
+function normalizeOptions(options: [string, string, string, string], correctIndex: number): [string, string, string, string] {
+  const used = new Set<string>();
+  return options.map((option, index) => {
+    let text = String(option);
+    if (!used.has(text)) {
+      used.add(text);
+      return text;
+    }
+
+    const numeric = Number(text);
+    if (!Number.isNaN(numeric)) {
+      let candidate = numeric + index + 2;
+      while (used.has(String(candidate))) candidate += 3;
+      text = String(candidate);
+    } else {
+      let suffix = index + 1;
+      let candidate = index === correctIndex ? text : `${text} - מסיח ${suffix}`;
+      while (used.has(candidate)) {
+        suffix += 1;
+        candidate = `${text} - מסיח ${suffix}`;
+      }
+      text = candidate;
+    }
+    used.add(text);
+    return text;
+  }) as [string, string, string, string];
+}
+
 function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
   const correctId = ['a', 'b', 'c', 'd'][seed.correctIndex];
   const validationStatus = seed.validationStatus ?? 'validated';
+  const normalizedOptions = normalizeOptions(seed.options, seed.correctIndex);
   return {
     id: `q_exp_${seed.prefix}_${String(index + 1).padStart(3, '0')}`,
     targetIds: seed.targetIds,
@@ -36,7 +65,7 @@ function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
     questionText: seed.questionText,
     mediaUrl: seed.mediaUrl,
     mediaType: seed.mediaUrl ? 'image' : undefined,
-    options: seed.options.map((text, optionIndex) => ({
+    options: normalizedOptions.map((text, optionIndex) => ({
       id: ['a', 'b', 'c', 'd'][optionIndex],
       text,
       isCorrect: optionIndex === seed.correctIndex,
@@ -369,7 +398,7 @@ function advancedLogicQuestions(): GeneratedQuestionSeed[] {
     questionText: `בטבלה, התוצאה בכל שורה מתקבלת מכפל של שלושת הערכים. אם הערכים הם ${t[0]}, ${t[1]}, ${t[2]}, מה התוצאה?`,
     options: [String(t[3]), String(Number(t[3]) + 6), String(Number(t[3]) - 8), String(Number(t[3]) + 12)],
     correctIndex: 0,
-    explanation: `${t[0]}×${t[1]}×${t[2]} = ${t[3]}.`,
+    explanation: `כלל הטבלה הוא כפל של שלושת הערכים באותה שורה. לכן מחשבים ${t[0]}×${t[1]}×${t[2]} ומקבלים ${t[3]}.`,
     difficulty: 3 + (i % 5),
     targetIds: TOPIC_TARGETS.topic_logic,
   }));
@@ -1039,6 +1068,171 @@ function pendingAdminValidationQuestions(): GeneratedQuestionSeed[] {
   return seeds;
 }
 
+function expandedSpatialReasoningVarietyQuestions(): GeneratedQuestionSeed[] {
+  const seeds: GeneratedQuestionSeed[] = [];
+
+  const mirrors = [
+    ['חץ פונה ימינה', 'חץ פונה שמאלה', 'במראה אנכית ימין ושמאל מתחלפים.'],
+    ['האות ב׳ פתוחה שמאלה', 'האות נראית פתוחה ימינה', 'שיקוף אנכי מחליף את צד הפתיחה של הצורה.'],
+    ['משולש עם נקודה בצד ימין', 'הנקודה תופיע בצד שמאל', 'המראה מחליפה צדדים אך לא את המיקום האנכי.'],
+    ['צורת L עם זרוע תחתונה ימינה', 'צורת L עם זרוע תחתונה שמאלה', 'הזרוע האופקית עוברת לצד הנגדי.'],
+    ['חץ אלכסוני עולה ימינה', 'חץ אלכסוני עולה שמאלה', 'במראה אנכית הכיוון האופקי מתהפך והעלייה נשארת עלייה.'],
+  ];
+  for (let i = 0; i < 40; i++) {
+    const row = mirrors[i % mirrors.length];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'spatial_mirror_reflection_plus',
+      questionType: 'shapes',
+      questionText: `מה יתקבל בשיקוף מראה אנכי של ${row[0]}?`,
+      options: [row[1], row[0], 'הצורה תסתובב ב-180 מעלות', 'לא יחול שינוי'],
+      correctIndex: 0,
+      explanation: row[2],
+      difficulty: 2 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  const folds = [
+    ['מקפלים דף לשניים לאורך ומחוררים חור אחד ליד הקפל', 'שני חורים סימטריים משני צדי הקפל', 'פתיחת הקיפול משכפלת את החור לצד השני במרחק שווה מהקפל.'],
+    ['מקפלים דף לשניים לרוחב ומחוררים בפינה העליונה', 'שני חורים באותו טור, אחד למעלה ואחד למטה', 'קיפול רוחבי יוצר השתקפות מעל ומתחת לקו הקיפול.'],
+    ['מקפלים דף פעמיים, לאורך ואז לרוחב, ומחוררים חור אחד קרוב למרכז', 'ארבעה חורים סימטריים סביב המרכז', 'שני קיפולים מכפילים את החור פעם בכל ציר ולכן מתקבלים ארבעה חורים.'],
+    ['מקפלים ריבוע באלכסון ומחוררים ליד האלכסון', 'שני חורים משני צדי האלכסון', 'האלכסון משמש כקו מראה ולכן החור משתקף לצד השני.'],
+  ];
+  for (let i = 0; i < 36; i++) {
+    const row = folds[i % folds.length];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'spatial_paper_folding_holes_plus',
+      questionType: 'shapes',
+      questionText: `${row[0]}. מה נראה כשפותחים את הדף?`,
+      options: [row[1], 'חור אחד בלבד', 'שלושה חורים בשורה', 'החורים יופיעו רק בצד ימין'],
+      correctIndex: 0,
+      explanation: row[2],
+      difficulty: 3 + (i % 7),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  const cubeFaces = [
+    { description: 'אדום מול כחול, ירוק מול צהוב, לבן מול שחור', pairs: [['אדום', 'כחול'], ['ירוק', 'צהוב'], ['לבן', 'שחור']] },
+    { description: '1 מול 6, 2 מול 5, 3 מול 4', pairs: [['1', '6'], ['2', '5'], ['3', '4']] },
+    { description: 'צפון מול דרום, מזרח מול מערב, מעלה מול מטה', pairs: [['צפון', 'דרום'], ['מזרח', 'מערב'], ['מעלה', 'מטה']] },
+    { description: 'עיגול מול משולש, ריבוע מול כוכב, קו מול נקודה', pairs: [['עיגול', 'משולש'], ['ריבוע', 'כוכב'], ['קו', 'נקודה']] },
+  ];
+  for (let i = 0; i < 40; i++) {
+    const row = cubeFaces[i % cubeFaces.length];
+    const pair = row.pairs[i % row.pairs.length];
+    const subject = pair[0];
+    const answer = pair[1];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'spatial_cube_opposites_plus',
+      questionType: 'shapes',
+      questionText: `בקובייה נתון: ${row.description}. איזו פאה נמצאת מול ${subject}?`,
+      options: [answer, subject, 'אין מספיק מידע', 'פאה סמוכה בלבד'],
+      correctIndex: 0,
+      explanation: `לפי הנתון, ${subject} ו-${answer} הן פאות מנוגדות, ולכן הפאה שמול ${subject} היא ${answer}.`,
+      difficulty: 3 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  const sideViews = [
+    [[3, 1, 2], '3', 'במבט צד רואים את הגובה הגבוה ביותר לאורך השורה, שהוא 3.'],
+    [[1, 4, 2], '4', 'המבט מהצד מסתיר עומק אך שומר את הגובה המרבי, 4.'],
+    [[2, 2, 5], '5', 'העמודה הגבוהה ביותר קובעת את הגובה הנראה מהצד.'],
+    [[1, 3, 3], '3', 'שתי עמודות בגובה 3 נראות כגובה מרבי של 3.'],
+    [[4, 2, 1], '4', 'העמודה הראשונה היא הגבוהה ביותר ולכן הגובה הנראה הוא 4.'],
+  ] as const;
+  for (let i = 0; i < 45; i++) {
+    const row = sideViews[i % sideViews.length];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'spatial_side_view_heights_plus',
+      questionType: 'shapes',
+      questionText: `שלוש עמודות קוביות בגבהים ${row[0].join(', ')} מסודרות בשורה. מה הגובה שייראה במבט צד?`,
+      options: [row[1], String(Number(row[1]) + 1), String(Math.max(1, Number(row[1]) - 1)), String(row[0].reduce((a, b) => a + b, 0))],
+      correctIndex: 0,
+      explanation: row[2],
+      difficulty: 2 + (i % 7),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  const paths = [
+    ['צעד ימינה, צעד למעלה, שני צעדים שמאלה', 'צעד אחד שמאלה וצעד אחד למעלה מנקודת ההתחלה', 'מאזנים תנועות: ימינה 1 ושמאלה 2 נותנים שמאלה 1; למעלה נשאר 1.'],
+    ['שני צעדים ימינה, שני צעדים למטה, צעד שמאלה', 'צעד אחד ימינה ושני צעדים למטה', 'ימינה 2 פחות שמאלה 1 נותן ימינה 1; למטה נשאר 2.'],
+    ['צעד למעלה, צעד ימינה, צעד למטה, צעד ימינה', 'שני צעדים ימינה מנקודת ההתחלה', 'למעלה ולמטה מתבטלים, ושני צעדי ימינה נשארים.'],
+    ['שלושה צעדים למעלה, צעד למטה, צעד שמאלה', 'שני צעדים למעלה וצעד שמאלה', '3 למעלה פחות 1 למטה נותנים 2 למעלה, ועוד צעד שמאלה.'],
+  ];
+  for (let i = 0; i < 36; i++) {
+    const row = paths[i % paths.length];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'spatial_grid_navigation_plus',
+      questionType: 'shapes',
+      questionText: `אדם נע על משבצות: ${row[0]}. היכן הוא ביחס לנקודת ההתחלה?`,
+      options: [row[1], 'בדיוק בנקודת ההתחלה', 'שני צעדים ימינה בלבד', 'צעד אחד למטה בלבד'],
+      correctIndex: 0,
+      explanation: row[2],
+      difficulty: 3 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  const matrices = [
+    ['בשורה הראשונה מספר הצלעות עולה: משולש, ריבוע, מחומש. בשורה השנייה: ריבוע, מחומש, ?', 'משושה', 'הדפוס הוא עלייה של צלע אחת בכל צעד, לכן אחרי מחומש מגיע משושה.'],
+    ['בכל שורה הצבע מתחלף: כהה, בהיר, כהה. השורה הבאה מתחילה בהיר, כהה, ?', 'בהיר', 'הדפוס מתחלף לסירוגין ולכן אחרי כהה מגיע בהיר.'],
+    ['בכל עמודה הצורה מסתובבת 90 מעלות בכיוון השעון. למעלה חץ למעלה, באמצע חץ ימינה, למטה ?', 'חץ למטה', 'עוד סיבוב של 90 מעלות מחץ ימינה נותן חץ למטה.'],
+    ['מספר הנקודות בתאים הוא 1,2,3 ואז 2,3,?.', '4', 'בכל שורה המספר גדל באחד, לכן אחרי 3 מגיע 4.'],
+  ];
+  for (let i = 0; i < 44; i++) {
+    const row = matrices[i % matrices.length];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'spatial_shape_matrix_plus',
+      questionType: 'shapes',
+      questionText: `מטריצת צורות: ${row[0]}`,
+      options: [row[1], 'ריבוע', 'משולש', 'אין שינוי'],
+      correctIndex: 0,
+      explanation: row[2],
+      difficulty: 4 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  const hiddenBlocks = [
+    [[3, 3, 3], '27', 'קובייה מלאה 3×3×3 מכילה 27 קוביות קטנות.'],
+    [[2, 3, 4], '24', 'מכפילים אורך×רוחב×גובה: 2×3×4=24.'],
+    [[4, 4, 1], '16', 'שכבה אחת בגודל 4×4 מכילה 16 קוביות.'],
+    [[2, 2, 5], '20', 'יש 2×2 עמודות וכל אחת בגובה 5, יחד 20 קוביות.'],
+  ] as const;
+  for (let i = 0; i < 36; i++) {
+    const row = hiddenBlocks[i % hiddenBlocks.length];
+    seeds.push({
+      topicId: 'topic_spatial',
+      prefix: 'spatial_hidden_block_count_plus',
+      questionType: 'shapes',
+      questionText: `מבנה מלא של קוביות במידות ${row[0][0]}×${row[0][1]}×${row[0][2]}. כמה קוביות קטנות יש בו?`,
+      options: [row[1], String(Number(row[1]) - 2), String(Number(row[1]) + 4), String(row[0][0] + row[0][1] + row[0][2])],
+      correctIndex: 0,
+      explanation: row[2],
+      difficulty: 3 + (i % 6),
+      targetIds: TOPIC_TARGETS.topic_spatial,
+      validationStatus: 'pending',
+    });
+  }
+
+  return seeds;
+}
+
 const RAW_EXPANDED_QUESTIONS: GeneratedQuestionSeed[] = [
   ...seriesQuestions(),
   ...quantitativeQuestions(),
@@ -1053,6 +1247,7 @@ const RAW_EXPANDED_QUESTIONS: GeneratedQuestionSeed[] = [
   ...massiveVerbalQuestions(),
   ...massiveSpatialQuestions(),
   ...pendingAdminValidationQuestions(),
+  ...expandedSpatialReasoningVarietyQuestions(),
 ];
 
 export const EXPANDED_PSYCHOTECHNIC_QUESTIONS: Question[] = RAW_EXPANDED_QUESTIONS.map(createQuestion);
