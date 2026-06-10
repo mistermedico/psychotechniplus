@@ -53,10 +53,17 @@ function normalizeOptions(options: [string, string, string, string], correctInde
   }) as [string, string, string, string];
 }
 
+function strengthenExplanation(explanation: string, correctText: string): string {
+  const clean = explanation.trim();
+  if (clean.length >= 35) return clean;
+  return `${clean} לכן התשובה הנכונה היא "${correctText}", כי היא היחידה שתואמת את הכלל או החישוב שהוצג בשאלה.`;
+}
+
 function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
   const correctId = ['a', 'b', 'c', 'd'][seed.correctIndex];
   const validationStatus = seed.validationStatus ?? 'validated';
   const normalizedOptions = normalizeOptions(seed.options, seed.correctIndex);
+  const explanation = strengthenExplanation(seed.explanation, normalizedOptions[seed.correctIndex]);
   return {
     id: `q_exp_${seed.prefix}_${String(index + 1).padStart(3, '0')}`,
     targetIds: seed.targetIds,
@@ -71,7 +78,7 @@ function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
       isCorrect: optionIndex === seed.correctIndex,
     })),
     correctAnswer: correctId,
-    explanation: seed.explanation,
+    explanation,
     difficulty: seed.difficulty,
     psychometricStats: {
       elo: difficultyToElo(seed.difficulty),
