@@ -116,6 +116,20 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const contentHealth = useMemo(() => {
+    const validatedPerTopic = topics.map(topic => ({
+      topic,
+      count: questions.filter(q => q.topicId === topic.id && q.validationStatus === 'validated').length,
+    }));
+    const lowCoverageTopics = validatedPerTopic.filter(row => row.count < 20).length;
+    const countByTopic = Object.fromEntries(validatedPerTopic.map(row => [row.topic.id, row.count]));
+    const templateShortages = templates.filter(template =>
+      template.rules.some(rule => (countByTopic[rule.topicId] ?? 0) < rule.count)
+    ).length;
+    const weakSessions = sessionHistory.filter(session => session.score < 55).length;
+    return { lowCoverageTopics, templateShortages, weakSessions };
+  }, [questions, topics, templates, sessionHistory]);
+
   if (!isAdmin) {
     return (
       <LoginScreen
@@ -152,20 +166,6 @@ export default function AdminDashboard() {
   const lastSyncText = lastSyncedAt
     ? new Date(lastSyncedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
     : 'עדיין לא סונכרן';
-
-  const contentHealth = useMemo(() => {
-    const validatedPerTopic = topics.map(topic => ({
-      topic,
-      count: questions.filter(q => q.topicId === topic.id && q.validationStatus === 'validated').length,
-    }));
-    const lowCoverageTopics = validatedPerTopic.filter(row => row.count < 20).length;
-    const countByTopic = Object.fromEntries(validatedPerTopic.map(row => [row.topic.id, row.count]));
-    const templateShortages = templates.filter(template =>
-      template.rules.some(rule => (countByTopic[rule.topicId] ?? 0) < rule.count)
-    ).length;
-    const weakSessions = sessionHistory.filter(session => session.score < 55).length;
-    return { lowCoverageTopics, templateShortages, weakSessions };
-  }, [questions, topics, templates, sessionHistory]);
 
   const categorized = (['content', 'exams', 'users', 'business', 'system'] as NavCategory[]).map(cat => ({
     cat,
