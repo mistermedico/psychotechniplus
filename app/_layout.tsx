@@ -17,6 +17,7 @@ import { useUserStore } from '../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { ensureDbSeeded } from '../lib/db';
+import ScreenGuide from '../components/ScreenGuide';
 
 // Force RTL for Hebrew
 if (!I18nManager.isRTL) {
@@ -99,6 +100,7 @@ export default function RootLayout() {
           <Stack.Screen name="privacy" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="maintenance" />
         </Stack>
+        <ScreenGuide />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
