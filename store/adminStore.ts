@@ -694,6 +694,9 @@ interface AdminState {
   premiumConfig: PremiumConfig;
   sessionHistory: SessionRecord[];
   appConfig: AppConfig;
+  isSyncing: boolean;
+  lastSyncedAt: string | null;
+  syncError: string | null;
   dailyChallenges: DailyChallenge[];
   userNotes: UserNote[];
 
@@ -795,6 +798,7 @@ interface AdminState {
   loadQuestionsFromSupabase: () => Promise<void>;
   seedToSupabase: () => Promise<{ ok: boolean; message: string }>;
   loadAdminData: () => Promise<void>;
+  syncAll: () => Promise<{ ok: boolean; message: string }>;
 
   // Computed
   getStats: () => AdminStats;
@@ -1228,6 +1232,9 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   premiumConfig: DEFAULT_PREMIUM_CONFIG,
   sessionHistory: [],
   appConfig: DEFAULT_APP_CONFIG,
+  isSyncing: false,
+  lastSyncedAt: null,
+  syncError: null,
   dailyChallenges: [],
   userNotes: [],
   promoCodes: SEED_PROMO_CODES,
@@ -1821,14 +1828,23 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   loadQuestionsFromSupabase: async () => {
-    const questions = await fetchAllQuestions();
-    if (questions.length > 0) set({ questions });
+    set({ isSyncing: true, syncError: null });
+    try {
+      const questions = await fetchAllQuestions();
+      if (questions.length > 0) set({ questions });
+      set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
+    } catch (e: any) {
+      const message = e?.message ?? 'Failed to load questions';
+      set({ isSyncing: false, syncError: message });
+      throw e;
+    }
   },
 
   seedToSupabase: () => seedDatabase(),
 
   loadAdminData: async () => {
     logger.info('adminStore:loadAdminData', 'טוען נתוני אדמין...');
+    set({ isSyncing: true, syncError: null });
 
     // 0. Seed PENDING_SEED questions to Supabase if they don't exist yet
     // (ensureDbSeeded in _layout.tsx already handles targets+topics)
@@ -1953,7 +1969,20 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       }
     } catch {}
 
+    set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
     logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');
+  },
+
+  syncAll: async () => {
+    try {
+      await get().loadAdminData();
+      get().logActivity('סנכרון מלא הופעל מפאנל הניהול', 'system');
+      return { ok: true, message: 'כל נתוני הניהול סונכרנו בהצלחה.' };
+    } catch (e: any) {
+      const message = e?.message ?? 'שגיאה בסנכרון מלא';
+      set({ isSyncing: false, syncError: message });
+      return { ok: false, message };
+    }
   },
 
   getPendingQuestions: () => get().questions.filter(q => q.validationStatus === 'pending'),

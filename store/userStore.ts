@@ -6,7 +6,7 @@ import {
   loadUserBadges, saveUserBadge, loadUserElos, saveUserElo,
 } from '../lib/db';
 import { logger } from '../utils/logger';
-import { useAdminStore } from './adminStore';
+import { ADMIN_EMAIL, useAdminStore } from './adminStore';
 import { logOutPurchases } from '../lib/purchases';
 import { PerformanceLevel, computeAdaptiveLevel, LEVEL_LABELS } from '../utils/adaptive';
 
@@ -134,9 +134,11 @@ export const useUserStore = create<UserState>((set, get) => ({
       } catch {}
     }
 
+    const isAdminPremium = sessionEmail.toLowerCase() === ADMIN_EMAIL;
     const isReviewPremium = PREMIUM_REVIEW_EMAILS.has(sessionEmail.toLowerCase());
+    const shouldForcePremium = isAdminPremium || isReviewPremium;
 
-    set({ userId, isAuthenticated: true, email: sessionEmail, isPremium: isReviewPremium });
+    set({ userId, isAuthenticated: true, email: sessionEmail, isPremium: shouldForcePremium });
 
     const [profile, badges, savedTopicPerformance] = await Promise.all([
       loadUserProfile(userId),
@@ -149,7 +151,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         name: profile.name,
         selectedTargetId: profile.selected_target_id,
         hasCompletedOnboarding: profile.has_completed_onboarding,
-        isPremium: isReviewPremium || !!profile.is_premium,
+        isPremium: shouldForcePremium || !!profile.is_premium,
         streak: profile.streak,
         longestStreak: profile.longest_streak,
         lastPracticedDate: profile.last_practiced_date,
@@ -159,6 +161,10 @@ export const useUserStore = create<UserState>((set, get) => ({
         totalCorrect: profile.total_correct,
         totalAnswered: profile.total_answered,
       });
+    }
+
+    if (shouldForcePremium && userId) {
+      saveUserProfile(userId, { is_premium: true });
     }
 
     if (badges.length > 0) set({ badges });
@@ -249,6 +255,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         newHistory.map(entry => ({ ...entry, date: entry.date ?? now })),
       );
     }
+
   },
 
   getTopicAccuracy: (topicId) => {
@@ -362,9 +369,10 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   setPremium: (val) => {
-    set({ isPremium: val });
-    const { userId } = get();
-    if (userId) saveUserProfile(userId, { is_premium: val });
+    const { userId, email } = get();
+    const next = email.toLowerCase() === ADMIN_EMAIL ? true : val;
+    set({ isPremium: next });
+    if (userId) saveUserProfile(userId, { is_premium: next });
   },
 
   reset: () => {

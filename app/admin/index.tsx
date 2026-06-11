@@ -86,7 +86,8 @@ const QUICK_ACTIONS = [
 export default function AdminDashboard() {
   const {
     isAdmin, login, logout, setIsAdmin, getStats, getPendingQuestions,
-    seedToSupabase, loadQuestionsFromSupabase,
+    seedToSupabase, loadAdminData, syncAll,
+    isSyncing, lastSyncedAt, syncError,
     revenueSnapshots, activityLog, questions, topics, templates, sessionHistory,
   } = useAdminStore();
 
@@ -95,6 +96,7 @@ export default function AdminDashboard() {
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   useEffect(() => {
     if (isAdmin) return;
@@ -104,6 +106,15 @@ export default function AdminDashboard() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    loadAdminData();
+    const interval = setInterval(() => {
+      loadAdminData();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isAdmin) {
     return (
@@ -138,6 +149,9 @@ export default function AdminDashboard() {
 
   const today = new Date().toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const recentActivity = activityLog.slice(0, 5);
+  const lastSyncText = lastSyncedAt
+    ? new Date(lastSyncedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+    : 'עדיין לא סונכרן';
 
   const contentHealth = useMemo(() => {
     const validatedPerTopic = topics.map(topic => ({
@@ -171,11 +185,19 @@ export default function AdminDashboard() {
             </View>
             <View style={styles.heroInfo}>
               <Text style={styles.heroDate}>{today}</Text>
-              <Text style={styles.heroStatus}>מצב מערכת: תקין ✅</Text>
+              <Text style={[styles.heroStatus, syncError && { color: Colors.danger }]}>
+                {syncError ? 'נדרשת בדיקת סנכרון' : isSyncing ? 'מסנכרן נתונים...' : 'מצב מערכת: תקין ✅'}
+              </Text>
             </View>
           </View>
           <Text style={styles.heroTitle}>🛠️ פאנל ניהול</Text>
           <Text style={styles.heroSub}>PsychoTechniPlus Admin</Text>
+          <View style={styles.adminBadgesRow}>
+            <Text style={styles.adminPremiumBadge}>💎 מנהל פרימיום אוטומטי</Text>
+            <Text style={[styles.syncBadge, syncError && styles.syncBadgeError]}>
+              {isSyncing ? 'מסנכרן...' : `סונכרן: ${lastSyncText}`}
+            </Text>
+          </View>
           <Pressable
             onPress={async () => { await logout(); router.replace('/auth'); }}
             style={styles.logoutBtn}
@@ -183,6 +205,33 @@ export default function AdminDashboard() {
             <Text style={styles.logoutText}>יציאה →</Text>
           </Pressable>
         </LinearGradient>
+
+        <View style={[styles.syncPanel, syncError && styles.syncPanelError]}>
+          <View style={styles.syncPanelText}>
+            <Text style={styles.syncPanelTitle}>מרכז סנכרון ניהול</Text>
+            <Text style={styles.syncPanelSub}>
+              {syncError
+                ? `שגיאה אחרונה: ${syncError}`
+                : `שאלות, נושאים, מסלולים, תבניות והגדרות נטענים מחדש אוטומטית. סנכרון אחרון: ${lastSyncText}`}
+            </Text>
+          </View>
+          <Pressable
+            disabled={syncingAll || isSyncing}
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setSyncingAll(true);
+              const result = await syncAll();
+              setSyncingAll(false);
+              Alert.alert(result.ok ? 'סונכרן' : 'שגיאת סנכרון', result.message);
+            }}
+            style={({ pressed }) => [styles.syncAllBtn, (pressed || syncingAll || isSyncing) && { opacity: 0.72 }]}
+          >
+            {syncingAll || isSyncing
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.syncAllBtnText}>סנכרן הכל</Text>
+            }
+          </Pressable>
+        </View>
 
         {/* Alert Banner */}
         {pendingCount > 0 && (
@@ -272,6 +321,19 @@ export default function AdminDashboard() {
               <Text style={styles.quickActionLabel}>{a.label}</Text>
             </Pressable>
           ))}
+          <Pressable
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setSyncingAll(true);
+              const result = await syncAll();
+              setSyncingAll(false);
+              Alert.alert(result.ok ? 'סונכרן' : 'שגיאת סנכרון', result.message);
+            }}
+            style={({ pressed }) => [styles.quickActionChip, styles.quickSyncChip, pressed && { opacity: 0.75 }]}
+          >
+            <Text style={styles.quickActionIcon}>🔄</Text>
+            <Text style={styles.quickActionLabel}>סנכרן הכל</Text>
+          </Pressable>
         </ScrollView>
 
         {/* Recent Activity */}
@@ -335,7 +397,7 @@ export default function AdminDashboard() {
               const result = await seedToSupabase();
               setSeeding(false);
               Alert.alert(result.ok ? '✅ הצלחה' : '❌ שגיאה', result.message);
-              if (result.ok) loadQuestionsFromSupabase();
+              if (result.ok) syncAll();
             }}
             style={({ pressed }) => [styles.seedBtn, pressed && { opacity: 0.85 }]}
             disabled={seeding}
@@ -347,8 +409,8 @@ export default function AdminDashboard() {
           <Pressable
             onPress={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              await loadQuestionsFromSupabase();
-              Alert.alert('✅ עודכן', 'שאלות נטענו מ-Supabase');
+              const result = await syncAll();
+              Alert.alert(result.ok ? 'עודכן' : 'שגיאת סנכרון', result.message);
             }}
             style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.85 }]}
           >
@@ -501,6 +563,40 @@ const styles = StyleSheet.create({
   heroStatus: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#10B981', marginTop: 2 },
   heroTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
   heroSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: '#64748B', marginTop: 2 },
+  adminBadgesRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    alignSelf: 'stretch',
+  },
+  adminPremiumBadge: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: '#1C1917',
+    backgroundColor: Colors.warning,
+    borderRadius: Radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  syncBadge: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.success,
+    backgroundColor: 'rgba(16,185,129,0.12)',
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.35)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  syncBadgeError: {
+    color: Colors.danger,
+    backgroundColor: Colors.dangerLight,
+    borderColor: Colors.dangerGlow,
+  },
   logoutBtn: {
     marginTop: 16,
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -509,6 +605,56 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   logoutText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#94A3B8' },
+
+  syncPanel: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    backgroundColor: '#111827',
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.32)',
+    padding: 14,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    ...Shadow.md,
+  },
+  syncPanelError: {
+    borderColor: Colors.dangerGlow,
+    backgroundColor: '#1B1117',
+  },
+  syncPanelText: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  syncPanelTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: '#E2E8F0',
+    textAlign: 'right',
+  },
+  syncPanelSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: '#94A3B8',
+    textAlign: 'right',
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  syncAllBtn: {
+    minWidth: 108,
+    minHeight: 42,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  syncAllBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: '#fff',
+  },
 
   // Alert Banner
   alertBanner: { marginHorizontal: 16, marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden' },
@@ -588,6 +734,10 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1, borderColor: '#334155',
     ...Shadow.sm,
+  },
+  quickSyncChip: {
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(124,111,247,0.18)',
   },
   quickActionIcon: { fontSize: 18 },
   quickActionLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#E2E8F0' },
