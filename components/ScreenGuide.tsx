@@ -232,15 +232,17 @@ function getGuide(pathname: string): ScreenGuideContent {
 export default function ScreenGuide() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const guide = useMemo(() => getGuide(pathname), [pathname]);
+  const isTabScreen = ['/', '/targets', '/practice', '/progress', '/profile'].includes(pathname);
+  const bottomOffset = insets.bottom + (isTabScreen ? 92 : 16);
 
   useEffect(() => {
-    setExpanded(true);
+    setExpanded(false);
   }, [pathname]);
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { top: insets.top + 10 }]}>
+    <View pointerEvents="box-none" style={[styles.wrap, { bottom: bottomOffset }]}>
       {expanded ? (
         <View style={styles.card}>
           <View style={styles.header}>
@@ -290,11 +292,12 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     zIndex: 1000,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   card: {
     width: '100%',
     maxWidth: 560,
+    alignSelf: 'center',
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.borderStrong,
@@ -378,6 +381,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(8,10,18,0.94)',
     paddingVertical: 9,
     paddingHorizontal: 14,
+    minHeight: 40,
     ...Shadow.sm,
   },
   collapsedText: {
