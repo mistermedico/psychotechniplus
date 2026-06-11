@@ -55,8 +55,9 @@ function normalizeOptions(options: [string, string, string, string], correctInde
 
 function strengthenExplanation(explanation: string, correctText: string): string {
   const clean = explanation.trim();
-  if (clean.length >= 35) return clean;
-  return `${clean} לכן התשובה הנכונה היא "${correctText}", כי היא היחידה שתואמת את הכלל או החישוב שהוצג בשאלה.`;
+  if (clean.length >= 35 && clean.includes(correctText)) return clean;
+  const answerSummary = ` לכן התשובה הנכונה היא "${correctText}", כי היא היחידה שתואמת את הכלל או החישוב שהוצג בשאלה.`;
+  return clean.endsWith('.') ? `${clean}${answerSummary}` : `${clean}.${answerSummary}`;
 }
 
 function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {

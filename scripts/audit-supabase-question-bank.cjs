@@ -23,35 +23,42 @@ async function fetchAllQuestions(supabase) {
   return rows;
 }
 
+function normalizeText(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function hasReasoningMarker(explanation) {
+  return /[.=:=→×÷+\-/]|לכן|כי|כלומר|מכיוון|סופרים|מחברים|מחשבים|הקשר|הדפוס|הכלל|מתקבל|נובע|משום/.test(explanation);
+}
+
+function hasForbiddenExplanation(explanation) {
+  return /לא\s+מופיע|לא\s+מופיעה|נבחר.*קרוב|טעות\s+בחישוב|רגע\s*[—-]/.test(explanation);
+}
+
 function auditQuestion(q) {
   const issues = [];
   const options = Array.isArray(q.options) ? q.options : [];
   const correct = options.filter((option) => option && option.isCorrect === true);
-  const explanation = String(q.explanation ?? '').trim();
-  const optionTexts = options.map((option) => String(option?.text ?? '').trim()).filter(Boolean);
+  const correctOption = correct[0];
+  const correctText = normalizeText(correctOption?.text);
+  const explanation = normalizeText(q.explanation);
+  const questionText = normalizeText(q.question_text);
+  const optionTexts = options.map((option) => normalizeText(option?.text)).filter(Boolean);
   const duplicateTexts = optionTexts.filter((text, index) => optionTexts.indexOf(text) !== index);
-  const forbiddenExplanationPatterns = [
-    /לא\s+מופיע/,
-    /לא\s+מופיעה/,
-    /נבחר.*קרוב/,
-    /טעות\s+בחישוב/,
-    /רגע\s*[—-]/,
-  ];
 
-  if (!q.question_text || q.question_text.trim().length < 8) issues.push('question text too short');
+  if (!questionText || questionText.length < 8) issues.push('question text too short');
   if (explanation.length < 28) issues.push('explanation too short for review quality');
-  if (!/[.=:=→×÷+\-/]|לכן|כי|כלומר|מכיוון|סופרים|מחברים|מחשבים|הקשר|הדפוס|הכלל/.test(explanation)) {
-    issues.push('explanation lacks visible reasoning marker');
-  }
-  if (forbiddenExplanationPatterns.some((pattern) => pattern.test(explanation))) {
-    issues.push('explanation contains contradiction or uncertainty marker');
-  }
+  if (explanation && !hasReasoningMarker(explanation)) issues.push('explanation lacks visible reasoning marker');
+  if (hasForbiddenExplanation(explanation)) issues.push('explanation contains contradiction or uncertainty marker');
   if (options.length < 2) issues.push('less than two options');
   if (correct.length !== 1) issues.push(`expected exactly one correct option, got ${correct.length}`);
-  if (correct[0] && q.correct_answer !== correct[0].id && q.correct_answer !== correct[0].text) {
-    issues.push(`correct_answer "${q.correct_answer}" does not match correct option "${correct[0].id}"`);
+  if (correctOption && q.correct_answer !== correctOption.id && q.correct_answer !== correctOption.text) {
+    issues.push(`correct_answer "${q.correct_answer}" does not match correct option "${correctOption.id}"`);
   }
   if (duplicateTexts.length > 0) issues.push(`duplicate option text: ${[...new Set(duplicateTexts)].join(', ')}`);
+  if (correctText && explanation && !explanation.includes(correctText)) {
+    issues.push(`explanation does not mention correct answer "${correctText}"`);
+  }
 
   return issues;
 }

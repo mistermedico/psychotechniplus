@@ -6362,11 +6362,11 @@ const BASE_QUESTION_OVERRIDES: Record<string, Partial<Pick<Question, 'options' |
 function reviewBaseQuestion(question: Question): Question {
   const reviewed = { ...question, ...BASE_QUESTION_OVERRIDES[question.id] };
   const cleanExplanation = reviewed.explanation.trim();
-  if (cleanExplanation.length >= 35) return reviewed;
   const correctText = reviewed.options.find(option => option.isCorrect)?.text ?? reviewed.correctAnswer;
+  if (cleanExplanation.length >= 35 && cleanExplanation.includes(correctText)) return reviewed;
   return {
     ...reviewed,
-    explanation: `${cleanExplanation} לכן התשובה הנכונה היא "${correctText}", כי היא היחידה שתואמת את החישוב או הכלל שמופיע בשאלה.`,
+    explanation: `${cleanExplanation}${cleanExplanation.endsWith('.') ? '' : '.'} לכן התשובה הנכונה היא "${correctText}", כי היא היחידה שתואמת את החישוב או הכלל שמופיע בשאלה.`,
   };
 }
 
