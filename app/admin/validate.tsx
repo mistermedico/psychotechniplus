@@ -14,6 +14,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
 import { startBulkGeneration, stopBulkGeneration } from '../../utils/backgroundGenerator';
+import { auditPsychotechnicQuestion } from '../../utils/questionQuality';
 
 // ── Question type options ──────────────────────────────────────────────────
 
@@ -70,6 +71,18 @@ function questionToDraft(q: Question): EditDraft {
   };
 }
 
+function confirmDeleteQuestion(message: string): Promise<boolean> {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+    return Promise.resolve(window.confirm(message));
+  }
+  return new Promise(resolve => {
+    Alert.alert('מחיקת שאלה', message, [
+      { text: 'ביטול', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'מחק', style: 'destructive', onPress: () => resolve(true) },
+    ]);
+  });
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function ValidateQueue() {
@@ -87,6 +100,7 @@ export default function ValidateQueue() {
   const [editMode, setEditMode] = useState(false);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
   const [showGenLog, setShowGenLog] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const queue = filter === 'pending' ? pending : rejected;
   const safeIdx = Math.min(currentIdx, Math.max(0, queue.length - 1));
@@ -110,6 +124,11 @@ export default function ValidateQueue() {
   };
 
   const handleApprove = (q: Question) => {
+    const issues = auditPsychotechnicQuestion(q);
+    if (issues.length > 0) {
+      Alert.alert('השאלה לא מוכנה לאימות', `תקן לפני אישור:\n${issues.map(issue => `• ${issue}`).join('\n')}`);
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     animateOut('approve', () => {
       validateQuestion(q.id, 'validated');
@@ -126,6 +145,11 @@ export default function ValidateQueue() {
   };
 
   const handleReApprove = (q: Question) => {
+    const issues = auditPsychotechnicQuestion(q);
+    if (issues.length > 0) {
+      Alert.alert('השאלה לא מוכנה לאימות', `תקן לפני אישור מחדש:\n${issues.map(issue => `• ${issue}`).join('\n')}`);
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     animateOut('approve', () => {
       validateQuestion(q.id, 'validated');
@@ -173,26 +197,51 @@ export default function ValidateQueue() {
       smartPracticeEligible: validationStatus === 'validated' ? editDraft.smartPracticeEligible : false,
       generalPracticeEligible: validationStatus === 'validated' ? editDraft.generalPracticeEligible : false,
     };
+    const issues = auditPsychotechnicQuestion(finalDraft);
+    if (validationStatus === 'validated' && issues.length > 0) {
+      Alert.alert('השאלה לא מוכנה לאימות', `תקן לפני שמירה כמאומתת:\n${issues.map(issue => `• ${issue}`).join('\n')}`);
+      return;
+    }
     updateQuestion(current.id, finalDraft);
     setEditMode(false);
     setEditDraft(null);
   };
 
-  const handleDeleteCurrent = (q: Question) => {
-    Alert.alert('מחיקת שאלה', 'למחוק את השאלה מהמערכת ומהמאגר?', [
-      { text: 'ביטול', style: 'cancel' },
-      {
-        text: 'מחק',
-        style: 'destructive',
-        onPress: () => {
-          deleteQuestion(q.id);
-          setEditMode(false);
-          setEditDraft(null);
-          setCurrentIdx(i => Math.max(0, Math.min(i, queue.length - 2)));
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        },
-      },
-    ]);
+  const handleDeleteCurrent = async (q: Question) => {
+    if (deletingId) return;
+    const okToDelete = await confirmDeleteQuestion('למחוק את השאלה מהמערכת ומהמאגר? פעולה זו תמחק גם מ-Supabase.');
+    if (!okToDelete) return;
+
+    setDeletingId(q.id);
+    const result = await deleteQuestion(q.id);
+    setDeletingId(null);
+    if (!result.ok) {
+      Alert.alert('מחיקה נכשלה', result.error ?? 'לא ניתן למחוק את השאלה כרגע.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    setEditMode(false);
+    setEditDraft(null);
+    setCurrentIdx(i => Math.max(0, Math.min(i, queue.length - 2)));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  };
+
+  const handleBulkApprove = (items: Question[]) => {
+    const valid = items.filter(q => auditPsychotechnicQuestion(q).length === 0);
+    const invalidCount = items.length - valid.length;
+    if (valid.length > 0) {
+      bulkValidate(valid.map(q => q.id), 'validated');
+      setCurrentIdx(0);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    if (invalidCount > 0) {
+      Alert.alert(
+        'נדרש תיקון לפני אישור',
+        `${valid.length} שאלות אושרו.\n${invalidCount} שאלות נשארו בתור כי חסר להן הסבר, יש יותר/פחות מתשובה נכונה אחת, או שהן לא עומדות בכללי שאלה פסיכוטכנית.`
+      );
+      return;
+    }
+    Alert.alert('אושר', `${valid.length} שאלות אושרו ונכנסו למאגר.`);
   };
 
   const handleCancelEdit = () => {
@@ -336,10 +385,11 @@ export default function ValidateQueue() {
                     <Text style={styles.skipText}>ביטול</Text>
                   </Pressable>
                   <Pressable
+                    disabled={!!deletingId}
                     onPress={() => current && handleDeleteCurrent(current)}
-                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.75 }]}
+                    style={({ pressed }) => [styles.deleteBtn, (pressed || !!deletingId) && { opacity: 0.75 }]}
                   >
-                    <Text style={styles.deleteText}>מחק</Text>
+                    <Text style={styles.deleteText}>{deletingId === current?.id ? 'מוחק...' : 'מחק'}</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => handleSaveEdit(false)}
@@ -361,7 +411,7 @@ export default function ValidateQueue() {
               ) : filter === 'pending' ? (
                 <>
                   <Pressable
-                    onPress={() => !isAnimating && handleReject(current)}
+                    onPress={() => !isAnimating && current && handleReject(current)}
                     style={({ pressed }) => [styles.rejectBtn, (pressed || isAnimating) && { transform: [{ scale: 0.95 }] }]}
                   >
                     <Text style={styles.rejectIcon}>❌</Text>
@@ -380,13 +430,14 @@ export default function ValidateQueue() {
                     <Text style={styles.editText}>✏️ ערוך</Text>
                   </Pressable>
                   <Pressable
+                    disabled={!!deletingId}
                     onPress={() => current && handleDeleteCurrent(current)}
-                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [styles.deleteBtn, (pressed || !!deletingId) && { opacity: 0.7 }]}
                   >
-                    <Text style={styles.deleteText}>מחק</Text>
+                    <Text style={styles.deleteText}>{deletingId === current?.id ? 'מוחק...' : 'מחק'}</Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => !isAnimating && handleApprove(current)}
+                    onPress={() => !isAnimating && current && handleApprove(current)}
                     style={({ pressed }) => [styles.approveBtn, (pressed || isAnimating) && { transform: [{ scale: 0.95 }] }]}
                   >
                     <Text style={styles.approveIcon}>✅</Text>
@@ -408,10 +459,11 @@ export default function ValidateQueue() {
                     <Text style={styles.editText}>✏️ ערוך</Text>
                   </Pressable>
                   <Pressable
+                    disabled={!!deletingId}
                     onPress={() => current && handleDeleteCurrent(current)}
-                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [styles.deleteBtn, (pressed || !!deletingId) && { opacity: 0.7 }]}
                   >
-                    <Text style={styles.deleteText}>מחק</Text>
+                    <Text style={styles.deleteText}>{deletingId === current?.id ? 'מוחק...' : 'מחק'}</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => !isAnimating && current && handleReApprove(current)}
@@ -432,7 +484,7 @@ export default function ValidateQueue() {
                 <Pressable
                   onPress={() => Alert.alert('אישור קבוצתי', `לאשר את כל ${pending.length} השאלות הממתינות?`, [
                     { text: 'ביטול', style: 'cancel' },
-                    { text: 'אשר הכל', onPress: () => { bulkValidate(pending.map(q => q.id), 'validated'); setCurrentIdx(0); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } },
+                    { text: 'אשר הכל', onPress: () => handleBulkApprove(pending) },
                   ])}
                   style={[styles.bulkApproveBtn, { flex: 1 }]}
                 >
@@ -443,7 +495,7 @@ export default function ValidateQueue() {
                 <Pressable
                   onPress={() => Alert.alert('אישור מחדש', `לאשר את כל ${rejected.length} השאלות הנדחות?`, [
                     { text: 'ביטול', style: 'cancel' },
-                    { text: 'אשר הכל', onPress: () => { bulkValidate(rejected.map(q => q.id), 'validated'); setCurrentIdx(0); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } },
+                    { text: 'אשר הכל', onPress: () => handleBulkApprove(rejected) },
                   ])}
                   style={[styles.bulkApproveBtn, { flex: 1, backgroundColor: Colors.successLight, borderColor: Colors.success }]}
                 >

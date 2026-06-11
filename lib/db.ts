@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 import { Question, Topic, Target, UserBadge } from '../data/types';
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
 import { logger } from '../utils/logger';
+import { isPsychotechnicQuestionReady } from '../utils/questionQuality';
 
 // ── Local storage helpers ──────────────────────────────────────────────────
 
@@ -103,7 +104,16 @@ export async function fetchQuestions(opts?: {
     logger.error('db:fetchQuestions', 'שגיאה בטעינת שאלות', error.message);
     return [];
   }
-  return (data ?? []).map(rowToQuestion);
+  const questions = (data ?? []).map(rowToQuestion);
+  if (opts?.status === 'validated') {
+    const ready = questions.filter(isPsychotechnicQuestionReady);
+    const blocked = questions.length - ready.length;
+    if (blocked > 0) {
+      logger.warn('db:fetchQuestions', `${blocked} שאלות מאושרות נחסמו כי אינן עומדות בבדיקת איכות פסיכוטכנית`);
+    }
+    return ready;
+  }
+  return questions;
 }
 
 export async function fetchAllQuestions(): Promise<Question[]> {

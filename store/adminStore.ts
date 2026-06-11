@@ -736,8 +736,8 @@ interface AdminState {
   // Actions — questions
   addQuestion: (q: Omit<Question, 'id'>) => Question;
   updateQuestion: (id: string, updates: Partial<Question>) => void;
-  deleteQuestion: (id: string) => void;
-  deleteQuestions: (ids: string[]) => void;
+  deleteQuestion: (id: string) => Promise<{ ok: boolean; error?: string }>;
+  deleteQuestions: (ids: string[]) => Promise<{ ok: boolean; error?: string }>;
   validateQuestion: (id: string, status: ValidationStatus) => void;
   bulkValidate: (ids: string[], status: ValidationStatus) => void;
   toggleSelectQuestion: (id: string) => void;
@@ -1423,25 +1423,50 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     get().logActivity(`עדכן שאלה ${id}`, 'question');
   },
 
-  deleteQuestion: (id) => {
+  deleteQuestion: async (id) => {
+    const existing = get().questions.find(q => q.id === id);
     set(s => ({
       questions: s.questions.filter(q => q.id !== id),
       selectedQuestionIds: s.selectedQuestionIds.filter(i => i !== id),
     }));
-    dbDelete(id);
+    const result = await dbDelete(id);
+    if (result.error) {
+      if (existing) {
+        set(s => ({
+          questions: s.questions.some(q => q.id === id) ? s.questions : [...s.questions, existing],
+        }));
+      }
+      logger.error('adminStore:deleteQuestion', `שגיאה במחיקת שאלה ${id}`, result.error);
+      return { ok: false, error: result.error };
+    }
     logger.info('adminStore:deleteQuestion', `שאלה נמחקה: ${id}`);
     get().logActivity(`מחק שאלה ${id}`, 'question');
+    return { ok: true };
   },
 
-  deleteQuestions: (ids) => {
+  deleteQuestions: async (ids) => {
     const idSet = new Set(ids);
+    const existing = get().questions.filter(q => idSet.has(q.id));
     set(s => ({
       questions: s.questions.filter(q => !idSet.has(q.id)),
       selectedQuestionIds: [],
     }));
-    ids.forEach(id => dbDelete(id));
+    const results = await Promise.all(ids.map(id => dbDelete(id)));
+    const failed = results
+      .map((result, index) => ({ result, id: ids[index] }))
+      .filter(row => row.result.error);
+    if (failed.length > 0) {
+      set(s => {
+        const currentIds = new Set(s.questions.map(q => q.id));
+        return { questions: [...s.questions, ...existing.filter(q => !currentIds.has(q.id))] };
+      });
+      const message = failed.map(row => `${row.id}: ${row.result.error}`).join('\n');
+      logger.error('adminStore:deleteQuestions', `שגיאה במחיקת ${failed.length} שאלות`, message);
+      return { ok: false, error: message };
+    }
     logger.info('adminStore:deleteQuestions', `${ids.length} שאלות נמחקו`);
     get().logActivity(`מחק ${ids.length} שאלות`, 'question');
+    return { ok: true };
   },
 
   validateQuestion: (id, status) => {

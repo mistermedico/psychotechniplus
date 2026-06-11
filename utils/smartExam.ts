@@ -1,5 +1,6 @@
 import { Question } from '../data/types';
 import { SmartExamTemplate, SmartRule } from '../store/adminStore';
+import { isPsychotechnicQuestionReady } from './questionQuality';
 
 export interface GeneratedExamSection {
   ruleId: string;
@@ -113,6 +114,7 @@ export function generateSmartExamQuestions(
     let pool = allQuestions.filter(q =>
       q.topicId === topicId &&
       q.validationStatus === 'validated' &&
+      isPsychotechnicQuestionReady(q) &&
       !usedIds.has(q.id) &&
       !excludedIds.has(q.id)
     );
@@ -122,12 +124,17 @@ export function generateSmartExamQuestions(
       pool = allQuestions.filter(q =>
         q.topicId === topicId &&
         q.validationStatus === 'validated' &&
+        isPsychotechnicQuestionReady(q) &&
         !excludedIds.has(q.id)
       );
     }
-    // Still empty: use all questions for this topic regardless of status
+    // Still empty: use only quality-checked validated questions for this topic.
     if (pool.length === 0) {
-      pool = allQuestions.filter(q => q.topicId === topicId);
+      pool = allQuestions.filter(q =>
+        q.topicId === topicId &&
+        q.validationStatus === 'validated' &&
+        isPsychotechnicQuestionReady(q)
+      );
     }
 
     let selected: Question[] = [];
