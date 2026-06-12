@@ -265,6 +265,9 @@ function ReviewQuestionCard({ question, index, selectedAnswerId }: { question: Q
         <Text style={reviewStyles.answerLine}>התשובה הנכונה: {correct ? correct.text || correct.id.toUpperCase() : question.correctAnswer}</Text>
       </View>
       <Text style={reviewStyles.explanationLabel}>הסבר:</Text>
+      {question.explanationImageUrl ? (
+        <Image source={{ uri: question.explanationImageUrl }} style={reviewStyles.image} resizeMode="contain" />
+      ) : null}
       <Text style={[reviewStyles.explanation, { textAlign: ta(question.explanation), writingDirection: detectDir(question.explanation) }]}>
         {question.explanation}
       </Text>

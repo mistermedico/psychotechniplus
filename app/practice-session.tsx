@@ -764,9 +764,9 @@ export default function PracticeSession() {
                 {lastAnswerCorrect ? '✅ נכון!' : '❌ לא נכון'}
               </Text>
               <Text style={styles.explanationTitle}>הסבר:</Text>
-              {question.questionType === 'shapes' && question.mediaUrl ? (
+              {question.explanationImageUrl ? (
                 <Image
-                  source={{ uri: question.mediaUrl }}
+                  source={{ uri: question.explanationImageUrl }}
                   style={styles.explanationImage}
                   resizeMode="contain"
                 />

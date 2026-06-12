@@ -97,8 +97,66 @@ function optionSvg(question: Question, option: QuestionOption, index: number): s
   `);
 }
 
+function isSpatialQuestion(question: Question): boolean {
+  const text = `${question.topicId} ${question.questionType} ${question.questionText} ${question.subtopicId ?? ''}`.toLowerCase();
+  return question.topicId === 'topic_spatial'
+    || question.questionType === 'shapes'
+    || text.includes('spatial')
+    || text.includes('shape')
+    || text.includes('צור')
+    || text.includes('מרחב')
+    || text.includes('קוב')
+    || text.includes('פריס')
+    || text.includes('סיבוב')
+    || text.includes('מראה')
+    || text.includes('מטריצ');
+}
+
+function explanationSvg(question: Question): string {
+  const seed = hashString(`${question.id}:explanation:${question.explanation}`);
+  const [primary, accent, bg] = palette(seed + 11);
+  const correct = question.options.find(option => option.id === question.correctAnswer);
+  const correctLabel = escapeXml((correct?.text || `אפשרות ${question.correctAnswer.toUpperCase()}`).replace(/\s+/g, ' ').slice(0, 58));
+  const steps = [
+    'מזהים את הכלל החזותי',
+    'משווים סיבוב / שיקוף / מיקום',
+    `התשובה המתאימה: ${correctLabel}`,
+  ];
+
+  return svgDataUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
+      <rect width="640" height="360" rx="28" fill="${bg}"/>
+      <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+      <text x="592" y="62" text-anchor="end" font-size="26" font-family="Arial" font-weight="700" fill="#F8FAFC">תרשים פתרון חזותי</text>
+      <g transform="translate(76 106)">
+        <rect x="0" y="0" width="160" height="150" rx="18" fill="#111827" stroke="#475569" stroke-width="2"/>
+        ${shapeMarkup(seed, 80, 74, 86, primary)}
+        ${shapeMarkup(seed + 1, 116, 108, 42, accent)}
+        <text x="80" y="132" text-anchor="middle" font-size="15" font-family="Arial" fill="#CBD5E1">מקור</text>
+      </g>
+      <path d="M 260 182 C 306 138, 354 138, 400 182" fill="none" stroke="#94A3B8" stroke-width="9" stroke-linecap="round"/>
+      <path d="M 400 182 l-28 -14 l9 31 z" fill="#94A3B8"/>
+      <g transform="translate(428 106) rotate(${(seed % 4) * 90} 80 74)">
+        <rect x="0" y="0" width="160" height="150" rx="18" fill="#111827" stroke="${primary}" stroke-width="3"/>
+        ${shapeMarkup(seed, 80, 74, 86, primary)}
+        ${shapeMarkup(seed + 1, 116, 108, 42, accent)}
+      </g>
+      <text x="508" y="238" text-anchor="middle" font-size="15" font-family="Arial" fill="#CBD5E1">לאחר שינוי</text>
+      <g>
+        ${steps.map((step, index) => `
+          <g transform="translate(548 ${104 + index * 42})">
+            <circle cx="0" cy="0" r="15" fill="${index === 2 ? accent : primary}"/>
+            <text x="0" y="5" text-anchor="middle" font-size="14" font-family="Arial" font-weight="700" fill="#0B1220">${index + 1}</text>
+            <text x="-24" y="5" text-anchor="end" font-size="17" font-family="Arial" fill="#F8FAFC">${escapeXml(step)}</text>
+          </g>
+        `).join('')}
+      </g>
+    </svg>
+  `);
+}
+
 export function ensureSpatialVisualAssets(question: Question): Question {
-  if (question.questionType !== 'shapes') return question;
+  if (!isSpatialQuestion(question)) return question;
 
   const options = question.options.map((option, index) => ({
     ...option,
@@ -109,6 +167,7 @@ export function ensureSpatialVisualAssets(question: Question): Question {
     ...question,
     mediaUrl: question.mediaUrl || questionSvg(question),
     mediaType: 'image',
+    explanationImageUrl: question.explanationImageUrl || explanationSvg(question),
     options,
   };
 }

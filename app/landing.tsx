@@ -103,6 +103,14 @@ export default function LandingScreen() {
   const visiblePackages = packages.length > 0 ? packages : DEFAULT_PURCHASE_PACKAGES;
 
   useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.dir = 'rtl';
+      document.documentElement.style.direction = 'rtl';
+      document.body.dir = 'rtl';
+      document.body.style.direction = 'rtl';
+      document.body.style.textAlign = 'right';
+    }
+
     if (packages.length === 0) {
       fetchOfferings().catch(() => null);
     }
@@ -179,7 +187,7 @@ export default function LandingScreen() {
       <View style={styles.orbCyan} />
       <View style={styles.orbGold} />
 
-      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
 
         {/* ─── Nav Bar ─── */}
         <Animated.View style={[styles.navShell, { opacity: navOpacity }]}>
@@ -489,7 +497,8 @@ export default function LandingScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#050816', writingDirection: 'rtl' },
+  root: { flex: 1, backgroundColor: '#050816', direction: 'rtl', writingDirection: 'rtl' },
+  safe: { flex: 1, direction: 'rtl', writingDirection: 'rtl' },
   meshGrid: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.22,
@@ -526,6 +535,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.13)',
+    direction: 'rtl',
+    writingDirection: 'rtl',
   },
   navBar: {
     flexDirection: 'row-reverse',
@@ -534,6 +545,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: 'rgba(8,10,18,0.42)',
+    direction: 'rtl',
+    writingDirection: 'rtl',
   },
   navBrand: {
     flexDirection: 'row-reverse',
@@ -570,11 +583,14 @@ const styles = StyleSheet.create({
     color: Colors.primaryLight,
   },
 
-  scroll: { paddingBottom: 48 },
+  scroll: { paddingBottom: 48, direction: 'rtl', writingDirection: 'rtl', alignItems: 'stretch' },
 
   // Hero
   hero: {
+    width: '100%',
     alignItems: 'flex-end',
+    direction: 'rtl',
+    writingDirection: 'rtl',
     paddingTop: 34,
     paddingBottom: 32,
     paddingHorizontal: 24,
@@ -627,7 +643,7 @@ const styles = StyleSheet.create({
   heroPreview: {
     width: '100%',
     maxWidth: 380,
-    alignSelf: 'stretch',
+    alignSelf: 'flex-end',
     borderRadius: Radius['2xl'],
     overflow: 'hidden',
     borderWidth: 1,
@@ -708,6 +724,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 20, borderRadius: Radius.xl, padding: 20,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     marginBottom: 36,
+    direction: 'rtl',
+    writingDirection: 'rtl',
     ...Shadow.md,
   },
   statItem: { flex: 1, alignItems: 'flex-end' },
@@ -722,7 +740,7 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, backgroundColor: Colors.border, marginVertical: 4 },
 
   // Section header reusable
-  sectionHeader: { marginBottom: 18, alignItems: 'flex-end' },
+  sectionHeader: { marginBottom: 18, alignItems: 'flex-end', direction: 'rtl', writingDirection: 'rtl' },
   sectionTag: {
     alignSelf: 'flex-end',
     backgroundColor: 'rgba(124,111,247,0.18)',
@@ -738,10 +756,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: FontFamily.bold, fontSize: FontSize['2xl'],
     color: Colors.text, textAlign: 'right', lineHeight: 30,
+    writingDirection: 'rtl',
   },
 
   // How It Works
-  howSection: { paddingHorizontal: 20, marginBottom: 36 },
+  howSection: { paddingHorizontal: 20, marginBottom: 36, direction: 'rtl', writingDirection: 'rtl' },
   howSteps: { flexDirection: 'row-reverse', gap: 10 },
   howStep: {
     flex: 1,
@@ -771,7 +790,7 @@ const styles = StyleSheet.create({
   },
 
   // Features
-  featuresSection: { paddingHorizontal: 20, marginBottom: 36 },
+  featuresSection: { paddingHorizontal: 20, marginBottom: 36, direction: 'rtl', writingDirection: 'rtl' },
   featuresGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
   featureCard: {
     width: (W - 50) / 2,
@@ -796,7 +815,7 @@ const styles = StyleSheet.create({
   },
 
   // Testimonials
-  testimonialsSection: { marginBottom: 36 },
+  testimonialsSection: { marginBottom: 36, direction: 'rtl', writingDirection: 'rtl' },
   testimonialsRow: { paddingHorizontal: 20, gap: 12, flexDirection: 'row-reverse' },
   testimonialCard: {
     width: W * 0.78,
@@ -819,7 +838,7 @@ const styles = StyleSheet.create({
   },
 
   // Pricing
-  pricingSection: { paddingHorizontal: 20, marginBottom: 36 },
+  pricingSection: { paddingHorizontal: 20, marginBottom: 36, direction: 'rtl', writingDirection: 'rtl' },
   pricingRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12 },
   pricingCard: {
     flexBasis: '47%',
@@ -883,7 +902,7 @@ const styles = StyleSheet.create({
   },
 
   // Final CTA
-  finalCtaSection: { paddingHorizontal: 20, marginBottom: 28 },
+  finalCtaSection: { paddingHorizontal: 20, marginBottom: 28, direction: 'rtl', writingDirection: 'rtl' },
   finalCtaBanner: {
     borderRadius: Radius['2xl'], padding: 28,
     borderWidth: 1, borderColor: Colors.borderGlow,
@@ -915,7 +934,7 @@ const styles = StyleSheet.create({
   },
 
   // Footer
-  footer: { paddingHorizontal: 32, alignItems: 'flex-end' },
+  footer: { paddingHorizontal: 32, alignItems: 'flex-end', direction: 'rtl', writingDirection: 'rtl' },
   footerText: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
     color: Colors.textTertiary, textAlign: 'right', lineHeight: 18,

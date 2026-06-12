@@ -66,6 +66,7 @@ export interface Question {
   readingPassage?: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'video' | 'audio';
+  explanationImageUrl?: string;
   options: QuestionOption[];
   correctAnswer: string;
   explanation: string;
