@@ -489,7 +489,7 @@ export default function LandingScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#050816' },
+  root: { flex: 1, backgroundColor: '#050816', writingDirection: 'rtl' },
   meshGrid: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.22,
@@ -574,13 +574,13 @@ const styles = StyleSheet.create({
 
   // Hero
   hero: {
-    alignItems: 'center',
+    alignItems: 'flex-end',
     paddingTop: 34,
     paddingBottom: 32,
     paddingHorizontal: 24,
   },
 
-  heroBadgeWrap: { marginBottom: 26, borderRadius: Radius.full, overflow: 'hidden' },
+  heroBadgeWrap: { marginBottom: 26, borderRadius: Radius.full, overflow: 'hidden', alignSelf: 'flex-end' },
   heroBadgeGrad: {
     paddingHorizontal: 18, paddingVertical: 8,
     borderRadius: Radius.full,
@@ -589,10 +589,10 @@ const styles = StyleSheet.create({
   },
   heroBadgeText: {
     fontFamily: FontFamily.medium, fontSize: FontSize.xs,
-    color: Colors.primaryLight, letterSpacing: 0.5,
+    color: Colors.primaryLight, letterSpacing: 0.5, textAlign: 'right', writingDirection: 'rtl',
   },
 
-  logoWrap: { marginBottom: 22, position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  logoWrap: { marginBottom: 22, position: 'relative', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end' },
   logoGrad: {
     width: 92, height: 92, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center',
@@ -606,24 +606,28 @@ const styles = StyleSheet.create({
 
   appName: {
     fontFamily: FontFamily.heading, fontSize: 40, color: Colors.text,
-    textAlign: 'center', letterSpacing: -1,
+    textAlign: 'right',
     marginBottom: 10,
+    writingDirection: 'rtl',
   },
   tagline: {
     fontFamily: FontFamily.regular, fontSize: FontSize.base,
-    color: Colors.textSecondary, textAlign: 'center',
+    color: Colors.textSecondary, textAlign: 'right',
     lineHeight: 25, maxWidth: 330,
     marginBottom: 6,
+    writingDirection: 'rtl',
   },
   subTagline: {
     fontFamily: FontFamily.medium, fontSize: FontSize.xs,
-    color: Colors.textTertiary, textAlign: 'center',
-    letterSpacing: 0.3, marginBottom: 22,
+    color: Colors.textTertiary, textAlign: 'right',
+    marginBottom: 22,
+    writingDirection: 'rtl',
   },
 
   heroPreview: {
     width: '100%',
     maxWidth: 380,
+    alignSelf: 'stretch',
     borderRadius: Radius['2xl'],
     overflow: 'hidden',
     borderWidth: 1,
@@ -675,11 +679,11 @@ const styles = StyleSheet.create({
   ctaPrimary: { borderRadius: Radius.xl, overflow: 'hidden' },
   ctaPrimaryGrad: {
     paddingVertical: 17, paddingHorizontal: 24,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'flex-end', justifyContent: 'center',
   },
   ctaPrimaryText: {
     fontFamily: FontFamily.bold, fontSize: FontSize.base,
-    color: '#fff', letterSpacing: 0.1,
+    color: '#fff', textAlign: 'right', writingDirection: 'rtl',
   },
   ctaGlow: {
     position: 'absolute', bottom: -10, left: '10%', right: '10%', height: 28,
@@ -687,12 +691,14 @@ const styles = StyleSheet.create({
   },
   ctaSecondary: {
     paddingVertical: 13, paddingHorizontal: 24,
-    borderRadius: Radius.xl, alignItems: 'center',
+    borderRadius: Radius.xl, alignItems: 'flex-end',
     width: '100%',
   },
   ctaSecondaryText: {
     fontFamily: FontFamily.medium, fontSize: FontSize.base,
     color: Colors.textSecondary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
 
   // Stats
@@ -704,14 +710,14 @@ const styles = StyleSheet.create({
     marginBottom: 36,
     ...Shadow.md,
   },
-  statItem: { flex: 1, alignItems: 'center' },
+  statItem: { flex: 1, alignItems: 'flex-end' },
   statValue: {
     fontFamily: FontFamily.bold, fontSize: 22,
-    color: Colors.primaryLight,
+    color: Colors.primaryLight, textAlign: 'right',
   },
   statLabel: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
-    color: Colors.textTertiary, marginTop: 3,
+    color: Colors.textTertiary, marginTop: 3, textAlign: 'right',
   },
   statDivider: { width: 1, backgroundColor: Colors.border, marginVertical: 4 },
 
@@ -881,7 +887,7 @@ const styles = StyleSheet.create({
   finalCtaBanner: {
     borderRadius: Radius['2xl'], padding: 28,
     borderWidth: 1, borderColor: Colors.borderGlow,
-    alignItems: 'center', overflow: 'hidden',
+    alignItems: 'flex-end', overflow: 'hidden',
   },
   finalCtaGlow: {
     ...StyleSheet.absoluteFillObject,
@@ -889,28 +895,31 @@ const styles = StyleSheet.create({
   },
   finalCtaTitle: {
     fontFamily: FontFamily.heading, fontSize: FontSize['2xl'],
-    color: Colors.text, textAlign: 'center', marginBottom: 10,
+    color: Colors.text, textAlign: 'right', marginBottom: 10,
+    writingDirection: 'rtl',
   },
   finalCtaSub: {
     fontFamily: FontFamily.regular, fontSize: FontSize.sm,
-    color: Colors.textSecondary, textAlign: 'center',
+    color: Colors.textSecondary, textAlign: 'right',
     lineHeight: 20, marginBottom: 24, maxWidth: 280,
+    writingDirection: 'rtl',
   },
   finalCtaBtn: { borderRadius: Radius.xl, overflow: 'hidden' },
   finalCtaBtnGrad: {
     paddingVertical: 16, paddingHorizontal: 32,
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   finalCtaBtnText: {
     fontFamily: FontFamily.bold, fontSize: FontSize.lg,
-    color: '#fff', letterSpacing: 0.2,
+    color: '#fff', textAlign: 'right', writingDirection: 'rtl',
   },
 
   // Footer
-  footer: { paddingHorizontal: 32, alignItems: 'center' },
+  footer: { paddingHorizontal: 32, alignItems: 'flex-end' },
   footerText: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
-    color: Colors.textTertiary, textAlign: 'center', lineHeight: 18,
+    color: Colors.textTertiary, textAlign: 'right', lineHeight: 18,
+    writingDirection: 'rtl',
   },
   footerLink: { color: Colors.primaryLight, fontFamily: FontFamily.medium },
 });

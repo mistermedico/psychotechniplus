@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Animated, Share,
+  View, Text, StyleSheet, ScrollView, Pressable, Animated, Share, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,9 @@ import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { getTopicById } from '../data/mockData';
 import { getPerformanceLevel, formatTime } from '../utils/scoring';
 import { StatCard } from '../components/StatCard';
+import { usePracticeStore } from '../store/practiceStore';
+import { Question } from '../data/types';
+import { detectDir, textAlign as ta } from '../utils/textDirection';
 
 export default function Results() {
   const insets = useSafeAreaInsets();
@@ -25,6 +28,7 @@ export default function Results() {
     difficultyScore: string;
     speedScore: string;
     stability: string;
+    sessionId?: string;
   }>();
 
   const score = parseInt(params.score ?? '0');
@@ -37,6 +41,9 @@ export default function Results() {
   const stability = parseInt(params.stability ?? '100');
 
   const topic = getTopicById(params.topicId ?? '');
+  const completedSession = usePracticeStore(s => s.completedSession);
+  const reviewSession = completedSession?.id === params.sessionId ? completedSession : null;
+  const isSimulationReview = reviewSession?.mode === 'simulation';
   const { label, color } = getPerformanceLevel(score);
 
   const [displayScore, setDisplayScore] = useState(0);
@@ -165,6 +172,25 @@ export default function Results() {
             </View>
           </View>
 
+          {isSimulationReview && (
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionSub}>REVIEW</Text>
+                <Text style={styles.sectionTitle}>פתרונות והסברים</Text>
+              </View>
+              <View style={styles.reviewList}>
+                {reviewSession.questions.map((q, index) => (
+                  <ReviewQuestionCard
+                    key={q.id}
+                    question={q}
+                    index={index}
+                    selectedAnswerId={reviewSession.answers.find(a => a.questionId === q.id)?.selectedAnswerId ?? ''}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionSub}>NEXT STEPS</Text>
             <Text style={styles.sectionTitle}>מה הלאה?</Text>
@@ -213,6 +239,36 @@ export default function Results() {
       </View>
     </SafeAreaView>
     </LinearGradient>
+  );
+}
+
+function ReviewQuestionCard({ question, index, selectedAnswerId }: { question: Question; index: number; selectedAnswerId: string }) {
+  const selected = question.options.find(o => o.id === selectedAnswerId);
+  const correct = question.options.find(o => o.id === question.correctAnswer);
+  const isCorrect = selectedAnswerId === question.correctAnswer;
+  return (
+    <View style={reviewStyles.card}>
+      <View style={reviewStyles.header}>
+        <Text style={[reviewStyles.status, { color: isCorrect ? Colors.success : Colors.danger }]}>
+          {isCorrect ? 'נכון' : selectedAnswerId ? 'לא נכון' : 'דולג'}
+        </Text>
+        <Text style={reviewStyles.title}>שאלה {index + 1}</Text>
+      </View>
+      <Text style={[reviewStyles.questionText, { textAlign: ta(question.questionText), writingDirection: detectDir(question.questionText) }]}>
+        {question.questionText}
+      </Text>
+      {question.mediaUrl && question.mediaType === 'image' ? (
+        <Image source={{ uri: question.mediaUrl }} style={reviewStyles.image} resizeMode="contain" />
+      ) : null}
+      <View style={reviewStyles.answerBox}>
+        <Text style={reviewStyles.answerLine}>התשובה שלך: {selected ? selected.text || selected.id.toUpperCase() : 'לא נבחרה תשובה'}</Text>
+        <Text style={reviewStyles.answerLine}>התשובה הנכונה: {correct ? correct.text || correct.id.toUpperCase() : question.correctAnswer}</Text>
+      </View>
+      <Text style={reviewStyles.explanationLabel}>הסבר:</Text>
+      <Text style={[reviewStyles.explanation, { textAlign: ta(question.explanation), writingDirection: detectDir(question.explanation) }]}>
+        {question.explanation}
+      </Text>
+    </View>
   );
 }
 
@@ -311,6 +367,8 @@ const styles = StyleSheet.create({
   percentileMarker: { position: 'absolute', top: -20, transform: [{ translateX: -16 }] },
   percentileMarkerText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
 
+  reviewList: { paddingHorizontal: 20, gap: 12, marginBottom: 16 },
+
   recsContainer: { paddingHorizontal: 20, marginBottom: 8 },
 
   bottomCtas: { flexDirection: 'row-reverse', paddingHorizontal: 20, paddingTop: 14, gap: 12, backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border },
@@ -319,4 +377,24 @@ const styles = StyleSheet.create({
   againBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
   againBtnGrad: { paddingVertical: 17, alignItems: 'center' },
   againBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+});
+
+const reviewStyles = StyleSheet.create({
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.13)',
+    padding: 16,
+    ...Shadow.sm,
+  },
+  header: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  title: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
+  status: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
+  questionText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.base, color: Colors.text, lineHeight: 24, marginBottom: 10 },
+  image: { width: '100%', height: 180, borderRadius: Radius.lg, backgroundColor: Colors.surfaceSecondary, marginBottom: 10 },
+  answerBox: { backgroundColor: 'rgba(15,23,42,0.72)', borderRadius: Radius.lg, padding: 12, gap: 6, marginBottom: 10 },
+  answerLine: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', writingDirection: 'rtl' },
+  explanationLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primaryLight, textAlign: 'right', marginBottom: 4 },
+  explanation: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, lineHeight: 22 },
 });

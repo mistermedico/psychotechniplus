@@ -57,6 +57,7 @@ export default function PracticeSession() {
   const [lastAnswerCorrect, setLastAnswerCorrect] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const [timer, setTimer] = useState(practiceSettings.speedModeSecondsPerQuestion);
+  const [simulationRemaining, setSimulationRemaining] = useState(0);
   const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(0);
   const [loadError, setLoadError] = useState(false);
 
@@ -73,6 +74,7 @@ export default function PracticeSession() {
   const [showRestScreen, setShowRestScreen] = useState(false);
   const [restCountdown, setRestCountdown] = useState(0);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isSimulation = mode === 'simulation' && !!templateId;
 
   const explanationAnim = useRef(new Animated.Value(0)).current;
@@ -86,7 +88,14 @@ export default function PracticeSession() {
   const isSpeedMode = mode === 'speed';
 
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice OR admin forced showTimerAlways)
-  const showTimer = isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
+  const showTimer = isSimulation || isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
+
+  const formatClock = (seconds: number) => {
+    const safe = Math.max(0, seconds);
+    const mins = Math.floor(safe / 60);
+    const secs = safe % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -133,6 +142,11 @@ export default function PracticeSession() {
         return;
       }
       setExamSections(generated.sections);
+      const totalSimulationSeconds = generated.sections.reduce(
+        (sum, section) => sum + section.timeLimitSeconds,
+        0
+      ) || Math.max(1, generated.estimatedMinutes) * 60;
+      setSimulationRemaining(totalSimulationSeconds);
       const firstSection = generated.sections[0];
       startSession({
         targetId: targetId ?? '',
@@ -222,8 +236,28 @@ export default function PracticeSession() {
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
       if (restTimerRef.current) clearInterval(restTimerRef.current);
+      if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Full simulation timer. In simulations, answers/explanations are revealed only on the results screen.
+  useEffect(() => {
+    if (!isSimulation || !session || simulationRemaining <= 0) return;
+    if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+    simulationTimerRef.current = setInterval(() => {
+      setSimulationRemaining(prev => {
+        if (prev <= 1) {
+          if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+          finishSession();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+    };
+  }, [isSimulation, session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Speed mode timer (only in speed mode — showTimerInPractice shows timer but doesn't auto-skip)
   useEffect(() => {
@@ -277,7 +311,7 @@ export default function PracticeSession() {
 
   const handleConfirm = () => {
     if (!selectedId || revealed || !session) return;
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (!isSimulation && timerRef.current) clearInterval(timerRef.current);
 
     const { isCorrect } = submitAnswer(selectedId);
 
@@ -291,6 +325,12 @@ export default function PracticeSession() {
     const question = getCurrentQuestion();
     if (question) {
       recordAnswer(question.topicId, question.difficulty, isCorrect);
+    }
+
+    if (isSimulation) {
+      resetQuestionState();
+      advanceOrEnd();
+      return;
     }
 
     setLastAnswerCorrect(isCorrect);
@@ -325,7 +365,7 @@ export default function PracticeSession() {
   };
 
   const handleSkip = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (!isSimulation && timerRef.current) clearInterval(timerRef.current);
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     resetQuestionState();
     skipQuestion();
@@ -383,6 +423,7 @@ export default function PracticeSession() {
   const finishSession = () => {
     if (finishingRef.current) return;
     finishingRef.current = true;
+    if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
     const finished = endSession();
     if (!finished) { finishingRef.current = false; return; }
     const scores = calcAllScores(finished.answers);
@@ -439,15 +480,23 @@ export default function PracticeSession() {
   };
 
   const handleQuit = () => {
+    const quit = () => {
+      if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+      endSession();
+      router.replace('/(tabs)');
+    };
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      if (window.confirm('לצאת מהתרגול? ההתקדמות הנוכחית תיעצר.')) quit();
+      return;
+    }
     Alert.alert('יציאה מהתרגול', 'האם לצאת ולשמור את ההתקדמות?', [
       { text: 'ביטול', style: 'cancel' },
       {
         text: 'יציאה',
         style: 'destructive',
-        onPress: () => {
-          endSession();
-          router.back();
-        },
+        onPress: quit,
       },
     ]);
   };
@@ -587,9 +636,11 @@ export default function PracticeSession() {
   const correct = session.answers.filter(a => a.isCorrect).length;
 
   // Timer display values
-  const displayTimer = isSpeedMode ? timer : practiceTimer;
+  const displayTimer = isSimulation ? simulationRemaining : isSpeedMode ? timer : practiceTimer;
   const timerColor = isSpeedMode
     ? (timer <= 10 ? Colors.danger : timer <= 20 ? Colors.warning : Colors.success)
+    : isSimulation
+    ? (simulationRemaining <= 60 ? Colors.danger : simulationRemaining <= 180 ? Colors.warning : Colors.success)
     : Colors.textSecondary;
 
   return (
@@ -614,9 +665,9 @@ export default function PracticeSession() {
         </View>
 
         {showTimer ? (
-          <View style={[styles.timerBadge, { borderColor: timerColor }]}>
+          <View style={[styles.timerBadge, isSimulation && styles.simulationTimerBadge, { borderColor: timerColor }]}>
             <Text style={[styles.timerText, { color: timerColor }]}>
-              {displayTimer}ש׳
+              {isSimulation ? formatClock(displayTimer) : `${displayTimer}ש׳`}
             </Text>
           </View>
         ) : (
@@ -847,6 +898,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
     ...Shadow.md,
+  },
+  simulationTimerBadge: {
+    width: 78,
   },
   explanationGrad: { padding: 18 },
   explanationResult: {

@@ -17,6 +17,7 @@ interface ActiveSession {
 
 interface PracticeState {
   session: ActiveSession | null;
+  completedSession: ActiveSession | null;
   lastCompletedSessionId: string | null;
 
   startSession: (config: {
@@ -43,6 +44,7 @@ interface PracticeState {
 
 export const usePracticeStore = create<PracticeState>((set, get) => ({
   session: null,
+  completedSession: null,
   lastCompletedSessionId: null,
 
   startSession: ({ targetId, topicId, mode, questions, initialLevel = 'beginner' }) => {
@@ -152,6 +154,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     if (!session) return null;
     set(state => ({
       lastCompletedSessionId: state.session?.id ?? null,
+      completedSession: state.session,
       session: null,
     }));
     return session;
