@@ -97,6 +97,10 @@ export default function PracticeSession() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const exitToPractice = useCallback(() => {
+    router.replace('/(tabs)/practice');
+  }, []);
+
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
@@ -119,13 +123,13 @@ export default function PracticeSession() {
     if (isSimulation && templateId) {
       if (!canAccessMode('simulation', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)) {
         Alert.alert('פרימיום בלבד', 'מבחן זה נעול לפי הגדרות המנהל.');
-        router.back();
+        exitToPractice();
         return;
       }
       const template = templates.find(t => t.id === templateId);
       if (!template) {
         Alert.alert('שגיאה', 'תבנית המבחן לא נמצאה');
-        router.back();
+        exitToPractice();
         return;
       }
       const generated = generateSmartExamQuestions(
@@ -138,7 +142,7 @@ export default function PracticeSession() {
       );
       if (generated.allQuestions.length === 0) {
         Alert.alert('שגיאה', 'לא נמצאו שאלות מתאימות למבחן זה. נסה לאמת שאלות קודם.');
-        router.back();
+        exitToPractice();
         return;
       }
       setExamSections(generated.sections);
@@ -162,12 +166,12 @@ export default function PracticeSession() {
     const userLevel = getTopicLevel(topicId ?? '');
     if (topic && !canAccessTopic(topic, isPremium, premiumConfig)) {
       Alert.alert('פרימיום בלבד', 'הנושא הזה נעול לפי הגדרות המנהל.');
-      router.back();
+      exitToPractice();
       return;
     }
     if (!canAccessMode(mode ?? 'practice', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)) {
       Alert.alert('פרימיום בלבד', 'מצב התרגול הזה נעול לפי הגדרות המנהל.');
-      router.back();
+      exitToPractice();
       return;
     }
 
@@ -181,14 +185,14 @@ export default function PracticeSession() {
       if (cancelled) return;
       if (questions.length === 0) {
         Alert.alert('שגיאה', 'לא נמצאו שאלות לנושא זה');
-        router.back();
+        exitToPractice();
         return;
       }
       // Apply difficulty filter if provided
       let filtered = questions.filter(q => canAccessQuestion(q, isPremium));
       if (filtered.length === 0) {
         Alert.alert('פרימיום בלבד', 'כל השאלות הזמינות לנושא הזה נעולות כרגע.');
-        router.back();
+        exitToPractice();
         return;
       }
       if (difficulty === 'easy') filtered = questions.filter(q => q.difficulty <= 4);
@@ -198,7 +202,7 @@ export default function PracticeSession() {
       if (filtered.length === 0) filtered = questions.filter(q => canAccessQuestion(q, isPremium)); // fallback to all allowed
       if (filtered.length === 0) {
         Alert.alert('פרימיום בלבד', 'אין שאלות זמינות להרשאה הנוכחית.');
-        router.back();
+        exitToPractice();
         return;
       }
       // Apply free user difficulty cap
@@ -615,7 +619,7 @@ export default function PracticeSession() {
           {loadError ? (
             <>
               <Text style={styles.loadingText}>לא ניתן לטעון שאלות. בדוק חיבור לאינטרנט.</Text>
-              <Pressable onPress={() => router.back()} style={styles.loadErrorBtn}>
+              <Pressable onPress={exitToPractice} style={styles.loadErrorBtn}>
                 <Text style={styles.loadErrorBtnText}>חזרה</Text>
               </Pressable>
             </>
