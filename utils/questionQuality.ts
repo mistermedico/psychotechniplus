@@ -1,7 +1,7 @@
 import { Question, QuestionType } from '../data/types';
 
 export function auditPsychotechnicQuestion(
-  q: Pick<Question, 'questionText' | 'targetIds' | 'topicId' | 'questionType' | 'options' | 'correctAnswer' | 'explanation' | 'difficulty'>
+  q: Pick<Question, 'questionText' | 'targetIds' | 'topicId' | 'questionType' | 'options' | 'correctAnswer' | 'explanation' | 'difficulty' | 'mediaUrl'>
 ): string[] {
   const issues: string[] = [];
   const allowedTypes: QuestionType[] = [
@@ -29,6 +29,10 @@ export function auditPsychotechnicQuestion(
   if (correctOptions.length !== 1) issues.push('חייבת להיות תשובה נכונה אחת בלבד.');
   if (correctOptions.length === 1 && q.correctAnswer !== correctOptions[0].id) issues.push('שדה התשובה הנכונה לא תואם לאפשרות המסומנת.');
   if (!q.explanation.trim() || q.explanation.trim().length < 25) issues.push('חסר הסבר מקיף מספיק למשתמש.');
+  if (q.questionType === 'shapes') {
+    if (!q.mediaUrl) issues.push('שאלת צורות/מרחב חייבת לכלול תמונה מרכזית לשאלה.');
+    if (!cleanOptions.every(o => !!o.imageUrl)) issues.push('בשאלת צורות/מרחב לכל תשובה חייבת להיות תמונה.');
+  }
 
   return issues;
 }

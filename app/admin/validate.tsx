@@ -890,6 +890,9 @@ function QuestionPreviewCard({ question }: { question: Question }) {
               >
                 <Text style={[cardStyles.optionId, opt.isCorrect && { color: Colors.success }]}>{opt.id.toUpperCase()}</Text>
                 <Text style={[cardStyles.optionText, { textAlign: ta(opt.text), writingDirection: optDir }]}>{opt.text}</Text>
+                {opt.imageUrl ? (
+                  <Image source={{ uri: opt.imageUrl }} style={cardStyles.optionImage} resizeMode="contain" />
+                ) : null}
                 {opt.isCorrect && <Text style={cardStyles.correctMark}>✓</Text>}
               </View>
             );
@@ -899,6 +902,9 @@ function QuestionPreviewCard({ question }: { question: Question }) {
         {question.explanation ? (
           <View style={cardStyles.explanation}>
             <Text style={cardStyles.explanationLabel}>💡 הסבר:</Text>
+            {question.questionType === 'shapes' && question.mediaUrl ? (
+              <Image source={{ uri: question.mediaUrl }} style={cardStyles.explanationImage} resizeMode="contain" />
+            ) : null}
             <Text style={[cardStyles.explanationText, { textAlign: ta(question.explanation), writingDirection: detectDir(question.explanation) }]}>
               {question.explanation}
             </Text>
@@ -948,9 +954,11 @@ const cardStyles = StyleSheet.create({
   optionRow: { flexDirection: 'row-reverse', alignItems: 'center', borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, padding: 10, gap: 8, backgroundColor: Colors.surfaceSecondary },
   optionId: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textSecondary, width: 20, textAlign: 'center' },
   optionText: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text },
+  optionImage: { width: 78, height: 58, borderRadius: Radius.md, backgroundColor: Colors.surface },
   correctMark: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.success },
   explanation: { backgroundColor: Colors.primaryLighter, borderRadius: Radius.lg, padding: 10 },
   explanationLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'right', marginBottom: 4 },
+  explanationImage: { width: '100%', height: 150, borderRadius: Radius.md, marginBottom: 8, backgroundColor: Colors.surface },
   explanationText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, lineHeight: 20 },
 });
 

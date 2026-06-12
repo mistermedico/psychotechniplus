@@ -5,6 +5,7 @@ import { Question, Topic, Target, UserBadge } from '../data/types';
 import { QUESTIONS, TOPICS, TARGETS } from '../data/mockData';
 import { logger } from '../utils/logger';
 import { isPsychotechnicQuestionReady } from '../utils/questionQuality';
+import { ensureSpatialVisualAssets } from '../utils/spatialVisualAssets';
 
 // ── Local storage helpers ──────────────────────────────────────────────────
 
@@ -338,30 +339,31 @@ function targetToRow(t: Target) {
 }
 
 function questionToRow(q: Question) {
+  const prepared = ensureSpatialVisualAssets(q);
   return {
-    id: q.id,
-    target_ids: q.targetIds,
-    topic_id: q.topicId,
-    subtopic_id: q.subtopicId ?? null,
-    question_type: q.questionType,
-    question_text: q.questionText,
-    reading_passage: q.readingPassage ?? null,
-    media_url: q.mediaUrl ?? null,
-    media_type: q.mediaType ?? null,
-    options: q.options,
-    correct_answer: q.correctAnswer,
-    explanation: q.explanation,
-    difficulty: q.difficulty,
-    psychometric_stats: q.psychometricStats,
-    access_level: q.accessLevel,
-    validation_status: q.validationStatus,
-    smart_practice_eligible: q.smartPracticeEligible,
-    general_practice_eligible: q.generalPracticeEligible,
+    id: prepared.id,
+    target_ids: prepared.targetIds,
+    topic_id: prepared.topicId,
+    subtopic_id: prepared.subtopicId ?? null,
+    question_type: prepared.questionType,
+    question_text: prepared.questionText,
+    reading_passage: prepared.readingPassage ?? null,
+    media_url: prepared.mediaUrl ?? null,
+    media_type: prepared.mediaType ?? null,
+    options: prepared.options,
+    correct_answer: prepared.correctAnswer,
+    explanation: prepared.explanation,
+    difficulty: prepared.difficulty,
+    psychometric_stats: prepared.psychometricStats,
+    access_level: prepared.accessLevel,
+    validation_status: prepared.validationStatus,
+    smart_practice_eligible: prepared.smartPracticeEligible,
+    general_practice_eligible: prepared.generalPracticeEligible,
   };
 }
 
 function rowToQuestion(row: any): Question {
-  return {
+  return ensureSpatialVisualAssets({
     id: row.id,
     targetIds: row.target_ids ?? [],
     topicId: row.topic_id,
@@ -380,7 +382,7 @@ function rowToQuestion(row: any): Question {
     validationStatus: row.validation_status ?? 'draft',
     smartPracticeEligible: row.smart_practice_eligible ?? false,
     generalPracticeEligible: row.general_practice_eligible ?? true,
-  };
+  });
 }
 
 function rowToTarget(row: any): Target {

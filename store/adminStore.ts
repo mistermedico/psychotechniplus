@@ -4,6 +4,7 @@ import { TOPICS, TARGETS, QUESTIONS } from '../data/mockData';
 import { fetchAllQuestions, fetchTargets, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTarget as dbUpsertTarget, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics, saveAdminState, loadAdminState } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
+import { ensureSpatialVisualAssets } from '../utils/spatialVisualAssets';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
@@ -1222,7 +1223,7 @@ const SEED_TEMPLATES: SmartExamTemplate[] = [
 export const useAdminStore = create<AdminState>((set, get) => ({
   isAdmin: false,
   freePracticeLimit: 30,
-  questions: [...LOCAL_QUESTION_BANK],
+  questions: LOCAL_QUESTION_BANK.map(ensureSpatialVisualAssets),
   topics: [...TOPICS],
   targets: [...TARGETS],
   templates: SEED_TEMPLATES,
@@ -1400,7 +1401,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   addQuestion: (q) => {
-    const newQ: Question = { ...q, id: `q_admin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` };
+    const newQ: Question = ensureSpatialVisualAssets({ ...q, id: `q_admin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` });
     set(s => ({ questions: [...s.questions, newQ] }));
     dbUpsert(newQ).then(r => {
       if (r.error) logger.error('adminStore:addQuestion', `שגיאה בשמירת שאלה חדשה`, r.error);
@@ -1412,7 +1413,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   updateQuestion: (id, updates) => {
     set(s => {
-      const updated = s.questions.map(q => (q.id === id ? { ...q, ...updates } : q));
+      const updated = s.questions.map(q => (q.id === id ? ensureSpatialVisualAssets({ ...q, ...updates }) : q));
       const q = updated.find(x => x.id === id);
       if (q) dbUpsert(q).then(r => {
         if (r.error) logger.error('adminStore:updateQuestion', `שגיאה בעדכון שאלה ${id}`, r.error);
@@ -1473,7 +1474,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => {
       const updated = s.questions.map(q =>
         q.id === id
-          ? { ...q, validationStatus: status, smartPracticeEligible: status === 'validated', generalPracticeEligible: status === 'validated' }
+          ? ensureSpatialVisualAssets({ ...q, validationStatus: status, smartPracticeEligible: status === 'validated', generalPracticeEligible: status === 'validated' })
           : q
       );
       const q = updated.find(x => x.id === id);
@@ -1492,7 +1493,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => {
       const updated = s.questions.map(q =>
         idSet.has(q.id)
-          ? { ...q, validationStatus: status, generalPracticeEligible: status === 'validated', smartPracticeEligible: status === 'validated' }
+          ? ensureSpatialVisualAssets({ ...q, validationStatus: status, generalPracticeEligible: status === 'validated', smartPracticeEligible: status === 'validated' })
           : q
       );
       toSync = updated.filter(q => idSet.has(q.id));

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView,
-  Animated, Alert, Dimensions, TextInput, Modal, KeyboardAvoidingView, Platform,
+  Animated, Alert, Dimensions, TextInput, Modal, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -709,6 +709,13 @@ export default function PracticeSession() {
                 {lastAnswerCorrect ? '✅ נכון!' : '❌ לא נכון'}
               </Text>
               <Text style={styles.explanationTitle}>הסבר:</Text>
+              {question.questionType === 'shapes' && question.mediaUrl ? (
+                <Image
+                  source={{ uri: question.mediaUrl }}
+                  style={styles.explanationImage}
+                  resizeMode="contain"
+                />
+              ) : null}
               <Text style={styles.explanationText}>{question.explanation}</Text>
             </LinearGradient>
           </Animated.View>
@@ -855,6 +862,13 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'right',
     marginBottom: 6,
+  },
+  explanationImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: Radius.lg,
+    marginBottom: 10,
+    backgroundColor: Colors.surfaceSecondary,
   },
   explanationText: {
     fontFamily: FontFamily.regular,
