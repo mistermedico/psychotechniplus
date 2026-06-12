@@ -1,7 +1,10 @@
 import { Question, QuestionOption } from '../data/types';
 
 function svgDataUri(svg: string): string {
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  const encoded = typeof btoa === 'function'
+    ? btoa(unescape(encodeURIComponent(svg)))
+    : (globalThis as any).Buffer.from(svg, 'utf8').toString('base64');
+  return `data:image/svg+xml;base64,${encoded}`;
 }
 
 function escapeXml(value: string): string {
@@ -41,63 +44,79 @@ function shapeMarkup(kind: number, x: number, y: number, size: number, fill: str
   return `<path d="M ${x - half} ${y} H ${x + half} M ${x} ${y - half} V ${y + half}" stroke="${fill}" stroke-width="16" stroke-linecap="round"/>`;
 }
 
+function visualMode(question: Question): 'series' | 'analogy' | 'rotation' | 'cube' {
+  const text = `${question.questionText} ${question.subtopicId ?? ''}`.toLowerCase();
+  if (text.includes('analog') || text.includes('אנלוג')) return 'analogy';
+  if (text.includes('rotate') || text.includes('rotation') || text.includes('סיבוב')) return 'rotation';
+  if (text.includes('cube') || text.includes('קוב') || text.includes('פריס')) return 'cube';
+  return 'series';
+}
+
+function sequenceShape(seed: number, index: number, x: number, y: number, size: number, primary: string, accent: string): string {
+  const rotation = ((seed + index) % 4) * 90;
+  const scale = 0.78 + ((seed + index) % 3) * 0.1;
+  return `
+    <g transform="translate(${x} ${y}) rotate(${rotation}) scale(${scale})">
+      ${shapeMarkup(seed + index, 0, 0, size, primary)}
+      ${shapeMarkup(seed + index + 2, size * 0.34, size * 0.32, size * 0.34, accent)}
+    </g>
+  `;
+}
+
 function questionSvg(question: Question): string {
   const seed = hashString(`${question.id}:${question.questionText}`);
   const [primary, accent, bg] = palette(seed);
-  const label = escapeXml(question.questionText.replace(/\s+/g, ' ').slice(0, 88));
-  const title = question.questionText.includes('קוב') || question.questionText.includes('פריס')
-    ? 'תרשים קוביות / פריסה'
-    : question.questionText.includes('מטריצ') || question.questionText.includes('סדרה')
-      ? 'מטריצת צורות'
-      : 'חשיבה מרחבית';
-  const cells = Array.from({ length: 9 }, (_, i) => {
-    const cx = 86 + (i % 3) * 92;
-    const cy = 88 + Math.floor(i / 3) * 72;
-    const fill = i === 8 ? '#111827' : (i + seed) % 2 === 0 ? primary : accent;
-    const mark = i === 8
-      ? `<text x="${cx}" y="${cy + 9}" text-anchor="middle" font-size="34" font-family="Arial" font-weight="700" fill="#F8FAFC">?</text>`
-      : shapeMarkup(seed + i, cx, cy, 40, fill);
-    return `<g><rect x="${cx - 34}" y="${cy - 30}" width="68" height="60" rx="10" fill="rgba(255,255,255,0.06)" stroke="#334155"/>${mark}</g>`;
+  const mode = visualMode(question);
+  const count = mode === 'analogy' ? 5 : 6;
+  const cells = Array.from({ length: count }, (_, i) => {
+    const cx = 88 + i * 88;
+    const isQuestionMark = i === count - 1;
+    const mark = isQuestionMark
+      ? `<text x="${cx}" y="190" text-anchor="middle" font-size="58" font-family="Arial" font-weight="700" fill="#F8FAFC">?</text>`
+      : sequenceShape(seed, i, cx, 170, 46, (i + seed) % 2 === 0 ? primary : accent, (i + seed) % 2 === 0 ? accent : primary);
+    const arrow = i > 0 && !isQuestionMark
+      ? `<path d="M ${cx - 58} 170 H ${cx - 34}" stroke="#94A3B8" stroke-width="5" stroke-linecap="round"/><path d="M ${cx - 34} 170 l-10 -7 v14 z" fill="#94A3B8"/>`
+      : '';
+    return `${arrow}<g><rect x="${cx - 34}" y="124" width="68" height="92" rx="14" fill="#111827" stroke="#334155" stroke-width="2"/>${mark}</g>`;
   }).join('');
+
+  const relation = mode === 'analogy'
+    ? `<path d="M 175 105 H 245" stroke="#22D3EE" stroke-width="7" stroke-linecap="round"/><path d="M 245 105 l-16 -10 v20 z" fill="#22D3EE"/><path d="M 352 105 H 422" stroke="#22D3EE" stroke-width="7" stroke-linecap="round"/><path d="M 422 105 l-16 -10 v20 z" fill="#22D3EE"/>`
+    : mode === 'rotation'
+      ? `<path d="M 266 92 C 330 42, 412 50, 460 105" fill="none" stroke="#22D3EE" stroke-width="8" stroke-linecap="round"/><path d="M 460 105 l-28 -7 l16 25 z" fill="#22D3EE"/>`
+      : mode === 'cube'
+        ? `<g transform="translate(450 66)"><path d="M0 40 L42 16 L84 40 L42 64 Z" fill="${primary}" stroke="#E5E7EB" stroke-width="3"/><path d="M0 40 L42 64 V112 L0 88 Z" fill="${accent}" stroke="#E5E7EB" stroke-width="3"/><path d="M84 40 L42 64 V112 L84 88 Z" fill="#38BDF8" stroke="#E5E7EB" stroke-width="3"/></g>`
+        : '';
 
   return svgDataUri(`
     <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
       <rect width="640" height="360" rx="28" fill="${bg}"/>
       <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
-      <text x="592" y="58" text-anchor="end" font-size="25" font-family="Arial" font-weight="700" fill="#F8FAFC">${escapeXml(title)}</text>
-      <text x="592" y="88" text-anchor="end" font-size="17" font-family="Arial" fill="#CBD5E1">${label}</text>
-      <g transform="translate(232 96) rotate(${seed % 4 * 90} 120 80)">
-        ${shapeMarkup(seed, 120, 80, 92, primary)}
-        ${shapeMarkup(seed + 2, 194, 132, 54, accent)}
-        <path d="M 36 184 C 96 230, 206 228, 274 184" fill="none" stroke="#94A3B8" stroke-width="8" stroke-linecap="round"/>
-        <path d="M 274 184 l-28 -12 l8 30 z" fill="#94A3B8"/>
-      </g>
+      <g>${relation}</g>
       <g>${cells}</g>
+      <text x="320" y="286" text-anchor="middle" font-size="18" font-family="Arial" font-weight="700" fill="#CBD5E1">בחרו את הצורה המתאימה</text>
     </svg>
   `);
 }
 
 function optionSvg(question: Question, option: QuestionOption, index: number): string {
-  const seed = hashString(`${question.id}:${option.id}:${option.text}`);
+  const seed = hashString(`${question.id}:${option.id}:${option.text}:${index}`);
   const [primary, accent, bg] = palette(seed + index);
-  const label = escapeXml((option.text || `אפשרות ${option.id.toUpperCase()}`).replace(/\s+/g, ' ').slice(0, 52));
   const rotation = (seed % 4) * 90;
   return svgDataUri(`
     <svg xmlns="http://www.w3.org/2000/svg" width="420" height="300" viewBox="0 0 420 300">
       <rect width="420" height="300" rx="24" fill="${bg}"/>
       <rect x="20" y="20" width="380" height="260" rx="18" fill="#0B1220" stroke="#334155" stroke-width="2"/>
-      <text x="374" y="54" text-anchor="end" font-size="22" font-family="Arial" font-weight="700" fill="#F8FAFC">אפשרות ${escapeXml(option.id.toUpperCase())}</text>
-      <text x="374" y="80" text-anchor="end" font-size="15" font-family="Arial" fill="#CBD5E1">${label}</text>
-      <g transform="translate(210 166) rotate(${rotation})">
-        ${shapeMarkup(seed, 0, 0, 96, primary)}
-        ${shapeMarkup(seed + 1, 58, 46, 48, accent)}
-        <path d="M -96 94 H 96" stroke="#94A3B8" stroke-width="8" stroke-linecap="round"/>
+      <g transform="translate(210 146) rotate(${rotation})">
+        ${shapeMarkup(seed, 0, 0, 106, primary)}
+        ${shapeMarkup(seed + index + 1, 62, 48, 48, accent)}
+        <path d="M -104 104 H 104" stroke="#94A3B8" stroke-width="8" stroke-linecap="round"/>
       </g>
     </svg>
   `);
 }
 
-function isSpatialQuestion(question: Question): boolean {
+export function isSpatialQuestion(question: Question): boolean {
   const text = `${question.topicId} ${question.questionType} ${question.questionText} ${question.subtopicId ?? ''}`.toLowerCase();
   return question.topicId === 'topic_spatial'
     || question.questionType === 'shapes'
@@ -116,7 +135,7 @@ function explanationSvg(question: Question): string {
   const seed = hashString(`${question.id}:explanation:${question.explanation}`);
   const [primary, accent, bg] = palette(seed + 11);
   const correct = question.options.find(option => option.id === question.correctAnswer);
-  const correctLabel = escapeXml((correct?.text || `אפשרות ${question.correctAnswer.toUpperCase()}`).replace(/\s+/g, ' ').slice(0, 58));
+  const correctLabel = escapeXml((correct?.id || question.correctAnswer).toUpperCase());
   const steps = [
     'מזהים את הכלל החזותי',
     'משווים סיבוב / שיקוף / מיקום',
@@ -160,14 +179,17 @@ export function ensureSpatialVisualAssets(question: Question): Question {
 
   const options = question.options.map((option, index) => ({
     ...option,
-    imageUrl: option.imageUrl || optionSvg(question, option, index),
+    text: '',
+    imageUrl: option.imageUrl?.trim() || optionSvg(question, option, index),
   }));
 
   return {
     ...question,
-    mediaUrl: question.mediaUrl || questionSvg(question),
+    questionType: 'shapes',
+    questionText: 'בחרו את התמונה המתאימה.',
+    mediaUrl: question.mediaUrl?.trim() || questionSvg(question),
     mediaType: 'image',
-    explanationImageUrl: question.explanationImageUrl || explanationSvg(question),
+    explanationImageUrl: question.explanationImageUrl?.trim() || explanationSvg(question),
     options,
   };
 }

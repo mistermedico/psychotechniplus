@@ -7,6 +7,7 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../constants/theme';
 import { useSettingsStore, FontSizeOption } from '../store/settingsStore';
 import { detectDir, textAlign } from '../utils/textDirection';
+import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
 
 interface Props {
   question: Question;
@@ -31,6 +32,8 @@ const fontSizeMap: Record<FontSizeOption, number> = {
 };
 
 export function QuestionCard({ question, selectedId, revealed, onSelect }: Props) {
+  const displayQuestion = isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question;
+  const isSpatial = isSpatialQuestion(displayQuestion);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -43,23 +46,23 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
   } = useSettingsStore();
 
   // Stable shuffled options order — computed once per question.id
-  const shuffledOptionsRef = useRef<typeof question.options | null>(null);
+  const shuffledOptionsRef = useRef<typeof displayQuestion.options | null>(null);
   const lastQuestionIdRef = useRef<string | null>(null);
 
-  if (lastQuestionIdRef.current !== question.id) {
-    lastQuestionIdRef.current = question.id;
+  if (lastQuestionIdRef.current !== displayQuestion.id) {
+    lastQuestionIdRef.current = displayQuestion.id;
     shuffledOptionsRef.current = shuffleOptions
-      ? shuffleArray(question.options)
-      : question.options;
+      ? shuffleArray(displayQuestion.options)
+      : displayQuestion.options;
   }
-  const displayOptions = shuffledOptionsRef.current ?? question.options;
+  const displayOptions = shuffledOptionsRef.current ?? displayQuestion.options;
 
   const [passageExpanded, setPassageExpanded] = useState(!collapseReadingPassage);
 
   // Reset passage expansion when question changes
   useEffect(() => {
     setPassageExpanded(!collapseReadingPassage);
-  }, [question.id, collapseReadingPassage]);
+  }, [displayQuestion.id, collapseReadingPassage]);
 
   useEffect(() => {
     fadeAnim.setValue(0);
@@ -68,13 +71,13 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
       Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
       Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: true }),
     ]).start();
-  }, [question.id]);
+  }, [displayQuestion.id]);
 
   const getOptionStyle = (optId: string) => {
     if (!revealed) {
       return selectedId === optId ? styles.optionSelected : styles.optionDefault;
     }
-    const opt = question.options.find(o => o.id === optId);
+    const opt = displayQuestion.options.find(o => o.id === optId);
     if (opt?.isCorrect) return styles.optionCorrect;
     if (selectedId === optId && !opt?.isCorrect) return styles.optionWrong;
     return styles.optionDefault;
@@ -84,7 +87,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
     if (!revealed) {
       return selectedId === optId ? styles.optionTextSelected : styles.optionText;
     }
-    const opt = question.options.find(o => o.id === optId);
+    const opt = displayQuestion.options.find(o => o.id === optId);
     if (opt?.isCorrect) return styles.optionTextCorrect;
     if (selectedId === optId && !opt?.isCorrect) return styles.optionTextWrong;
     return styles.optionText;
@@ -92,15 +95,15 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
 
   const getOptionIcon = (optId: string) => {
     if (!revealed) return '○';
-    const opt = question.options.find(o => o.id === optId);
+    const opt = displayQuestion.options.find(o => o.id === optId);
     if (opt?.isCorrect) return '✓';
     if (selectedId === optId) return '✗';
     return '○';
   };
 
   const questionFontSize_ = fontSizeMap[questionFontSize];
-  const questionDir = detectDir(question.questionText);
-  const passageDir = question.readingPassage ? detectDir(question.readingPassage) : 'rtl';
+  const questionDir = detectDir(displayQuestion.questionText);
+  const passageDir = displayQuestion.readingPassage ? detectDir(displayQuestion.readingPassage) : 'rtl';
 
   return (
     <Animated.View
@@ -110,7 +113,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
       ]}
     >
       {/* Reading passage */}
-      {question.readingPassage && (
+      {displayQuestion.readingPassage && !isSpatial && (
         <View style={styles.passageBox}>
           <View style={styles.passageHeaderRow}>
             <Text style={styles.passageLabel}>📖 קטע לקריאה</Text>
@@ -127,8 +130,8 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
           </View>
           {passageExpanded && (
             <ScrollView style={styles.passageScroll} nestedScrollEnabled>
-              <Text style={[styles.passageText, { textAlign: textAlign(question.readingPassage ?? ''), writingDirection: passageDir }]}>
-                {question.readingPassage}
+              <Text style={[styles.passageText, { textAlign: textAlign(displayQuestion.readingPassage ?? ''), writingDirection: passageDir }]}>
+                {displayQuestion.readingPassage}
               </Text>
             </ScrollView>
           )}
@@ -142,24 +145,26 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
           <View style={styles.badgeRow}>
             {showDifficultyBadge && (
               <View style={styles.difficultyBadge}>
-                <Text style={styles.difficultyText}>רמה {question.difficulty}</Text>
+              <Text style={styles.difficultyText}>רמה {displayQuestion.difficulty}</Text>
               </View>
             )}
             {showEloOnQuestion && (
               <View style={styles.eloBadge}>
-                <Text style={styles.eloText}>ELO {question.psychometricStats.elo}</Text>
+                <Text style={styles.eloText}>ELO {displayQuestion.psychometricStats.elo}</Text>
               </View>
             )}
           </View>
         )}
-        <Text style={[styles.questionText, { fontSize: questionFontSize_, textAlign: textAlign(question.questionText), writingDirection: questionDir }]}>
-          {question.questionText}
-        </Text>
+        {!isSpatial && (
+          <Text style={[styles.questionText, { fontSize: questionFontSize_, textAlign: textAlign(displayQuestion.questionText), writingDirection: questionDir }]}>
+            {displayQuestion.questionText}
+          </Text>
+        )}
         {/* Question image */}
-        {question.mediaUrl && question.mediaType === 'image' && (
+        {displayQuestion.mediaUrl && displayQuestion.mediaType === 'image' && (
           <Image
-            source={{ uri: question.mediaUrl }}
-            style={styles.questionImage}
+            source={{ uri: displayQuestion.mediaUrl }}
+            style={[styles.questionImage, isSpatial && styles.spatialQuestionImage]}
             resizeMode="contain"
           />
         )}
@@ -167,13 +172,13 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
 
       {/* Options */}
       {(() => {
-        const allOptionsHaveImages = displayOptions.every(o => !!o.imageUrl);
+        const allOptionsHaveImages = isSpatial || displayOptions.every(o => !!o.imageUrl);
         if (allOptionsHaveImages) {
           // 2×2 grid layout
           return (
             <View style={styles.optionsGrid}>
               {displayOptions.map(opt => {
-                const isTextEmpty = !opt.text || !opt.text.trim();
+                const isTextEmpty = isSpatial || !opt.text || !opt.text.trim();
                 return (
                   <Pressable
                     key={opt.id}
@@ -339,6 +344,10 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 12,
     marginTop: 8,
+  },
+  spatialQuestionImage: {
+    height: 280,
+    marginTop: 0,
   },
 
   optionsContainer: { gap: 10 },
