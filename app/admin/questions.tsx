@@ -50,6 +50,17 @@ function hasQualityIssue(q: Question, issue: Exclude<QualityFilter, 'all'>) {
   return q.options.length > 0 && (markedCorrect > 1 || (markedCorrect === 0 && !answerMatchesOption));
 }
 
+function isSpatialQuestion(q: Question) {
+  const text = `${q.topicId} ${q.questionType} ${q.questionText}`.toLowerCase();
+  return q.topicId === 'topic_spatial'
+    || q.questionType === 'shapes'
+    || text.includes('מרחב')
+    || text.includes('צור')
+    || text.includes('קוב')
+    || text.includes('סיבוב')
+    || text.includes('מטריצ');
+}
+
 export default function QuestionsAdmin() {
   const insets = useSafeAreaInsets();
   const { questions, topics, selectedQuestionIds, toggleSelectQuestion, clearSelection,
@@ -107,6 +118,25 @@ export default function QuestionsAdmin() {
     ).length;
     const avgDifficulty = questions.length ? (questions.reduce((sum, q) => sum + q.difficulty, 0) / questions.length).toFixed(1) : '0.0';
     return { validated, premium, smart, missingPool, qualityIssues, avgDifficulty };
+  }, [questions]);
+
+  const topicAudit = useMemo(() => {
+    return TOPICS.map(topic => {
+      const topicQuestions = questions.filter(q => q.topicId === topic.id);
+      const validated = topicQuestions.filter(q => q.validationStatus === 'validated').length;
+      const pending = topicQuestions.filter(q => q.validationStatus === 'pending').length;
+      const premium = topicQuestions.filter(q => q.accessLevel === 'premium').length;
+      const spatialWithoutVisuals = topicQuestions.filter(q =>
+        isSpatialQuestion(q) && (!q.mediaUrl || q.options.some(option => !option.imageUrl))
+      ).length;
+      const qualityIssues = topicQuestions.filter(q =>
+        hasQualityIssue(q, 'missingExplanation') ||
+        hasQualityIssue(q, 'weakOptions') ||
+        hasQualityIssue(q, 'invalidAnswer') ||
+        hasQualityIssue(q, 'difficulty')
+      ).length;
+      return { topic, total: topicQuestions.length, validated, pending, premium, spatialWithoutVisuals, qualityIssues };
+    }).sort((a, b) => b.qualityIssues - a.qualityIssues || b.pending - a.pending || b.total - a.total);
   }, [questions]);
 
   const handleBulkAction = (action: 'approve' | 'reject' | 'delete') => {
@@ -324,6 +354,45 @@ export default function QuestionsAdmin() {
         <AuditPill label="בעיות איכות" value={audit.qualityIssues} color={audit.qualityIssues ? Colors.warning : Colors.success} />
         <AuditPill label="קושי ממוצע" value={audit.avgDifficulty} color={Colors.accent} />
       </ScrollView>
+
+      <View style={styles.topicAuditPanel}>
+        <View style={styles.topicAuditHeader}>
+          <Text style={styles.topicAuditTitle}>בקרת פרקים ושאלות</Text>
+          <Text style={styles.topicAuditHint}>לחיצה על פרק מסננת את המאגר</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topicAuditRow}>
+          {topicAudit.map(row => {
+            const hasIssues = row.qualityIssues > 0 || row.pending > 0 || row.spatialWithoutVisuals > 0;
+            return (
+              <Pressable
+                key={row.topic.id}
+                onPress={() => setFilterTopicId(filterTopicId === row.topic.id ? 'all' : row.topic.id)}
+                style={[
+                  styles.topicAuditCard,
+                  { borderColor: hasIssues ? Colors.warning + '66' : row.topic.color + '55' },
+                  filterTopicId === row.topic.id && { backgroundColor: row.topic.color + '18', borderColor: row.topic.color },
+                ]}
+              >
+                <Text style={[styles.topicAuditName, { color: row.topic.color }]} numberOfLines={1}>
+                  {row.topic.icon} {row.topic.name}
+                </Text>
+                <View style={styles.topicAuditStats}>
+                  <Text style={styles.topicAuditStat}>סה"כ {row.total}</Text>
+                  <Text style={styles.topicAuditStat}>מאומתות {row.validated}</Text>
+                  <Text style={styles.topicAuditStat}>ממתינות {row.pending}</Text>
+                  <Text style={styles.topicAuditStat}>פרימיום {row.premium}</Text>
+                </View>
+                {(row.qualityIssues > 0 || row.spatialWithoutVisuals > 0) && (
+                  <View style={styles.topicAuditWarnings}>
+                    {row.qualityIssues > 0 && <Text style={styles.topicAuditWarning}>בעיות איכות {row.qualityIssues}</Text>}
+                    {row.spatialWithoutVisuals > 0 && <Text style={styles.topicAuditWarning}>מרחב בלי תמונה {row.spatialWithoutVisuals}</Text>}
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {/* Search */}
       <View style={styles.searchBar}>
@@ -564,13 +633,49 @@ function AuditPill({ label, value, color }: { label: string; value: string | num
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1, backgroundColor: Colors.background, direction: 'rtl', writingDirection: 'rtl' },
 
   auditScroll: { maxHeight: 76, borderBottomWidth: 1, borderBottomColor: Colors.border },
   auditGrid: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 12, paddingVertical: 10 },
   auditPill: { minWidth: 96, borderRadius: Radius.lg, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'flex-end' },
   auditValue: { fontFamily: FontFamily.bold, fontSize: FontSize.base },
-  auditLabel: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, marginTop: 2 },
+  auditLabel: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, marginTop: 2, textAlign: 'right', writingDirection: 'rtl' },
+
+  topicAuditPanel: {
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingVertical: 10,
+    direction: 'rtl',
+    writingDirection: 'rtl',
+  },
+  topicAuditHeader: { paddingHorizontal: 14, marginBottom: 8, alignItems: 'flex-end' },
+  topicAuditTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', writingDirection: 'rtl' },
+  topicAuditHint: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'right', marginTop: 2, writingDirection: 'rtl' },
+  topicAuditRow: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 12 },
+  topicAuditCard: {
+    width: 168,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    backgroundColor: Colors.surfaceSecondary,
+    padding: 10,
+    alignItems: 'flex-end',
+  },
+  topicAuditName: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'right', writingDirection: 'rtl', marginBottom: 6 },
+  topicAuditStats: { alignItems: 'flex-end', gap: 2 },
+  topicAuditStat: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textSecondary, textAlign: 'right', writingDirection: 'rtl' },
+  topicAuditWarnings: { marginTop: 7, gap: 4, alignItems: 'flex-end' },
+  topicAuditWarning: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.warning,
+    backgroundColor: Colors.warningLight,
+    borderRadius: Radius.full,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    textAlign: 'right',
+    overflow: 'hidden',
+  },
 
   searchBar: { padding: 12, paddingBottom: 8 },
   searchInput: {
@@ -582,6 +687,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
     borderWidth: 1,
     borderColor: Colors.border,
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
 
   filterScrollWrap: { maxHeight: 44 },

@@ -243,6 +243,29 @@ export default function SimulationBuilder() {
     ]);
   };
 
+  const fixVisibleTemplateShortages = () => {
+    if (filteredTemplates.length === 0) return;
+    filteredTemplates.forEach(template => {
+      const fixedRules = template.rules.map(rule => {
+        const available = questionsPerTopic[rule.topicId] ?? 0;
+        return available > 0 && rule.count > available ? { ...rule, count: available } : rule;
+      });
+      const totalQuestions = fixedRules.reduce((sum, rule) => sum + rule.count, 0);
+      updateTemplate(template.id, { rules: fixedRules, totalQuestions });
+    });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const setVisibleTemplatesAdaptive = () => {
+    if (filteredTemplates.length === 0) return;
+    filteredTemplates.forEach(template => {
+      updateTemplate(template.id, {
+        rules: template.rules.map(rule => ({ ...rule, useAdaptive: true })),
+      });
+    });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   if (showForm) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -573,6 +596,12 @@ export default function SimulationBuilder() {
           <Pressable onPress={() => bulkUpdateVisibleTemplates({ isActive: false }, 'השבתת מבחנים')} style={[styles.bulkTemplateBtn, { backgroundColor: Colors.warningLight }]}>
             <Text style={[styles.bulkTemplateText, { color: Colors.warning }]}>השבת מוצגים</Text>
           </Pressable>
+          <Pressable onPress={fixVisibleTemplateShortages} style={[styles.bulkTemplateBtn, { backgroundColor: Colors.dangerLight }]}>
+            <Text style={[styles.bulkTemplateText, { color: Colors.danger }]}>תקן מחסורים</Text>
+          </Pressable>
+          <Pressable onPress={setVisibleTemplatesAdaptive} style={[styles.bulkTemplateBtn, { backgroundColor: Colors.primaryLighter }]}>
+            <Text style={[styles.bulkTemplateText, { color: Colors.primary }]}>הכל אדפטיבי</Text>
+          </Pressable>
         </View>
 
         {filteredTemplates.length === 0 && (
@@ -729,8 +758,8 @@ const spStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  content: { paddingBottom: 40 },
+  safe: { flex: 1, backgroundColor: Colors.background, direction: 'rtl', writingDirection: 'rtl' },
+  content: { paddingBottom: 40, direction: 'rtl', writingDirection: 'rtl' },
 
   hero: { padding: 24, alignItems: 'flex-end' },
   heroIcon: { fontSize: 40, marginBottom: 8 },
@@ -751,16 +780,16 @@ const styles = StyleSheet.create({
   newBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
 
   searchWrap: { flexDirection: 'row-reverse', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
-  searchInput: { flex: 1, padding: 10, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text },
+  searchInput: { flex: 1, padding: 10, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', writingDirection: 'rtl' },
   searchClear: { padding: 10 },
   templateFilters: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   templateFilterChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.full, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   templateFilterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   templateFilterText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textSecondary },
   templateFilterTextActive: { color: '#fff' },
-  bulkTemplateBar: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 16, marginBottom: 10 },
-  bulkTemplateBtn: { flex: 1, borderRadius: Radius.lg, paddingVertical: 9, alignItems: 'center' },
-  bulkTemplateText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
+  bulkTemplateBar: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, marginBottom: 10, direction: 'rtl', writingDirection: 'rtl' },
+  bulkTemplateBtn: { flexGrow: 1, minWidth: 128, borderRadius: Radius.lg, paddingVertical: 9, paddingHorizontal: 10, alignItems: 'center' },
+  bulkTemplateText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'center', writingDirection: 'rtl' },
 
   templateCard: { backgroundColor: Colors.surface, marginHorizontal: 16, borderRadius: Radius.xl, padding: 16, marginBottom: 12, ...Shadow.md, borderWidth: 1, borderColor: Colors.border },
   templateHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 6 },

@@ -153,6 +153,17 @@ export default function TopicsAdmin() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  const setVisibleTopicsPremium = (premium: boolean) => {
+    filteredTopics.forEach(topic => updateTopic(topic.id, { isPremiumOnly: premium }));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const sortVisibleTopicsByQuestionCount = () => {
+    const sorted = [...filteredTopics].sort((a, b) => (qPerTopic[b.id]?.total ?? 0) - (qPerTopic[a.id]?.total ?? 0));
+    sorted.forEach((topic, index) => updateTopic(topic.id, { order: index + 1 }));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   if (showForm) {
     const qCount = editId ? (qPerTopic[editId] ?? { total: 0, validated: 0 }) : { total: 0, validated: 0 };
     const previewSlug = makeSlug(name || 'שם הנושא', editId ?? undefined);
@@ -320,6 +331,18 @@ export default function TopicsAdmin() {
           ))}
         </ScrollView>
 
+        <View style={styles.bulkTopicBar}>
+          <Pressable onPress={() => setVisibleTopicsPremium(true)} style={[styles.bulkTopicBtn, { backgroundColor: Colors.warningLight }]}>
+            <Text style={[styles.bulkTopicText, { color: Colors.warning }]}>הפוך מוצגים לפרימיום</Text>
+          </Pressable>
+          <Pressable onPress={() => setVisibleTopicsPremium(false)} style={[styles.bulkTopicBtn, { backgroundColor: Colors.successLight }]}>
+            <Text style={[styles.bulkTopicText, { color: Colors.success }]}>הפוך מוצגים לחינם</Text>
+          </Pressable>
+          <Pressable onPress={sortVisibleTopicsByQuestionCount} style={[styles.bulkTopicBtn, { backgroundColor: Colors.primaryLighter }]}>
+            <Text style={[styles.bulkTopicText, { color: Colors.primary }]}>מיין לפי שאלות</Text>
+          </Pressable>
+        </View>
+
         {filteredTopics.length === 0 && (
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyIcon}>📚</Text>
@@ -438,29 +461,35 @@ const scStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 16, paddingBottom: 40 },
+  safe: { flex: 1, backgroundColor: Colors.background, direction: 'rtl', writingDirection: 'rtl' },
+  content: { padding: 16, paddingBottom: 40, direction: 'rtl', writingDirection: 'rtl' },
 
   statsRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
 
   listHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  listTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text },
+  listTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text, textAlign: 'right', writingDirection: 'rtl' },
   newBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 8, ...Shadow.primary },
   newBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
 
   searchWrap: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, marginBottom: 8, ...Shadow.sm },
-  searchInput: { flex: 1, padding: 10, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text },
+  searchInput: { flex: 1, padding: 10, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', writingDirection: 'rtl' },
   searchClear: { padding: 10 },
 
   filterScroll: { marginBottom: 12 },
   filterChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.border },
   filterChipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
 
+  bulkTopicBar: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  bulkTopicBtn: { flexGrow: 1, borderRadius: Radius.lg, paddingHorizontal: 10, paddingVertical: 9, alignItems: 'center' },
+  bulkTopicText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'center', writingDirection: 'rtl' },
+
   targetLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'right', marginBottom: 8 },
 
   topicCard: {
     backgroundColor: Colors.surface, borderRadius: Radius.xl,
     padding: 12, marginBottom: 8, ...Shadow.sm, borderWidth: 1, borderColor: Colors.border,
+    direction: 'rtl',
+    writingDirection: 'rtl',
   },
   topicMain: { flexDirection: 'row-reverse', gap: 10, marginBottom: 10, alignItems: 'flex-start' },
   topicIconWrap: { width: 44, height: 44, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },

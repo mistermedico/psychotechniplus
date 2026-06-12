@@ -31,9 +31,38 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.setAttribute('dir', 'rtl');
   document.documentElement.style.direction = 'rtl';
   document.documentElement.style.backgroundColor = '#080A12';
+  document.documentElement.style.textAlign = 'right';
+  document.body.setAttribute('dir', 'rtl');
   document.body.style.direction = 'rtl';
+  document.body.style.textAlign = 'right';
   document.body.style.backgroundColor = '#080A12';
   document.body.style.color = '#F0F4FF';
+
+  const styleId = 'psychotechniplus-global-rtl';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      html, body, #root {
+        direction: rtl !important;
+        text-align: right !important;
+      }
+
+      input, textarea, [contenteditable="true"] {
+        direction: rtl !important;
+        text-align: right !important;
+      }
+
+      [data-testid], [role="button"], [role="link"] {
+        direction: rtl;
+      }
+
+      [class*="css-text"] {
+        text-align: right;
+      }
+    `;
+    document.head.appendChild(style);
+  }
 }
 
 SplashScreen.preventAutoHideAsync();
