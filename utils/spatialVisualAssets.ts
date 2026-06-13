@@ -1,6 +1,6 @@
 import { Question, QuestionOption } from '../data/types';
 
-type SpatialMode = 'series' | 'analogy' | 'rotation' | 'cube';
+type SpatialMode = 'series' | 'analogy' | 'rotation' | 'matrix' | 'mirror' | 'cube';
 
 interface ShapeSignature {
   kind: number;
@@ -57,11 +57,14 @@ function shapeMarkup(kind: number, x: number, y: number, size: number, fill: str
 }
 
 function visualMode(question: Question): SpatialMode {
-  const text = `${question.questionText} ${question.subtopicId ?? ''}`.toLowerCase();
+  const text = `${question.id} ${question.questionText} ${question.subtopicId ?? ''}`.toLowerCase();
   if (text.includes('analog') || text.includes('אנלוג')) return 'analogy';
-  if (text.includes('rotate') || text.includes('rotation') || text.includes('סיבוב') || text.includes('שיקוף')) return 'rotation';
+  if (text.includes('matrix') || text.includes('מטריצ')) return 'matrix';
+  if (text.includes('mirror') || text.includes('reflection') || text.includes('שיקוף') || text.includes('מראה')) return 'mirror';
+  if (text.includes('rotate') || text.includes('rotation') || text.includes('סיבוב')) return 'rotation';
   if (text.includes('cube') || text.includes('קוב') || text.includes('פריס')) return 'cube';
-  return 'series';
+  const modes: SpatialMode[] = ['series', 'analogy', 'rotation', 'matrix', 'mirror', 'cube'];
+  return modes[hashString(question.id) % modes.length];
 }
 
 function baseSignature(seed: number): ShapeSignature {
@@ -85,6 +88,30 @@ function transformSignature(base: ShapeSignature, step: number, mode: SpatialMod
       secondaryDx: base.secondaryDx + step * 4,
       secondaryDy: base.secondaryDy - step * 2,
       flip: step % 2 === 0 ? base.flip : !base.flip,
+    };
+  }
+
+  if (mode === 'mirror') {
+    return {
+      ...base,
+      secondaryDx: -base.secondaryDx,
+      rotation: (360 - base.rotation) % 360,
+      flip: !base.flip,
+    };
+  }
+
+  if (mode === 'matrix') {
+    const row = Math.floor(step / 3);
+    const col = step % 3;
+    return {
+      ...base,
+      kind: (base.kind + row) % 6,
+      rotation: (base.rotation + col * 90) % 360,
+      scale: 0.82 + row * 0.08,
+      secondaryKind: (base.secondaryKind + col) % 6,
+      secondaryDx: base.secondaryDx + col * 9,
+      secondaryDy: base.secondaryDy + row * 8,
+      flip: col % 2 === 1 ? !base.flip : base.flip,
     };
   }
 
@@ -116,11 +143,15 @@ function transformSignature(base: ShapeSignature, step: number, mode: SpatialMod
 }
 
 function targetStepForMode(mode: SpatialMode): number {
-  return mode === 'analogy' ? 3 : 4;
+  if (mode === 'analogy') return 3;
+  if (mode === 'mirror') return 1;
+  if (mode === 'rotation') return 2;
+  if (mode === 'matrix') return 8;
+  return 4;
 }
 
 function targetSignature(question: Question): ShapeSignature {
-  const seed = hashString(`${question.id}:${question.questionText}:spatial-rule`);
+  const seed = hashString(`${question.id}:spatial-rule`);
   return transformSignature(baseSignature(seed), targetStepForMode(visualMode(question)), visualMode(question));
 }
 
@@ -149,6 +180,10 @@ function spatialExplanation(question: Question): string {
       ? 'באנלוגיית הצורות יש להחיל על הזוג השני בדיוק את אותו שינוי שמופיע בזוג הראשון.'
       : mode === 'rotation'
         ? 'בסדרת הסיבוב כל צורה ממשיכה את אותה תנועת סיבוב ושומרת על היחסים הפנימיים.'
+        : mode === 'matrix'
+          ? 'במטריצת הצורות יש לזהות את חוק השינוי בשורות ובעמודות ולהחיל אותו על התא החסר.'
+        : mode === 'mirror'
+          ? 'בשאלת שיקוף יש להפוך את הצורה ביחס לקו המראה ולשמור על מיקום הסימן הפנימי לאחר ההיפוך.'
         : mode === 'cube'
           ? 'בשאלת הקובייה יש להשוות את כיוון הפאות, הסימן הפנימי והסיבוב של הגוף.'
           : 'בסדרת הצורות כל איבר משתנה לפי אותו כלל חזותי: צורה, סיבוב, גודל ומיקום פנימי.';
@@ -182,11 +217,77 @@ function renderCell(content: string, cx: number, y = 124): string {
   return `<g><rect x="${cx - 38}" y="${y}" width="76" height="96" rx="14" fill="#111827" stroke="#334155" stroke-width="2"/>${content}</g>`;
 }
 
+function modePrompt(mode: SpatialMode): string {
+  if (mode === 'analogy') return 'איזו צורה משלימה את האנלוגיה?';
+  if (mode === 'rotation') return 'איזו צורה מתקבלת אחרי הסיבוב?';
+  if (mode === 'matrix') return 'איזו צורה חסרה במטריצה?';
+  if (mode === 'mirror') return 'איזו צורה היא השיקוף הנכון?';
+  if (mode === 'cube') return 'איזו קובייה ממשיכה את החוק המרחבי?';
+  return 'איזו צורה משלימה את הסדרה?';
+}
+
 function questionSvg(question: Question): string {
-  const seed = hashString(`${question.id}:${question.questionText}:spatial-rule`);
+  const seed = hashString(`${question.id}:spatial-rule`);
   const [primary, accent, bg] = palette(seed);
   const mode = visualMode(question);
   const base = baseSignature(seed);
+
+  if (mode === 'matrix') {
+    const positions = [
+      [176, 104], [288, 104], [400, 104],
+      [176, 196], [288, 196], [400, 196],
+      [176, 288], [288, 288], [400, 288],
+    ];
+    const cells = positions.map(([cx, cy], step) => {
+      const content = step === 8
+        ? `<text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="52" font-family="Arial" font-weight="700" fill="#F8FAFC">?</text>`
+        : renderSignature(transformSignature(base, step, mode), cx, cy, 34, step % 2 ? accent : primary, step % 2 ? primary : accent);
+      return `<g><rect x="${cx - 43}" y="${cy - 39}" width="86" height="78" rx="12" fill="#111827" stroke="#334155" stroke-width="2"/>${content}</g>`;
+    }).join('');
+
+    return svgDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
+        <rect width="640" height="360" rx="28" fill="${bg}"/>
+        <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${modePrompt(mode)}</text>
+        <g>${cells}</g>
+      </svg>
+    `);
+  }
+
+  if (mode === 'mirror') {
+    const source = renderSignature(base, 188, 178, 78, primary, accent);
+    const missing = renderCell(`<text x="450" y="196" text-anchor="middle" font-size="58" font-family="Arial" font-weight="700" fill="#F8FAFC">?</text>`, 450, 130);
+    return svgDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
+        <rect width="640" height="360" rx="28" fill="${bg}"/>
+        <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${modePrompt(mode)}</text>
+        ${renderCell(source, 188, 130)}
+        <path d="M 320 108 V 250" stroke="#22D3EE" stroke-width="6" stroke-dasharray="10 10" stroke-linecap="round"/>
+        <text x="320" y="278" text-anchor="middle" font-size="18" font-family="Arial" font-weight="700" fill="#CBD5E1">קו מראה</text>
+        ${missing}
+      </svg>
+    `);
+  }
+
+  if (mode === 'rotation') {
+    const source = renderSignature(base, 188, 178, 78, primary, accent);
+    const missing = renderCell(`<text x="450" y="196" text-anchor="middle" font-size="58" font-family="Arial" font-weight="700" fill="#F8FAFC">?</text>`, 450, 130);
+    return svgDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
+        <rect width="640" height="360" rx="28" fill="${bg}"/>
+        <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${modePrompt(mode)}</text>
+        ${renderCell(source, 188, 130)}
+        <path d="M 266 178 C 306 118, 394 118, 430 176" fill="none" stroke="#22D3EE" stroke-width="8" stroke-linecap="round"/>
+        <path d="M 430 176 l-26 -6 l14 24 z" fill="#22D3EE"/>
+        <text x="348" y="118" text-anchor="middle" font-size="22" font-family="Arial" font-weight="700" fill="#CBD5E1">180°</text>
+        ${missing}
+      </svg>
+    `);
+  }
+
   const visibleSteps = mode === 'analogy' ? [0, 1, 2] : [0, 1, 2, 3];
   const xPositions = mode === 'analogy' ? [104, 210, 386, 492] : [88, 176, 264, 352, 440];
   const cells = visibleSteps.map((step, i) => {
@@ -206,23 +307,21 @@ function questionSvg(question: Question): string {
   }).join('');
   const relation = mode === 'analogy'
     ? `<path d="M 142 96 H 196" stroke="#22D3EE" stroke-width="7" stroke-linecap="round"/><path d="M 196 96 l-16 -10 v20 z" fill="#22D3EE"/><text x="300" y="103" text-anchor="middle" font-size="30" font-family="Arial" font-weight="700" fill="#CBD5E1">::</text><path d="M 424 96 H 478" stroke="#22D3EE" stroke-width="7" stroke-linecap="round"/><path d="M 478 96 l-16 -10 v20 z" fill="#22D3EE"/>`
-    : mode === 'rotation'
-      ? `<path d="M 232 92 C 310 38, 420 48, 492 108" fill="none" stroke="#22D3EE" stroke-width="8" stroke-linecap="round"/><path d="M 492 108 l-28 -7 l16 25 z" fill="#22D3EE"/>`
-      : '';
+    : '';
 
   return svgDataUri(`
     <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
       <rect width="640" height="360" rx="28" fill="${bg}"/>
       <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+      <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${modePrompt(mode)}</text>
       <g>${relation}${connectors}</g>
       <g>${cells}${missing}</g>
-      <text x="320" y="286" text-anchor="middle" font-size="18" font-family="Arial" font-weight="700" fill="#CBD5E1">בחרו את הצורה החסרה</text>
     </svg>
   `);
 }
 
 function optionSvg(question: Question, option: QuestionOption, index: number): string {
-  const seed = hashString(`${question.id}:${question.questionText}:spatial-rule`);
+  const seed = hashString(`${question.id}:spatial-rule`);
   const [primary, accent, bg] = palette(seed + index);
   const mode = visualMode(question);
   const correctId = correctOptionId(question);
@@ -305,7 +404,7 @@ export function ensureSpatialVisualAssets(question: Question): Question {
     ...question,
     correctAnswer: correctId,
     questionType: 'shapes',
-    questionText: 'בחרו את התמונה המתאימה.',
+    questionText: modePrompt(visualMode(question)),
     mediaUrl: questionSvg(question),
     mediaType: 'image',
     explanation: spatialExplanation(question),

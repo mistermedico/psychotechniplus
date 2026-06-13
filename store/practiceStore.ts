@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Question, UserAnswer, SessionMode } from '../data/types';
 import { selectAdaptiveQuestion, computeAdaptiveLevel, PerformanceLevel } from '../utils/adaptive';
+import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
 
 interface ActiveSession {
   id: string;
@@ -49,13 +50,16 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
 
   startSession: ({ targetId, topicId, mode, questions, initialLevel = 'beginner' }) => {
     const now = new Date();
+    const normalizedQuestions = questions.map(question =>
+      isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question
+    );
     set({
       session: {
         id: `session_${Date.now()}`,
         targetId,
         topicId,
         mode,
-        questions,
+        questions: normalizedQuestions,
         currentIndex: 0,
         answers: [],
         startedAt: now,
