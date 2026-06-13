@@ -58,12 +58,17 @@ function shapeMarkup(kind: number, x: number, y: number, size: number, fill: str
 
 function visualMode(question: Question): SpatialMode {
   const text = `${question.id} ${question.questionText} ${question.subtopicId ?? ''}`.toLowerCase();
+  const modes: SpatialMode[] = ['series', 'analogy', 'rotation', 'matrix', 'mirror', 'cube'];
+
+  if (question.topicId === 'topic_spatial' || question.questionType === 'shapes') {
+    return modes[hashString(question.id) % modes.length];
+  }
+
   if (text.includes('analog') || text.includes('אנלוג')) return 'analogy';
   if (text.includes('matrix') || text.includes('מטריצ')) return 'matrix';
   if (text.includes('mirror') || text.includes('reflection') || text.includes('שיקוף') || text.includes('מראה')) return 'mirror';
   if (text.includes('rotate') || text.includes('rotation') || text.includes('סיבוב')) return 'rotation';
   if (text.includes('cube') || text.includes('קוב') || text.includes('פריס')) return 'cube';
-  const modes: SpatialMode[] = ['series', 'analogy', 'rotation', 'matrix', 'mirror', 'cube'];
   return modes[hashString(question.id) % modes.length];
 }
 
@@ -450,4 +455,8 @@ export function ensureSpatialVisualAssets(question: Question): Question {
     explanationImageUrl: explanationSvg(question),
     options,
   };
+}
+
+export function getSpatialVisualModeForQa(question: Question): SpatialMode {
+  return visualMode(question);
 }
