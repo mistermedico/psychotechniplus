@@ -175,20 +175,22 @@ function correctOptionId(question: Question): string {
 function spatialExplanation(question: Question): string {
   const mode = visualMode(question);
   const correct = correctOptionId(question).toUpperCase();
-  const rule =
-    mode === 'analogy'
-      ? 'באנלוגיית הצורות יש להחיל על הזוג השני בדיוק את אותו שינוי שמופיע בזוג הראשון.'
-      : mode === 'rotation'
-        ? 'בסדרת הסיבוב כל צורה ממשיכה את אותה תנועת סיבוב ושומרת על היחסים הפנימיים.'
-        : mode === 'matrix'
-          ? 'במטריצת הצורות יש לזהות את חוק השינוי בשורות ובעמודות ולהחיל אותו על התא החסר.'
-        : mode === 'mirror'
-          ? 'בשאלת שיקוף יש להפוך את הצורה ביחס לקו המראה ולשמור על מיקום הסימן הפנימי לאחר ההיפוך.'
-        : mode === 'cube'
-          ? 'בשאלת הקובייה יש להשוות את כיוון הפאות, הסימן הפנימי והסיבוב של הגוף.'
-          : 'בסדרת הצורות כל איבר משתנה לפי אותו כלל חזותי: צורה, סיבוב, גודל ומיקום פנימי.';
-
-  return `${rule} התשובה הנכונה היא ${correct}, כי היא היחידה שמשלימה את התבנית החסרה בלי לשנות מאפיין שאינו משתנה לפי החוק. שאר המסיחים משנים לפחות פרט אחד, כמו כיוון, סוג צורה, מיקום פנימי או גודל, ולכן אינם מתאימים.`;
+  if (mode === 'analogy') {
+    return `התשובה הנכונה היא ${correct}. בזוג הראשון מזהים שינוי קבוע: הצורה הראשית, הכיוון והסימן הפנימי משתנים יחד. מחילים את אותו שינוי בדיוק על הצורה השלישית, ורק אפשרות ${correct} שומרת על אותה התאמה. שאר האפשרויות משנות פרט אחד לפחות ולכן אינן משלימות את האנלוגיה.`;
+  }
+  if (mode === 'rotation') {
+    return `התשובה הנכונה היא ${correct}. משווים את הצורה לפני הסיבוב ואחרי סיבוב של 180 מעלות: הכיוון מתהפך, אך היחס בין הצורה החיצונית לסימן הפנימי נשמר. רק אפשרות ${correct} מציגה את תוצאת הסיבוב המדויקת.`;
+  }
+  if (mode === 'matrix') {
+    return `התשובה הנכונה היא ${correct}. במטריצה בודקים מה משתנה בכל עמודה ובכל שורה: סוג הצורה, הסיבוב, הגודל והמיקום הפנימי. התא החסר צריך להמשיך את שני החוקים יחד, ורק אפשרות ${correct} עושה זאת בלי חריגה.`;
+  }
+  if (mode === 'mirror') {
+    return `התשובה הנכונה היא ${correct}. קו המראה הופך ימין ושמאל, ולכן גם הסימן הפנימי עובר לצד המקביל לאחר השיקוף. האפשרות הנכונה היא זו ששומרת על הצורה והצבעים אך מציבה אותם בצד המשוקף.`;
+  }
+  if (mode === 'cube') {
+    return `התשובה הנכונה היא ${correct}. בשאלת הקובייה משווים את כיוון הפאות, הסיבוב של הגוף והסימן הפנימי שעל הפאה. אפשרות ${correct} היא היחידה שממשיכה את אותו חוק מרחבי; המסיחים משנים כיוון, פאה או מיקום פנימי ולכן אינם מתאימים.`;
+  }
+  return `התשובה הנכונה היא ${correct}. בסדרת הצורות מזהים את חוק ההתקדמות בין האיברים: שינוי צורה, סיבוב, גודל ומיקום פנימי. רק אפשרות ${correct} ממשיכה את אותו רצף חזותי בדיוק.`;
 }
 
 function renderSignature(signature: ShapeSignature, x: number, y: number, size: number, primary: string, accent: string): string {
@@ -363,32 +365,54 @@ function explanationSvg(question: Question): string {
   const target = targetSignature(question);
   const correctLabel = escapeXml(correctOptionId(question).toUpperCase());
   const targetVisual = mode === 'cube'
-    ? renderCubeSignature(target, 168, 188, primary, accent, 1.08)
-    : renderSignature(target, 168, 188, 98, primary, accent);
+    ? renderCubeSignature(target, 178, 214, primary, accent, 1.02)
+    : renderSignature(target, 178, 208, 88, primary, accent);
+  const title = mode === 'cube'
+    ? 'התאמת קובייה נכונה'
+    : mode === 'mirror'
+      ? 'שיקוף נכון'
+      : mode === 'matrix'
+        ? 'השלמת מטריצה'
+        : mode === 'rotation'
+          ? 'תוצאת סיבוב'
+          : mode === 'analogy'
+            ? 'השלמת אנלוגיה'
+            : 'המשך סדרה';
+  const checks = mode === 'cube'
+    ? ['כיוון הפאות', 'סיבוב הגוף', 'סימן פנימי']
+    : mode === 'mirror'
+      ? ['צד משוקף', 'אותה צורה', 'סימן פנימי']
+      : mode === 'matrix'
+        ? ['חוק שורה', 'חוק עמודה', 'תא חסר']
+        : mode === 'rotation'
+          ? ['סיבוב 180°', 'אותה צורה', 'אותו סימן']
+          : mode === 'analogy'
+            ? ['שינוי בזוג', 'יישום זהה', 'התאמה מלאה']
+            : ['רצף צורות', 'סיבוב וגודל', 'מיקום פנימי'];
 
   return svgDataUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
-      <rect width="640" height="360" rx="28" fill="${bg}"/>
-      <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
-      <text x="592" y="62" text-anchor="end" font-size="26" font-family="Arial" font-weight="700" fill="#F8FAFC">תרשים פתרון חזותי</text>
-      <text x="592" y="96" text-anchor="end" font-size="18" font-family="Arial" fill="#CBD5E1">התשובה הנכונה היא האפשרות שמשחזרת בדיוק את הצורה החסרה.</text>
-      <rect x="72" y="104" width="190" height="170" rx="22" fill="#111827" stroke="#475569" stroke-width="2"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" direction="rtl">
+      <rect width="640" height="400" rx="28" fill="${bg}"/>
+      <rect x="28" y="28" width="584" height="344" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+      <text x="562" y="70" text-anchor="end" font-size="25" font-family="Arial" font-weight="700" fill="#F8FAFC">${title}</text>
+      <text x="562" y="101" text-anchor="end" font-size="17" font-family="Arial" fill="#CBD5E1">אפשרות ${correctLabel} משלימה את החוק החזותי.</text>
+      <rect x="68" y="120" width="220" height="190" rx="24" fill="#111827" stroke="#475569" stroke-width="2"/>
       ${targetVisual}
-      <text x="168" y="296" text-anchor="middle" font-size="18" font-family="Arial" font-weight="700" fill="#F8FAFC">אפשרות ${correctLabel}</text>
-      <g transform="translate(548 136)">
+      <text x="178" y="335" text-anchor="middle" font-size="20" font-family="Arial" font-weight="700" fill="#F8FAFC">אפשרות ${correctLabel}</text>
+      <g transform="translate(540 150)">
         <circle cx="0" cy="0" r="15" fill="${primary}"/>
         <text x="0" y="5" text-anchor="middle" font-size="14" font-family="Arial" font-weight="700" fill="#0B1220">1</text>
-        <text x="-24" y="5" text-anchor="end" font-size="17" font-family="Arial" fill="#F8FAFC">מזהים את חוק הסדרה</text>
+        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${checks[0]}</text>
       </g>
-      <g transform="translate(548 184)">
+      <g transform="translate(540 204)">
         <circle cx="0" cy="0" r="15" fill="${accent}"/>
         <text x="0" y="5" text-anchor="middle" font-size="14" font-family="Arial" font-weight="700" fill="#0B1220">2</text>
-        <text x="-24" y="5" text-anchor="end" font-size="17" font-family="Arial" fill="#F8FAFC">משווים צורה, סיבוב ומיקום פנימי</text>
+        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${checks[1]}</text>
       </g>
-      <g transform="translate(548 232)">
+      <g transform="translate(540 258)">
         <circle cx="0" cy="0" r="15" fill="#38BDF8"/>
         <text x="0" y="5" text-anchor="middle" font-size="14" font-family="Arial" font-weight="700" fill="#0B1220">3</text>
-        <text x="-24" y="5" text-anchor="end" font-size="17" font-family="Arial" fill="#F8FAFC">בוחרים רק את ההתאמה המדויקת</text>
+        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${checks[2]}</text>
       </g>
     </svg>
   `);

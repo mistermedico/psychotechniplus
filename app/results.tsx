@@ -395,7 +395,7 @@ const reviewStyles = StyleSheet.create({
   title: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
   status: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
   questionText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.base, color: Colors.text, lineHeight: 24, marginBottom: 10 },
-  image: { width: '100%', height: 180, borderRadius: Radius.lg, backgroundColor: Colors.surfaceSecondary, marginBottom: 10 },
+  image: { width: '100%', height: 230, borderRadius: Radius.lg, backgroundColor: Colors.surfaceSecondary, marginBottom: 10 },
   answerBox: { backgroundColor: 'rgba(15,23,42,0.72)', borderRadius: Radius.lg, padding: 12, gap: 6, marginBottom: 10 },
   answerLine: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', writingDirection: 'rtl' },
   explanationLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primaryLight, textAlign: 'right', marginBottom: 4 },

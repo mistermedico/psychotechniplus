@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
   },
   explanationImage: {
     width: '100%',
-    height: 180,
+    height: 230,
     borderRadius: Radius.lg,
     marginBottom: 10,
     backgroundColor: Colors.surfaceSecondary,
