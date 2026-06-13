@@ -201,14 +201,15 @@ function renderSignature(signature: ShapeSignature, x: number, y: number, size: 
   `;
 }
 
-function renderCubeSignature(signature: ShapeSignature, x: number, y: number, primary: string, accent: string): string {
+function renderCubeSignature(signature: ShapeSignature, x: number, y: number, primary: string, accent: string, visualScale = 1): string {
   const shade = signature.flip ? '#38BDF8' : '#FBBF24';
+  const scale = signature.scale * visualScale;
   return `
-    <g transform="translate(${x} ${y}) rotate(${signature.rotation / 4}) scale(${signature.scale})">
-      <path d="M0 42 L42 18 L84 42 L42 66 Z" fill="${primary}" stroke="#E5E7EB" stroke-width="3"/>
-      <path d="M0 42 L42 66 V116 L0 92 Z" fill="${accent}" stroke="#E5E7EB" stroke-width="3"/>
-      <path d="M84 42 L42 66 V116 L84 92 Z" fill="${shade}" stroke="#E5E7EB" stroke-width="3"/>
-      ${shapeMarkup(signature.secondaryKind, 42, 58, 22, '#0F172A', '#E5E7EB')}
+    <g transform="translate(${x} ${y}) rotate(${signature.rotation / 4}) scale(${scale})">
+      <path d="M -42 -24 L 0 -48 L 42 -24 L 0 0 Z" fill="${primary}" stroke="#E5E7EB" stroke-width="3"/>
+      <path d="M -42 -24 L 0 0 V 58 L -42 34 Z" fill="${accent}" stroke="#E5E7EB" stroke-width="3"/>
+      <path d="M 42 -24 L 0 0 V 58 L 42 34 Z" fill="${shade}" stroke="#E5E7EB" stroke-width="3"/>
+      ${shapeMarkup(signature.secondaryKind, 0, -18, 18, '#0F172A', '#E5E7EB')}
     </g>
   `;
 }
@@ -294,8 +295,8 @@ function questionSvg(question: Question): string {
     const sig = transformSignature(base, step, mode);
     const cx = xPositions[i];
     const shape = mode === 'cube'
-      ? renderCubeSignature(sig, cx - 42, 138, primary, accent)
-      : renderSignature(sig, cx, 172, 46, (i + seed) % 2 === 0 ? primary : accent, (i + seed) % 2 === 0 ? accent : primary);
+      ? renderCubeSignature(sig, cx, 172, primary, accent, 0.58)
+      : renderSignature(sig, cx, 172, 40, (i + seed) % 2 === 0 ? primary : accent, (i + seed) % 2 === 0 ? accent : primary);
     return renderCell(shape, cx);
   }).join('');
 
@@ -328,7 +329,7 @@ function optionSvg(question: Question, option: QuestionOption, index: number): s
   const target = targetSignature(question);
   const signature = option.id === correctId ? target : distractorSignature(target, index);
   const shape = mode === 'cube'
-    ? renderCubeSignature(signature, 168, 80, primary, accent)
+    ? renderCubeSignature(signature, 210, 150, primary, accent, 1.25)
     : renderSignature(signature, 210, 146, 110, primary, accent);
 
   return svgDataUri(`
@@ -358,8 +359,12 @@ export function isSpatialQuestion(question: Question): boolean {
 function explanationSvg(question: Question): string {
   const seed = hashString(`${question.id}:explanation:${question.explanation}`);
   const [primary, accent, bg] = palette(seed + 11);
+  const mode = visualMode(question);
   const target = targetSignature(question);
   const correctLabel = escapeXml(correctOptionId(question).toUpperCase());
+  const targetVisual = mode === 'cube'
+    ? renderCubeSignature(target, 168, 188, primary, accent, 1.08)
+    : renderSignature(target, 168, 188, 98, primary, accent);
 
   return svgDataUri(`
     <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
@@ -368,7 +373,7 @@ function explanationSvg(question: Question): string {
       <text x="592" y="62" text-anchor="end" font-size="26" font-family="Arial" font-weight="700" fill="#F8FAFC">תרשים פתרון חזותי</text>
       <text x="592" y="96" text-anchor="end" font-size="18" font-family="Arial" fill="#CBD5E1">התשובה הנכונה היא האפשרות שמשחזרת בדיוק את הצורה החסרה.</text>
       <rect x="72" y="104" width="190" height="170" rx="22" fill="#111827" stroke="#475569" stroke-width="2"/>
-      ${renderSignature(target, 168, 188, 98, primary, accent)}
+      ${targetVisual}
       <text x="168" y="296" text-anchor="middle" font-size="18" font-family="Arial" font-weight="700" fill="#F8FAFC">אפשרות ${correctLabel}</text>
       <g transform="translate(548 136)">
         <circle cx="0" cy="0" r="15" fill="${primary}"/>
