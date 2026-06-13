@@ -155,12 +155,22 @@ function targetSignature(question: Question): ShapeSignature {
   return transformSignature(baseSignature(seed), targetStepForMode(visualMode(question)), visualMode(question));
 }
 
-function distractorSignature(target: ShapeSignature, index: number): ShapeSignature {
+function distractorSignature(target: ShapeSignature, index: number, mode: SpatialMode): ShapeSignature {
+  if (mode === 'cube') {
+    const cubeVariants: Array<Partial<ShapeSignature>> = [
+      { rotation: (target.rotation + 90) % 360 },
+      { secondaryKind: (target.secondaryKind + 1) % 6 },
+      { rotation: (target.rotation + 180) % 360 },
+      { secondaryKind: (target.secondaryKind + 2) % 6, rotation: (target.rotation + 270) % 360 },
+    ];
+    return { ...target, ...cubeVariants[index % cubeVariants.length] };
+  }
+
   const variants: Array<Partial<ShapeSignature>> = [
     { rotation: (target.rotation + 90) % 360 },
-    { kind: (target.kind + 1) % 6, secondaryKind: (target.secondaryKind + 2) % 6 },
-    { secondaryDx: target.secondaryDx * -1, flip: !target.flip },
-    { scale: Math.max(0.72, target.scale - 0.18), rotation: (target.rotation + 180) % 360 },
+    { secondaryDx: target.secondaryDx * -1 },
+    { secondaryDy: target.secondaryDy * -1, flip: !target.flip },
+    { rotation: (target.rotation + 180) % 360, scale: target.scale },
   ];
   return { ...target, ...variants[index % variants.length] };
 }
@@ -188,9 +198,9 @@ function spatialExplanation(question: Question): string {
     return `התשובה הנכונה היא ${correct}. קו המראה הופך ימין ושמאל, ולכן גם הסימן הפנימי עובר לצד המקביל לאחר השיקוף. האפשרות הנכונה היא זו ששומרת על הצורה והצבעים אך מציבה אותם בצד המשוקף.`;
   }
   if (mode === 'cube') {
-    return `התשובה הנכונה היא ${correct}. בשאלת הקובייה משווים את כיוון הפאות, הסיבוב של הגוף והסימן הפנימי שעל הפאה. אפשרות ${correct} היא היחידה שממשיכה את אותו חוק מרחבי; המסיחים משנים כיוון, פאה או מיקום פנימי ולכן אינם מתאימים.`;
+    return `התשובה הנכונה היא ${correct}. בשאלת הקובייה כל האפשרויות נשארות מאותה משפחת צורות וצבעים, ולכן צריך להשוות פרט-פרט: כיוון הפאות, סיבוב הגוף והסימן הפנימי שעל הפאה. אפשרות ${correct} היא היחידה שממשיכה את אותו חוק מרחבי; המסיחים דומים לה אך משנים פרט אחד כמו כיוון, פאה או מיקום פנימי.`;
   }
-  return `התשובה הנכונה היא ${correct}. בסדרת הצורות מזהים את חוק ההתקדמות בין האיברים: שינוי צורה, סיבוב, גודל ומיקום פנימי. רק אפשרות ${correct} ממשיכה את אותו רצף חזותי בדיוק.`;
+  return `התשובה הנכונה היא ${correct}. בסדרת הצורות כל האפשרויות שייכות לאותה משפחת צורות, ולכן בודקים את החוק המדויק: שינוי צורה, סיבוב, גודל ומיקום פנימי. רק אפשרות ${correct} ממשיכה את אותו רצף חזותי; המסיחים דומים אך טועים בפרט אחד.`;
 }
 
 function renderSignature(signature: ShapeSignature, x: number, y: number, size: number, primary: string, accent: string): string {
@@ -204,7 +214,7 @@ function renderSignature(signature: ShapeSignature, x: number, y: number, size: 
 }
 
 function renderCubeSignature(signature: ShapeSignature, x: number, y: number, primary: string, accent: string, visualScale = 1): string {
-  const shade = signature.flip ? '#38BDF8' : '#FBBF24';
+  const shade = '#38BDF8';
   const scale = signature.scale * visualScale;
   return `
     <g transform="translate(${x} ${y}) rotate(${signature.rotation / 4}) scale(${scale})">
@@ -325,11 +335,11 @@ function questionSvg(question: Question): string {
 
 function optionSvg(question: Question, option: QuestionOption, index: number): string {
   const seed = hashString(`${question.id}:spatial-rule`);
-  const [primary, accent, bg] = palette(seed + index);
+  const [primary, accent, bg] = palette(seed);
   const mode = visualMode(question);
   const correctId = correctOptionId(question);
   const target = targetSignature(question);
-  const signature = option.id === correctId ? target : distractorSignature(target, index);
+  const signature = option.id === correctId ? target : distractorSignature(target, index, mode);
   const shape = mode === 'cube'
     ? renderCubeSignature(signature, 210, 150, primary, accent, 1.25)
     : renderSignature(signature, 210, 146, 110, primary, accent);
@@ -359,8 +369,8 @@ export function isSpatialQuestion(question: Question): boolean {
 }
 
 function explanationSvg(question: Question): string {
-  const seed = hashString(`${question.id}:explanation:${question.explanation}`);
-  const [primary, accent, bg] = palette(seed + 11);
+  const seed = hashString(`${question.id}:spatial-rule`);
+  const [primary, accent, bg] = palette(seed);
   const mode = visualMode(question);
   const target = targetSignature(question);
   const correctLabel = escapeXml(correctOptionId(question).toUpperCase());
