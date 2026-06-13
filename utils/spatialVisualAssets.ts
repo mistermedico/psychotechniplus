@@ -134,6 +134,28 @@ function distractorSignature(target: ShapeSignature, index: number): ShapeSignat
   return { ...target, ...variants[index % variants.length] };
 }
 
+function correctOptionId(question: Question): string {
+  const byId = question.options.find(option => option.id === question.correctAnswer);
+  const byText = question.options.find(option => option.text === question.correctAnswer);
+  const byMarked = question.options.find(option => option.isCorrect);
+  return (byId ?? byText ?? byMarked ?? question.options[0])?.id ?? question.correctAnswer;
+}
+
+function spatialExplanation(question: Question): string {
+  const mode = visualMode(question);
+  const correct = correctOptionId(question).toUpperCase();
+  const rule =
+    mode === 'analogy'
+      ? 'באנלוגיית הצורות יש להחיל על הזוג השני בדיוק את אותו שינוי שמופיע בזוג הראשון.'
+      : mode === 'rotation'
+        ? 'בסדרת הסיבוב כל צורה ממשיכה את אותה תנועת סיבוב ושומרת על היחסים הפנימיים.'
+        : mode === 'cube'
+          ? 'בשאלת הקובייה יש להשוות את כיוון הפאות, הסימן הפנימי והסיבוב של הגוף.'
+          : 'בסדרת הצורות כל איבר משתנה לפי אותו כלל חזותי: צורה, סיבוב, גודל ומיקום פנימי.';
+
+  return `${rule} התשובה הנכונה היא ${correct}, כי היא היחידה שמשלימה את התבנית החסרה בלי לשנות מאפיין שאינו משתנה לפי החוק. שאר המסיחים משנים לפחות פרט אחד, כמו כיוון, סוג צורה, מיקום פנימי או גודל, ולכן אינם מתאימים.`;
+}
+
 function renderSignature(signature: ShapeSignature, x: number, y: number, size: number, primary: string, accent: string): string {
   const flipScale = signature.flip ? -1 : 1;
   return `
@@ -203,9 +225,9 @@ function optionSvg(question: Question, option: QuestionOption, index: number): s
   const seed = hashString(`${question.id}:${question.questionText}:spatial-rule`);
   const [primary, accent, bg] = palette(seed + index);
   const mode = visualMode(question);
-  const correctId = question.correctAnswer;
-  const isCorrect = option.id === correctId || option.isCorrect;
-  const signature = isCorrect ? targetSignature(question) : distractorSignature(targetSignature(question), index);
+  const correctId = correctOptionId(question);
+  const target = targetSignature(question);
+  const signature = option.id === correctId ? target : distractorSignature(target, index);
   const shape = mode === 'cube'
     ? renderCubeSignature(signature, 168, 80, primary, accent)
     : renderSignature(signature, 210, 146, 110, primary, accent);
@@ -238,7 +260,7 @@ function explanationSvg(question: Question): string {
   const seed = hashString(`${question.id}:explanation:${question.explanation}`);
   const [primary, accent, bg] = palette(seed + 11);
   const target = targetSignature(question);
-  const correctLabel = escapeXml(question.correctAnswer.toUpperCase());
+  const correctLabel = escapeXml(correctOptionId(question).toUpperCase());
 
   return svgDataUri(`
     <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
@@ -271,18 +293,22 @@ function explanationSvg(question: Question): string {
 export function ensureSpatialVisualAssets(question: Question): Question {
   if (!isSpatialQuestion(question)) return question;
 
+  const correctId = correctOptionId(question);
   const options = question.options.map((option, index) => ({
     ...option,
+    isCorrect: option.id === correctId,
     text: '',
     imageUrl: optionSvg(question, option, index),
   }));
 
   return {
     ...question,
+    correctAnswer: correctId,
     questionType: 'shapes',
     questionText: 'בחרו את התמונה המתאימה.',
     mediaUrl: questionSvg(question),
     mediaType: 'image',
+    explanation: spatialExplanation(question),
     explanationImageUrl: explanationSvg(question),
     options,
   };
