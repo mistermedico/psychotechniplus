@@ -259,7 +259,7 @@ function questionSvg(question: Question): string {
     const cells = positions.map(([cx, cy], step) => {
       const content = step === 8
         ? `<text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="52" font-family="Arial" font-weight="700" fill="#F8FAFC">?</text>`
-        : renderSignature(transformSignature(base, step, mode), cx, cy, 34, step % 2 ? accent : primary, step % 2 ? primary : accent);
+        : renderSignature(transformSignature(base, step, mode), cx, cy, 34, primary, accent);
       return `<g><rect x="${cx - 43}" y="${cy - 39}" width="86" height="78" rx="12" fill="#111827" stroke="#334155" stroke-width="2"/>${content}</g>`;
     }).join('');
 
@@ -313,7 +313,7 @@ function questionSvg(question: Question): string {
     const cx = xPositions[i];
     const shape = mode === 'cube'
       ? renderCubeSignature(sig, cx, 172, primary, accent, 0.58)
-      : renderSignature(sig, cx, 172, 40, (i + seed) % 2 === 0 ? primary : accent, (i + seed) % 2 === 0 ? accent : primary);
+      : renderSignature(sig, cx, 172, 40, primary, accent);
     return renderCell(shape, cx);
   }).join('');
 

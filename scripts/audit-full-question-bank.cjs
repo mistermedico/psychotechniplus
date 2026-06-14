@@ -8,12 +8,18 @@ const buildDir = path.join(root, '.full-audit-build');
 function compileAllQuestions() {
   fs.rmSync(buildDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(buildDir, 'data'), { recursive: true });
+  fs.mkdirSync(path.join(buildDir, 'utils'), { recursive: true });
   const compilerOptions = {
     module: ts.ModuleKind.CommonJS,
     target: ts.ScriptTarget.ES2020,
     esModuleInterop: true,
   };
-  for (const relativePath of ['data/types.ts', 'data/expandedPsychotechnicQuestions.ts', 'data/mockData.ts']) {
+  for (const relativePath of [
+    'data/types.ts',
+    'data/expandedPsychotechnicQuestions.ts',
+    'data/mockData.ts',
+    'utils/spatialVisualAssets.ts',
+  ]) {
     const sourcePath = path.join(root, relativePath);
     const outputPath = path.join(buildDir, relativePath.replace(/\.ts$/, '.js'));
     const source = fs.readFileSync(sourcePath, 'utf8');
@@ -65,12 +71,74 @@ function auditQuestion(question) {
   return issues;
 }
 
+function decodeSvgDataUri(value) {
+  if (!String(value ?? '').startsWith('data:image/svg+xml;base64,')) return '';
+  return Buffer.from(value.replace('data:image/svg+xml;base64,', ''), 'base64').toString('utf8');
+}
+
+function visiblePalette(svg) {
+  const ignored = new Set([
+    '#0B1120',
+    '#0B1220',
+    '#0F172A',
+    '#111827',
+    '#1E293B',
+    '#334155',
+    '#94A3B8',
+    '#CBD5E1',
+    '#E5E7EB',
+    '#F8FAFC',
+  ]);
+  return [...new Set([...svg.matchAll(/(?:fill|stroke)="(#[A-Fa-f0-9]{6})"/g)].map((match) => match[1]).filter((color) => !ignored.has(color)))].sort();
+}
+
+function auditSpatialVisualQuestion(question) {
+  const issues = [];
+  const mediaSvg = decodeSvgDataUri(question.mediaUrl);
+  const explanationSvg = decodeSvgDataUri(question.explanationImageUrl);
+  const optionSvgs = question.options.map((option) => decodeSvgDataUri(option.imageUrl));
+
+  if (!mediaSvg) issues.push('spatial question missing generated question SVG');
+  if (!explanationSvg) issues.push('spatial question missing generated explanation SVG');
+  if (optionSvgs.some((svg) => !svg)) issues.push('spatial option missing generated SVG');
+  if (new Set(question.options.map((option) => option.imageUrl)).size !== question.options.length) {
+    issues.push('spatial option SVGs are not unique');
+  }
+  if (question.options.some((option) => normalizeText(option.text))) {
+    issues.push('spatial image-only option still contains text');
+  }
+  if (mediaSvg && !mediaSvg.includes('?</text>')) issues.push('spatial question SVG missing visual gap marker');
+  if (explanationSvg && !explanationSvg.includes(`אפשרות ${question.correctAnswer.toUpperCase()}`)) {
+    issues.push('spatial explanation SVG does not label the correct option');
+  }
+  const questionPalette = visiblePalette(mediaSvg);
+  const questionPaletteSet = new Set(questionPalette);
+  const optionPaletteMismatch = optionSvgs.some((svg) => (
+    visiblePalette(svg).some((color) => !questionPaletteSet.has(color))
+  ));
+  if (questionPalette.length > 0 && optionPaletteMismatch) issues.push('spatial option palette differs from question palette');
+
+  return issues;
+}
+
 try {
   const questions = compileAllQuestions();
+  const {
+    ensureSpatialVisualAssets,
+    getSpatialVisualModeForQa,
+    isSpatialQuestion,
+  } = require(path.join(buildDir, 'utils', 'spatialVisualAssets.js'));
   const ids = questions.map((question) => question.id);
   const duplicateIds = ids.filter((id, index) => id && ids.indexOf(id) !== index);
-  const failures = questions
-    .map((question) => ({ id: question.id, issues: auditQuestion(question) }))
+  const normalizedQuestions = questions.map((question) => (isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question));
+  const failures = normalizedQuestions
+    .map((question) => ({
+      id: question.id,
+      issues: [
+        ...auditQuestion(question),
+        ...(isSpatialQuestion(question) ? auditSpatialVisualQuestion(question) : []),
+      ],
+    }))
     .filter((row) => row.issues.length > 0);
   if (duplicateIds.length > 0) {
     failures.unshift({
@@ -79,20 +147,29 @@ try {
     });
   }
 
-  const byTopic = questions.reduce((acc, question) => {
+  const byTopic = normalizedQuestions.reduce((acc, question) => {
     acc[question.topicId] = (acc[question.topicId] ?? 0) + 1;
     return acc;
   }, {});
-  const byStatus = questions.reduce((acc, question) => {
+  const byStatus = normalizedQuestions.reduce((acc, question) => {
     acc[question.validationStatus] = (acc[question.validationStatus] ?? 0) + 1;
     return acc;
   }, {});
 
+  const spatialModes = normalizedQuestions
+    .filter(isSpatialQuestion)
+    .reduce((acc, question) => {
+      const mode = getSpatialVisualModeForQa(question);
+      acc[mode] = (acc[mode] ?? 0) + 1;
+      return acc;
+    }, {});
+
   console.log(JSON.stringify({
-    totalQuestions: questions.length,
+    totalQuestions: normalizedQuestions.length,
     failures: failures.length,
     byTopic,
     byStatus,
+    spatialModes,
     sampleFailures: failures.slice(0, 200),
   }, null, 2));
 
