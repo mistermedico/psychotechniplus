@@ -8,6 +8,8 @@ const buildDir = path.join(root, '.full-audit-build');
 function compileAllQuestions() {
   fs.rmSync(buildDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(buildDir, 'data'), { recursive: true });
+  fs.mkdirSync(path.join(buildDir, 'lib'), { recursive: true });
+  fs.mkdirSync(path.join(buildDir, 'store'), { recursive: true });
   fs.mkdirSync(path.join(buildDir, 'utils'), { recursive: true });
   const compilerOptions = {
     module: ts.ModuleKind.CommonJS,
@@ -18,6 +20,9 @@ function compileAllQuestions() {
     'data/types.ts',
     'data/expandedPsychotechnicQuestions.ts',
     'data/mockData.ts',
+    'store/adminStore.ts',
+    'utils/questionQuality.ts',
+    'utils/smartExam.ts',
     'utils/spatialVisualAssets.ts',
   ]) {
     const sourcePath = path.join(root, relativePath);
@@ -26,6 +31,29 @@ function compileAllQuestions() {
     const output = ts.transpileModule(source, { compilerOptions, fileName: sourcePath });
     fs.writeFileSync(outputPath, output.outputText, 'utf8');
   }
+  fs.writeFileSync(path.join(buildDir, 'lib', 'db.js'), `
+    const noop = async () => null;
+    exports.fetchAllQuestions = async () => [];
+    exports.fetchTargets = async () => [];
+    exports.fetchTopics = async () => [];
+    exports.upsertQuestion = noop;
+    exports.deleteQuestion = noop;
+    exports.seedDatabase = noop;
+    exports.saveSessionRecord = noop;
+    exports.loadUserSessionHistory = async () => [];
+    exports.loadAllSessionHistory = async () => [];
+    exports.upsertTarget = noop;
+    exports.upsertTopic = noop;
+    exports.deleteTopicFromDB = noop;
+    exports.saveTemplates = noop;
+    exports.loadTemplates = async () => null;
+    exports.saveAdminSettings = noop;
+    exports.loadAdminSettings = async () => null;
+    exports.saveAdminState = noop;
+    exports.loadAdminState = async () => null;
+  `, 'utf8');
+  fs.writeFileSync(path.join(buildDir, 'lib', 'supabase.js'), 'exports.supabase = null;\n', 'utf8');
+  fs.writeFileSync(path.join(buildDir, 'utils', 'logger.js'), 'exports.logger = { info(){}, warn(){}, error(){}, debug(){} };\n', 'utf8');
   return require(path.join(buildDir, 'data', 'mockData.js')).QUESTIONS;
 }
 
@@ -121,16 +149,90 @@ function auditSpatialVisualQuestion(question) {
   return issues;
 }
 
+function auditSimulationTemplate(template, generated, knownTopicIds) {
+  const issues = [];
+  const sourceRules = template.smartRules && template.smartRules.length > 0 ? template.smartRules : template.rules;
+  const expectedQuestions = sourceRules.reduce((sum, rule) => sum + Number(rule.count || 0), 0);
+  const generatedIds = generated.allQuestions.map((question) => question.id);
+  const duplicateGeneratedIds = generatedIds.filter((id, index) => generatedIds.indexOf(id) !== index);
+
+  if (!template.id) issues.push('template missing id');
+  if (!normalizeText(template.name)) issues.push('template missing name');
+  if (!template.targetId) issues.push('template missing targetId');
+  if (!Array.isArray(sourceRules) || sourceRules.length === 0) issues.push('template has no rules');
+  if (Number(template.totalQuestions) !== expectedQuestions) {
+    issues.push(`template totalQuestions ${template.totalQuestions} differs from rules total ${expectedQuestions}`);
+  }
+  if (generated.totalQuestions !== expectedQuestions) {
+    issues.push(`generated ${generated.totalQuestions} questions, expected ${expectedQuestions}`);
+  }
+  if (duplicateGeneratedIds.length > 0) {
+    issues.push(`simulation generated duplicate question ids: ${[...new Set(duplicateGeneratedIds)].join(', ')}`);
+  }
+  if (generated.sections.length !== sourceRules.length) {
+    issues.push(`generated ${generated.sections.length} sections, expected ${sourceRules.length}`);
+  }
+
+  sourceRules.forEach((rule, index) => {
+    const section = generated.sections[index];
+    if (!knownTopicIds.has(rule.topicId)) issues.push(`rule ${rule.id} references unknown topic ${rule.topicId}`);
+    if (!section) return;
+    if (section.topicId !== rule.topicId) {
+      issues.push(`section ${index + 1} topic ${section.topicId} differs from rule topic ${rule.topicId}`);
+    }
+    if (section.questions.length !== rule.count) {
+      issues.push(`section ${rule.id} generated ${section.questions.length} questions, expected ${rule.count}`);
+    }
+    if (section.timeLimitSeconds <= 0) {
+      issues.push(`section ${rule.id} has invalid time limit ${section.timeLimitSeconds}`);
+    }
+    const wrongTopic = section.questions.find((question) => question.topicId !== rule.topicId);
+    if (wrongTopic) issues.push(`section ${rule.id} includes question ${wrongTopic.id} from ${wrongTopic.topicId}`);
+  });
+
+  return issues;
+}
+
 try {
   const questions = compileAllQuestions();
+  const Module = require('module');
+  const originalLoad = Module._load;
+  Module._load = function patchedLoad(request, parent, isMain) {
+    if (request === 'zustand') {
+      return {
+        create: (initializer) => {
+          let state;
+          const set = (updater) => {
+            const partial = typeof updater === 'function' ? updater(state) : updater;
+            state = { ...state, ...(partial || {}) };
+            return state;
+          };
+          const get = () => state;
+          state = initializer(set, get);
+          const useStore = () => state;
+          useStore.getState = get;
+          useStore.setState = set;
+          return useStore;
+        },
+      };
+    }
+    if (request === '@react-native-async-storage/async-storage') {
+      return { getItem: async () => null, setItem: async () => undefined, removeItem: async () => undefined };
+    }
+    return originalLoad(request, parent, isMain);
+  };
   const {
     ensureSpatialVisualAssets,
     getSpatialVisualModeForQa,
     isSpatialQuestion,
   } = require(path.join(buildDir, 'utils', 'spatialVisualAssets.js'));
+  const { generateSmartExamQuestions } = require(path.join(buildDir, 'utils', 'smartExam.js'));
+  const { useAdminStore } = require(path.join(buildDir, 'store', 'adminStore.js'));
+  Module._load = originalLoad;
   const ids = questions.map((question) => question.id);
   const duplicateIds = ids.filter((id, index) => id && ids.indexOf(id) !== index);
-  const normalizedQuestions = questions.map((question) => (isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question));
+  const adminState = useAdminStore.getState();
+  const normalizedQuestions = adminState.questions.map((question) => (isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question));
   const failures = normalizedQuestions
     .map((question) => ({
       id: question.id,
@@ -164,8 +266,25 @@ try {
       return acc;
     }, {});
 
+  const knownTopicIds = new Set(adminState.topics.map((topic) => topic.id));
+  const simulationFailures = adminState.templates
+    .map((template) => {
+      const generated = generateSmartExamQuestions(template, normalizedQuestions, {});
+      return {
+        id: template.id,
+        issues: auditSimulationTemplate(template, generated, knownTopicIds),
+      };
+    })
+    .filter((row) => row.issues.length > 0);
+
+  failures.push(...simulationFailures.map((failure) => ({
+    id: `simulation:${failure.id}`,
+    issues: failure.issues,
+  })));
+
   console.log(JSON.stringify({
     totalQuestions: normalizedQuestions.length,
+    totalSimulations: adminState.templates.length,
     failures: failures.length,
     byTopic,
     byStatus,
