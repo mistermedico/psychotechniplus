@@ -391,35 +391,51 @@ export default function PracticeSession() {
     }
   };
 
-  const advanceOrEnd = () => {
-    const hasMore = nextQuestion();
-    if (!hasMore) {
-      // In simulation: check if there are more sections
-      if (isSimulation && examSections.length > 1) {
-        const nextSectionIdx = currentSectionIdx + 1;
-        if (nextSectionIdx < examSections.length) {
-          // Show rest screen between sections
-          const template = templates.find(t => t.id === templateId);
-          const restTime = template?.restTimeBetweenRules ?? 0;
-          if (restTime > 0) {
-            setShowRestScreen(true);
-            setRestCountdown(restTime);
-            let t = restTime;
-            restTimerRef.current = setInterval(() => {
-              t--;
-              setRestCountdown(t);
-              if (t <= 0) {
-                if (restTimerRef.current) clearInterval(restTimerRef.current);
-                setShowRestScreen(false);
-                setCurrentSectionIdx(nextSectionIdx);
-              }
-            }, 1000);
-          } else {
-            setCurrentSectionIdx(nextSectionIdx);
-          }
-          return;
+  const getSectionEndIndex = (sectionIndex: number) => (
+    examSections
+      .slice(0, sectionIndex + 1)
+      .reduce((sum, section) => sum + section.questions.length, 0) - 1
+  );
+
+  const startSectionBreak = (nextSectionIdx: number) => {
+    const template = templates.find(t => t.id === templateId);
+    const restTime = template?.restTimeBetweenRules ?? 0;
+    if (restTime > 0) {
+      setShowRestScreen(true);
+      setRestCountdown(restTime);
+      let remaining = restTime;
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
+      restTimerRef.current = setInterval(() => {
+        remaining -= 1;
+        setRestCountdown(remaining);
+        if (remaining <= 0) {
+          if (restTimerRef.current) clearInterval(restTimerRef.current);
+          setShowRestScreen(false);
+          setCurrentSectionIdx(nextSectionIdx);
         }
-      }
+      }, 1000);
+      return;
+    }
+    setCurrentSectionIdx(nextSectionIdx);
+  };
+
+  const advanceOrEnd = () => {
+    const activeSession = usePracticeStore.getState().session;
+    const indexBeforeAdvance = activeSession?.currentIndex ?? session?.currentIndex ?? 0;
+    const nextSectionIdx = currentSectionIdx + 1;
+    const shouldPauseBetweenSections =
+      isSimulation &&
+      examSections.length > 1 &&
+      nextSectionIdx < examSections.length &&
+      indexBeforeAdvance >= getSectionEndIndex(currentSectionIdx);
+
+    const hasMore = nextQuestion();
+    if (hasMore && shouldPauseBetweenSections) {
+      startSectionBreak(nextSectionIdx);
+      return;
+    }
+
+    if (!hasMore) {
       finishSession();
     }
   };
