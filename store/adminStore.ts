@@ -224,6 +224,35 @@ export interface SmartExamTemplate {
   pinnedQuestionIds?: string[];  // specific questions always included
 }
 
+function toSmartRule(rule: SimulationRule, existing?: SmartRule, index = 0): SmartRule {
+  return {
+    id: existing?.id ?? rule.id,
+    name: existing?.name ?? `כלל ${index + 1}`,
+    topicId: rule.topicId,
+    count: rule.count,
+    minDifficulty: rule.minDifficulty,
+    maxDifficulty: rule.maxDifficulty,
+    useAdaptiveAlgorithm: rule.useAdaptive,
+    subRules: existing?.subRules ?? [],
+    conditions: existing?.conditions ?? [],
+    fallback: existing?.fallback ?? { type: 'nextRule' },
+  };
+}
+
+function normalizeTemplateRules(template: SmartExamTemplate): SmartExamTemplate {
+  const smartRulesById = new Map((template.smartRules ?? []).map(rule => [rule.id, rule]));
+  const rules = Array.isArray(template.rules) ? template.rules : [];
+  const smartRules = rules.map((rule, index) => (
+    toSmartRule(rule, smartRulesById.get(rule.id) ?? template.smartRules?.[index], index)
+  ));
+  return {
+    ...template,
+    rules,
+    totalQuestions: rules.reduce((sum, rule) => sum + Number(rule.count || 0), 0),
+    smartRules,
+  };
+}
+
 export interface PracticeSessionSettings {
   speedModeSecondsPerQuestion: number;   // default: 60
   showExplanationsAuto: boolean;          // default: false
@@ -1098,9 +1127,9 @@ const SEED_TEMPLATES: SmartExamTemplate[] = [
       { id: 'r_spatial_hard', topicId: 'topic_spatial', count: 12, minDifficulty: 6, maxDifficulty: 10, useAdaptive: true },
     ],
     smartRules: [
-      { id: 'sr_spatial_rotation', name: 'סיבובי צורות', topicId: 'topic_spatial', count: 12, minDifficulty: 2, maxDifficulty: 8, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
-      { id: 'sr_spatial_cubes', name: 'קוביות ומבנים', topicId: 'topic_spatial', count: 12, minDifficulty: 3, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
-      { id: 'sr_spatial_nets', name: 'פריסות גופים', topicId: 'topic_spatial', count: 12, minDifficulty: 4, maxDifficulty: 10, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_spatial_rotation', name: 'סיבובי צורות', topicId: 'topic_spatial', count: 10, minDifficulty: 2, maxDifficulty: 5, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr_spatial_cubes', name: 'קוביות ומבנים', topicId: 'topic_spatial', count: 14, minDifficulty: 4, maxDifficulty: 7, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr_spatial_nets', name: 'פריסות גופים', topicId: 'topic_spatial', count: 12, minDifficulty: 6, maxDifficulty: 10, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
     ],
     topicTimeSettings: { topic_spatial: 55 },
     restTimeBetweenRules: 15,
@@ -1226,7 +1255,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   questions: LOCAL_QUESTION_BANK.map(ensureSpatialVisualAssets),
   topics: [...TOPICS],
   targets: [...TARGETS],
-  templates: SEED_TEMPLATES,
+  templates: SEED_TEMPLATES.map(normalizeTemplateRules),
   selectedQuestionIds: [],
   practiceSettings: DEFAULT_PRACTICE_SETTINGS,
   examSettings: DEFAULT_EXAM_SETTINGS,
@@ -1619,11 +1648,11 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   addTemplate: (t) => {
-    const newT: SmartExamTemplate = {
+    const newT = normalizeTemplateRules({
       ...t,
       id: `tmpl_${Date.now()}`,
       createdAt: new Date(),
-    };
+    });
     set(s => {
       const next = [...s.templates, newT];
       saveTemplates(next);
@@ -1635,7 +1664,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   updateTemplate: (id, updates) => {
     set(s => {
-      const next = s.templates.map(t => (t.id === id ? { ...t, ...updates } : t));
+      const next = s.templates.map(t => (t.id === id ? normalizeTemplateRules({ ...t, ...updates }) : t));
       saveTemplates(next);
       return { templates: next };
     });
@@ -1654,7 +1683,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => {
       const templates = s.templates.map(t =>
         t.id === templateId
-          ? { ...t, rules: [...t.rules.filter(r => r.id !== rule.id), rule] }
+          ? normalizeTemplateRules({ ...t, rules: [...t.rules.filter(r => r.id !== rule.id), rule] })
           : t
       );
       saveTemplates(templates);
@@ -1666,7 +1695,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => {
       const templates = s.templates.map(t =>
         t.id === templateId
-          ? { ...t, rules: t.rules.filter(r => r.id !== ruleId) }
+          ? normalizeTemplateRules({ ...t, rules: t.rules.filter(r => r.id !== ruleId) })
           : t
       );
       saveTemplates(templates);
@@ -1937,7 +1966,9 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     try {
       const templates = await loadTemplates();
       if (templates && templates.length > 0) {
-        set({ templates });
+        const normalizedTemplates = templates.map(normalizeTemplateRules);
+        set({ templates: normalizedTemplates });
+        saveTemplates(normalizedTemplates);
       } else {
         saveTemplates(get().templates);
       }

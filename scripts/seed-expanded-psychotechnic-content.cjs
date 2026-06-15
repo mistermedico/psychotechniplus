@@ -95,9 +95,9 @@ const expandedTemplates = [
       { id: 'r_spatial_hard', topicId: 'topic_spatial', count: 12, minDifficulty: 6, maxDifficulty: 10, useAdaptive: true },
     ],
     smartRules: [
-      { id: 'sr_spatial_rotation', name: 'סיבובי צורות', topicId: 'topic_spatial', count: 12, minDifficulty: 2, maxDifficulty: 8, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
-      { id: 'sr_spatial_cubes', name: 'קוביות ומבנים', topicId: 'topic_spatial', count: 12, minDifficulty: 3, maxDifficulty: 9, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
-      { id: 'sr_spatial_nets', name: 'פריסות גופים', topicId: 'topic_spatial', count: 12, minDifficulty: 4, maxDifficulty: 10, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
+      { id: 'sr_spatial_rotation', name: 'סיבובי צורות', topicId: 'topic_spatial', count: 10, minDifficulty: 2, maxDifficulty: 5, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr_spatial_cubes', name: 'קוביות ומבנים', topicId: 'topic_spatial', count: 14, minDifficulty: 4, maxDifficulty: 7, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'nextRule' } },
+      { id: 'sr_spatial_nets', name: 'פריסות גופים', topicId: 'topic_spatial', count: 12, minDifficulty: 6, maxDifficulty: 10, useAdaptiveAlgorithm: true, subRules: [], conditions: [], fallback: { type: 'anyTopic' } },
     ],
     topicTimeSettings: { topic_spatial: 55 },
     restTimeBetweenRules: 15,

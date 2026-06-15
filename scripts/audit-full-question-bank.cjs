@@ -152,6 +152,9 @@ function auditSpatialVisualQuestion(question) {
 function auditSimulationTemplate(template, generated, knownTopicIds) {
   const issues = [];
   const sourceRules = template.smartRules && template.smartRules.length > 0 ? template.smartRules : template.rules;
+  const visibleRules = Array.isArray(template.rules) ? template.rules : [];
+  const smartRules = Array.isArray(template.smartRules) ? template.smartRules : [];
+  const visibleExpectedQuestions = visibleRules.reduce((sum, rule) => sum + Number(rule.count || 0), 0);
   const expectedQuestions = sourceRules.reduce((sum, rule) => sum + Number(rule.count || 0), 0);
   const generatedIds = generated.allQuestions.map((question) => question.id);
   const duplicateGeneratedIds = generatedIds.filter((id, index) => generatedIds.indexOf(id) !== index);
@@ -159,9 +162,13 @@ function auditSimulationTemplate(template, generated, knownTopicIds) {
   if (!template.id) issues.push('template missing id');
   if (!normalizeText(template.name)) issues.push('template missing name');
   if (!template.targetId) issues.push('template missing targetId');
-  if (!Array.isArray(sourceRules) || sourceRules.length === 0) issues.push('template has no rules');
-  if (Number(template.totalQuestions) !== expectedQuestions) {
-    issues.push(`template totalQuestions ${template.totalQuestions} differs from rules total ${expectedQuestions}`);
+  if (!Array.isArray(visibleRules) || visibleRules.length === 0) issues.push('template has no visible rules');
+  if (!Array.isArray(sourceRules) || sourceRules.length === 0) issues.push('template has no runnable rules');
+  if (smartRules.length > 0 && smartRules.length !== visibleRules.length) {
+    issues.push(`smartRules length ${smartRules.length} differs from visible rules length ${visibleRules.length}`);
+  }
+  if (Number(template.totalQuestions) !== visibleExpectedQuestions) {
+    issues.push(`template totalQuestions ${template.totalQuestions} differs from visible rules total ${visibleExpectedQuestions}`);
   }
   if (generated.totalQuestions !== expectedQuestions) {
     issues.push(`generated ${generated.totalQuestions} questions, expected ${expectedQuestions}`);
@@ -171,6 +178,28 @@ function auditSimulationTemplate(template, generated, knownTopicIds) {
   }
   if (generated.sections.length !== sourceRules.length) {
     issues.push(`generated ${generated.sections.length} sections, expected ${sourceRules.length}`);
+  }
+
+  if (smartRules.length > 0) {
+    visibleRules.forEach((rule, index) => {
+      const smartRule = smartRules[index];
+      if (!smartRule) return;
+      if (smartRule.topicId !== rule.topicId) {
+        issues.push(`smartRule ${index + 1} topic ${smartRule.topicId} differs from visible rule topic ${rule.topicId}`);
+      }
+      if (Number(smartRule.count) !== Number(rule.count)) {
+        issues.push(`smartRule ${index + 1} count ${smartRule.count} differs from visible rule count ${rule.count}`);
+      }
+      if (Number(smartRule.minDifficulty) !== Number(rule.minDifficulty)) {
+        issues.push(`smartRule ${index + 1} minDifficulty ${smartRule.minDifficulty} differs from visible rule ${rule.minDifficulty}`);
+      }
+      if (Number(smartRule.maxDifficulty) !== Number(rule.maxDifficulty)) {
+        issues.push(`smartRule ${index + 1} maxDifficulty ${smartRule.maxDifficulty} differs from visible rule ${rule.maxDifficulty}`);
+      }
+      if (Boolean(smartRule.useAdaptiveAlgorithm) !== Boolean(rule.useAdaptive)) {
+        issues.push(`smartRule ${index + 1} adaptive flag differs from visible rule`);
+      }
+    });
   }
 
   sourceRules.forEach((rule, index) => {
