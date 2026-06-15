@@ -108,7 +108,7 @@ function seriesQuestions(): GeneratedQuestionSeed[] {
   ];
   return patterns.map((p, i) => {
     const nums = [p.start];
-    p.steps.forEach(step => nums.push(nums[nums.length - 1] + step));
+    p.steps.slice(0, -1).forEach(step => nums.push(nums[nums.length - 1] + step));
     const wrong = [p.answer + 2, p.answer - 3, p.answer + 6].map(String);
     const options = [String(p.answer), ...wrong] as [string, string, string, string];
     return {
@@ -540,24 +540,36 @@ function massiveQuantitativeQuestions(): GeneratedQuestionSeed[] {
     targetIds: TOPIC_TARGETS.topic_quantitative,
   }));
 
-  const work: Array<[number, number, number, string]> = [
-    [6, 8, 24, 'קצב משותף: 1/6+1/8=7/24. זמן ליחידה אחת: 24/7 שעות.'],
-    [5, 10, 10, 'קצב משותף: 1/5+1/10=3/10. זמן ל-3 יחידות עבודה: 10 שעות.'],
-    [4, 12, 12, 'קצב משותף: 1/4+1/12=1/3. שלוש יחידות עבודה ייקחו 9 שעות; כאן שואלים על 4 יחידות ולכן 12.'],
-    [9, 18, 18, 'קצב משותף: 1/9+1/18=1/6. שלוש יחידות עבודה ייקחו 18 שעות.'],
-    [7, 14, 14, 'קצב משותף: 1/7+1/14=3/14. שלוש יחידות עבודה: 14 שעות.'],
-    [8, 24, 24, 'קצב משותף: 1/8+1/24=1/6. ארבע יחידות עבודה: 24 שעות.'],
-    [10, 15, 18, 'קצב משותף: 1/10+1/15=1/6. שלוש יחידות עבודה: 18 שעות.'],
-    [12, 20, 30, 'קצב משותף: 1/12+1/20=2/15. ארבע יחידות עבודה: 30 שעות.'],
+  const work: Array<[number, number]> = [
+    [6, 8],
+    [5, 10],
+    [4, 12],
+    [9, 18],
+    [7, 14],
+    [8, 24],
+    [10, 15],
+    [12, 20],
   ];
+  const gcd = (a: number, b: number): number => (b === 0 ? Math.abs(a) : gcd(b, a % b));
+  const formatHours = (numerator: number, denominator: number): string => {
+    const divisor = gcd(numerator, denominator);
+    const n = numerator / divisor;
+    const d = denominator / divisor;
+    return d === 1 ? `${n}` : `${n}/${d}`;
+  };
   work.forEach((w, i) => seeds.push({
     topicId: 'topic_quantitative',
     prefix: 'quant_work',
     questionType: 'quantitative',
-    questionText: `פועל א מסיים עבודה ב-${w[0]} שעות ופועל ב ב-${w[1]} שעות. לפי אותו יחס עבודה, כמה שעות יידרשו לסיים את הכמות המתוארת בתשובה?`,
-    options: [String(w[2]), String(Number(w[2]) + 4), String(Math.max(1, Number(w[2]) - 3)), String(Number(w[2]) + 8)],
+    questionText: `פועל א מסיים עבודה אחת ב-${w[0]} שעות ופועל ב מסיים אותה עבודה ב-${w[1]} שעות. אם שניהם עובדים יחד, כמה שעות יידרשו לסיום עבודה אחת?`,
+    options: [
+      formatHours(w[0] * w[1], w[0] + w[1]),
+      formatHours(w[0] + w[1], 2),
+      String(Math.min(w[0], w[1])),
+      String(Math.max(w[0], w[1])),
+    ],
     correctIndex: 0,
-    explanation: w[3],
+    explanation: `קצב העבודה המשותף הוא 1/${w[0]} + 1/${w[1]} = ${(w[0] + w[1])}/${w[0] * w[1]}. לכן הזמן לעבודה אחת הוא ${formatHours(w[0] * w[1], w[0] + w[1])} שעות.`,
     difficulty: 6 + (i % 4),
     targetIds: TOPIC_TARGETS.topic_quantitative,
   }));
