@@ -234,19 +234,20 @@ export default function ProfileTab() {
 
   const handleContact = () => {
     Haptics.selectionAsync();
-    const url = 'mailto:support@psychotechniplus.com';
+    const supportEmail = 'mrmedico111@gmail.com';
+    const url = `mailto:${supportEmail}`;
     Linking.canOpenURL(url)
       .then(supported => {
         if (supported) {
           Linking.openURL(url).catch(() => {
-            Alert.alert('צור קשר', 'שלח מייל לכתובת:\nsupport@psychotechniplus.com');
+            Alert.alert('צור קשר', `שלח מייל לכתובת:\n${supportEmail}`);
           });
         } else {
-          Alert.alert('צור קשר', 'שלח מייל לכתובת:\nsupport@psychotechniplus.com');
+          Alert.alert('צור קשר', `שלח מייל לכתובת:\n${supportEmail}`);
         }
       })
       .catch(() => {
-        Alert.alert('צור קשר', 'שלח מייל לכתובת:\nsupport@psychotechniplus.com');
+        Alert.alert('צור קשר', `שלח מייל לכתובת:\n${supportEmail}`);
       });
   };
 
@@ -607,7 +608,6 @@ export default function ProfileTab() {
 
           <Pressable onPress={handleVersionTap} style={styles.versionWrap}>
             <Text style={styles.version}>PsychoTechniPlus v1.0.0</Text>
-            <Text style={styles.versionSub}>לחץ 5 פעמים לגישת מנהל</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>

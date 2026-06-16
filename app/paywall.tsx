@@ -31,7 +31,7 @@ const PLAN_META: Record<string, { label: string; badge?: string; period: string;
 export default function PaywallScreen() {
   const {
     packages, isPurchasing, isRestoring, loadError,
-    fetchOfferings, purchase, restore, showRevenueCatPaywall, showCustomerCenter,
+    fetchOfferings, purchase, restore,
   } = usePurchaseStore();
   const { isPremium } = useUserStore();
   const [selected, setSelected] = useState<string>('monthly');
@@ -87,25 +87,6 @@ export default function PaywallScreen() {
       Alert.alert('שגיאה', result.error);
     } else {
       Alert.alert('לא נמצא מנוי', 'לא נמצאו רכישות קודמות לשחזור עבור חשבון זה.');
-    }
-  };
-
-  const handleRevenueCatPaywall = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const result = await showRevenueCatPaywall();
-    if (result.purchased || result.restored) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('פרימיום הופעל', 'הגישה המלאה הופעלה דרך RevenueCat.', [{ text: 'המשך', onPress: () => router.back() }]);
-    } else if (result.error) {
-      Alert.alert('RevenueCat Paywall', result.error);
-    }
-  };
-
-  const handleCustomerCenter = async () => {
-    Haptics.selectionAsync();
-    const result = await showCustomerCenter();
-    if (!result.success && result.error) {
-      Alert.alert('Customer Center', result.error);
     }
   };
 
@@ -279,25 +260,6 @@ export default function PaywallScreen() {
             <Text style={styles.restoreBtnText}>
               {isRestoring ? 'משחזר רכישות...' : 'שחזר רכישה קודמת'}
             </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleRevenueCatPaywall}
-            disabled={isPurchasing}
-            accessibilityRole="button"
-            accessibilityLabel="פתח מסך רכישה"
-            style={styles.nativePaywallBtn}
-          >
-            <Text style={styles.nativePaywallBtnText}>פתח מסך רכישה מובנה</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleCustomerCenter}
-            accessibilityRole="button"
-            accessibilityLabel="נהל מנוי"
-            style={styles.customerCenterBtn}
-          >
-            <Text style={styles.customerCenterBtnText}>ניהול מנוי</Text>
           </Pressable>
 
           {/* Legal text */}

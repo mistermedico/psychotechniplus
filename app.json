@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "PsychoTechniPlus",
+    "name": "פסיכוטכני פלוס",
     "slug": "psychotechniplus",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,10 +18,7 @@
       "infoPlist": {
         "UIRequiresFullScreen": true,
         "ITSAppUsesNonExemptEncryption": false,
-        "NSFaceIDUsageDescription": "Used for quick and secure authentication to your account",
-        "NSCameraUsageDescription": "Used to take a photo for your profile picture",
-        "NSPhotoLibraryUsageDescription": "Used to select a photo for your profile picture",
-        "NSPhotoLibraryAddUsageDescription": "Used to save images to your photo library",
+        "NSPhotoLibraryUsageDescription": "מאפשר למנהל לבחור תמונה לשאלה או להסבר מתוך ספריית התמונות.",
         "CFBundleAllowMixedLocalizations": true,
         "UIBackgroundModes": [],
         "NSAppTransportSecurity": {
@@ -97,8 +94,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Used to select a photo for your profile picture",
-          "cameraPermission": "Used to take a photo for your profile picture"
+          "photosPermission": "מאפשר למנהל לבחור תמונה לשאלה או להסבר מתוך ספריית התמונות."
         }
       ]
     ],

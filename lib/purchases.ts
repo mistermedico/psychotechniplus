@@ -9,9 +9,9 @@ import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 export const USE_REAL_PURCHASES = true;
 
 export const REVENUECAT_API_KEY_IOS =
-  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? 'test_QEWYAtjdTugtGFWGvpOncFXuwYS';
+  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? '';
 export const REVENUECAT_API_KEY_ANDROID =
-  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ?? 'test_QEWYAtjdTugtGFWGvpOncFXuwYS';
+  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ?? '';
 
 export const PREMIUM_ENTITLEMENT = 'premium';
 export const LEGACY_PREMIUM_ENTITLEMENTS = ['psychotechniplus Pro'];
@@ -76,6 +76,10 @@ function getApiKey(): string {
   return Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
 }
 
+function hasRevenueCatApiKey(): boolean {
+  return getApiKey().trim().length > 0;
+}
+
 function normalizePackageIdentifier(pkg: PurchasesPackage): PurchasePackageId | null {
   const raw = `${pkg.identifier} ${pkg.packageType} ${pkg.product.identifier}`.toLowerCase();
   if (raw.includes('lifetime')) return 'lifetime';
@@ -123,6 +127,7 @@ function sortPackages(packages: PurchasePackage[]): PurchasePackage[] {
 
 export async function initializePurchases(userId: string): Promise<void> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
+  if (!hasRevenueCatApiKey()) return;
   if (!configured) {
     Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.ERROR);
     Purchases.configure({
@@ -139,18 +144,21 @@ export async function initializePurchases(userId: string): Promise<void> {
 
 export async function identifyUser(userId: string): Promise<void> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
+  if (!hasRevenueCatApiKey()) return;
   const result = await Purchases.logIn(userId);
   latestCustomerInfo = result.customerInfo;
 }
 
 export async function getCustomerInfo(): Promise<RevenueCatCustomerInfo | null> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return latestCustomerInfo;
+  if (!hasRevenueCatApiKey()) return latestCustomerInfo;
   latestCustomerInfo = await Purchases.getCustomerInfo();
   return latestCustomerInfo;
 }
 
 export async function getOfferings(): Promise<PurchasePackage[]> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return DEFAULT_PURCHASE_PACKAGES;
+  if (!hasRevenueCatApiKey()) throw new Error('רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.');
   const offerings = await Purchases.getOfferings();
   const availablePackages = offerings.current?.availablePackages ?? offerings.all[DEFAULT_OFFERING_ID]?.availablePackages ?? [];
   const mapped = availablePackages.map(mapPackage).filter((pkg): pkg is PurchasePackage => Boolean(pkg));
@@ -161,8 +169,9 @@ export async function purchasePackage(
   pkg: PurchasePackage,
 ): Promise<{ success: boolean; customerInfo?: RevenueCatCustomerInfo; cancelled?: boolean; error?: string }> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) {
-    return { success: false, error: 'רכישות אמיתיות זמינות רק ב-iOS/Android development build.' };
+    return { success: false, error: 'רכישות זמינות רק באפליקציית iOS או Android.' };
   }
+  if (!hasRevenueCatApiKey()) return { success: false, error: 'רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.' };
 
   try {
     const offerings = await Purchases.getOfferings();
@@ -176,7 +185,7 @@ export async function purchasePackage(
     });
 
     if (!rcPackage) {
-      return { success: false, error: `החבילה ${pkg.identifier} לא נמצאה ב-RevenueCat Offering.` };
+      return { success: false, error: 'המוצר שבחרת אינו זמין כרגע לרכישה. נסה שוב מאוחר יותר.' };
     }
 
     const result = await Purchases.purchasePackage(rcPackage);
@@ -184,7 +193,7 @@ export async function purchasePackage(
     return {
       success: hasPremiumEntitlement(result.customerInfo),
       customerInfo: result.customerInfo,
-      error: hasPremiumEntitlement(result.customerInfo) ? undefined : `הרכישה הושלמה אבל entitlement ${PREMIUM_ENTITLEMENT} לא פעיל.`,
+      error: hasPremiumEntitlement(result.customerInfo) ? undefined : 'הרכישה הושלמה אך הגישה עדיין לא הופעלה. נסה לשחזר רכישה או פנה לתמיכה.',
     };
   } catch (error: unknown) {
     if (isUserCancelled(error)) return { success: false, cancelled: true };
@@ -194,6 +203,7 @@ export async function purchasePackage(
 
 export async function restorePurchases(): Promise<{ isPremium: boolean; error?: string }> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return { isPremium: false };
+  if (!hasRevenueCatApiKey()) return { isPremium: false, error: 'רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.' };
   try {
     const info = await Purchases.restorePurchases();
     latestCustomerInfo = info;
@@ -210,8 +220,9 @@ export async function checkPremiumStatus(): Promise<boolean> {
 
 export async function presentRevenueCatPaywall(): Promise<{ purchased: boolean; restored: boolean; error?: string }> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) {
-    return { purchased: false, restored: false, error: 'RevenueCat Paywall זמין רק ב-iOS/Android development build.' };
+    return { purchased: false, restored: false, error: 'מסך הרכישה זמין רק באפליקציית iOS או Android.' };
   }
+  if (!hasRevenueCatApiKey()) return { purchased: false, restored: false, error: 'רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.' };
 
   try {
     const result = await RevenueCatUI.presentPaywallIfNeeded({
@@ -230,8 +241,9 @@ export async function presentRevenueCatPaywall(): Promise<{ purchased: boolean; 
 
 export async function presentCustomerCenter(): Promise<{ success: boolean; error?: string }> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) {
-    return { success: false, error: 'RevenueCat Customer Center זמין רק ב-iOS/Android development build.' };
+    return { success: false, error: 'ניהול מנוי זמין רק באפליקציית iOS או Android.' };
   }
+  if (!hasRevenueCatApiKey()) return { success: false, error: 'רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.' };
 
   try {
     await RevenueCatUI.presentCustomerCenter({
@@ -250,6 +262,7 @@ export async function presentCustomerCenter(): Promise<{ success: boolean; error
 
 export async function logOutPurchases(): Promise<void> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
+  if (!hasRevenueCatApiKey()) return;
   await Purchases.logOut().catch(() => null);
   latestCustomerInfo = null;
 }
