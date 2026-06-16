@@ -14,9 +14,9 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
 
 const BENEFITS = [
-  { icon: '♾️', title: 'שאלות ללא הגבלה', desc: 'גישה לכל המאגר — מעל 2,000 שאלות' },
-  { icon: '🧠', title: 'אלגוריתם ELO אדפטיבי', desc: 'AI שמתאים את השאלות לרמתך בזמן אמת' },
-  { icon: '🏆', title: 'כל הסימולציות', desc: 'סימולציות מלאות בתנאי לחץ אמיתיים' },
+  { icon: '♾️', title: 'שאלות ללא הגבלה', desc: 'גישה לכל המאגר — מעל 1,200 שאלות תרגול' },
+  { icon: '🧠', title: 'אלגוריתם ELO אדפטיבי', desc: 'מנגנון שמתאים שאלות לפי רמת התרגול שלך' },
+  { icon: '🏆', title: 'כל הסימולציות', desc: 'סימולציות מלאות המדמות תרגול תחת זמן' },
   { icon: '⚡', title: 'אתגרים יומיים', desc: 'בונוס XP ומשימות מיוחדות מדי יום' },
   { icon: '📊', title: 'אנליטיקס מפורט', desc: 'גרפים, חוזקות, חולשות — הכל גלוי' },
   { icon: '💡', title: 'הסברים מלאים', desc: 'פתרון מפורט לכל שאלה' },
@@ -151,7 +151,7 @@ export default function PaywallScreen() {
             <View style={styles.heroPremiumBadge}>
               <Text style={styles.heroPremiumBadgeText}>פרמיום</Text>
             </View>
-            <Text style={styles.heroSub}>הכלי החזק ביותר להצלחה בפסיכוטכני</Text>
+            <Text style={styles.heroSub}>כלים מתקדמים לתרגול פסיכוטכני מסודר</Text>
           </Animated.View>
 
           {/* Benefits */}
@@ -285,10 +285,10 @@ export default function PaywallScreen() {
             onPress={handleRevenueCatPaywall}
             disabled={isPurchasing}
             accessibilityRole="button"
-            accessibilityLabel="פתח RevenueCat Paywall"
+            accessibilityLabel="פתח מסך רכישה"
             style={styles.nativePaywallBtn}
           >
-            <Text style={styles.nativePaywallBtnText}>פתח Paywall של RevenueCat</Text>
+            <Text style={styles.nativePaywallBtnText}>פתח מסך רכישה מובנה</Text>
           </Pressable>
 
           <Pressable
@@ -297,7 +297,7 @@ export default function PaywallScreen() {
             accessibilityLabel="נהל מנוי"
             style={styles.customerCenterBtn}
           >
-            <Text style={styles.customerCenterBtnText}>ניהול מנוי / Customer Center</Text>
+            <Text style={styles.customerCenterBtnText}>ניהול מנוי</Text>
           </Pressable>
 
           {/* Legal text */}

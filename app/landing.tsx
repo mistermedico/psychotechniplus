@@ -55,27 +55,27 @@ const FEATURES = [
 ];
 
 const STATS = [
-  { value: '10,000+', label: 'משתמשים' },
-  { value: '95%', label: 'שיפור ממוצע' },
-  { value: '3,000+', label: 'שאלות' },
+  { value: '1,200+', label: 'שאלות תרגול' },
+  { value: '4', label: 'תחומי תרגול' },
+  { value: '18', label: 'סימולציות' },
 ];
 
 const HOW_STEPS = [
   { icon: '📋', title: 'הירשם', desc: 'הרשמה מהירה ב-30 שניות' },
   { icon: '🧠', title: 'תרגל', desc: 'שאלות מותאמות לרמתך' },
-  { icon: '🚀', title: 'תצליח', desc: 'הגע לציון הרצוי' },
+  { icon: '🚀', title: 'התקדם', desc: 'עקוב אחרי ההתקדמות ותרגל נקודות חולשה' },
 ];
 
 const TESTIMONIALS = [
   {
     stars: '⭐⭐⭐⭐⭐',
-    text: 'עלה לי 30 נקודות תוך חודש! האפליקציה מרגישה כמו מאמן אישי. ממליץ בחום!',
-    author: '— דנה ג., ציון 134',
+    text: 'התרגול האדפטיבי עזר לי להבין איפה אני צריך להשתפר.',
+    author: '— משתמש תרגול',
   },
   {
     stars: '⭐⭐⭐⭐⭐',
-    text: 'הסימולציות חיקו בדיוק את המבחן האמיתי. הגעתי מוכן לחלוטין.',
-    author: '— יואב מ., ציון 141',
+    text: 'הסימולציות עזרו לי לתרגל עבודה עם זמן ולנתח טעויות.',
+    author: '— מתרגל באפליקציה',
   },
 ];
 
@@ -237,7 +237,7 @@ export default function LandingScreen() {
             </View>
 
             <Text style={styles.appName}>פסיכוטכניPlus</Text>
-            <Text style={styles.tagline}>הדרך החכמה להגיע לציון שרצית, עם אימון שנראה ומרגיש כמו מוצר פרימיום.</Text>
+            <Text style={styles.tagline}>דרך חכמה לתרגל לפסיכוטכני, עם שאלות, סימולציות ומעקב התקדמות אישי.</Text>
             <Text style={styles.subTagline}>מנוע אדפטיבי · תרגול חכם · סימולציות מלאות</Text>
 
             <View style={styles.heroPreview}>
@@ -339,7 +339,7 @@ export default function LandingScreen() {
               <View style={styles.sectionTag}>
                 <Text style={styles.sectionTagText}>מה תקבל</Text>
               </View>
-              <Text style={styles.sectionTitle}>כל מה שצריך{'\n'}כדי להצליח</Text>
+              <Text style={styles.sectionTitle}>כל מה שצריך{'\n'}כדי לתרגל בצורה מסודרת</Text>
             </View>
             <View style={styles.featuresGrid}>
               {FEATURES.map((f) => (
@@ -366,7 +366,7 @@ export default function LandingScreen() {
               <View style={styles.sectionTag}>
                 <Text style={styles.sectionTagText}>מה אומרים עלינו</Text>
               </View>
-              <Text style={styles.sectionTitle}>סטודנטים שהצליחו</Text>
+              <Text style={styles.sectionTitle}>משתמשים שמתרגלים בעקביות</Text>
             </View>
             <ScrollView
               horizontal
@@ -457,9 +457,9 @@ export default function LandingScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             >
               <View style={styles.finalCtaGlow} />
-              <Text style={styles.finalCtaTitle}>מוכן להצליח בפסיכוטכני?</Text>
+              <Text style={styles.finalCtaTitle}>מוכן לתרגל לפסיכוטכני?</Text>
               <Text style={styles.finalCtaSub}>
-                הצטרף לאלפי סטודנטים שכבר משתמשים ב-PsychoTechniPlus
+                התחל לתרגל שאלות, סימולציות והסברים ב-PsychoTechniPlus
               </Text>
               <Animated.View style={{ transform: [{ scale: ctaPressScale }] }}>
                 <Pressable
