@@ -13,7 +13,6 @@
       "bundleIdentifier": "com.psychotechniplus.app",
       "userInterfaceStyle": "dark",
       "requireFullScreen": true,
-      "deploymentTarget": "15.1",
       "infoPlist": {
         "UIRequiresFullScreen": true,
         "ITSAppUsesNonExemptEncryption": false,

@@ -10,10 +10,10 @@
     "typecheck": "tsc --noEmit",
     "build:web": "expo export --platform web --output-dir dist",
     "export:web": "expo export --platform web --output-dir dist-check",
-    "eas:whoami": "eas whoami",
-    "eas:env:list": "eas env:list --environment production",
-    "build:ios:production": "eas build --platform ios --profile production --non-interactive",
-    "submit:ios:production": "eas submit --platform ios --profile production --latest --non-interactive"
+    "eas:whoami": "npx eas-cli@20.2.0 whoami",
+    "eas:env:list": "npx eas-cli@20.2.0 env:list --environment production",
+    "build:ios:production": "npx eas-cli@20.2.0 build --platform ios --profile production --non-interactive",
+    "submit:ios:production": "npx eas-cli@20.2.0 submit --platform ios --profile production --latest --non-interactive"
   },
   "dependencies": {
     "@expo-google-fonts/heebo": "^0.2.3",
@@ -25,6 +25,7 @@
     "expo": "~52.0.46",
     "expo-blur": "~14.0.3",
     "expo-clipboard": "~7.0.1",
+    "expo-constants": "~17.0.8",
     "expo-font": "~13.0.4",
     "expo-haptics": "~14.0.1",
     "expo-image-picker": "~16.0.6",
@@ -49,10 +50,6 @@
     "@anthropic-ai/sdk": "^0.98.0",
     "@babel/core": "^7.25.0",
     "@types/react": "~18.3.12",
-    "eas-cli": "^20.2.0",
     "typescript": "^5.3.3"
-  },
-  "overrides": {
-    "@xmldom/xmldom": "0.9.10"
   }
 }
