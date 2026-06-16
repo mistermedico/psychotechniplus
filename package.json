@@ -9,7 +9,11 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "build:web": "expo export --platform web --output-dir dist",
-    "export:web": "expo export --platform web --output-dir dist-check"
+    "export:web": "expo export --platform web --output-dir dist-check",
+    "eas:whoami": "eas whoami",
+    "eas:env:list": "eas env:list --environment production",
+    "build:ios:production": "eas build --platform ios --profile production --non-interactive",
+    "submit:ios:production": "eas submit --platform ios --profile production --latest --non-interactive"
   },
   "dependencies": {
     "@expo-google-fonts/heebo": "^0.2.3",
@@ -45,6 +49,7 @@
     "@anthropic-ai/sdk": "^0.98.0",
     "@babel/core": "^7.25.0",
     "@types/react": "~18.3.12",
+    "eas-cli": "^20.2.0",
     "typescript": "^5.3.3"
   },
   "overrides": {
