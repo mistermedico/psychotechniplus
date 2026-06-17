@@ -86,6 +86,7 @@
     "plugins": [
       "expo-router",
       "expo-font",
+      "./plugins/withFmtXcode26Fix",
       [
         "expo-splash-screen",
         {
