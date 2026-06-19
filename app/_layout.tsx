@@ -86,7 +86,7 @@ export default function RootLayout() {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
       initialize().then(() => {
-        const { email, userId } = useUserStore.getState();
+        const { email, userId, isGuest } = useUserStore.getState();
         // Ensure targets+topics exist in Supabase for all users (FK prerequisite)
         ensureDbSeeded().then(() => {
           if (email.toLowerCase() === ADMIN_EMAIL) {
@@ -96,8 +96,8 @@ export default function RootLayout() {
             loadQuestionsFromSupabase();
           }
         });
-        // Initialize RevenueCat and restore premium status (no-op in dev)
-        if (userId) {
+        // Initialize RevenueCat only for signed-in accounts. Guests can use free content without registration.
+        if (userId && !isGuest) {
           initializePurchases(userId).catch(() => null);
         }
       });

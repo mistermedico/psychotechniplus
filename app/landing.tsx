@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { DEFAULT_PURCHASE_PACKAGES } from '../lib/purchases';
 import { usePurchaseStore } from '../store/purchaseStore';
+import { useUserStore } from '../store/userStore';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 
@@ -81,6 +82,7 @@ const TESTIMONIALS = [
 
 export default function LandingScreen() {
   const { packages, loadError, fetchOfferings } = usePurchaseStore();
+  const continueAsGuest = useUserStore(s => s.continueAsGuest);
 
   // Animation refs
   const navOpacity    = useRef(new Animated.Value(0)).current;
@@ -161,9 +163,10 @@ export default function LandingScreen() {
     return 'גמיש';
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/auth');
+    await continueAsGuest();
+    router.replace('/(tabs)');
   };
 
   const handleLogin = () => {
@@ -274,7 +277,7 @@ export default function LandingScreen() {
                   style={styles.ctaPrimaryGrad}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 >
-                  <Text style={styles.ctaPrimaryText}>התחל בחינם — ללא כרטיס אשראי ←</Text>
+                  <Text style={styles.ctaPrimaryText}>המשך חינמי כאורח ←</Text>
                 </LinearGradient>
               </Pressable>
               <View style={styles.ctaGlow} />
@@ -282,7 +285,7 @@ export default function LandingScreen() {
 
             {/* Secondary CTA */}
             <Pressable onPress={handleLogin} style={styles.ctaSecondary}>
-              <Text style={styles.ctaSecondaryText}>יש לי חשבון</Text>
+              <Text style={styles.ctaSecondaryText}>כניסה או הרשמה לסנכרון ופרימיום</Text>
             </Pressable>
           </Animated.View>
 
@@ -473,7 +476,7 @@ export default function LandingScreen() {
                     style={styles.finalCtaBtnGrad}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   >
-                    <Text style={styles.finalCtaBtnText}>התחל עכשיו — בחינם ←</Text>
+                    <Text style={styles.finalCtaBtnText}>המשך עכשיו כאורח בחינם ←</Text>
                   </LinearGradient>
                 </Pressable>
               </Animated.View>

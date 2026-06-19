@@ -28,6 +28,7 @@ export default function AuthScreen() {
   const [emailPending, setEmailPending] = useState(false);
 
   const initialize = useUserStore(s => s.initialize);
+  const continueAsGuest = useUserStore(s => s.continueAsGuest);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
   const registrationOpen = useAdminStore(s => s.appConfig.registrationOpen);
   const announcementEnabled = useAdminStore(s => s.appConfig.announcementEnabled);
@@ -139,6 +140,13 @@ export default function AuthScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/onboarding');
     }
+  };
+
+  const handleGuestAccess = async () => {
+    setError('');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await continueAsGuest();
+    router.replace('/(tabs)');
   };
 
   if (emailPending) {
@@ -375,6 +383,17 @@ export default function AuthScreen() {
                     </LinearGradient>
                   </Pressable>
 
+                  <Pressable
+                    onPress={handleGuestAccess}
+                    disabled={loading}
+                    accessibilityRole="button"
+                    accessibilityLabel="המשך כאורח ללא הרשמה"
+                    style={({ pressed }) => [styles.guestBtn, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: loading ? 0.75 : 1 }]}
+                  >
+                    <Text style={styles.guestBtnText}>המשך כאורח ללא הרשמה</Text>
+                    <Text style={styles.guestBtnSubText}>גישה חינמית לתרגול בסיסי בלי אימייל או סיסמה</Text>
+                  </Pressable>
+
                   <Text style={styles.hint}>
                     {mode === 'login'
                       ? 'אין לך חשבון? לחץ על "הרשמה" למעלה'
@@ -571,6 +590,32 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     color: '#fff',
     letterSpacing: 0.3,
+  },
+
+  guestBtn: {
+    marginTop: 8,
+    borderRadius: Radius.xl,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.055)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  guestBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: Colors.text,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  guestBtnSubText: {
+    marginTop: 4,
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.textTertiary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
 
   hint: {

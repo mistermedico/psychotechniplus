@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { UserBadge, BadgeType } from '../data/types';
 import { supabase } from '../lib/supabase';
 import {
-  getOrCreateUserId, loadUserProfile, saveUserProfile,
+  loadUserProfile, saveUserProfile,
   loadUserBadges, saveUserBadge, loadUserElos, saveUserElo,
 } from '../lib/db';
 import { logger } from '../utils/logger';
@@ -12,7 +12,12 @@ import { PerformanceLevel, computeAdaptiveLevel, LEVEL_LABELS } from '../utils/a
 
 const PREMIUM_REVIEW_EMAILS = new Set([
   'apple-review@psychotechniplus.app',
+  'apple-review-2026@psychotechniplus.app',
 ]);
+
+const GUEST_USER_ID = 'guest_local_free_access';
+const GUEST_NAME = 'אורח';
+const DEFAULT_TARGET_ID = 'target_psychometric';
 
 export interface TopicPerformanceEntry {
   isCorrect: boolean;
@@ -49,7 +54,9 @@ interface UserState {
   isLoaded: boolean;
   isSyncing: boolean;
   isAuthenticated: boolean;
+  isGuest: boolean;
   initialize: (overrideUserId?: string) => Promise<void>;
+  continueAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
 
@@ -86,6 +93,7 @@ const INITIAL_STATE = {
   isLoaded: false,
   isSyncing: false,
   isAuthenticated: false,
+  isGuest: false,
 };
 
 function xpForLevel(level: number): number { return level * 100; }
@@ -138,7 +146,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     const isReviewPremium = PREMIUM_REVIEW_EMAILS.has(sessionEmail.toLowerCase());
     const shouldForcePremium = isAdminPremium || isReviewPremium;
 
-    set({ userId, isAuthenticated: true, email: sessionEmail, isPremium: shouldForcePremium });
+    set({ userId, isAuthenticated: true, isGuest: false, email: sessionEmail, isPremium: shouldForcePremium });
 
     const [profile, badges, savedTopicPerformance] = await Promise.all([
       loadUserProfile(userId),
@@ -194,6 +202,25 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoaded: true, isSyncing: false });
   },
 
+  continueAsGuest: async () => {
+    await logOutPurchases().catch(() => null);
+    await supabase.auth.signOut().catch(() => null);
+    useAdminStore.getState().setIsAdmin(false);
+    set({
+      ...INITIAL_STATE,
+      userId: GUEST_USER_ID,
+      email: '',
+      name: GUEST_NAME,
+      selectedTargetId: DEFAULT_TARGET_ID,
+      hasCompletedOnboarding: true,
+      isAuthenticated: true,
+      isGuest: true,
+      isLoaded: true,
+      isSyncing: false,
+    });
+    logger.info('userStore:continueAsGuest', 'משתמש נכנס כאורח ללא הרשמה');
+  },
+
   signOut: async () => {
     logger.info('userStore:signOut', 'משתמש התנתק');
     await logOutPurchases().catch(() => null);
@@ -203,7 +230,11 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   deleteAccount: async () => {
-    const { userId } = get();
+    const { userId, isGuest } = get();
+    if (isGuest) {
+      set({ ...INITIAL_STATE, isLoaded: true });
+      return { success: true };
+    }
     if (!userId) return { success: false, error: 'No user session' };
     try {
       logger.info('userStore:deleteAccount', `מוחק חשבון: ${userId}`);
@@ -225,8 +256,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   completeOnboarding: (name, targetId) => {
     set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true });
-    const { userId } = get();
-    if (userId) saveUserProfile(userId, {
+    const { userId, isGuest } = get();
+    if (userId && !isGuest) saveUserProfile(userId, {
       name, selected_target_id: targetId, has_completed_onboarding: true,
     });
     logger.success('userStore:completeOnboarding', `אונבורדינג הושלם — ${name}, מסלול: ${targetId}`);
@@ -234,7 +265,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   recordAnswer: (topicId, difficulty, isCorrect) => {
-    const { topicPerformance, userId } = get();
+    const { topicPerformance, userId, isGuest } = get();
     const current = topicPerformance[topicId] ?? { history: [], currentLevel: 'beginner' as PerformanceLevel };
     const now = new Date().toISOString();
     const newHistory = [...current.history.slice(-39), { isCorrect, difficulty: clampDifficulty(difficulty), date: now }];
@@ -247,7 +278,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       },
     });
 
-    if (userId) {
+    if (userId && !isGuest) {
       saveUserElo(
         userId,
         topicId,
@@ -281,7 +312,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         newXp -= xpForLevel(newLevel);
         newLevel += 1;
       }
-      if (state.userId) saveUserProfile(state.userId, { xp: newXp, level: newLevel });
+      if (state.userId && !state.isGuest) saveUserProfile(state.userId, { xp: newXp, level: newLevel });
       return { xp: newXp, level: newLevel };
     });
   },
@@ -297,7 +328,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         longestStreak: Math.max(newStreak, state.longestStreak),
         lastPracticedDate: today,
       };
-      if (state.userId) {
+      if (state.userId && !state.isGuest) {
         saveUserProfile(state.userId, {
           streak: updates.streak,
           longest_streak: updates.longestStreak,
@@ -318,7 +349,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       earnedAt: new Date(),
     };
     set(state => ({ badges: [...state.badges, badge] }));
-    if (badge.userId) saveUserBadge(badge);
+    if (badge.userId && !get().isGuest) saveUserBadge(badge);
     useAdminStore.getState().logActivity(`תג הושג: ${type}`, 'user');
     return badge;
   },
@@ -342,7 +373,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         : state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
       const longestStreak = Math.max(newStreak, state.longestStreak);
 
-      if (state.userId) {
+      if (state.userId && !state.isGuest) {
         saveUserProfile(state.userId, {
           total_sessions: totalSessions,
           total_correct: totalCorrect,
@@ -369,19 +400,28 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   setPremium: (val) => {
-    const { userId, email } = get();
+    const { userId, email, isGuest } = get();
     const next = email.toLowerCase() === ADMIN_EMAIL ? true : val;
     set({ isPremium: next });
-    if (userId) saveUserProfile(userId, { is_premium: next });
+    if (userId && !isGuest) saveUserProfile(userId, { is_premium: next });
   },
 
   reset: () => {
-    const { userId } = get();
-    if (userId) saveUserProfile(userId, {
+    const { userId, isGuest } = get();
+    if (userId && !isGuest) saveUserProfile(userId, {
       name: '', selected_target_id: null, has_completed_onboarding: false,
       streak: 0, longest_streak: 0, last_practiced_date: null,
       level: 1, xp: 0, total_sessions: 0, total_correct: 0, total_answered: 0,
     });
-    set({ ...INITIAL_STATE, userId, isLoaded: true });
+    set({
+      ...INITIAL_STATE,
+      userId,
+      name: isGuest ? GUEST_NAME : '',
+      selectedTargetId: isGuest ? DEFAULT_TARGET_ID : null,
+      hasCompletedOnboarding: isGuest,
+      isAuthenticated: isGuest,
+      isGuest,
+      isLoaded: true,
+    });
   },
 }));

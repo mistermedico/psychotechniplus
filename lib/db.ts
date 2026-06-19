@@ -566,6 +566,10 @@ export interface SessionRecord {
 
 export async function saveSessionRecord(record: SessionRecord): Promise<void> {
   if (!record.userId) { logger.error('db:saveSessionRecord', 'userId חסר — סשן לא נשמר'); return; }
+  if (record.userId.startsWith('guest_')) {
+    logger.info('db:saveSessionRecord', 'סשן אורח נשמר מקומית בלבד');
+    return;
+  }
   try {
     await supabase.from('user_profiles').upsert({
       id: record.userId,
