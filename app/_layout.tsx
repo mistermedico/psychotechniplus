@@ -96,10 +96,8 @@ export default function RootLayout() {
             loadQuestionsFromSupabase();
           }
         });
-        // Initialize RevenueCat only for signed-in accounts. Guests can use free content without registration.
-        if (userId && !isGuest) {
-          initializePurchases(userId).catch(() => null);
-        }
+        // Guests receive an anonymous RevenueCat ID so StoreKit prices and purchase restoration work before sign-in.
+        initializePurchases(userId && !isGuest ? userId : undefined).catch(() => null);
       });
     }
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps

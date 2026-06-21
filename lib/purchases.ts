@@ -13,8 +13,8 @@ export const REVENUECAT_API_KEY_IOS =
 export const REVENUECAT_API_KEY_ANDROID =
   process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ?? '';
 
-export const PREMIUM_ENTITLEMENT = 'premium';
-export const LEGACY_PREMIUM_ENTITLEMENTS = ['psychotechniplus Pro'];
+export const PREMIUM_ENTITLEMENT = 'psychotechniplus Pro';
+export const LEGACY_PREMIUM_ENTITLEMENTS = ['premium'];
 export const DEFAULT_OFFERING_ID = 'default';
 
 export const PRODUCT_IDS = {
@@ -80,6 +80,23 @@ function hasRevenueCatApiKey(): boolean {
   return getApiKey().trim().length > 0;
 }
 
+function ensurePurchasesConfigured(userId?: string): boolean {
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported || !hasRevenueCatApiKey()) return false;
+  if (configured) return true;
+
+  Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.ERROR);
+  Purchases.configure({
+    apiKey: getApiKey(),
+    ...(userId ? { appUserID: userId } : {}),
+    preferredUILocaleOverride: 'he-IL',
+  });
+  Purchases.addCustomerInfoUpdateListener(info => {
+    latestCustomerInfo = info;
+  });
+  configured = true;
+  return true;
+}
+
 function normalizePackageIdentifier(pkg: PurchasesPackage): PurchasePackageId | null {
   const raw = `${pkg.identifier} ${pkg.packageType} ${pkg.product.identifier}`.toLowerCase();
   if (raw.includes('lifetime')) return 'lifetime';
@@ -125,33 +142,18 @@ function sortPackages(packages: PurchasePackage[]): PurchasePackage[] {
   return [...packages].sort((a, b) => order.indexOf(a.identifier) - order.indexOf(b.identifier));
 }
 
-export async function initializePurchases(userId: string): Promise<void> {
-  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
-  if (!hasRevenueCatApiKey()) return;
-  if (!configured) {
-    Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.ERROR);
-    Purchases.configure({
-      apiKey: getApiKey(),
-      appUserID: userId,
-      preferredUILocaleOverride: 'he-IL',
-    });
-    Purchases.addCustomerInfoUpdateListener(info => {
-      latestCustomerInfo = info;
-    });
-    configured = true;
-  }
+export async function initializePurchases(userId?: string): Promise<void> {
+  ensurePurchasesConfigured(userId);
 }
 
 export async function identifyUser(userId: string): Promise<void> {
-  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
-  if (!hasRevenueCatApiKey()) return;
+  if (!ensurePurchasesConfigured()) return;
   const result = await Purchases.logIn(userId);
   latestCustomerInfo = result.customerInfo;
 }
 
 export async function getCustomerInfo(): Promise<RevenueCatCustomerInfo | null> {
-  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return latestCustomerInfo;
-  if (!hasRevenueCatApiKey()) return latestCustomerInfo;
+  if (!ensurePurchasesConfigured()) return latestCustomerInfo;
   latestCustomerInfo = await Purchases.getCustomerInfo();
   return latestCustomerInfo;
 }
@@ -159,6 +161,7 @@ export async function getCustomerInfo(): Promise<RevenueCatCustomerInfo | null> 
 export async function getOfferings(): Promise<PurchasePackage[]> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return DEFAULT_PURCHASE_PACKAGES;
   if (!hasRevenueCatApiKey()) throw new Error('רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.');
+  ensurePurchasesConfigured();
   const offerings = await Purchases.getOfferings();
   const availablePackages = offerings.current?.availablePackages ?? offerings.all[DEFAULT_OFFERING_ID]?.availablePackages ?? [];
   const mapped = availablePackages.map(mapPackage).filter((pkg): pkg is PurchasePackage => Boolean(pkg));
@@ -172,6 +175,7 @@ export async function purchasePackage(
     return { success: false, error: 'רכישות זמינות רק באפליקציית iOS או Android.' };
   }
   if (!hasRevenueCatApiKey()) return { success: false, error: 'רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.' };
+  ensurePurchasesConfigured();
 
   try {
     const offerings = await Purchases.getOfferings();
@@ -204,6 +208,7 @@ export async function purchasePackage(
 export async function restorePurchases(): Promise<{ isPremium: boolean; error?: string }> {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return { isPremium: false };
   if (!hasRevenueCatApiKey()) return { isPremium: false, error: 'רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.' };
+  ensurePurchasesConfigured();
   try {
     const info = await Purchases.restorePurchases();
     latestCustomerInfo = info;
@@ -223,6 +228,7 @@ export async function presentRevenueCatPaywall(): Promise<{ purchased: boolean; 
     return { purchased: false, restored: false, error: 'מסך הרכישה זמין רק באפליקציית iOS או Android.' };
   }
   if (!hasRevenueCatApiKey()) return { purchased: false, restored: false, error: 'רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.' };
+  ensurePurchasesConfigured();
 
   try {
     const result = await RevenueCatUI.presentPaywallIfNeeded({
@@ -244,6 +250,7 @@ export async function presentCustomerCenter(): Promise<{ success: boolean; error
     return { success: false, error: 'ניהול מנוי זמין רק באפליקציית iOS או Android.' };
   }
   if (!hasRevenueCatApiKey()) return { success: false, error: 'רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.' };
+  ensurePurchasesConfigured();
 
   try {
     await RevenueCatUI.presentCustomerCenter({
@@ -261,8 +268,7 @@ export async function presentCustomerCenter(): Promise<{ success: boolean; error
 }
 
 export async function logOutPurchases(): Promise<void> {
-  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return;
-  if (!hasRevenueCatApiKey()) return;
+  if (!ensurePurchasesConfigured()) return;
   await Purchases.logOut().catch(() => null);
   latestCustomerInfo = null;
 }

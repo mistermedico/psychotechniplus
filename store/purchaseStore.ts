@@ -24,7 +24,7 @@ interface PurchaseState {
   loadError: string | null;
   customerInfo: CustomerInfo | null;
 
-  initialize: (userId: string) => Promise<void>;
+  initialize: (userId?: string) => Promise<void>;
   fetchOfferings: () => Promise<void>;
   purchase: (pkg: PurchasePackage) => Promise<{ success: boolean; cancelled?: boolean; error?: string }>;
   restore: () => Promise<{ isPremium: boolean; error?: string }>;
@@ -50,7 +50,7 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
   initialize: async (userId) => {
     try {
       await initializePurchases(userId);
-      await identifyUser(userId);
+      if (userId) await identifyUser(userId);
       const customerInfo = await getCustomerInfo();
       set({ isInitialized: true, customerInfo, loadError: null });
       logger.info('purchaseStore:initialize', 'RevenueCat initialized');
