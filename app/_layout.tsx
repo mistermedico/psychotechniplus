@@ -20,6 +20,7 @@ import { ensureDbSeeded } from '../lib/db';
 import ScreenGuide from '../components/ScreenGuide';
 
 // Force RTL for Hebrew
+I18nManager.allowRTL(true);
 if (!I18nManager.isRTL) {
   I18nManager.forceRTL(true);
   if (Platform.OS !== 'web') {
@@ -46,6 +47,12 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       html, body, #root {
         direction: rtl !important;
         text-align: right !important;
+        unicode-bidi: plaintext !important;
+      }
+
+      #root, #root * {
+        direction: rtl !important;
+        unicode-bidi: plaintext !important;
       }
 
       input, textarea, [contenteditable="true"] {
@@ -53,12 +60,23 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         text-align: right !important;
       }
 
-      [data-testid], [role="button"], [role="link"] {
-        direction: rtl;
+      [dir="ltr"], [style*="direction: ltr"], [style*="text-align: left"] {
+        direction: rtl !important;
+        text-align: right !important;
       }
 
-      [class*="css-text"] {
-        text-align: right;
+      [data-testid], [role="button"], [role="link"] {
+        direction: rtl !important;
+      }
+
+      [class*="css-text"], [class*="r-"], div, span, p, h1, h2, h3, h4, h5, h6 {
+        text-align: right !important;
+        direction: rtl !important;
+      }
+
+      svg text {
+        direction: rtl !important;
+        unicode-bidi: bidi-override !important;
       }
     `;
     document.head.appendChild(style);

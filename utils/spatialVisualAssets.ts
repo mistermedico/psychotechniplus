@@ -55,17 +55,13 @@ function shapeMarkup(kind: number, x: number, y: number, size: number, fill: str
 
 function visualMode(question: Question): SpatialMode {
   const text = `${question.id} ${question.questionText} ${question.subtopicId ?? ''}`.toLowerCase();
-  const modes: SpatialMode[] = ['series', 'analogy', 'rotation', 'matrix', 'mirror', 'cube'];
-
-  if (question.topicId === 'topic_spatial' || question.questionType === 'shapes') {
-    return modes[hashString(question.id) % modes.length];
-  }
-
   if (text.includes('analog') || text.includes('אנלוג')) return 'analogy';
   if (text.includes('matrix') || text.includes('מטריצ')) return 'matrix';
   if (text.includes('mirror') || text.includes('reflection') || text.includes('שיקוף') || text.includes('מראה')) return 'mirror';
   if (text.includes('rotate') || text.includes('rotation') || text.includes('סיבוב')) return 'rotation';
   if (text.includes('cube') || text.includes('קוב') || text.includes('פריס')) return 'cube';
+
+  const modes: SpatialMode[] = ['series', 'analogy', 'rotation', 'matrix', 'mirror', 'cube'];
   return modes[hashString(question.id) % modes.length];
 }
 
@@ -159,13 +155,13 @@ function targetSignature(question: Question): ShapeSignature {
 
 function distractorSignature(target: ShapeSignature, index: number, mode: SpatialMode): ShapeSignature {
   if (mode === 'cube') {
-    const cubeVariants: Array<Partial<ShapeSignature>> = [
+    const variants: Array<Partial<ShapeSignature>> = [
       { rotation: (target.rotation + 90) % 360 },
       { secondaryKind: (target.secondaryKind + 1) % 6 },
       { rotation: (target.rotation + 180) % 360 },
       { secondaryKind: (target.secondaryKind + 2) % 6, rotation: (target.rotation + 270) % 360 },
     ];
-    return { ...target, ...cubeVariants[index % cubeVariants.length] };
+    return { ...target, ...variants[index % variants.length] };
   }
 
   const variants: Array<Partial<ShapeSignature>> = [
@@ -184,6 +180,15 @@ function correctOptionId(question: Question): string {
   return (byId ?? byText ?? byMarked ?? question.options[0])?.id ?? question.correctAnswer;
 }
 
+function modePrompt(mode: SpatialMode): string {
+  if (mode === 'analogy') return 'איזו צורה משלימה את האנלוגיה?';
+  if (mode === 'rotation') return 'איזו צורה מתקבלת אחרי הסיבוב?';
+  if (mode === 'matrix') return 'איזו צורה חסרה במטריצה?';
+  if (mode === 'mirror') return 'איזו צורה היא השיקוף הנכון?';
+  if (mode === 'cube') return 'איזו קובייה ממשיכה את החוק המרחבי?';
+  return 'איזו צורה משלימה את הסדרה?';
+}
+
 function spatialExplanation(question: Question): string {
   const mode = visualMode(question);
   const correct = correctOptionId(question).toUpperCase();
@@ -191,18 +196,18 @@ function spatialExplanation(question: Question): string {
     return `התשובה הנכונה היא ${correct}. בזוג הראשון מזהים שינוי קבוע: הצורה הראשית, הכיוון והסימן הפנימי משתנים יחד. מחילים את אותו שינוי בדיוק על הצורה השלישית, ורק אפשרות ${correct} שומרת על אותה התאמה. שאר האפשרויות משנות פרט אחד לפחות ולכן אינן משלימות את האנלוגיה.`;
   }
   if (mode === 'rotation') {
-    return `התשובה הנכונה היא ${correct}. משווים את הצורה לפני הסיבוב ואחרי סיבוב של 180 מעלות: הכיוון מתהפך, אך היחס בין הצורה החיצונית לסימן הפנימי נשמר. רק אפשרות ${correct} מציגה את תוצאת הסיבוב המדויקת.`;
+    return `התשובה הנכונה היא ${correct}. משווים את הצורה לפני הסיבוב ולאחר סיבוב של 180 מעלות: הכיוון מתהפך, אך היחס בין הצורה החיצונית לסימן הפנימי נשמר. רק אפשרות ${correct} מציגה את תוצאת הסיבוב המדויקת.`;
   }
   if (mode === 'matrix') {
-    return `התשובה הנכונה היא ${correct}. במטריצה בודקים מה משתנה בכל עמודה ובכל שורה: סוג הצורה, הסיבוב, הגודל והמיקום הפנימי. התא החסר צריך להמשיך את שני החוקים יחד, ורק אפשרות ${correct} עושה זאת בלי חריגה.`;
+    return `התשובה הנכונה היא ${correct}. במטריצה בודקים מה משתנה בכל עמודה ובכל שורה: סוג הצורה, הסיבוב, הגודל והמיקום הפנימי. התא החסר צריך להמשיך את שני החוקים יחד, ורק אפשרות ${correct} עושה זאת ללא חריגה.`;
   }
   if (mode === 'mirror') {
-    return `התשובה הנכונה היא ${correct}. קו המראה הופך ימין ושמאל, ולכן גם הסימן הפנימי עובר לצד המקביל לאחר השיקוף. האפשרות הנכונה היא זו ששומרת על הצורה והצבעים אך מציבה אותם בצד המשוקף.`;
+    return `התשובה הנכונה היא ${correct}. קו המראה הופך ימין ושמאל, ולכן גם הסימן הפנימי עובר לצד המקביל לאחר השיקוף. האפשרות הנכונה שומרת על הצורה והצבעים, אך מציבה אותם בצד המשוקף.`;
   }
   if (mode === 'cube') {
-    return `התשובה הנכונה היא ${correct}. בשאלת הקובייה כל האפשרויות נשארות מאותה משפחת צורות וצבעים, ולכן צריך להשוות פרט-פרט: כיוון הפאות, סיבוב הגוף והסימן הפנימי שעל הפאה. אפשרות ${correct} היא היחידה שממשיכה את אותו חוק מרחבי; המסיחים דומים לה אך משנים פרט אחד כמו כיוון, פאה או מיקום פנימי.`;
+    return `התשובה הנכונה היא ${correct}. בשאלת קובייה משווים פרט-פרט: כיוון הפאות, סיבוב הגוף והסימן הפנימי שעל הפאה. אפשרות ${correct} היא היחידה שממשיכה את אותו חוק מרחבי; המסיחים דומים אך משנים פרט אחד כמו כיוון, פאה או מיקום פנימי.`;
   }
-  return `התשובה הנכונה היא ${correct}. בסדרת הצורות כל האפשרויות שייכות לאותה משפחת צורות, ולכן בודקים את החוק המדויק: שינוי צורה, סיבוב, גודל ומיקום פנימי. רק אפשרות ${correct} ממשיכה את אותו רצף חזותי; המסיחים דומים אך טועים בפרט אחד.`;
+  return `התשובה הנכונה היא ${correct}. בסדרת הצורות בודקים את החוק המדויק: שינוי צורה, סיבוב, גודל ומיקום פנימי. רק אפשרות ${correct} ממשיכה את אותו רצף חזותי; המסיחים דומים אך טועים בפרט אחד.`;
 }
 
 function renderSignature(signature: ShapeSignature, x: number, y: number, size: number, primary: string, accent: string): string {
@@ -232,20 +237,12 @@ function renderCell(content: string, cx: number, y = 124): string {
   return `<g><rect x="${cx - 38}" y="${y}" width="76" height="96" rx="14" fill="#111827" stroke="#334155" stroke-width="2"/>${content}</g>`;
 }
 
-function modePrompt(mode: SpatialMode): string {
-  if (mode === 'analogy') return 'איזו צורה משלימה את האנלוגיה?';
-  if (mode === 'rotation') return 'איזו צורה מתקבלת אחרי הסיבוב?';
-  if (mode === 'matrix') return 'איזו צורה חסרה במטריצה?';
-  if (mode === 'mirror') return 'איזו צורה היא השיקוף הנכון?';
-  if (mode === 'cube') return 'איזו קובייה ממשיכה את החוק המרחבי?';
-  return 'איזו צורה משלימה את הסדרה?';
-}
-
 function questionSvg(question: Question): string {
   const seed = hashString(`${question.id}:spatial-rule`);
   const [primary, accent, bg] = palette(seed);
   const mode = visualMode(question);
   const base = baseSignature(seed);
+  const prompt = escapeXml(modePrompt(mode));
 
   if (mode === 'matrix') {
     const positions = [
@@ -264,7 +261,7 @@ function questionSvg(question: Question): string {
       <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
         <rect width="640" height="360" rx="28" fill="${bg}"/>
         <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
-        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${modePrompt(mode)}</text>
+        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${prompt}</text>
         <g>${cells}</g>
       </svg>
     `);
@@ -277,7 +274,7 @@ function questionSvg(question: Question): string {
       <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
         <rect width="640" height="360" rx="28" fill="${bg}"/>
         <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
-        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${modePrompt(mode)}</text>
+        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${prompt}</text>
         ${renderCell(source, 188, 130)}
         <path d="M 320 108 V 250" stroke="#22D3EE" stroke-width="6" stroke-dasharray="10 10" stroke-linecap="round"/>
         <text x="320" y="278" text-anchor="middle" font-size="18" font-family="Arial" font-weight="700" fill="#CBD5E1">קו מראה</text>
@@ -293,7 +290,7 @@ function questionSvg(question: Question): string {
       <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
         <rect width="640" height="360" rx="28" fill="${bg}"/>
         <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
-        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${modePrompt(mode)}</text>
+        <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${prompt}</text>
         ${renderCell(source, 188, 130)}
         <path d="M 266 178 C 306 118, 394 118, 430 176" fill="none" stroke="#22D3EE" stroke-width="8" stroke-linecap="round"/>
         <path d="M 430 176 l-26 -6 l14 24 z" fill="#22D3EE"/>
@@ -325,10 +322,10 @@ function questionSvg(question: Question): string {
     : '';
 
   return svgDataUri(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" direction="rtl">
       <rect width="640" height="360" rx="28" fill="${bg}"/>
       <rect x="24" y="24" width="592" height="312" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
-      <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${modePrompt(mode)}</text>
+      <text x="592" y="62" text-anchor="end" font-size="24" font-family="Arial" font-weight="700" fill="#F8FAFC">${prompt}</text>
       <g>${relation}${connectors}</g>
       <g>${cells}${missing}</g>
     </svg>
@@ -406,7 +403,7 @@ function explanationSvg(question: Question): string {
     <svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" direction="rtl">
       <rect width="640" height="400" rx="28" fill="${bg}"/>
       <rect x="28" y="28" width="584" height="344" rx="22" fill="#0B1220" stroke="#334155" stroke-width="2"/>
-      <text x="562" y="70" text-anchor="end" font-size="25" font-family="Arial" font-weight="700" fill="#F8FAFC">${title}</text>
+      <text x="562" y="70" text-anchor="end" font-size="25" font-family="Arial" font-weight="700" fill="#F8FAFC">${escapeXml(title)}</text>
       <text x="562" y="101" text-anchor="end" font-size="17" font-family="Arial" fill="#CBD5E1">אפשרות ${correctLabel} משלימה את החוק החזותי.</text>
       <rect x="68" y="120" width="220" height="190" rx="24" fill="#111827" stroke="#475569" stroke-width="2"/>
       ${targetVisual}
@@ -414,17 +411,17 @@ function explanationSvg(question: Question): string {
       <g transform="translate(540 150)">
         <circle cx="0" cy="0" r="15" fill="${primary}"/>
         <text x="0" y="5" text-anchor="middle" font-size="14" font-family="Arial" font-weight="700" fill="#0B1220">1</text>
-        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${checks[0]}</text>
+        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${escapeXml(checks[0])}</text>
       </g>
       <g transform="translate(540 204)">
         <circle cx="0" cy="0" r="15" fill="${accent}"/>
         <text x="0" y="5" text-anchor="middle" font-size="14" font-family="Arial" font-weight="700" fill="#0B1220">2</text>
-        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${checks[1]}</text>
+        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${escapeXml(checks[1])}</text>
       </g>
       <g transform="translate(540 258)">
         <circle cx="0" cy="0" r="15" fill="#38BDF8"/>
         <text x="0" y="5" text-anchor="middle" font-size="14" font-family="Arial" font-weight="700" fill="#0B1220">3</text>
-        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${checks[2]}</text>
+        <text x="-28" y="5" text-anchor="end" font-size="18" font-family="Arial" fill="#F8FAFC">${escapeXml(checks[2])}</text>
       </g>
     </svg>
   `);
