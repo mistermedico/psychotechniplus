@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, ActivityIndicator, Alert, Animated,
-  KeyboardAvoidingView, Platform, Image, Switch,
+  KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { Question, QuestionType, QuestionOption } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
+import { VisualImage } from '../../components/VisualImage';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -959,8 +960,8 @@ function QuestionCard({ question, index, onSave, onDiscard, onUpdateText, onUpda
 
       {/* Question image preview */}
       {question.mediaUrl && (
-        <Image
-          source={{ uri: question.mediaUrl }}
+        <VisualImage
+          uri={question.mediaUrl}
           style={styles.qImagePreview}
           resizeMode="contain"
         />

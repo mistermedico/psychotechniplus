@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Animated, Alert, ScrollView, Image,
+  View, Text, StyleSheet, Pressable, Animated, Alert, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +15,7 @@ import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
 import { startBulkGeneration, stopBulkGeneration } from '../../utils/backgroundGenerator';
 import { auditPsychotechnicQuestion } from '../../utils/questionQuality';
+import { VisualImage } from '../../components/VisualImage';
 
 // ── Question type options ──────────────────────────────────────────────────
 
@@ -873,7 +874,7 @@ function QuestionPreviewCard({ question }: { question: Question }) {
         </Text>
 
         {question.mediaUrl && question.mediaType === 'image' && (
-          <Image source={{ uri: question.mediaUrl }} style={{ width: '100%', height: 160, borderRadius: 8, marginBottom: 8 }} resizeMode="contain" />
+          <VisualImage uri={question.mediaUrl} style={{ width: '100%', height: 160, borderRadius: 8, marginBottom: 8 }} resizeMode="contain" />
         )}
 
         <View style={cardStyles.options}>
@@ -891,7 +892,7 @@ function QuestionPreviewCard({ question }: { question: Question }) {
                 <Text style={[cardStyles.optionId, opt.isCorrect && { color: Colors.success }]}>{opt.id.toUpperCase()}</Text>
                 <Text style={[cardStyles.optionText, { textAlign: ta(opt.text), writingDirection: optDir }]}>{opt.text}</Text>
                 {opt.imageUrl ? (
-                  <Image source={{ uri: opt.imageUrl }} style={cardStyles.optionImage} resizeMode="contain" />
+                  <VisualImage uri={opt.imageUrl} style={cardStyles.optionImage} resizeMode="contain" />
                 ) : null}
                 {opt.isCorrect && <Text style={cardStyles.correctMark}>✓</Text>}
               </View>
@@ -903,7 +904,7 @@ function QuestionPreviewCard({ question }: { question: Question }) {
           <View style={cardStyles.explanation}>
             <Text style={cardStyles.explanationLabel}>💡 הסבר:</Text>
             {question.questionType === 'shapes' && question.mediaUrl ? (
-              <Image source={{ uri: question.mediaUrl }} style={cardStyles.explanationImage} resizeMode="contain" />
+              <VisualImage uri={question.mediaUrl} style={cardStyles.explanationImage} resizeMode="contain" />
             ) : null}
             <Text style={[cardStyles.explanationText, { textAlign: ta(question.explanation), writingDirection: detectDir(question.explanation) }]}>
               {question.explanation}

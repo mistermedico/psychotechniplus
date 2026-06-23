@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView,
-  Animated, Alert, Dimensions, TextInput, Modal, KeyboardAvoidingView, Platform, Image,
+  Animated, Alert, Dimensions, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { useSettingsStore } from '../store/settingsStore';
 import { getTopicById, getTargetById, TOPICS } from '../data/mockData';
 import { fetchQuestions } from '../lib/db';
 import { QuestionCard } from '../components/QuestionCard';
+import { VisualImage } from '../components/VisualImage';
 import { ProgressBar } from '../components/ProgressBar';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
@@ -781,8 +782,8 @@ export default function PracticeSession() {
               </Text>
               <Text style={styles.explanationTitle}>הסבר:</Text>
               {question.explanationImageUrl ? (
-                <Image
-                  source={{ uri: question.explanationImageUrl }}
+                <VisualImage
+                  uri={question.explanationImageUrl}
                   style={styles.explanationImage}
                   resizeMode="contain"
                 />

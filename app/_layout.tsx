@@ -112,6 +112,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="landing" options={{ animation: 'fade' }} />
           <Stack.Screen name="auth" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="auth-callback" options={{ animation: 'fade' }} />
           <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
           <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
           <Stack.Screen

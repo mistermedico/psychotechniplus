@@ -13,10 +13,7 @@ interface ShapeSignature {
 }
 
 function svgDataUri(svg: string): string {
-  const encoded = typeof btoa === 'function'
-    ? btoa(unescape(encodeURIComponent(svg)))
-    : (globalThis as any).Buffer.from(svg, 'utf8').toString('base64');
-  return `data:image/svg+xml;base64,${encoded}`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg.replace(/\s+/g, ' ').trim())}`;
 }
 
 function escapeXml(value: string): string {

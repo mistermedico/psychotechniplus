@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Animated, Share, Image,
+  View, Text, StyleSheet, ScrollView, Pressable, Animated, Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
+import { VisualImage } from '../components/VisualImage';
 import { getTopicById } from '../data/mockData';
 import { getPerformanceLevel, formatTime } from '../utils/scoring';
 import { StatCard } from '../components/StatCard';
@@ -258,7 +259,7 @@ function ReviewQuestionCard({ question, index, selectedAnswerId }: { question: Q
         {question.questionText}
       </Text>
       {question.mediaUrl && question.mediaType === 'image' ? (
-        <Image source={{ uri: question.mediaUrl }} style={reviewStyles.image} resizeMode="contain" />
+        <VisualImage uri={question.mediaUrl} style={reviewStyles.image} resizeMode="contain" />
       ) : null}
       <View style={reviewStyles.answerBox}>
         <Text style={reviewStyles.answerLine}>התשובה שלך: {selected ? selected.text || selected.id.toUpperCase() : 'לא נבחרה תשובה'}</Text>
@@ -266,7 +267,7 @@ function ReviewQuestionCard({ question, index, selectedAnswerId }: { question: Q
       </View>
       <Text style={reviewStyles.explanationLabel}>הסבר:</Text>
       {question.explanationImageUrl ? (
-        <Image source={{ uri: question.explanationImageUrl }} style={reviewStyles.image} resizeMode="contain" />
+        <VisualImage uri={question.explanationImageUrl} style={reviewStyles.image} resizeMode="contain" />
       ) : null}
       <Text style={[reviewStyles.explanation, { textAlign: ta(question.explanation), writingDirection: detectDir(question.explanation) }]}>
         {question.explanation}

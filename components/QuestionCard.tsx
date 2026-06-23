@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, Animated, Image,
+  View, Text, StyleSheet, Pressable, ScrollView, Animated,
 } from 'react-native';
 import { Question } from '../data/types';
 import { Colors } from '../constants/colors';
@@ -8,6 +8,7 @@ import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../constants/them
 import { useSettingsStore, FontSizeOption } from '../store/settingsStore';
 import { detectDir, textAlign } from '../utils/textDirection';
 import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
+import { VisualImage } from './VisualImage';
 
 interface Props {
   question: Question;
@@ -162,8 +163,8 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
         )}
         {/* Question image */}
         {displayQuestion.mediaUrl && displayQuestion.mediaType === 'image' && (
-          <Image
-            source={{ uri: displayQuestion.mediaUrl }}
+          <VisualImage
+            uri={displayQuestion.mediaUrl}
             style={[styles.questionImage, isSpatial && styles.spatialQuestionImage]}
             resizeMode="contain"
           />
@@ -190,8 +191,8 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                       pressed && !revealed && { opacity: 0.85 },
                     ]}
                   >
-                    <Image
-                      source={{ uri: opt.imageUrl! }}
+                    <VisualImage
+                      uri={opt.imageUrl}
                       style={styles.optionGridImage}
                       resizeMode="contain"
                     />
@@ -238,8 +239,8 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                     {opt.text}
                   </Text>
                   {opt.imageUrl && (
-                    <Image
-                      source={{ uri: opt.imageUrl }}
+                    <VisualImage
+                      uri={opt.imageUrl}
                       style={styles.optionThumbnail}
                       resizeMode="cover"
                     />
