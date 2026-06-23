@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     padding: 8,
     marginTop: 2,
   },
-  entryDataText: { fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,255,0.55)', textAlign: 'left' },
+  entryDataText: { fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,255,0.55)', textAlign: 'right', writingDirection: 'rtl' },
   copyBtn: {
     width: 32,
     height: 32,

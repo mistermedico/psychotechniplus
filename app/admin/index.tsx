@@ -26,37 +26,31 @@ interface NavSection {
 }
 
 const ADMIN_SECTIONS: NavSection[] = [
-  // Content
-  { id: 'questions',          icon: '📋', label: 'שאלות',          desc: 'CRUD ופילטרים',        route: '/admin/questions',           category: 'content' },
-  { id: 'validate',           icon: '✅', label: 'ולידציה',         desc: 'אישור שאלות',           route: '/admin/validate',            category: 'content' },
-  { id: 'json-import',        icon: '📥', label: 'ייבוא JSON',      desc: 'העלאת שאלות',           route: '/admin/json-import',         category: 'content' },
-  { id: 'ai-generator',       icon: '📝', label: 'מחולל שאלות',     desc: 'מבוסס תבניות',          route: '/admin/ai-generator',        category: 'content' },
-  { id: 'export',             icon: '📤', label: 'ייצוא',            desc: 'ייצוא JSON',             route: '/admin/export',              category: 'content' },
-  { id: 'topics-admin',       icon: '📚', label: 'נושאים',          desc: 'ניהול Topics',           route: '/admin/topics-admin',        category: 'content' },
-  // Exams
-  { id: 'simulation-builder', icon: '🏗️', label: 'סימולציה',        desc: 'תבניות מבחן',           route: '/admin/simulation-builder',  category: 'exams' },
-  { id: 'topic-exam-map',     icon: '🗺️', label: 'מפת נושאים',     desc: 'שיוך נושא↔מבחן',        route: '/admin/topic-exam-map',      category: 'exams' },
-  { id: 'question-assignment',icon: '🔗', label: 'שיוך שאלות',      desc: 'שייך לנושאים',          route: '/admin/question-assignment', category: 'exams' },
-  { id: 'display-settings',  icon: '🎨', label: 'תצוגה',            desc: 'ממשק שאלות',             route: '/admin/display-settings',    category: 'exams' },
-  // Users
-  { id: 'users',              icon: '👥', label: 'משתמשים',         desc: 'צפייה, שדרוג',           route: '/admin/users',               category: 'users' },
-  { id: 'monitor',            icon: '🛰️', label: 'מוניטור',         desc: 'שאלות, פרקים ומבחנים',    route: '/admin/monitor',             category: 'users' },
-  { id: 'leaderboard-admin',  icon: '🏅', label: 'לוח מובילים',     desc: 'ניהול דירוג',            route: '/admin/leaderboard-admin',   category: 'users' },
-  // Business
-  { id: 'revenue',            icon: '📈', label: 'הכנסות',           desc: 'MRR ומנויים',            route: '/admin/revenue',             category: 'business' },
-  { id: 'promo-codes',        icon: '🎟️', label: 'קודי קופון',      desc: 'הנחות וגישה',            route: '/admin/promo-codes',         category: 'business' },
-  { id: 'notifications',      icon: '🔔', label: 'הודעות Push',     desc: 'שליחת התראות',           route: '/admin/notifications',       category: 'business' },
-  { id: 'app-settings',       icon: '⚙️', label: 'הגדרות אפליקציה',desc: 'פרמטרים גלובליים',       route: '/admin/app-settings',        category: 'business' },
-  // System
-  { id: 'performance',        icon: '📈', label: 'ביצועים',           desc: 'דיוק, רמות, נושאים',     route: '/admin/performance',         category: 'system' },
-  { id: 'analytics',          icon: '📊', label: 'אנליטיקס',         desc: 'גרפים ומגמות',           route: '/admin/analytics',           category: 'system' },
-  { id: 'app-control',        icon: '🎮', label: 'מרכז שליטה',       desc: 'תחזוקה, דגלים',          route: '/admin/app-control',         category: 'system' },
-  { id: 'session-settings',   icon: '🎛️', label: 'הגדרות סשן',      desc: 'תרגול ומבחנים',          route: '/admin/session-settings',    category: 'system' },
-  { id: 'daily-challenge',    icon: '🎯', label: 'אתגרים יומיים',    desc: 'בונוס XP',               route: '/admin/daily-challenge',     category: 'system' },
-  { id: 'activity-log',       icon: '📋', label: 'יומן פעילות',      desc: 'תיעוד פעולות',           route: '/admin/activity-log',        category: 'system' },
-  { id: 'logs',               icon: '🪵', label: 'לוגים',             desc: 'שגיאות ואירועים',         route: '/admin/logs',                category: 'system' },
+  { id: 'questions',           icon: 'ש', label: 'שאלות',              desc: 'עריכה, מחיקה וסינון',                 route: '/admin/questions',           category: 'content' },
+  { id: 'validate',            icon: 'א', label: 'אימות שאלות',        desc: 'אישור שאלות לפני פרסום',              route: '/admin/validate',            category: 'content' },
+  { id: 'json-import',         icon: 'י', label: 'ייבוא JSON',         desc: 'העלאת שאלות למאגר',                   route: '/admin/json-import',         category: 'content' },
+  { id: 'ai-generator',        icon: 'מ', label: 'מחולל שאלות',        desc: 'יצירה לפי תבניות',                    route: '/admin/ai-generator',        category: 'content' },
+  { id: 'export',              icon: 'צ', label: 'ייצוא',              desc: 'ייצוא נתונים לקובץ JSON',              route: '/admin/export',              category: 'content' },
+  { id: 'topics-admin',        icon: 'נ', label: 'נושאים ופרקים',      desc: 'ניהול נושאים, פרקים ותוכן',            route: '/admin/topics-admin',        category: 'content' },
+  { id: 'simulation-builder',  icon: 'ס', label: 'סימולציות',          desc: 'בניית תבניות מבחן מלאות',             route: '/admin/simulation-builder',  category: 'exams' },
+  { id: 'topic-exam-map',      icon: 'מ', label: 'מפת נושאים',         desc: 'שיוך נושא למבחן',                     route: '/admin/topic-exam-map',      category: 'exams' },
+  { id: 'question-assignment', icon: 'ק', label: 'שיוך שאלות',         desc: 'חיבור שאלות לפרקים ולמבחנים',          route: '/admin/question-assignment', category: 'exams' },
+  { id: 'display-settings',    icon: 'ת', label: 'תצוגה',              desc: 'הגדרות ממשק שאלות',                   route: '/admin/display-settings',    category: 'exams' },
+  { id: 'users',               icon: 'מ', label: 'משתמשים',            desc: 'צפייה, שדרוג וניהול גישה',             route: '/admin/users',               category: 'users' },
+  { id: 'monitor',             icon: 'ב', label: 'ניטור הגשות',        desc: 'שאלות, פרקים, מבחנים והגשות',          route: '/admin/monitor',             category: 'users' },
+  { id: 'leaderboard-admin',   icon: 'ד', label: 'לוח מובילים',        desc: 'ניהול דירוגים והישגים',                route: '/admin/leaderboard-admin',   category: 'users' },
+  { id: 'revenue',             icon: 'ה', label: 'הכנסות',             desc: 'מנויים, המרות ומדדי הכנסה',            route: '/admin/revenue',             category: 'business' },
+  { id: 'promo-codes',         icon: 'ק', label: 'קודי קופון',         desc: 'הנחות וגישה זמנית',                   route: '/admin/promo-codes',         category: 'business' },
+  { id: 'notifications',       icon: 'ה', label: 'הודעות Push',        desc: 'שליחת התראות למשתמשים',               route: '/admin/notifications',       category: 'business' },
+  { id: 'app-settings',        icon: 'ג', label: 'הגדרות אפליקציה',    desc: 'פרמטרים גלובליים',                    route: '/admin/app-settings',        category: 'business' },
+  { id: 'performance',         icon: 'ב', label: 'ביצועים',            desc: 'דיוק, רמות ונושאים',                   route: '/admin/performance',         category: 'system' },
+  { id: 'analytics',           icon: 'א', label: 'אנליטיקס',           desc: 'גרפים, חוזקות ומגמות',                 route: '/admin/analytics',           category: 'system' },
+  { id: 'app-control',         icon: 'ש', label: 'מרכז שליטה',         desc: 'תחזוקה, דגלים ומצב מערכת',             route: '/admin/app-control',         category: 'system' },
+  { id: 'session-settings',    icon: 'ס', label: 'הגדרות סשן',         desc: 'תרגול, מבחנים וסימולציות',             route: '/admin/session-settings',    category: 'system' },
+  { id: 'daily-challenge',     icon: 'י', label: 'אתגרים יומיים',      desc: 'משימות יומיות ובונוס XP',              route: '/admin/daily-challenge',     category: 'system' },
+  { id: 'activity-log',        icon: 'פ', label: 'יומן פעילות',        desc: 'תיעוד פעולות מנהל',                   route: '/admin/activity-log',        category: 'system' },
+  { id: 'logs',                icon: 'ל', label: 'לוגים',              desc: 'שגיאות ואירועי מערכת',                 route: '/admin/logs',                category: 'system' },
 ];
-
 const CATEGORY_COLORS: Record<NavCategory, [string, string]> = {
   content:  ['#5A52D5', '#7C6FF7'],
   exams:    ['#7C6FF7', '#C084FC'],
@@ -66,21 +60,21 @@ const CATEGORY_COLORS: Record<NavCategory, [string, string]> = {
 };
 
 const CATEGORY_LABELS: Record<NavCategory, string> = {
-  content:  'תוכן 📚',
-  exams:    'מבחנים 🏆',
-  users:    'משתמשים 👥',
-  business: 'עסקי 💼',
-  system:   'מערכת ⚙️',
+  content:  'תוכן',
+  exams:    'מבחנים וסימולציות',
+  users:    'משתמשים',
+  business: 'עסקי',
+  system:   'מערכת',
 };
 
 const QUICK_ACTIONS = [
-  { icon: '✅', label: 'אמת שאלות', route: '/admin/validate' },
-  { icon: '➕', label: 'הוסף שאלה', route: '/admin/question-editor?mode=add' },
-  { icon: '📈', label: 'ביצועים',    route: '/admin/performance' },
-  { icon: '🛰️', label: 'מוניטור',    route: '/admin/monitor' },
-  { icon: '👥', label: 'משתמשים',   route: '/admin/users' },
-  { icon: '📤', label: 'ייצא',        route: '/admin/export' },
-  { icon: '🔔', label: 'שלח הודעה',  route: '/admin/notifications' },
+  { icon: 'א', label: 'אמת שאלות', route: '/admin/validate' },
+  { icon: '+', label: 'הוסף שאלה', route: '/admin/question-editor?mode=add' },
+  { icon: 'ב', label: 'ביצועים', route: '/admin/performance' },
+  { icon: 'נ', label: 'ניטור', route: '/admin/monitor' },
+  { icon: 'מ', label: 'משתמשים', route: '/admin/users' },
+  { icon: 'י', label: 'ייצוא', route: '/admin/export' },
+  { icon: 'ש', label: 'שלח הודעה', route: '/admin/notifications' },
 ];
 
 export default function AdminDashboard() {
@@ -186,14 +180,14 @@ export default function AdminDashboard() {
             <View style={styles.heroInfo}>
               <Text style={styles.heroDate}>{today}</Text>
               <Text style={[styles.heroStatus, syncError && { color: Colors.danger }]}>
-                {syncError ? 'נדרשת בדיקת סנכרון' : isSyncing ? 'מסנכרן נתונים...' : 'מצב מערכת: תקין ✅'}
+                {syncError ? 'נדרשת בדיקת סנכרון' : isSyncing ? 'מסנכרן נתונים...' : 'מצב מערכת: תקין'}
               </Text>
             </View>
           </View>
-          <Text style={styles.heroTitle}>🛠️ פאנל ניהול</Text>
+          <Text style={styles.heroTitle}>פאנל ניהול</Text>
           <Text style={styles.heroSub}>PsychoTechniPlus Admin</Text>
           <View style={styles.adminBadgesRow}>
-            <Text style={styles.adminPremiumBadge}>💎 מנהל פרימיום אוטומטי</Text>
+            <Text style={styles.adminPremiumBadge}>מנהל פרימיום אוטומטי</Text>
             <Text style={[styles.syncBadge, syncError && styles.syncBadgeError]}>
               {isSyncing ? 'מסנכרן...' : `סונכרן: ${lastSyncText}`}
             </Text>
@@ -240,8 +234,8 @@ export default function AdminDashboard() {
             style={({ pressed }) => [styles.alertBanner, pressed && { opacity: 0.85 }]}
           >
             <LinearGradient colors={['#D97706', '#B45309']} style={styles.alertGrad}>
-              <Text style={styles.alertText}>⚠️  {pendingCount} שאלות ממתינות לאישור</Text>
-              <Text style={styles.alertArrow}>←</Text>
+              <Text style={styles.alertText}>{pendingCount} שאלות ממתינות לאישור</Text>
+              <Text style={styles.alertArrow}>‹</Text>
             </LinearGradient>
           </Pressable>
         )}
@@ -251,23 +245,23 @@ export default function AdminDashboard() {
         <View style={styles.statsGrid}>
           {/* Questions */}
           <View style={[styles.glassCard, { borderColor: Colors.primary + '40' }]}>
-            <Text style={styles.glassCardTitle}>📋 שאלות</Text>
+            <Text style={styles.glassCardTitle}>שאלות</Text>
             <Text style={[styles.glassCardValue, { color: Colors.primary }]}>{stats.totalQuestions}</Text>
-            <Text style={styles.glassCardSub}>✅ {stats.validatedCount} מאושרות · ⏳ {stats.pendingCount} ממתינות</Text>
+            <Text style={styles.glassCardSub}>{stats.validatedCount} מאושרות · {stats.pendingCount} ממתינות</Text>
           </View>
           {/* Users */}
           <View style={[styles.glassCard, { borderColor: Colors.success + '40' }]}>
-            <Text style={styles.glassCardTitle}>👥 משתמשים</Text>
+            <Text style={styles.glassCardTitle}>משתמשים</Text>
             <Text style={[styles.glassCardValue, { color: Colors.success }]}>
               {latestRevenue ? latestRevenue.totalPremiumUsers : '—'}
             </Text>
             <Text style={styles.glassCardSub}>
-              💎 פרמיום · 📈 {latestRevenue ? (latestRevenue.conversionRate * 100).toFixed(1) : '—'}% המרה
+              פרימיום · {latestRevenue ? (latestRevenue.conversionRate * 100).toFixed(1) : '—'}% המרה
             </Text>
           </View>
           {/* Revenue */}
           <View style={[styles.glassCard, { borderColor: '#D97706' + '40' }]}>
-            <Text style={styles.glassCardTitle}>💰 הכנסות</Text>
+            <Text style={styles.glassCardTitle}>הכנסות</Text>
             <Text style={[styles.glassCardValue, { color: '#F59E0B' }]}>
               {latestRevenue ? `₪${latestRevenue.mrr.toLocaleString()}` : '—'}
             </Text>
@@ -277,7 +271,7 @@ export default function AdminDashboard() {
           </View>
           {/* Quality */}
           <View style={[styles.glassCard, { borderColor: Colors.accent + '40' }]}>
-            <Text style={styles.glassCardTitle}>⚖️ איכות</Text>
+            <Text style={styles.glassCardTitle}>איכות</Text>
             <Text style={[styles.glassCardValue, { color: Colors.accent }]}>{approvedPct}%</Text>
             <Text style={styles.glassCardSub}>קושי ממוצע: {stats.avgDifficulty}</Text>
           </View>
@@ -331,7 +325,7 @@ export default function AdminDashboard() {
             }}
             style={({ pressed }) => [styles.quickActionChip, styles.quickSyncChip, pressed && { opacity: 0.75 }]}
           >
-            <Text style={styles.quickActionIcon}>🔄</Text>
+            <Text style={styles.quickActionIcon}>ר</Text>
             <Text style={styles.quickActionLabel}>סנכרן הכל</Text>
           </Pressable>
         </ScrollView>
@@ -396,14 +390,14 @@ export default function AdminDashboard() {
               setSeeding(true);
               const result = await seedToSupabase();
               setSeeding(false);
-              Alert.alert(result.ok ? '✅ הצלחה' : '❌ שגיאה', result.message);
+              Alert.alert(result.ok ? 'הצלחה' : 'שגיאה', result.message);
               if (result.ok) syncAll();
             }}
             style={({ pressed }) => [styles.seedBtn, pressed && { opacity: 0.85 }]}
             disabled={seeding}
           >
             <LinearGradient colors={['#0EA5E9', '#0284C7']} style={styles.seedBtnGrad}>
-              {seeding ? <ActivityIndicator color="#fff" /> : <Text style={styles.seedBtnText}>☁️ זרע ל-Supabase</Text>}
+              {seeding ? <ActivityIndicator color="#fff" /> : <Text style={styles.seedBtnText}>זרע ל-Supabase</Text>}
             </LinearGradient>
           </Pressable>
           <Pressable
@@ -414,7 +408,7 @@ export default function AdminDashboard() {
             }}
             style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.85 }]}
           >
-            <Text style={styles.refreshBtnText}>🔄 טען</Text>
+            <Text style={styles.refreshBtnText}>טען מחדש</Text>
           </Pressable>
         </View>
 
@@ -453,7 +447,7 @@ function LoginScreen({ email, setEmail, password, setPassword, error, loading, o
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
       <KeyboardAvoidingView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Text style={{ fontSize: 48, marginBottom: 16 }}>🔐</Text>
+        <Text style={styles.loginIconText}>ניהול</Text>
         <Text style={{ fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff', marginBottom: 4 }}>
           כניסה למנהל
         </Text>
@@ -536,6 +530,17 @@ const inputStyle = (hasError: boolean) => ({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#0A0F1E' },
   content: { paddingBottom: 40 },
+  loginIconText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.primaryLight,
+    backgroundColor: 'rgba(124,111,247,0.16)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
 
   // Hero
   hero: {
@@ -820,3 +825,4 @@ const styles = StyleSheet.create({
   },
   refreshBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#E2E8F0' },
 });
+
