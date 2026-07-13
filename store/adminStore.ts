@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
-import { TOPICS, TARGETS, QUESTIONS } from '../data/mockData';
-import { fetchAllQuestions, fetchTargets, upsertQuestion as dbUpsert, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTarget as dbUpsertTarget, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics, saveAdminState, loadAdminState } from '../lib/db';
+import { fetchAllQuestions, fetchTargets, upsertQuestions as dbUpsertMany, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTarget as dbUpsertTarget, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics, saveAdminState, loadAdminState } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
 import { ensureSpatialVisualAssets } from '../utils/spatialVisualAssets';
@@ -9,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
 const ADMIN_COLLECTIONS_KEY = 'collections';
+let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 function pickAdminCollections(s: any) {
   return {
@@ -33,7 +34,82 @@ function normalizeAdminCollections(collections: any) {
   for (const key of Object.keys(pickAdminCollections({}))) {
     if (Array.isArray(collections[key])) next[key] = collections[key];
   }
+  if (Array.isArray(next.promoCodes)) {
+    next.promoCodes = next.promoCodes.filter((item: any) => !String(item?.id ?? '').startsWith('promo_00'));
+  }
+  if (Array.isArray(next.pushNotifications)) {
+    next.pushNotifications = next.pushNotifications.filter((item: any) => !String(item?.id ?? '').startsWith('notif_00'));
+  }
+  if (Array.isArray(next.activityLog)) {
+    next.activityLog = next.activityLog.filter((item: any) => !/^log_00[1-8]$/.test(String(item?.id ?? '')));
+  }
+  if (Array.isArray(next.generationSessions)) {
+    next.generationSessions = next.generationSessions.filter((item: any) => !String(item?.id ?? '').startsWith('gen_00'));
+  }
+  if (Array.isArray(next.generationPresets)) {
+    next.generationPresets = next.generationPresets.filter((item: any) => !String(item?.id ?? '').startsWith('preset_00'));
+  }
+  next.revenueSnapshots = [];
   return Object.keys(next).length > 0 ? next : null;
+}
+
+function syncQuestionsToSupabase(
+  set: (partial: Partial<AdminState> | ((state: AdminState) => Partial<AdminState>)) => void,
+  questions: Question[],
+  context: string
+) {
+  if (questions.length === 0) return;
+  set({ isSyncing: true, syncError: null });
+  dbUpsertMany(questions).then(result => {
+    if (result.error) {
+      set({ isSyncing: false, syncError: result.error });
+      logger.error(context, `שגיאה בסנכרון ${questions.length} שאלות`, result.error);
+      return;
+    }
+    set({ isSyncing: false, lastSyncedAt: new Date().toISOString(), syncError: null });
+    logger.success(context, `${questions.length} שאלות סונכרנו ל-Supabase`);
+  }).catch((e: any) => {
+    const message = e?.message ?? 'שגיאת סנכרון שאלות';
+    set({ isSyncing: false, syncError: message });
+    logger.error(context, message);
+  });
+}
+
+async function buildRevenueSnapshotsFromProfiles(): Promise<RevenueSnapshot[]> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('created_at,is_premium');
+  if (error) throw error;
+
+  const profiles = data ?? [];
+  const months: string[] = [];
+  const cursor = new Date();
+  cursor.setUTCDate(1);
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() - i, 1));
+    months.push(d.toISOString().slice(0, 7));
+  }
+
+  return months.map(month => {
+    const end = new Date(`${month}-01T00:00:00.000Z`);
+    end.setUTCMonth(end.getUTCMonth() + 1);
+    const profilesByMonthEnd = profiles.filter(profile =>
+      !profile.created_at || new Date(profile.created_at) < end
+    );
+    const premiumByMonthEnd = profilesByMonthEnd.filter(profile => profile.is_premium);
+    const newSubscribers = profiles.filter(profile =>
+      profile.is_premium && String(profile.created_at ?? '').slice(0, 7) === month
+    ).length;
+
+    return {
+      month,
+      mrr: 0,
+      newSubscribers,
+      churnedSubscribers: 0,
+      totalPremiumUsers: premiumByMonthEnd.length,
+      conversionRate: profilesByMonthEnd.length > 0 ? premiumByMonthEnd.length / profilesByMonthEnd.length : 0,
+    };
+  });
 }
 
 function withDefaultAppConfig(config: Partial<AppConfig>): AppConfig {
@@ -156,11 +232,6 @@ const PENDING_SEED: Question[] = [
     smartPracticeEligible: false,
     generalPracticeEligible: false,
   },
-];
-
-const LOCAL_QUESTION_BANK: Question[] = [
-  ...QUESTIONS,
-  ...PENDING_SEED.filter(q => !QUESTIONS.some(existing => existing.id === q.id)),
 ];
 
 export interface SimulationRule {
@@ -601,7 +672,7 @@ const SEED_PUSH_NOTIFICATIONS: PushNotification[] = [
     status: 'sent',
     scheduledAt: null,
     sentAt: '2025-05-10T09:00:00Z',
-    estimatedReach: 2612,
+    estimatedReach: 0,
     openRate: 0.31,
     createdAt: '2025-05-09T14:00:00Z',
   },
@@ -613,7 +684,7 @@ const SEED_PUSH_NOTIFICATIONS: PushNotification[] = [
     status: 'scheduled',
     scheduledAt: '2025-06-01T08:00:00Z',
     sentAt: null,
-    estimatedReach: 167,
+    estimatedReach: 0,
     openRate: null,
     createdAt: '2025-05-18T10:00:00Z',
   },
@@ -625,19 +696,10 @@ const SEED_PUSH_NOTIFICATIONS: PushNotification[] = [
     status: 'draft',
     scheduledAt: null,
     sentAt: null,
-    estimatedReach: 340,
+    estimatedReach: 0,
     openRate: null,
     createdAt: '2025-05-17T16:00:00Z',
   },
-];
-
-const SEED_REVENUE_SNAPSHOTS: RevenueSnapshot[] = [
-  { month: '2025-01', mrr: 890, newSubscribers: 12, churnedSubscribers: 2, totalPremiumUsers: 45, conversionRate: 0.031 },
-  { month: '2025-02', mrr: 1180, newSubscribers: 18, churnedSubscribers: 3, totalPremiumUsers: 60, conversionRate: 0.038 },
-  { month: '2025-03', mrr: 1540, newSubscribers: 24, churnedSubscribers: 4, totalPremiumUsers: 80, conversionRate: 0.042 },
-  { month: '2025-04', mrr: 1920, newSubscribers: 30, churnedSubscribers: 5, totalPremiumUsers: 105, conversionRate: 0.051 },
-  { month: '2025-05', mrr: 2310, newSubscribers: 35, churnedSubscribers: 6, totalPremiumUsers: 134, conversionRate: 0.058 },
-  { month: '2025-06', mrr: 2780, newSubscribers: 40, churnedSubscribers: 7, totalPremiumUsers: 167, conversionRate: 0.064 },
 ];
 
 const SEED_ACTIVITY_LOG: AdminActivityLog[] = [
@@ -829,6 +891,8 @@ interface AdminState {
   seedToSupabase: () => Promise<{ ok: boolean; message: string }>;
   loadAdminData: () => Promise<void>;
   syncAll: () => Promise<{ ok: boolean; message: string }>;
+  startRealtimeSync: () => void;
+  stopRealtimeSync: () => void;
 
   // Computed
   getStats: () => AdminStats;
@@ -1252,9 +1316,9 @@ const SEED_TEMPLATES: SmartExamTemplate[] = [
 export const useAdminStore = create<AdminState>((set, get) => ({
   isAdmin: false,
   freePracticeLimit: 30,
-  questions: LOCAL_QUESTION_BANK.map(ensureSpatialVisualAssets),
-  topics: [...TOPICS],
-  targets: [...TARGETS],
+  questions: [],
+  topics: [],
+  targets: [],
   templates: SEED_TEMPLATES.map(normalizeTemplateRules),
   selectedQuestionIds: [],
   practiceSettings: DEFAULT_PRACTICE_SETTINGS,
@@ -1267,12 +1331,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   syncError: null,
   dailyChallenges: [],
   userNotes: [],
-  promoCodes: SEED_PROMO_CODES,
-  pushNotifications: SEED_PUSH_NOTIFICATIONS,
-  revenueSnapshots: SEED_REVENUE_SNAPSHOTS,
-  activityLog: SEED_ACTIVITY_LOG,
-  generationSessions: SEED_GENERATION_SESSIONS,
-  generationPresets: SEED_GENERATION_PRESETS,
+  promoCodes: [],
+  pushNotifications: [],
+  revenueSnapshots: [],
+  activityLog: [],
+  generationSessions: [],
+  generationPresets: [],
   bgGenRunning: false,
   bgGenProgress: null,
 
@@ -1432,10 +1496,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   addQuestion: (q) => {
     const newQ: Question = ensureSpatialVisualAssets({ ...q, id: `q_admin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` });
     set(s => ({ questions: [...s.questions, newQ] }));
-    dbUpsert(newQ).then(r => {
-      if (r.error) logger.error('adminStore:addQuestion', `שגיאה בשמירת שאלה חדשה`, r.error);
-      else logger.success('adminStore:addQuestion', `שאלה נוצרה: ${newQ.id}`);
-    });
+    syncQuestionsToSupabase(set, [newQ], 'adminStore:addQuestion');
     get().logActivity(`הוסיף שאלה: "${newQ.questionText.slice(0, 40)}..."`, 'question');
     return newQ;
   },
@@ -1444,10 +1505,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => {
       const updated = s.questions.map(q => (q.id === id ? ensureSpatialVisualAssets({ ...q, ...updates }) : q));
       const q = updated.find(x => x.id === id);
-      if (q) dbUpsert(q).then(r => {
-        if (r.error) logger.error('adminStore:updateQuestion', `שגיאה בעדכון שאלה ${id}`, r.error);
-        else logger.success('adminStore:updateQuestion', `שאלה עודכנה: ${id}`);
-      });
+      if (q) syncQuestionsToSupabase(set, [q], 'adminStore:updateQuestion');
       return { questions: updated };
     });
     get().logActivity(`עדכן שאלה ${id}`, 'question');
@@ -1507,10 +1565,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           : q
       );
       const q = updated.find(x => x.id === id);
-      if (q) dbUpsert(q).then(r => {
-        if (r.error) logger.error('adminStore:validateQuestion', `שגיאה באימות שאלה ${id} → ${status}`, r.error);
-        else logger.success('adminStore:validateQuestion', `שאלה ${id} → ${status}`);
-      });
+      if (q) syncQuestionsToSupabase(set, [q], 'adminStore:validateQuestion');
       return { questions: updated };
     });
     get().logActivity(`אימת שאלה ${id} → ${status}`, 'question');
@@ -1528,9 +1583,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       toSync = updated.filter(q => idSet.has(q.id));
       return { questions: updated, selectedQuestionIds: [] };
     });
-    toSync.forEach(q => dbUpsert(q).then(r => {
-      if (r.error) logger.error('adminStore:bulkValidate', `שגיאה בעדכון שאלה ${q.id}`, r.error);
-    }));
+    syncQuestionsToSupabase(set, toSync, 'adminStore:bulkValidate');
     logger.info('adminStore:bulkValidate', `${ids.length} שאלות → ${status}`);
     get().logActivity(`אימות מרובה: ${ids.length} שאלות → ${status}`, 'question');
   },
@@ -1559,9 +1612,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       toSync = updated.filter(q => idSet.has(q.id));
       return { questions: updated };
     });
-    toSync.forEach(q => dbUpsert(q).then(r => {
-      if (r.error) logger.error('adminStore:assignQuestionsToTopic', `שגיאה בהקצאת שאלה ${q.id}`, r.error);
-    }));
+    syncQuestionsToSupabase(set, toSync, 'adminStore:assignQuestionsToTopic');
     logger.info('adminStore:assignQuestionsToTopic', `${questionIds.length} שאלות → נושא ${topicId}`);
   },
 
@@ -1575,9 +1626,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       toSync = updated.filter(q => idSet.has(q.id));
       return { questions: updated };
     });
-    toSync.forEach(q => dbUpsert(q).then(r => {
-      if (r.error) logger.error('adminStore:setQuestionsAccessLevel', `שגיאה בעדכון גישה לשאלה ${q.id}`, r.error);
-    }));
+    syncQuestionsToSupabase(set, toSync, 'adminStore:setQuestionsAccessLevel');
     logger.info('adminStore:setQuestionsAccessLevel', `${questionIds.length} שאלות → ${level}`);
   },
 
@@ -1591,9 +1640,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       toSync = updated.filter(q => idSet.has(q.id));
       return { questions: updated };
     });
-    toSync.forEach(q => dbUpsert(q).then(r => {
-      if (r.error) logger.error('adminStore:assignQuestionsToTargets', `שגיאה בהקצאת מסלול לשאלה ${q.id}`, r.error);
-    }));
+    syncQuestionsToSupabase(set, toSync, 'adminStore:assignQuestionsToTargets');
     logger.info('adminStore:assignQuestionsToTargets', `${questionIds.length} שאלות → מסלולים: ${targetIds.join(',')}`);
     get().logActivity(`שויכו ${questionIds.length} שאלות למסלולים: ${targetIds.join(', ')}`, 'question');
   },
@@ -1608,9 +1655,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       toSync = updated.filter(q => idSet.has(q.id));
       return { questions: updated };
     });
-    toSync.forEach(q => dbUpsert(q).then(r => {
-      if (r.error) logger.error('adminStore:setQuestionsAdaptiveEligibility', `שגיאה בעדכון אדפטיבי לשאלה ${q.id}`, r.error);
-    }));
+    syncQuestionsToSupabase(set, toSync, 'adminStore:setQuestionsAdaptiveEligibility');
     logger.info('adminStore:setQuestionsAdaptiveEligibility', `${questionIds.length} שאלות — חכם:${smart} כללי:${general}`);
     get().logActivity(`עודכנה כשירות אדפטיבית ל-${questionIds.length} שאלות`, 'question');
   },
@@ -1816,7 +1861,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => ({
       pushNotifications: s.pushNotifications.map(n =>
         n.id === id
-          ? { ...n, status: 'sent', sentAt: new Date().toISOString(), openRate: Math.random() * 0.3 + 0.1 }
+          ? { ...n, status: 'sent', sentAt: new Date().toISOString(), openRate: null }
           : n
       ),
     }));
@@ -1886,7 +1931,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set({ isSyncing: true, syncError: null });
     try {
       const questions = await fetchAllQuestions();
-      if (questions.length > 0) set({ questions });
+      set({ questions });
       set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
     } catch (e: any) {
       const message = e?.message ?? 'Failed to load questions';
@@ -1901,65 +1946,31 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     logger.info('adminStore:loadAdminData', 'טוען נתוני אדמין...');
     set({ isSyncing: true, syncError: null });
 
-    // 0. Seed PENDING_SEED questions to Supabase if they don't exist yet
-    // (ensureDbSeeded in _layout.tsx already handles targets+topics)
-    try {
-      const { data: check } = await supabase.from('questions')
-        .select('id').eq('id', PENDING_SEED[0].id).limit(1);
-      if (!check?.length) {
-        for (const q of PENDING_SEED) {
-          await dbUpsert(q);
-        }
-        logger.success('adminStore:loadAdminData', `נזרעו ${PENDING_SEED.length} שאלות ממתינות`);
-      }
-    } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'שגיאה בהזרעת שאלות ממתינות', e?.message);
-    }
-
-    // 1. Load all questions from Supabase (source of truth), then append any
-    // locally-created questions that have not synced yet.
+    // 1. Load all questions from Supabase. In admin, Supabase is the source of truth.
     try {
       const remote = await fetchAllQuestions();
-      if (remote.length > 0) {
-        set(s => {
-          const remoteIds = new Set(remote.map(q => q.id));
-          const localOnly = s.questions.filter(q => !remoteIds.has(q.id));
-          logger.success('adminStore:loadAdminData', `נטענו ${remote.length} שאלות (${localOnly.length} מקומיות בלבד)`);
-          return { questions: [...remote, ...localOnly] };
-        });
-      }
+      set({ questions: remote });
+      logger.success('adminStore:loadAdminData', `Loaded ${remote.length} questions from Supabase`);
     } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת שאלות', e?.message);
+      logger.error('adminStore:loadAdminData', 'Failed loading questions', e?.message);
+      set({ questions: [] });
     }
 
-    // 2. Load targets and topics from Supabase (includes admin-created content), merge with local
+    // 2. Load targets and topics from Supabase. Admin views must not mask DB issues with mock data.
     try {
       const remoteTargets = await fetchTargets();
-      if (remoteTargets.length > 0) {
-        set(s => {
-          const remoteIds = new Set(remoteTargets.map(t => t.id));
-          const localOnly = s.targets.filter(t => !remoteIds.has(t.id));
-          return { targets: [...remoteTargets, ...localOnly] };
-        });
-      }
+      set({ targets: remoteTargets });
     } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת מסלולים', e?.message);
+      logger.error('adminStore:loadAdminData', 'Failed loading targets', e?.message);
+      set({ targets: [] });
     }
 
     try {
       const remoteTopics = await fetchTopics();
-      if (remoteTopics.length > 0) {
-        set(s => {
-          const remoteIds = new Set(remoteTopics.map(t => t.id));
-          const localOnly = s.topics.filter(t => !remoteIds.has(t.id));
-          if (localOnly.length > 0) {
-            logger.info('adminStore:loadAdminData', `${localOnly.length} נושאים מקומיים לא ב-Supabase עדיין`);
-          }
-          return { topics: [...remoteTopics, ...localOnly] };
-        });
-      }
+      set({ topics: remoteTopics });
     } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת נושאים', e?.message);
+      logger.error('adminStore:loadAdminData', 'Failed loading topics', e?.message);
+      set({ topics: [] });
     }
 
     // 3. Load simulation templates from AsyncStorage
@@ -2011,11 +2022,23 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       logger.error('adminStore:loadAdminData', 'שגיאה בטעינת אוספי אדמין', e?.message);
     }
 
-    // 6. Load persisted activityLog from AsyncStorage
+    // 6. Revenue snapshots are derived from real profiles only. MRR stays 0
+    // until a real purchases/subscriptions table is connected.
+    try {
+      const revenueSnapshots = await buildRevenueSnapshotsFromProfiles();
+      set({ revenueSnapshots });
+    } catch (e: any) {
+      logger.error('adminStore:loadAdminData', 'Failed building revenue snapshots from real profiles', e?.message);
+      set({ revenueSnapshots: [] });
+    }
+
+    // 7. Load persisted activityLog from AsyncStorage
     try {
       const saved = await AsyncStorage.getItem(ACTIVITY_LOG_KEY);
       if (saved) {
-        const parsed: AdminActivityLog[] = JSON.parse(saved);
+        const parsed: AdminActivityLog[] = JSON.parse(saved).filter((item: AdminActivityLog) =>
+          !/^log_00[1-8]$/.test(String(item?.id ?? ''))
+        );
         if (parsed.length > 0) {
           set(s => {
             const existingIds = new Set(s.activityLog.map(l => l.id));
@@ -2039,6 +2062,47 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       const message = e?.message ?? 'שגיאה בסנכרון מלא';
       set({ isSyncing: false, syncError: message });
       return { ok: false, message };
+    }
+  },
+
+  startRealtimeSync: () => {
+    if (adminRealtimeChannel) return;
+    const scheduleReload = () => {
+      if (adminRealtimeReloadTimer) clearTimeout(adminRealtimeReloadTimer);
+      adminRealtimeReloadTimer = setTimeout(() => {
+        get().loadAdminData().catch((e: any) => {
+          const message = e?.message ?? 'Realtime sync failed';
+          set({ syncError: message, isSyncing: false });
+        });
+      }, 350);
+    };
+
+    adminRealtimeChannel = supabase
+      .channel('psychotechniplus-admin-live-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_state' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topics' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'targets' }, scheduleReload)
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') {
+          set({ syncError: null, lastSyncedAt: new Date().toISOString() });
+          logger.info('adminStore:realtime', 'Live Supabase sync is active');
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          set({ syncError: `Realtime sync status: ${status}` });
+          logger.warn('adminStore:realtime', `Live sync status: ${status}`);
+        }
+      });
+  },
+
+  stopRealtimeSync: () => {
+    if (adminRealtimeReloadTimer) {
+      clearTimeout(adminRealtimeReloadTimer);
+      adminRealtimeReloadTimer = null;
+    }
+    if (adminRealtimeChannel) {
+      supabase.removeChannel(adminRealtimeChannel);
+      adminRealtimeChannel = null;
     }
   },
 

@@ -1,0 +1,53 @@
+{
+  "fixedAt": "2026-07-13T19:47:40.235Z",
+  "scanned": 811,
+  "fixesCount": 5,
+  "fixes": [
+    {
+      "id": "q_pro_spatial_6a18ac3e935e65d95a751158",
+      "ok": true,
+      "fields": [
+        "explanation"
+      ]
+    },
+    {
+      "id": "q_pro_spatial_696b4544a7273f46ed8fe658",
+      "ok": true,
+      "fields": [
+        "topic_id",
+        "question_type",
+        "media_url",
+        "explanation"
+      ]
+    },
+    {
+      "id": "q_pro_spatial_6969183d2950e337c3845308",
+      "ok": true,
+      "fields": [
+        "correct_answer",
+        "media_url",
+        "options",
+        "explanation"
+      ]
+    },
+    {
+      "id": "q_pro_spatial_69564ba92ef39aa110626958",
+      "ok": true,
+      "fields": [
+        "media_url",
+        "options",
+        "explanation"
+      ]
+    },
+    {
+      "id": "q_pro_spatial_695a9749d49d2d3053a8ff57",
+      "ok": true,
+      "fields": [
+        "question_text",
+        "media_url",
+        "options",
+        "explanation"
+      ]
+    }
+  ]
+}

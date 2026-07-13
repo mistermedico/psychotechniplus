@@ -61,7 +61,8 @@ export async function ensureDbSeeded(): Promise<void> {
         is_premium_only: t.isPremiumOnly ?? false,
         is_active: t.isActive ?? true, coming_soon: t.comingSoon ?? false,
         access_settings: t.accessSettings ?? {},
-      }))
+      })),
+      { onConflict: 'id', ignoreDuplicates: true }
     );
     if (te) {
       _seeded = false;
@@ -73,7 +74,8 @@ export async function ensureDbSeeded(): Promise<void> {
         id: t.id, target_id: t.targetId, name: t.name, slug: t.slug ?? t.id,
         description: t.description ?? '', icon: t.icon,
         order_index: t.order ?? 0, is_premium_only: t.isPremiumOnly ?? false, color: t.color ?? '',
-      }))
+      })),
+      { onConflict: 'id', ignoreDuplicates: true }
     );
     if (tope) {
       _seeded = false;
@@ -139,6 +141,17 @@ export async function upsertQuestion(q: Question): Promise<{ error?: string }> {
   return {};
 }
 
+export async function upsertQuestions(qs: Question[]): Promise<{ error?: string }> {
+  if (qs.length === 0) return {};
+  const { error } = await supabase.from('questions').upsert(qs.map(questionToRow));
+  if (error) {
+    logger.error('db:upsertQuestions', `שגיאה בשמירת ${qs.length} שאלות`, error.message);
+    return { error: error.message };
+  }
+  logger.success('db:upsertQuestions', `${qs.length} שאלות נשמרו ב-Supabase`);
+  return {};
+}
+
 export async function deleteQuestion(id: string): Promise<{ error?: string }> {
   const { error } = await supabase.from('questions').delete().eq('id', id);
   if (error) {
@@ -154,10 +167,12 @@ export async function deleteQuestion(id: string): Promise<{ error?: string }> {
 export async function fetchTargets(): Promise<Target[]> {
   try {
     const { data, error } = await supabase.from('targets').select('*').order('order_index');
-    if (error || !data?.length) return TARGETS;
+    if (error) throw error;
+    if (!data?.length) return [];
     return data.map(rowToTarget);
-  } catch {
-    return TARGETS;
+  } catch (e: any) {
+    logger.error('db:fetchTargets', 'Failed loading targets from Supabase', e?.message);
+    return [];
   }
 }
 
@@ -166,10 +181,12 @@ export async function fetchTopics(targetId?: string): Promise<Topic[]> {
     let query = supabase.from('topics').select('*').order('order_index');
     if (targetId) query = query.eq('target_id', targetId);
     const { data, error } = await query;
-    if (error || !data?.length) return targetId ? TOPICS.filter(t => t.targetId === targetId) : TOPICS;
+    if (error) throw error;
+    if (!data?.length) return [];
     return data.map(rowToTopic);
-  } catch {
-    return targetId ? TOPICS.filter(t => t.targetId === targetId) : TOPICS;
+  } catch (e: any) {
+    logger.error('db:fetchTopics', 'Failed loading topics from Supabase', e?.message);
+    return [];
   }
 }
 

@@ -1,5 +1,6 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 import { Provider } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
@@ -8,7 +9,19 @@ WebBrowser.maybeCompleteAuthSession();
 export type OAuthProvider = Extract<Provider, 'google' | 'apple'>;
 
 export function getOAuthRedirectUrl(): string {
-  return Linking.createURL('auth-callback');
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return `${window.location.origin}/auth-callback`;
+  }
+
+  return Linking.createURL('auth-callback', { scheme: 'psychotechniplus' });
+}
+
+export function getCurrentOAuthCallbackUrl(): string | null {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return window.location.href;
+  }
+
+  return null;
 }
 
 function readParam(url: string, key: string): string | null {
@@ -35,6 +48,9 @@ export async function finishOAuthCallback(url: string) {
   if (code) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
     if (exchangeError) throw exchangeError;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.history.replaceState({}, document.title, '/auth-callback');
+    }
     return;
   }
 
@@ -46,10 +62,39 @@ export async function finishOAuthCallback(url: string) {
       refresh_token: refreshToken,
     });
     if (sessionError) throw sessionError;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.history.replaceState({}, document.title, '/auth-callback');
+    }
     return;
   }
 
   throw new Error('לא התקבל אישור התחברות מהספק');
+}
+
+async function assertOAuthProviderReady(authUrl: string) {
+  if (Platform.OS !== 'web' || typeof fetch === 'undefined') return;
+
+  try {
+    const response = await fetch(authUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      credentials: 'include',
+    });
+    if (response.status < 400) return;
+
+    const payload = await response.json().catch(() => null);
+    const message = typeof payload?.msg === 'string'
+      ? payload.msg
+      : typeof payload?.message === 'string'
+        ? payload.message
+        : 'ספק ההתחברות לא זמין כרגע';
+    const providerError = new Error(message);
+    (providerError as Error & { fromOAuthPreflight?: boolean }).fromOAuthPreflight = true;
+    throw providerError;
+  } catch (error: any) {
+    if (error?.fromOAuthPreflight) throw error;
+    // If the browser blocks this preflight, continue to the normal OAuth redirect.
+  }
 }
 
 export async function signInWithOAuthProvider(provider: OAuthProvider) {
@@ -65,6 +110,12 @@ export async function signInWithOAuthProvider(provider: OAuthProvider) {
 
   if (error) throw error;
   if (!data.url) throw new Error('ספק ההתחברות לא החזיר כתובת אימות');
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    await assertOAuthProviderReady(data.url);
+    window.location.assign(data.url);
+    await new Promise<never>(() => {});
+  }
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
   if (result.type !== 'success' || !result.url) {
