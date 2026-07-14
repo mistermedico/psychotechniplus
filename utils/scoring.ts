@@ -9,20 +9,27 @@ export interface ScoreResult {
   percentileRank: number;
 }
 
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function safeDifficulty(value: number): number {
+  return Math.max(1, Math.min(10, Number.isFinite(value) ? value : 5));
+}
+
 export function calcRawScore(answers: UserAnswer[]): number {
   const correct = answers.filter(a => a.isCorrect && !a.isSkipped).length;
-  const total = answers.filter(a => !a.isSkipped).length;
+  const total = answers.length;
   return total === 0 ? 0 : Math.round((correct / total) * 100);
 }
 
 export function calcDifficultyWeightedScore(answers: UserAnswer[]): number {
-  const answered = answers.filter(a => !a.isSkipped);
-  if (answered.length === 0) return 0;
-  const weightedCorrect = answered.reduce(
-    (s, a) => s + (a.isCorrect ? a.questionDifficulty : 0),
+  if (answers.length === 0) return 0;
+  const weightedCorrect = answers.reduce(
+    (s, a) => s + (a.isCorrect && !a.isSkipped ? safeDifficulty(a.questionDifficulty) : 0),
     0
   );
-  const totalWeight = answered.reduce((s, a) => s + a.questionDifficulty, 0);
+  const totalWeight = answers.reduce((s, a) => s + safeDifficulty(a.questionDifficulty), 0);
   return totalWeight === 0 ? 0 : Math.round((weightedCorrect / totalWeight) * 100);
 }
 
@@ -30,18 +37,22 @@ export function calcSpeedAdjustedScore(
   answers: UserAnswer[],
   baseScore: number
 ): number {
-  const answered = answers.filter(a => !a.isSkipped && a.isCorrect);
+  const answered = answers.filter(a => !a.isSkipped);
   if (answered.length === 0) return baseScore;
 
-  // Bonus for answering hard questions quickly (< 20s)
-  const speedBonuses = answered.map(a => {
-    if (a.timeSpent < 10 && a.questionDifficulty >= 6) return 3;
-    if (a.timeSpent < 20 && a.questionDifficulty >= 5) return 2;
-    if (a.timeSpent < 30 && a.questionDifficulty >= 4) return 1;
-    return 0;
+  const speedDeltas = answered.map(a => {
+    const difficulty = safeDifficulty(a.questionDifficulty);
+    const expectedSeconds = 18 + difficulty * 5;
+    if (!a.isCorrect) {
+      return a.timeSpent > expectedSeconds * 1.7 ? -2 : 0;
+    }
+    if (a.timeSpent <= expectedSeconds * 0.55 && difficulty >= 6) return 4;
+    if (a.timeSpent <= expectedSeconds * 0.75) return 2;
+    if (a.timeSpent <= expectedSeconds * 1.15) return 0;
+    return -1;
   });
-  const totalBonus = speedBonuses.reduce((s: number, b: number) => s + b, 0);
-  return Math.min(100, baseScore + Math.round(totalBonus / answered.length));
+  const averageDelta = speedDeltas.reduce((s: number, b: number) => s + b, 0) / answered.length;
+  return clampScore(baseScore + averageDelta);
 }
 
 export function calcStabilityScore(answers: UserAnswer[]): number {
@@ -61,31 +72,38 @@ export function calcStabilityScore(answers: UserAnswer[]): number {
 }
 
 export function estimatePercentileRank(score: number): number {
-  // Simulated normal distribution (mean=65, std=15)
-  if (score >= 95) return 99;
-  if (score >= 90) return 96;
-  if (score >= 85) return 92;
-  if (score >= 80) return 85;
-  if (score >= 75) return 75;
-  if (score >= 70) return 63;
-  if (score >= 65) return 50;
-  if (score >= 60) return 38;
-  if (score >= 55) return 27;
-  if (score >= 50) return 18;
-  if (score >= 45) return 11;
-  if (score >= 40) return 6;
-  return 3;
+  const z = (score - 64) / 14;
+  return Math.round(Math.min(99, Math.max(1, 50 + 49 * Math.tanh(z * 0.72))));
+}
+
+export function calcPsychotechnicScore(answers: UserAnswer[]): number {
+  if (answers.length === 0) return 0;
+  const rawScore = calcRawScore(answers);
+  const difficultyWeightedScore = calcDifficultyWeightedScore(answers);
+  const speedAdjustedScore = calcSpeedAdjustedScore(answers, difficultyWeightedScore);
+  const stabilityScore = calcStabilityScore(answers);
+  const skippedRate = answers.filter(a => a.isSkipped).length / answers.length;
+
+  const composite =
+    rawScore * 0.42 +
+    difficultyWeightedScore * 0.38 +
+    speedAdjustedScore * 0.12 +
+    stabilityScore * 0.08 -
+    skippedRate * 8;
+
+  return clampScore(composite);
 }
 
 export function calcAllScores(answers: UserAnswer[]): ScoreResult {
   const rawScore = calcRawScore(answers);
   const difficultyWeightedScore = calcDifficultyWeightedScore(answers);
-  const speedAdjustedScore = calcSpeedAdjustedScore(answers, rawScore);
+  const speedAdjustedScore = calcSpeedAdjustedScore(answers, difficultyWeightedScore);
   const stabilityScore = calcStabilityScore(answers);
-  const percentileRank = estimatePercentileRank(rawScore);
+  const score = calcPsychotechnicScore(answers);
+  const percentileRank = estimatePercentileRank(score);
   return {
     rawScore,
-    score: rawScore,
+    score,
     difficultyWeightedScore,
     speedAdjustedScore,
     stabilityScore,

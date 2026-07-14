@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Dimensions, Animated,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,12 +9,10 @@ import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore } from '../../store/adminStore';
-import { TARGETS, TOPICS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
-
-const { width: W } = Dimensions.get('window');
+import { visiblePracticeTopics } from '../../utils/topicVisibility';
 
 const TOPIC_META: Record<string, { icon: string; gradient: [string, string]; glow: string }> = {
   topic_quantitative: { icon: '⚡', gradient: ['#5A52D5', '#7C6FF7'], glow: '#7C6FF7' },
@@ -42,10 +40,10 @@ export default function Dashboard() {
     selectedTargetId, getTopicLevel,
   } = useUserStore();
 
-  const { dailyChallenges } = useAdminStore();
+  const { dailyChallenges, targets, topics } = useAdminStore();
 
-  const selectedTarget = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
-  const targetTopics = TOPICS.filter(t => t.targetId === selectedTarget.id);
+  const selectedTarget = targets.find(t => t.id === selectedTargetId) ?? targets[0];
+  const targetTopics = selectedTarget ? visiblePracticeTopics(topics.filter(t => t.targetId === selectedTarget.id)) : [];
 
   const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
   const todayChallenge = dailyChallenges.find(c => c.date === today);
@@ -85,7 +83,7 @@ export default function Dashboard() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
       pathname: '/practice-session',
-      params: { topicId, targetId: selectedTarget.id, mode: opts?.mode ?? 'practice', ...(opts?.questionLimit ? { questionLimit: opts.questionLimit } : {}) },
+      params: { topicId, targetId: selectedTarget?.id ?? '', mode: opts?.mode ?? 'practice', ...(opts?.questionLimit ? { questionLimit: opts.questionLimit } : {}) },
     });
   };
 
@@ -173,7 +171,7 @@ export default function Dashboard() {
             <Pressable
               onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
               accessibilityRole="button"
-              accessibilityLabel={`המשך תרגול · ${selectedTarget.name}`}
+              accessibilityLabel={`המשך תרגול · ${selectedTarget?.name ?? 'תרגול'}`}
               style={({ pressed }) => [styles.ctaBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
             >
               <LinearGradient
@@ -184,7 +182,7 @@ export default function Dashboard() {
                 <View style={styles.ctaShimmer} />
                 <View style={styles.ctaRight}>
                   <Text style={styles.ctaTitle}>המשך תרגול</Text>
-                  <Text style={styles.ctaSub}>{selectedTarget.name} · {totalSessions} סשנים עד כה</Text>
+                  <Text style={styles.ctaSub}>{selectedTarget?.name ?? 'תרגול'} · {totalSessions} סשנים עד כה</Text>
                 </View>
                 <View style={styles.ctaArrow}>
                   <Text style={styles.ctaArrowText}>←</Text>
@@ -274,7 +272,7 @@ export default function Dashboard() {
                     pathname: '/practice-session',
                     params: {
                       topicId: 'topic_quantitative', // fallback topic
-                      targetId: selectedTarget.id,
+                      targetId: selectedTarget?.id ?? '',
                       mode: 'speed',
                       questionLimit: '10',
                       challengeQuestionId: todayChallenge.questionId, // admin-set question
@@ -361,7 +359,12 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
-  content: { paddingTop: 4 },
+  content: {
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
+    paddingTop: 4,
+  },
 
   // Ambient
   orb: {
@@ -634,7 +637,7 @@ const styles = StyleSheet.create({
   bentoGrid: { flexDirection: 'row-reverse', gap: 10, flexWrap: 'wrap' },
   bentoCard: {
     flex: 1,
-    minWidth: (W - 52) / 2 - 20,
+    minWidth: 150,
     borderRadius: Radius['2xl'],
     overflow: 'hidden',
     borderWidth: 1,

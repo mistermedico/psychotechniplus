@@ -1,18 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  TextInput, Alert, Switch,
+  TextInput, Alert, Switch, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, SmartExamTemplate, SimulationRule } from '../../store/adminStore';
-import { TOPICS, TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 export default function SimulationBuilder() {
-  const { templates, addTemplate, updateTemplate, deleteTemplate, questions } = useAdminStore();
+  const {
+    templates, addTemplate, updateTemplate, deleteTemplate, questions, topics, targets,
+    isSyncing, lastSyncedAt, syncError, syncAll,
+  } = useAdminStore();
+  const { width } = useWindowDimensions();
+  const isCompact = width < 430;
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -21,7 +26,7 @@ export default function SimulationBuilder() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [targetId, setTargetId] = useState(TARGETS[0]?.id ?? '');
+  const [targetId, setTargetId] = useState(targets[0]?.id ?? '');
   const [timeLimitMinutes, setTimeLimitMinutes] = useState('45');
   const [passingScore, setPassingScore] = useState('65');
   const [isActive, setIsActive] = useState(true);
@@ -30,9 +35,13 @@ export default function SimulationBuilder() {
 
   const markDirty = () => setIsDirty(true);
 
+  useEffect(() => {
+    if (!targetId && targets[0]?.id) setTargetId(targets[0].id);
+  }, [targetId, targets]);
+
   const resetForm = () => {
     setName(''); setDescription('');
-    setTargetId(TARGETS[0]?.id ?? '');
+    setTargetId(targets[0]?.id ?? '');
     setTimeLimitMinutes('45'); setPassingScore('65');
     setIsActive(true); setRules([]);
     setEditId(null); setIsDirty(false);
@@ -78,9 +87,46 @@ export default function SimulationBuilder() {
     Alert.alert('שוכפל!', `"${t.name} (עותק)" נוצר`);
   };
 
+  const previewTemplate = (template: SmartExamTemplate) => {
+    if (template.rules.length === 0) {
+      Alert.alert('אין כללים', 'אי אפשר לפתוח תצוגה מקדימה למבחן בלי לפחות כלל שאלות אחד.');
+      return;
+    }
+    const audit = getTemplateAudit(template);
+    if (audit.shortages.length > 0) {
+      Alert.alert(
+        'יש מחסור בשאלות',
+        'המבחן ייפתח בתצוגה מקדימה, אבל חלק מהפרקים עלולים להכיל פחות שאלות מהמבוקש. מומלץ ללחוץ "תקן מחסור" לפני פרסום למשתמשים.',
+        [
+          { text: 'בטל', style: 'cancel' },
+          {
+            text: 'פתח בכל זאת',
+            onPress: () => openTemplatePreview(template),
+          },
+        ]
+      );
+      return;
+    }
+    openTemplatePreview(template);
+  };
+
+  const openTemplatePreview = (template: SmartExamTemplate) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({
+      pathname: '/practice-session',
+      params: {
+        mode: 'simulation',
+        templateId: template.id,
+        targetId: template.targetId,
+        topicId: template.rules[0]?.topicId ?? '',
+        adminPreview: '1',
+      },
+    });
+  };
+
   const addRule = () => {
     const usedTopics = new Set(rules.map(r => r.topicId));
-    const topic = TOPICS.find(t => !usedTopics.has(t.id));
+    const topic = topics.find(t => !usedTopics.has(t.id));
     if (!topic) {
       Alert.alert('כל הנושאים כבר נוספו', 'לא ניתן להוסיף כלל נוסף - כל הנושאים כבר קיימים ברשימה');
       return;
@@ -266,6 +312,10 @@ export default function SimulationBuilder() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  const syncLabel = lastSyncedAt
+    ? new Date(lastSyncedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+    : 'טרם סונכרן';
+
   if (showForm) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -298,7 +348,7 @@ export default function SimulationBuilder() {
 
             <Text style={[styles.label, { marginTop: 12 }]}>מסלול</Text>
             <View style={styles.chipRow}>
-              {TARGETS.filter(t => !t.comingSoon).map(t => (
+              {targets.filter(t => !t.comingSoon).map(t => (
                 <Pressable
                   key={t.id}
                   onPress={() => { setTargetId(t.id); markDirty(); }}
@@ -359,7 +409,7 @@ export default function SimulationBuilder() {
             </View>
 
             {rules.map(rule => {
-              const topic = TOPICS.find(t => t.id === rule.topicId);
+              const topic = topics.find(t => t.id === rule.topicId);
               const available = questionsPerTopic[rule.topicId] ?? 0;
               const customVal = customCounts[rule.id] ?? '';
               return (
@@ -377,7 +427,7 @@ export default function SimulationBuilder() {
                   {/* Topic picker — exclude already-used topics */}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
                     <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
-                      {TOPICS.map(t => {
+                      {topics.map(t => {
                         const usedElsewhere = rules.some(r => r.id !== rule.id && r.topicId === t.id);
                         return (
                           <Pressable
@@ -497,7 +547,7 @@ export default function SimulationBuilder() {
                 זמן ממוצע לשאלה: ~{totalQ > 0 ? Math.round((parseInt(timeLimitMinutes) || 45) * 60 / totalQ) : 0} שניות
               </Text>
               {rules.map(r => {
-                const t = TOPICS.find(x => x.id === r.topicId);
+                const t = topics.find(x => x.id === r.topicId);
                 const avail = questionsPerTopic[r.topicId] ?? 0;
                 const shortage = r.count > avail;
                 return (
@@ -523,18 +573,38 @@ export default function SimulationBuilder() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.content, isCompact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
 
         <LinearGradient colors={Colors.gradients.gold} style={styles.hero}>
-          <Text style={styles.heroIcon}>🏗️</Text>
-          <Text style={styles.heroTitle}>בניית סימולציות</Text>
+          <View style={styles.heroTopRow}>
+            <Text style={styles.heroIcon}>סימולציות</Text>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>{templates.filter(t => t.isActive).length} פעילות</Text>
+            </View>
+          </View>
+          <Text style={styles.heroTitle}>ניהול מבחנים חכמים</Text>
           <Text style={styles.heroDesc}>
-            צור תבניות מבחן חכמות עם כללי הגרלה, זמן מוגבל וסיווג לפי נושאים
+            עריכה, פרסום, תצוגה מקדימה וסנכרון חי של תבניות המבחן והשאלות.
           </Text>
         </LinearGradient>
 
+        <View style={[styles.syncPanel, syncError ? styles.syncPanelError : null]}>
+          <View style={styles.syncTextWrap}>
+            <Text style={styles.syncTitle}>סנכרון חי מול Supabase</Text>
+            <Text style={styles.syncSub}>
+              {syncError ? syncError : isSyncing ? 'מסנכרן נתונים...' : `עדכון אחרון: ${syncLabel}`}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => syncAll()}
+            style={({ pressed }) => [styles.syncBtn, pressed && { opacity: 0.75 }]}
+          >
+            <Text style={styles.syncBtnText}>{isSyncing ? 'מסנכרן' : 'רענן'}</Text>
+          </Pressable>
+        </View>
+
         {/* Stats row */}
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, isCompact && styles.statsRowCompact]}>
           <StatPill icon="📋" label="סה״כ תבניות" value={templates.length} />
           <StatPill icon="✅" label="פעילות" value={templates.filter(t => t.isActive).length} />
           <StatPill icon="⏸" label="מושבתות" value={templates.filter(t => !t.isActive).length} />
@@ -550,7 +620,7 @@ export default function SimulationBuilder() {
           </View>
         </View>
 
-        <View style={styles.listHeader}>
+        <View style={[styles.listHeader, isCompact && styles.listHeaderCompact]}>
           <Text style={styles.listTitle}>תבניות קיימות</Text>
           <Pressable onPress={openNew} style={styles.newBtn}>
             <Text style={styles.newBtnText}>+ תבנית חדשה</Text>
@@ -614,7 +684,7 @@ export default function SimulationBuilder() {
         )}
 
         {filteredTemplates.map(t => {
-          const target = TARGETS.find(x => x.id === t.targetId);
+          const target = targets.find(x => x.id === t.targetId);
           const audit = getTemplateAudit(t);
           return (
             <View key={t.id} style={styles.templateCard}>
@@ -649,7 +719,7 @@ export default function SimulationBuilder() {
               {/* Rules summary */}
               <View style={styles.rulesSummary}>
                 {t.rules.map(r => {
-                  const topic = TOPICS.find(x => x.id === r.topicId);
+                  const topic = topics.find(x => x.id === r.topicId);
                   const avail = questionsPerTopic[r.topicId] ?? 0;
                   const shortage = r.count > avail;
                   return (
@@ -667,19 +737,25 @@ export default function SimulationBuilder() {
                     { text: 'ביטול', style: 'cancel' },
                     { text: 'מחק', style: 'destructive', onPress: () => deleteTemplate(t.id) },
                   ])}
-                  style={[styles.tAction, { backgroundColor: Colors.dangerLight }]}
+                  style={[styles.tAction, styles.tActionSecondary, { backgroundColor: Colors.dangerLight }]}
                 >
                   <Text style={[styles.tActionText, { color: Colors.danger }]}>🗑️ מחק</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => cloneTemplate(t)}
-                  style={[styles.tAction, { backgroundColor: Colors.successLight }]}
+                  style={[styles.tAction, styles.tActionSecondary, { backgroundColor: Colors.successLight }]}
                 >
                   <Text style={[styles.tActionText, { color: Colors.success }]}>📋 שכפל</Text>
                 </Pressable>
                 <Pressable
+                  onPress={() => previewTemplate(t)}
+                  style={[styles.tAction, styles.tActionSecondary, { backgroundColor: Colors.primaryLighter }]}
+                >
+                  <Text style={[styles.tActionText, { color: Colors.primary }]}>👁 תצוגה</Text>
+                </Pressable>
+                <Pressable
                   onPress={() => updateTemplate(t.id, { isActive: !t.isActive })}
-                  style={[styles.tAction, { backgroundColor: t.isActive ? Colors.warningLight : Colors.successLight }]}
+                  style={[styles.tAction, styles.tActionSecondary, { backgroundColor: t.isActive ? Colors.warningLight : Colors.successLight }]}
                 >
                   <Text style={[styles.tActionText, { color: t.isActive ? Colors.warning : Colors.success }]}>
                     {t.isActive ? '⏸ השבת' : '▶ הפעל'}
@@ -688,14 +764,14 @@ export default function SimulationBuilder() {
                 {audit.shortages.length > 0 && (
                   <Pressable
                     onPress={() => fixTemplateShortages(t)}
-                    style={[styles.tAction, { backgroundColor: Colors.warningLight }]}
+                    style={[styles.tAction, styles.tActionSecondary, { backgroundColor: Colors.warningLight }]}
                   >
                     <Text style={[styles.tActionText, { color: Colors.warning }]}>תקן מחסור</Text>
                   </Pressable>
                 )}
                 <Pressable
                   onPress={() => openEdit(t)}
-                  style={[styles.tAction, { backgroundColor: Colors.primaryLighter, flex: 1 }]}
+                  style={[styles.tAction, styles.tActionPrimary, { backgroundColor: Colors.primaryLighter }]}
                 >
                   <Text style={[styles.tActionText, { color: Colors.primary }]}>✏️ ערוך</Text>
                 </Pressable>
@@ -758,15 +834,28 @@ const spStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background, direction: 'rtl', writingDirection: 'rtl' },
-  content: { paddingBottom: 40, direction: 'rtl', writingDirection: 'rtl' },
+  safe: { flex: 1, backgroundColor: Colors.background, writingDirection: 'rtl' },
+  content: { paddingBottom: 40, writingDirection: 'rtl' },
+  contentCompact: { paddingBottom: 72 },
 
-  hero: { padding: 24, alignItems: 'flex-end' },
-  heroIcon: { fontSize: 40, marginBottom: 8 },
-  heroTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
+  hero: { padding: 20, alignItems: 'flex-end', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroTopRow: { width: '100%', flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  heroIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.82)', letterSpacing: 0 },
+  heroBadge: { borderRadius: Radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', paddingHorizontal: 10, paddingVertical: 5, backgroundColor: 'rgba(255,255,255,0.12)' },
+  heroBadgeText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
+  heroTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff', textAlign: 'right', letterSpacing: 0 },
   heroDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.85)', textAlign: 'right', lineHeight: 20, marginTop: 6 },
 
+  syncPanel: { marginHorizontal: 16, marginTop: 14, marginBottom: 2, backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.primary + '44', padding: 12, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, ...Shadow.sm },
+  syncPanelError: { borderColor: Colors.danger + '66', backgroundColor: Colors.dangerLight },
+  syncTextWrap: { flex: 1, alignItems: 'flex-end' },
+  syncTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  syncSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 3, lineHeight: 17 },
+  syncBtn: { minWidth: 74, minHeight: 40, borderRadius: Radius.lg, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  syncBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff', textAlign: 'center' },
+
   statsRow: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  statsRowCompact: { gap: 6, paddingHorizontal: 12 },
   auditPanel: { marginHorizontal: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: 12, ...Shadow.sm },
   auditTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right', marginBottom: 10 },
   auditGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
@@ -775,9 +864,10 @@ const styles = StyleSheet.create({
   auditBoxLabel: { fontFamily: FontFamily.medium, fontSize: 10, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
 
   listHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
+  listHeaderCompact: { alignItems: 'stretch', gap: 10 },
   listTitle: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.text },
-  newBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 8, ...Shadow.primary },
-  newBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
+  newBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 16, paddingVertical: 11, minHeight: 44, alignItems: 'center', justifyContent: 'center', ...Shadow.primary },
+  newBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff', textAlign: 'center' },
 
   searchWrap: { flexDirection: 'row-reverse', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
   searchInput: { flex: 1, padding: 10, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', writingDirection: 'rtl' },
@@ -787,28 +877,30 @@ const styles = StyleSheet.create({
   templateFilterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   templateFilterText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textSecondary },
   templateFilterTextActive: { color: '#fff' },
-  bulkTemplateBar: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, marginBottom: 10, direction: 'rtl', writingDirection: 'rtl' },
+  bulkTemplateBar: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, marginBottom: 10, writingDirection: 'rtl' },
   bulkTemplateBtn: { flexGrow: 1, minWidth: 128, borderRadius: Radius.lg, paddingVertical: 9, paddingHorizontal: 10, alignItems: 'center' },
   bulkTemplateText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'center', writingDirection: 'rtl' },
 
-  templateCard: { backgroundColor: Colors.surface, marginHorizontal: 16, borderRadius: Radius.xl, padding: 16, marginBottom: 12, ...Shadow.md, borderWidth: 1, borderColor: Colors.border },
-  templateHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 6 },
+  templateCard: { backgroundColor: Colors.surface, marginHorizontal: 16, borderRadius: Radius.xl, padding: 14, marginBottom: 12, ...Shadow.md, borderWidth: 1, borderColor: Colors.border },
+  templateHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
   templateMeta: {},
   templateActive: { fontFamily: FontFamily.medium, fontSize: FontSize.xs },
   templateTitleWrap: { alignItems: 'flex-end' },
   templateName: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text, textAlign: 'right' },
   templateTarget: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right' },
   templateDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', marginBottom: 10, lineHeight: 18 },
-  templateStats: { flexDirection: 'row-reverse', gap: 6, marginBottom: 10 },
+  templateStats: { flexDirection: 'row-reverse', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
   templateHealthRow: { flexDirection: 'row-reverse', gap: 6, flexWrap: 'wrap', marginBottom: 10 },
   healthPill: { minWidth: 86, flexGrow: 1, borderRadius: Radius.lg, borderWidth: 1, backgroundColor: Colors.surfaceSecondary, paddingHorizontal: 8, paddingVertical: 7, alignItems: 'flex-end' },
   healthPillValue: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, textAlign: 'right' },
   healthPillLabel: { fontFamily: FontFamily.regular, fontSize: 9, color: Colors.textTertiary, textAlign: 'right', marginTop: 1 },
   rulesSummary: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 10, marginBottom: 10 },
   ruleSummaryText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', lineHeight: 18 },
-  templateActions: { flexDirection: 'row-reverse', gap: 6, flexWrap: 'wrap' },
-  tAction: { borderRadius: Radius.lg, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center' },
-  tActionText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs },
+  templateActions: { flexDirection: 'row-reverse', gap: 8, flexWrap: 'wrap' },
+  tAction: { borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 10, minHeight: 42, alignItems: 'center', justifyContent: 'center' },
+  tActionPrimary: { flexBasis: '100%' },
+  tActionSecondary: { flexGrow: 1, minWidth: 96 },
+  tActionText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, textAlign: 'center' },
 
   // Form styles
   formHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', padding: 16 },

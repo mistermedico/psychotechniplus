@@ -7,7 +7,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
-import { TOPICS } from '../../data/mockData';
 import { AccessLevel, Question, QuestionType, ValidationStatus } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -121,7 +120,7 @@ export default function QuestionsAdmin() {
   }, [questions]);
 
   const topicAudit = useMemo(() => {
-    return TOPICS.map(topic => {
+    return topics.map(topic => {
       const topicQuestions = questions.filter(q => q.topicId === topic.id);
       const validated = topicQuestions.filter(q => q.validationStatus === 'validated').length;
       const pending = topicQuestions.filter(q => q.validationStatus === 'pending').length;
@@ -137,7 +136,7 @@ export default function QuestionsAdmin() {
       ).length;
       return { topic, total: topicQuestions.length, validated, pending, premium, spatialWithoutVisuals, qualityIssues };
     }).sort((a, b) => b.qualityIssues - a.qualityIssues || b.pending - a.pending || b.total - a.total);
-  }, [questions]);
+  }, [questions, topics]);
 
   const handleBulkAction = (action: 'approve' | 'reject' | 'delete') => {
     if (selectedQuestionIds.length === 0) return;
@@ -187,7 +186,7 @@ export default function QuestionsAdmin() {
   };
 
   const renderItem = ({ item }: { item: Question }) => {
-    const topic = TOPICS.find(t => t.id === item.topicId);
+    const topic = topics.find(t => t.id === item.topicId);
     const isSelected = selectedQuestionIds.includes(item.id);
     const itemQualityIssues = ([
       ['missingExplanation', 'הסבר חסר'],
@@ -522,7 +521,7 @@ export default function QuestionsAdmin() {
             📚 כל הנושאים
           </Text>
         </Pressable>
-        {TOPICS.map(t => (
+        {topics.map(t => (
           <Pressable
             key={t.id}
             onPress={() => setFilterTopicId(filterTopicId === t.id ? 'all' : t.id)}
@@ -633,7 +632,7 @@ function AuditPill({ label, value, color }: { label: string; value: string | num
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background, direction: 'rtl', writingDirection: 'rtl' },
+  safe: { flex: 1, backgroundColor: Colors.background, writingDirection: 'rtl' },
 
   auditScroll: { maxHeight: 76, borderBottomWidth: 1, borderBottomColor: Colors.border },
   auditGrid: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 12, paddingVertical: 10 },
@@ -646,7 +645,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     paddingVertical: 10,
-    direction: 'rtl',
     writingDirection: 'rtl',
   },
   topicAuditHeader: { paddingHorizontal: 14, marginBottom: 8, alignItems: 'flex-end' },

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView,
-  Animated, Dimensions,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -13,8 +13,6 @@ import { usePurchaseStore } from '../store/purchaseStore';
 import { useUserStore } from '../store/userStore';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
-
-const { width: W } = Dimensions.get('window');
 
 const FEATURES = [
   {
@@ -532,7 +530,9 @@ const styles = StyleSheet.create({
 
   // Nav Bar
   navShell: {
-    marginHorizontal: 16,
+    width: '92%',
+    maxWidth: 1120,
+    alignSelf: 'center',
     marginTop: 8,
     borderRadius: Radius.full,
     overflow: 'hidden',
@@ -586,12 +586,20 @@ const styles = StyleSheet.create({
     color: Colors.primaryLight,
   },
 
-  scroll: { paddingBottom: 48, direction: 'rtl', writingDirection: 'rtl', alignItems: 'stretch' },
+  scroll: {
+    width: '100%',
+    maxWidth: 1120,
+    alignSelf: 'center',
+    paddingBottom: 48,
+    direction: 'rtl',
+    writingDirection: 'rtl',
+    alignItems: 'stretch',
+  },
 
   // Hero
   hero: {
     width: '100%',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     direction: 'rtl',
     writingDirection: 'rtl',
     paddingTop: 34,
@@ -599,7 +607,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
 
-  heroBadgeWrap: { marginBottom: 26, borderRadius: Radius.full, overflow: 'hidden', alignSelf: 'flex-end' },
+  heroBadgeWrap: { marginBottom: 26, borderRadius: Radius.full, overflow: 'hidden', alignSelf: 'flex-start' },
   heroBadgeGrad: {
     paddingHorizontal: 18, paddingVertical: 8,
     borderRadius: Radius.full,
@@ -611,7 +619,7 @@ const styles = StyleSheet.create({
     color: Colors.primaryLight, letterSpacing: 0.5, textAlign: 'right', writingDirection: 'rtl',
   },
 
-  logoWrap: { marginBottom: 22, position: 'relative', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end' },
+  logoWrap: { marginBottom: 22, position: 'relative', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
   logoGrad: {
     width: 92, height: 92, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center',
@@ -646,7 +654,7 @@ const styles = StyleSheet.create({
   heroPreview: {
     width: '100%',
     maxWidth: 380,
-    alignSelf: 'flex-end',
+    alignSelf: 'flex-start',
     borderRadius: Radius['2xl'],
     overflow: 'hidden',
     borderWidth: 1,
@@ -698,7 +706,7 @@ const styles = StyleSheet.create({
   ctaPrimary: { borderRadius: Radius.xl, overflow: 'hidden' },
   ctaPrimaryGrad: {
     paddingVertical: 17, paddingHorizontal: 24,
-    alignItems: 'flex-end', justifyContent: 'center',
+    alignItems: 'flex-start', justifyContent: 'center',
   },
   ctaPrimaryText: {
     fontFamily: FontFamily.bold, fontSize: FontSize.base,
@@ -710,7 +718,7 @@ const styles = StyleSheet.create({
   },
   ctaSecondary: {
     paddingVertical: 13, paddingHorizontal: 24,
-    borderRadius: Radius.xl, alignItems: 'flex-end',
+    borderRadius: Radius.xl, alignItems: 'flex-start',
     width: '100%',
   },
   ctaSecondaryText: {
@@ -731,7 +739,7 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
     ...Shadow.md,
   },
-  statItem: { flex: 1, alignItems: 'flex-end' },
+  statItem: { flex: 1, alignItems: 'flex-start' },
   statValue: {
     fontFamily: FontFamily.bold, fontSize: 22,
     color: Colors.primaryLight, textAlign: 'right',
@@ -743,9 +751,9 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, backgroundColor: Colors.border, marginVertical: 4 },
 
   // Section header reusable
-  sectionHeader: { marginBottom: 18, alignItems: 'flex-end', direction: 'rtl', writingDirection: 'rtl' },
+  sectionHeader: { marginBottom: 18, alignItems: 'flex-start', direction: 'rtl', writingDirection: 'rtl' },
   sectionTag: {
-    alignSelf: 'flex-end',
+    alignSelf: 'flex-start',
     backgroundColor: 'rgba(124,111,247,0.18)',
     borderRadius: Radius.full,
     paddingHorizontal: 12, paddingVertical: 5,
@@ -770,7 +778,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15,23,42,0.66)',
     borderRadius: Radius.xl, padding: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   howIconWrap: {
     width: 46, height: 46, borderRadius: 14,
@@ -796,11 +804,13 @@ const styles = StyleSheet.create({
   featuresSection: { paddingHorizontal: 20, marginBottom: 36, direction: 'rtl', writingDirection: 'rtl' },
   featuresGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
   featureCard: {
-    width: (W - 50) / 2,
+    flexBasis: '48%',
+    flexGrow: 1,
+    minWidth: 260,
     backgroundColor: 'rgba(15,23,42,0.66)',
     borderRadius: Radius.xl, padding: 16,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   featureIconWrap: {
     width: 46, height: 46, borderRadius: 14,
@@ -821,7 +831,8 @@ const styles = StyleSheet.create({
   testimonialsSection: { marginBottom: 36, direction: 'rtl', writingDirection: 'rtl' },
   testimonialsRow: { paddingHorizontal: 20, gap: 12, flexDirection: 'row-reverse' },
   testimonialCard: {
-    width: W * 0.78,
+    width: 360,
+    maxWidth: 360,
     borderRadius: Radius.xl,
     overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)',
@@ -846,6 +857,7 @@ const styles = StyleSheet.create({
   pricingCard: {
     flexBasis: '47%',
     flexGrow: 1,
+    minWidth: 260,
     backgroundColor: 'rgba(15,23,42,0.70)',
     borderRadius: Radius.xl,
     overflow: 'hidden',
@@ -856,7 +868,7 @@ const styles = StyleSheet.create({
     ...Shadow.primary,
   },
   pricingHeader: {
-    padding: 16, alignItems: 'flex-end',
+    padding: 16, alignItems: 'flex-start',
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   pricingPlanName: {
@@ -868,7 +880,7 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary, textAlign: 'right', marginTop: 2,
   },
   pricingPremiumHeader: {
-    padding: 16, alignItems: 'flex-end',
+    padding: 16, alignItems: 'flex-start',
   },
   pricingPremiumName: {
     fontFamily: FontFamily.bold, fontSize: FontSize.base,
@@ -893,7 +905,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 10,
   },
-  pricingFeatures: { padding: 14, gap: 8, alignItems: 'flex-end' },
+  pricingFeatures: { padding: 14, gap: 8, alignItems: 'flex-start' },
   pricingFeatureRow: { flexDirection: 'row-reverse', gap: 6, alignItems: 'center' },
   pricingFeatureDot: {
     fontFamily: FontFamily.bold, fontSize: FontSize.sm,
@@ -909,7 +921,7 @@ const styles = StyleSheet.create({
   finalCtaBanner: {
     borderRadius: Radius['2xl'], padding: 28,
     borderWidth: 1, borderColor: Colors.borderGlow,
-    alignItems: 'flex-end', overflow: 'hidden',
+    alignItems: 'flex-start', overflow: 'hidden',
   },
   finalCtaGlow: {
     ...StyleSheet.absoluteFillObject,
@@ -929,7 +941,7 @@ const styles = StyleSheet.create({
   finalCtaBtn: { borderRadius: Radius.xl, overflow: 'hidden' },
   finalCtaBtnGrad: {
     paddingVertical: 16, paddingHorizontal: 32,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   finalCtaBtnText: {
     fontFamily: FontFamily.bold, fontSize: FontSize.lg,
@@ -937,7 +949,7 @@ const styles = StyleSheet.create({
   },
 
   // Footer
-  footer: { paddingHorizontal: 32, alignItems: 'flex-end', direction: 'rtl', writingDirection: 'rtl' },
+  footer: { paddingHorizontal: 32, alignItems: 'flex-start', direction: 'rtl', writingDirection: 'rtl' },
   footerText: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
     color: Colors.textTertiary, textAlign: 'right', lineHeight: 18,

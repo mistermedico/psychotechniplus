@@ -41,7 +41,9 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'leaderboard-admin',   icon: 'ד', label: 'לוח מובילים',        desc: 'ניהול דירוגים והישגים',                route: '/admin/leaderboard-admin',   category: 'users' },
   { id: 'revenue',             icon: 'ה', label: 'הכנסות',             desc: 'מנויים, המרות ומדדי הכנסה',            route: '/admin/revenue',             category: 'business' },
   { id: 'app-store',           icon: 'A', label: 'App Store',          desc: 'צפיות, הורדות וקישורים לאפל',          route: '/admin/app-store',           category: 'business' },
+  { id: 'events',              icon: 'ר', label: 'התקנות ורכישות',     desc: 'פתיחות ראשונות, הרשמות ורכישות',       route: '/admin/events',              category: 'business' },
   { id: 'promo-codes',         icon: 'ק', label: 'קודי קופון',         desc: 'הנחות וגישה זמנית',                   route: '/admin/promo-codes',         category: 'business' },
+  { id: 'support',             icon: 'פ', label: 'פניות משתמשים',       desc: 'תיבת פניות, תשובות וסטטוסים',          route: '/admin/support',             category: 'business' },
   { id: 'notifications',       icon: 'ה', label: 'הודעות Push',        desc: 'שליחת התראות למשתמשים',               route: '/admin/notifications',       category: 'business' },
   { id: 'app-settings',        icon: 'ג', label: 'הגדרות אפליקציה',    desc: 'פרמטרים גלובליים',                    route: '/admin/app-settings',        category: 'business' },
   { id: 'performance',         icon: 'ב', label: 'ביצועים',            desc: 'דיוק, רמות ונושאים',                   route: '/admin/performance',         category: 'system' },
@@ -75,6 +77,8 @@ const QUICK_ACTIONS = [
   { icon: 'נ', label: 'ניטור', route: '/admin/monitor' },
   { icon: 'מ', label: 'משתמשים', route: '/admin/users' },
   { icon: 'A', label: 'App Store', route: '/admin/app-store' },
+  { icon: 'ר', label: 'רכישות', route: '/admin/events' },
+  { icon: 'פ', label: 'פניות', route: '/admin/support' },
   { icon: 'י', label: 'ייצוא', route: '/admin/export' },
   { icon: 'ש', label: 'שלח הודעה', route: '/admin/notifications' },
 ];

@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
-import { I18nManager, Platform, StyleSheet } from 'react-native';
+import { AppState, I18nManager, Platform, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -17,7 +17,7 @@ import { useUserStore } from '../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { ensureDbSeeded } from '../lib/db';
-import ScreenGuide from '../components/ScreenGuide';
+import { notifyFirstOpenOnce } from '../lib/adminEmail';
 
 // Force RTL for Hebrew
 I18nManager.allowRTL(true);
@@ -65,8 +65,14 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         text-align: right !important;
       }
 
-      [data-testid], [role="button"], [role="link"] {
+      button, a, [data-testid], [role="button"], [role="link"] {
         direction: rtl !important;
+        text-align: right !important;
+      }
+
+      button *, a *, [role="button"] *, [role="link"] * {
+        direction: rtl !important;
+        text-align: right !important;
       }
 
       [class*="css-text"], [class*="r-"], div, span, p, h1, h2, h3, h4, h5, h6 {
@@ -89,8 +95,10 @@ export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
   const loadAdminData = useAdminStore(s => s.loadAdminData);
-  const loadQuestionsFromSupabase = useAdminStore(s => s.loadQuestionsFromSupabase);
+  const startRealtimeSync = useAdminStore(s => s.startRealtimeSync);
+  const stopRealtimeSync = useAdminStore(s => s.stopRealtimeSync);
   const initializePurchases = usePurchaseStore(s => s.initialize);
+  const checkPurchaseStatus = usePurchaseStore(s => s.checkStatus);
 
   const [fontsLoaded, fontError] = useFonts({
     Heebo_400Regular,
@@ -105,20 +113,34 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
       initialize().then(() => {
         const { email, userId, isGuest } = useUserStore.getState();
+        notifyFirstOpenOnce(userId, isGuest ? null : email).catch(() => null);
         // Ensure targets+topics exist in Supabase for all users (FK prerequisite)
         ensureDbSeeded().then(() => {
-          if (email.toLowerCase() === ADMIN_EMAIL) {
-            setIsAdmin(true);
-            loadAdminData();
-          } else {
-            loadQuestionsFromSupabase();
-          }
+          if (email.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
+          loadAdminData();
+          startRealtimeSync();
         });
         // Guests receive an anonymous RevenueCat ID so StoreKit prices and purchase restoration work before sign-in.
         initializePurchases(userId && !isGuest ? userId : undefined).catch(() => null);
       });
     }
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => {
+    stopRealtimeSync();
+  }, [stopRealtimeSync]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        const { isAuthenticated, isGuest } = useUserStore.getState();
+        if (isAuthenticated && !isGuest) {
+          checkPurchaseStatus().catch(() => null);
+        }
+      }
+    });
+    return () => subscription.remove();
+  }, [checkPurchaseStatus]);
 
   if (!fontsLoaded && !fontError) return null;
 
@@ -142,11 +164,11 @@ export default function RootLayout() {
             options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
           />
           <Stack.Screen name="paywall" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+          <Stack.Screen name="support" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="terms" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="privacy" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="maintenance" />
         </Stack>
-        <ScreenGuide />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

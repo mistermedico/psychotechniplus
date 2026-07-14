@@ -431,22 +431,23 @@ export function ensureSpatialVisualAssets(question: Question): Question {
   if (!isSpatialQuestion(question)) return question;
 
   const correctId = correctOptionId(question);
+  const generatedQuestionImage = question.mediaUrl ? undefined : questionSvg(question);
+  const generatedExplanationImage = question.explanationImageUrl ? undefined : explanationSvg(question);
   const options = question.options.map((option, index) => ({
     ...option,
     isCorrect: option.id === correctId,
-    text: '',
-    imageUrl: optionSvg(question, option, index),
+    imageUrl: option.imageUrl ?? optionSvg(question, option, index),
   }));
 
   return {
     ...question,
     correctAnswer: correctId,
     questionType: 'shapes',
-    questionText: modePrompt(visualMode(question)),
-    mediaUrl: questionSvg(question),
-    mediaType: 'image',
-    explanation: spatialExplanation(question),
-    explanationImageUrl: explanationSvg(question),
+    questionText: question.questionText || modePrompt(visualMode(question)),
+    mediaUrl: question.mediaUrl ?? generatedQuestionImage,
+    mediaType: question.mediaType ?? 'image',
+    explanation: question.explanation || spatialExplanation(question),
+    explanationImageUrl: question.explanationImageUrl ?? generatedExplanationImage,
     options,
   };
 }

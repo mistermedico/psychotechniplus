@@ -4,6 +4,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+const ADMIN_EMAIL = 'mrmedico111@gmail.com';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -38,16 +39,29 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const body = await req.json().catch(() => ({}));
+    const requestedUserId = typeof body?.userId === 'string' && body.userId.trim()
+      ? body.userId.trim()
+      : user.id;
+    const isSelfDelete = requestedUserId === user.id;
+    const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL;
+
+    if (!isSelfDelete && !isAdmin) {
+      return new Response(JSON.stringify({ error: 'Admin privileges required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Delete all user data
     await Promise.all([
-      supabaseAdmin.from('user_profiles').delete().eq('id', user.id),
-      supabaseAdmin.from('user_elos').delete().eq('user_id', user.id),
-      supabaseAdmin.from('user_badges').delete().eq('user_id', user.id),
-      supabaseAdmin.from('practice_sessions').delete().eq('user_id', user.id),
+      supabaseAdmin.from('user_profiles').delete().eq('id', requestedUserId),
+      supabaseAdmin.from('user_elos').delete().eq('user_id', requestedUserId),
+      supabaseAdmin.from('user_badges').delete().eq('user_id', requestedUserId),
+      supabaseAdmin.from('practice_sessions').delete().eq('user_id', requestedUserId),
     ]);
 
     // Delete the auth user
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(requestedUserId);
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

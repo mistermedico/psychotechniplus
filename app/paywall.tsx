@@ -15,7 +15,7 @@ import { FontFamily, FontSize, Radius } from '../constants/theme';
 
 const BENEFITS = [
   { icon: '♾️', title: 'שאלות ללא הגבלה', desc: 'גישה לכל המאגר — מעל 1,200 שאלות תרגול' },
-  { icon: '🧠', title: 'אלגוריתם ELO אדפטיבי', desc: 'מנגנון שמתאים שאלות לפי רמת התרגול שלך' },
+  { icon: '🧠', title: 'מעקב רמה חכם', desc: 'ניתוח ביצועים לפי נושאים ורמות קושי לאורך זמן' },
   { icon: '🏆', title: 'כל הסימולציות', desc: 'סימולציות מלאות המדמות תרגול תחת זמן' },
   { icon: '⚡', title: 'אתגרים יומיים', desc: 'בונוס XP ומשימות מיוחדות מדי יום' },
   { icon: '📊', title: 'אנליטיקס מפורט', desc: 'גרפים, חוזקות, חולשות — הכל גלוי' },
@@ -33,7 +33,7 @@ export default function PaywallScreen() {
     packages, isPurchasing, isRestoring, loadError,
     fetchOfferings, purchase, restore,
   } = usePurchaseStore();
-  const { isPremium } = useUserStore();
+  const { isPremium, isGuest } = useUserStore();
   const [selected, setSelected] = useState<string>('monthly');
 
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -45,10 +45,10 @@ export default function PaywallScreen() {
       Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
     ]).start();
 
-    if (packages.length === 0) {
+    if (!isGuest && packages.length === 0) {
       fetchOfferings().catch(() => null);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isGuest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Already premium — close paywall
   useEffect(() => {
@@ -56,6 +56,12 @@ export default function PaywallScreen() {
   }, [isPremium]);
 
   const handlePurchase = async () => {
+    if (isGuest) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.push({ pathname: '/auth', params: { redirect: 'paywall', mode: 'register' } });
+      return;
+    }
+
     const pkg = packages.find(p => p.identifier === selected);
     if (!pkg) return;
 
@@ -135,6 +141,47 @@ export default function PaywallScreen() {
             <Text style={styles.heroSub}>כלים מתקדמים לתרגול פסיכוטכני מסודר</Text>
           </Animated.View>
 
+          {isGuest && (
+            <Animated.View style={[styles.guestUpgradeCard, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+              <Text style={styles.guestUpgradeIcon}>💎</Text>
+              <Text style={styles.guestUpgradeTitle}>כדי לרכוש פרימיום צריך חשבון</Text>
+              <Text style={styles.guestUpgradeText}>
+                התחבר או צור חשבון, ואז נחזיר אותך לכאן כדי להשלים רכישה. כך המנוי יישמר ויזוהה גם במכשירים הבאים.
+              </Text>
+
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push({ pathname: '/auth', params: { redirect: 'paywall', mode: 'register' } });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="יצירת חשבון ורכישת פרימיום"
+                style={({ pressed }) => [styles.guestPrimaryBtn, { opacity: pressed ? 0.85 : 1 }]}
+              >
+                <LinearGradient
+                  colors={[Colors.primary, Colors.primaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.guestPrimaryGrad}
+                >
+                  <Text style={styles.guestPrimaryText}>צור חשבון ורכוש פרימיום</Text>
+                </LinearGradient>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  router.push({ pathname: '/auth', params: { redirect: 'paywall', mode: 'login' } });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="כבר יש לי חשבון"
+                style={({ pressed }) => [styles.guestSecondaryBtn, { opacity: pressed ? 0.75 : 1 }]}
+              >
+                <Text style={styles.guestSecondaryText}>כבר יש לי חשבון</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+
           {/* Benefits */}
           <Animated.View style={[styles.benefitsCard, { opacity: fadeIn }]}>
             <View style={styles.cardGlow} />
@@ -150,6 +197,8 @@ export default function PaywallScreen() {
             ))}
           </Animated.View>
 
+          {!isGuest && (
+            <>
           {/* Plans */}
           <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
             <Text style={styles.plansTitle}>בחר תוכנית</Text>
@@ -274,6 +323,8 @@ export default function PaywallScreen() {
               רכישה חד-פעמית · לא מתחדשת · גישה לצמיתות לכל התכנים הנוכחיים.
             </Text>
           )}
+            </>
+          )}
 
           {/* Legal links */}
           <View style={styles.legalLinks}>
@@ -343,6 +394,62 @@ const styles = StyleSheet.create({
   heroSub: {
     fontFamily: FontFamily.regular, fontSize: FontSize.sm,
     color: Colors.textSecondary, textAlign: 'center',
+  },
+
+  guestUpgradeCard: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: Radius['2xl'],
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.30)',
+    padding: 20,
+    marginBottom: 18,
+    alignItems: 'center',
+  },
+  guestUpgradeIcon: {
+    fontSize: 34,
+    marginBottom: 8,
+  },
+  guestUpgradeTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.text,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  guestUpgradeText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  guestPrimaryBtn: {
+    width: '100%',
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  guestPrimaryGrad: {
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  guestPrimaryText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: '#fff',
+  },
+  guestSecondaryBtn: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  guestSecondaryText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.primaryLight,
+    textDecorationLine: 'underline',
   },
 
   // Benefits

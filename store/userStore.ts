@@ -401,7 +401,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   setPremium: (val) => {
     const { userId, email, isGuest } = get();
-    const next = email.toLowerCase() === ADMIN_EMAIL ? true : val;
+    const normalizedEmail = email.toLowerCase();
+    const next = normalizedEmail === ADMIN_EMAIL || PREMIUM_REVIEW_EMAILS.has(normalizedEmail) ? true : val;
     set({ isPremium: next });
     if (userId && !isGuest) saveUserProfile(userId, { is_premium: next });
   },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Modal, Alert,
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, PushNotification } from '../../store/adminStore';
+import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -56,6 +57,33 @@ export default function NotificationsScreen() {
   const [segment, setSegment] = useState<PushNotification['targetSegment']>('all');
   const [scheduleToggle, setScheduleToggle] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+  const [estimatedReachMap, setEstimatedReachMap] = useState<Record<PushNotification['targetSegment'], number>>({
+    all: 0, free: 0, premium: 0, inactive_7d: 0, inactive_30d: 0,
+  });
+
+  useEffect(() => {
+    const loadReach = async () => {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('is_premium,last_practiced_date');
+      const rows = data ?? [];
+      const cutoff7 = new Date();
+      cutoff7.setDate(cutoff7.getDate() - 7);
+      const cutoff30 = new Date();
+      cutoff30.setDate(cutoff30.getDate() - 30);
+      const cutoff7Date = cutoff7.toISOString().slice(0, 10);
+      const cutoff30Date = cutoff30.toISOString().slice(0, 10);
+      setEstimatedReachMap({
+        all: rows.length,
+        free: rows.filter(row => !row.is_premium).length,
+        premium: rows.filter(row => row.is_premium).length,
+        inactive_7d: rows.filter(row => !row.last_practiced_date || row.last_practiced_date < cutoff7Date).length,
+        inactive_30d: rows.filter(row => !row.last_practiced_date || row.last_practiced_date < cutoff30Date).length,
+      });
+    };
+
+    loadReach();
+  }, []);
 
   const filtered = pushNotifications.filter(n => activeTab === 'all' || n.status === activeTab);
   const sentNotifs = pushNotifications.filter(n => n.status === 'sent');
@@ -68,9 +96,6 @@ export default function NotificationsScreen() {
       Alert.alert('שגיאה', 'מלא כותרת ותוכן');
       return;
     }
-    const estimatedReachMap: Record<PushNotification['targetSegment'], number> = {
-      all: 2612, free: 2445, premium: 167, inactive_7d: 340, inactive_30d: 820,
-    };
     if (scheduleToggle && scheduledAt) {
       addPushNotification({
         title: title.trim(),

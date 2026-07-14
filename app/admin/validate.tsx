@@ -8,7 +8,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
-import { TOPICS, TARGETS } from '../../data/mockData';
 import { Question, QuestionOption, QuestionType, AccessLevel, ValidationStatus } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -519,7 +518,7 @@ function QuestionEditForm({
   draft: EditDraft;
   onChange: (d: EditDraft) => void;
 }) {
-  const topics = TOPICS;
+  const { topics, targets } = useAdminStore();
 
   const setCorrectAnswer = (optId: string) => {
     onChange({
@@ -738,7 +737,7 @@ function QuestionEditForm({
       <Text style={editStyles.sectionLabel}>מסלולים</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={editStyles.chipsScroll}>
         <View style={editStyles.chipsRow}>
-          {TARGETS.map(t => (
+          {targets.map(t => (
             <Pressable
               key={t.id}
               onPress={() => toggleTarget(t.id)}
@@ -848,7 +847,8 @@ function QuestionEditForm({
 // ── Question Preview Card ──────────────────────────────────────────────────
 
 function QuestionPreviewCard({ question }: { question: Question }) {
-  const topic = TOPICS.find(t => t.id === question.topicId);
+  const { topics } = useAdminStore();
+  const topic = topics.find(t => t.id === question.topicId);
 
   return (
     <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>

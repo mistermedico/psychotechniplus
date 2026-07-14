@@ -36,6 +36,7 @@ interface PracticeState {
   };
 
   skipQuestion: () => void;
+  completeUnansweredAsSkipped: () => void;
   nextQuestion: () => boolean;
   endSession: () => ActiveSession | null;
   getCurrentQuestion: () => Question | null;
@@ -74,6 +75,14 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     if (!session) return { isCorrect: false, timeSpent: 0, correctAnswerId: '' };
 
     const question = session.questions[session.currentIndex];
+    const existing = session.answers.find(answer => answer.questionId === question.id);
+    if (existing) {
+      return {
+        isCorrect: existing.isCorrect,
+        timeSpent: existing.timeSpent,
+        correctAnswerId: question.correctAnswer,
+      };
+    }
     const isCorrect = question.correctAnswer === selectedAnswerId;
     const timeSpent = Math.round(
       (Date.now() - session.questionStartedAt.getTime()) / 1000
@@ -106,6 +115,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     const { session } = get();
     if (!session) return;
     const question = session.questions[session.currentIndex];
+    if (session.answers.some(answer => answer.questionId === question.id)) return;
     const timeSpent = Math.round(
       (Date.now() - session.questionStartedAt.getTime()) / 1000
     );
@@ -120,6 +130,32 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     set(state => ({
       session: state.session
         ? { ...state.session, answers: [...state.session.answers, answer] }
+        : null,
+    }));
+  },
+
+  completeUnansweredAsSkipped: () => {
+    const { session } = get();
+    if (!session) return;
+    const answeredIds = new Set(session.answers.map(answer => answer.questionId));
+    const now = Date.now();
+    const skippedAnswers = session.questions
+      .map((question, index) => ({ question, index }))
+      .filter(({ question }) => !answeredIds.has(question.id))
+      .map(({ question, index }) => ({
+        questionId: question.id,
+        selectedAnswerId: '',
+        isCorrect: false,
+        timeSpent: index === session.currentIndex
+          ? Math.max(0, Math.round((now - session.questionStartedAt.getTime()) / 1000))
+          : 0,
+        isSkipped: true,
+        questionDifficulty: question.difficulty,
+      }));
+    if (skippedAnswers.length === 0) return;
+    set(state => ({
+      session: state.session
+        ? { ...state.session, answers: [...state.session.answers, ...skippedAnswers] }
         : null,
     }));
   },

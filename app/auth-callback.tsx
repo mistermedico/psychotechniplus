@@ -4,7 +4,7 @@ import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/theme';
-import { finishOAuthCallback } from '../lib/oauth';
+import { finishOAuthCallback, getCurrentOAuthCallbackUrl } from '../lib/oauth';
 import { supabase } from '../lib/supabase';
 import { useUserStore } from '../store/userStore';
 import { ADMIN_EMAIL, useAdminStore } from '../store/adminStore';
@@ -16,10 +16,14 @@ export default function AuthCallbackScreen() {
 
   useEffect(() => {
     let mounted = true;
-    const run = async () => {
+    let handled = false;
+
+    const run = async (callbackUrl?: string | null) => {
+      if (handled) return;
       try {
-        const url = await Linking.getInitialURL();
+        const url = callbackUrl ?? getCurrentOAuthCallbackUrl() ?? await Linking.getInitialURL();
         if (!url) throw new Error('לא התקבלה כתובת חזרה מההתחברות');
+        handled = true;
         await finishOAuthCallback(url);
         const { data } = await supabase.auth.getSession();
         const user = data.session?.user;
@@ -34,8 +38,14 @@ export default function AuthCallbackScreen() {
         setTimeout(() => router.replace('/auth'), 1800);
       }
     };
+
+    const subscription = Linking.addEventListener('url', ({ url }) => run(url));
     run();
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
   }, [initialize, setIsAdmin]);
 
   return (

@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
-import { TOPICS, TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -55,7 +54,7 @@ function validateQuestion(q: unknown, index: number): string | null {
 }
 
 export default function JsonImportScreen() {
-  const { addQuestion, questions: existingQuestions } = useAdminStore();
+  const { addQuestion, questions: existingQuestions, topics, targets } = useAdminStore();
   const [jsonText, setJsonText] = useState('');
   const [preview, setPreview] = useState<ImportedQuestion[]>([]);
   const [duplicates, setDuplicates] = useState<number[]>([]);
@@ -128,7 +127,7 @@ export default function JsonImportScreen() {
       if (skipDups && duplicates.includes(i)) { skipped++; continue; }
       try {
         addQuestion({
-          targetIds: item.targetIds ?? ['target_psychometric'],
+          targetIds: item.targetIds ?? (targets[0]?.id ? [targets[0].id] : []),
           topicId: item.topicId,
           questionType: (item.questionType as any) ?? 'multiple_choice',
           questionText: item.questionText,
@@ -195,7 +194,7 @@ export default function JsonImportScreen() {
           <Text style={styles.infoText}>
             הדבק מערך JSON של שאלות. כל שאלה חייבת לכלול:{'\n'}
             • <Text style={styles.bold}>questionText</Text> — טקסט השאלה{'\n'}
-            • <Text style={styles.bold}>topicId</Text> — {TOPICS.map(t => t.id).join(' / ')}{'\n'}
+            • <Text style={styles.bold}>topicId</Text> — {topics.map(t => t.id).join(' / ')}{'\n'}
             • <Text style={styles.bold}>options</Text> — מערך עם id, text, isCorrect{'\n'}
             • <Text style={styles.bold}>correctAnswer</Text> — ה-id של התשובה הנכונה{'\n'}
             • <Text style={styles.bold}>explanation</Text> — הסבר (אופציונלי){'\n'}
@@ -256,7 +255,7 @@ export default function JsonImportScreen() {
                     <Text style={styles.previewMetaText}>תשובות: {q.options.length}</Text>
                     <Text style={styles.previewMetaText}>{q.accessLevel ?? 'free'}</Text>
                   </View>
-                  {!TOPICS.find(t => t.id === q.topicId) && (
+                  {!topics.find(t => t.id === q.topicId) && (
                     <Text style={{ color: Colors.warning, fontSize: 10, fontFamily: FontFamily.regular, textAlign: 'right' }}>
                       ⚠️ נושא לא מוכר: {q.topicId}
                     </Text>

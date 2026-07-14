@@ -1,6 +1,7 @@
 import { Question } from '../data/types';
 import { SmartExamTemplate, SmartRule } from '../store/adminStore';
 import { isPsychotechnicQuestionReady } from './questionQuality';
+import { estimatePercentileRank } from './scoring';
 
 export interface GeneratedExamSection {
   ruleId: string;
@@ -65,6 +66,20 @@ function selectRandom(
   return shuffle(source).slice(0, count);
 }
 
+function safeCount(value: number): number {
+  return Math.max(0, Math.floor(Number(value) || 0));
+}
+
+function safeDifficultyRange(min?: number, max?: number): { min: number; max: number } {
+  const safeMin = Math.max(1, Math.min(10, Number(min) || 1));
+  const safeMax = Math.max(1, Math.min(10, Number(max) || 10));
+  return safeMin <= safeMax ? { min: safeMin, max: safeMax } : { min: safeMax, max: safeMin };
+}
+
+function isUsableQuestion(q: Question): boolean {
+  return q.validationStatus === 'validated' && isPsychotechnicQuestionReady(q);
+}
+
 export function generateSmartExamQuestions(
   template: SmartExamTemplate,
   allQuestions: Question[],
@@ -109,22 +124,25 @@ export function generateSmartExamQuestions(
   for (const rule of rules) {
     const topicId = rule.topicId;
     const userElo = userTopicElos[topicId] ?? 1200;
+    const requestedCount = safeCount(rule.count);
+    const { min: minDifficulty, max: maxDifficulty } = safeDifficultyRange(rule.minDifficulty, rule.maxDifficulty);
+
+    if (requestedCount === 0) continue;
 
     // Base pool: correct topic, validated, not used, not excluded
     let pool = allQuestions.filter(q =>
       q.topicId === topicId &&
-      q.validationStatus === 'validated' &&
-      isPsychotechnicQuestionReady(q) &&
+      isUsableQuestion(q) &&
       !usedIds.has(q.id) &&
       !excludedIds.has(q.id)
     );
 
-    // If pool is empty, fallback: relax used-id filter
-    if (pool.length < rule.count) {
+    // If pool is too small, keep the no-duplicate rule and use the available pool.
+    if (pool.length < requestedCount) {
       pool = allQuestions.filter(q =>
         q.topicId === topicId &&
-        q.validationStatus === 'validated' &&
-        isPsychotechnicQuestionReady(q) &&
+        isUsableQuestion(q) &&
+        !usedIds.has(q.id) &&
         !excludedIds.has(q.id)
       );
     }
@@ -132,8 +150,7 @@ export function generateSmartExamQuestions(
     if (pool.length === 0) {
       pool = allQuestions.filter(q =>
         q.topicId === topicId &&
-        q.validationStatus === 'validated' &&
-        isPsychotechnicQuestionReady(q)
+        isUsableQuestion(q)
       );
     }
 
@@ -141,15 +158,15 @@ export function generateSmartExamQuestions(
 
     if (rule.subRules && rule.subRules.length > 0) {
       // Select per sub-rule (subcategory)
-      let remaining = rule.count;
+      let remaining = requestedCount;
       for (const sub of rule.subRules) {
         const subPool = pool.filter(
-          q => (q as any).subcategory === sub.value || !sub.value
+          q => !usedIds.has(q.id) && ((q as any).subcategory === sub.value || !sub.value)
         );
-        const subCount = Math.min(sub.count, remaining, subPool.length || pool.length);
+        const subCount = Math.min(safeCount(sub.count), remaining, subPool.length || pool.length);
         const subSelected = rule.useAdaptiveAlgorithm
-          ? selectByElo(subPool.length > 0 ? subPool : pool, userElo, subCount, rule.minDifficulty, rule.maxDifficulty)
-          : selectRandom(subPool.length > 0 ? subPool : pool, subCount, rule.minDifficulty, rule.maxDifficulty);
+          ? selectByElo(subPool.length > 0 ? subPool : pool.filter(q => !usedIds.has(q.id)), userElo, subCount, minDifficulty, maxDifficulty)
+          : selectRandom(subPool.length > 0 ? subPool : pool.filter(q => !usedIds.has(q.id)), subCount, minDifficulty, maxDifficulty);
         selected.push(...subSelected);
         subSelected.forEach(q => usedIds.add(q.id));
         remaining -= subSelected.length;
@@ -158,16 +175,30 @@ export function generateSmartExamQuestions(
       if (remaining > 0) {
         const fillPool = pool.filter(q => !usedIds.has(q.id));
         const fill = rule.useAdaptiveAlgorithm
-          ? selectByElo(fillPool, userElo, remaining, rule.minDifficulty, rule.maxDifficulty)
-          : selectRandom(fillPool, remaining, rule.minDifficulty, rule.maxDifficulty);
+          ? selectByElo(fillPool, userElo, remaining, minDifficulty, maxDifficulty)
+          : selectRandom(fillPool, remaining, minDifficulty, maxDifficulty);
         selected.push(...fill);
         fill.forEach(q => usedIds.add(q.id));
       }
     } else {
       selected = rule.useAdaptiveAlgorithm
-        ? selectByElo(pool, userElo, rule.count, rule.minDifficulty, rule.maxDifficulty)
-        : selectRandom(pool, rule.count, rule.minDifficulty, rule.maxDifficulty);
+        ? selectByElo(pool, userElo, requestedCount, minDifficulty, maxDifficulty)
+        : selectRandom(pool, requestedCount, minDifficulty, maxDifficulty);
       selected.forEach(q => usedIds.add(q.id));
+    }
+
+    if (selected.length < requestedCount && rule.fallback?.type === 'anyTopic') {
+      const fillPool = allQuestions.filter(q =>
+        isUsableQuestion(q) &&
+        !usedIds.has(q.id) &&
+        !excludedIds.has(q.id)
+      );
+      const fillCount = requestedCount - selected.length;
+      const fill = rule.useAdaptiveAlgorithm
+        ? selectByElo(fillPool, userElo, fillCount, minDifficulty, maxDifficulty)
+        : selectRandom(fillPool, fillCount, minDifficulty, maxDifficulty);
+      selected.push(...fill);
+      fill.forEach(q => usedIds.add(q.id));
     }
 
     // Per-topic time: template.topicTimeSettings or fallback to timeLimitMinutes / totalQ
@@ -197,7 +228,7 @@ export function generateSmartExamQuestions(
 }
 
 export function calcSmartExamScore(
-  answers: Array<{ isCorrect: boolean; timeSpent: number; difficulty: number }>,
+  answers: Array<{ isCorrect: boolean; timeSpent: number; difficulty: number; isSkipped?: boolean }>,
   passingScore: number
 ): {
   rawScore: number;
@@ -214,52 +245,65 @@ export function calcSmartExamScore(
     stabilityScore: 0, percentileRank: 0, performanceLevel: 'low', passed: false,
   };
 
-  const correct = answers.filter(a => a.isCorrect).length;
+  const safeDifficulty = (value: number) => Math.max(1, Math.min(10, Number.isFinite(value) ? value : 5));
+  const correct = answers.filter(a => a.isCorrect && !a.isSkipped).length;
   const rawScore = Math.round((correct / total) * 100);
 
-  // Difficulty-weighted score
-  const totalDiff = answers.reduce((s, a) => s + a.difficulty, 0);
-  const weightedCorrect = answers.filter(a => a.isCorrect).reduce((s, a) => s + a.difficulty, 0);
+  const totalDiff = answers.reduce((sum, answer) => sum + safeDifficulty(answer.difficulty), 0);
+  const weightedCorrect = answers
+    .filter(answer => answer.isCorrect && !answer.isSkipped)
+    .reduce((sum, answer) => sum + safeDifficulty(answer.difficulty), 0);
   const difficultyWeightedScore = totalDiff > 0
     ? Math.round((weightedCorrect / totalDiff) * 100)
     : rawScore;
 
-  // Speed score: bonus for fast answers (avg under 30s per question)
-  const avgTime = answers.reduce((s, a) => s + a.timeSpent, 0) / total;
-  const speedBonus = avgTime < 20 ? 8 : avgTime < 30 ? 4 : avgTime < 45 ? 0 : -4;
-  const speedAdjustedScore = Math.max(0, Math.min(100, rawScore + speedBonus));
+  const answered = answers.filter(answer => !answer.isSkipped);
+  const speedDelta = answered.length > 0
+    ? answered.reduce((sum, answer) => {
+        const difficulty = safeDifficulty(answer.difficulty);
+        const expectedSeconds = 18 + difficulty * 5;
+        if (!answer.isCorrect) return sum + (answer.timeSpent > expectedSeconds * 1.7 ? -2 : 0);
+        if (answer.timeSpent <= expectedSeconds * 0.55 && difficulty >= 6) return sum + 4;
+        if (answer.timeSpent <= expectedSeconds * 0.75) return sum + 2;
+        if (answer.timeSpent <= expectedSeconds * 1.15) return sum;
+        return sum - 1;
+      }, 0) / answered.length
+    : 0;
+  const speedAdjustedScore = Math.max(0, Math.min(100, Math.round(difficultyWeightedScore + speedDelta)));
 
-  // Stability: how consistent the performance is (less variance = more stable)
   const windowSize = 5;
   const windows: number[] = [];
   for (let i = 0; i <= answers.length - windowSize; i++) {
-    const w = answers.slice(i, i + windowSize);
-    windows.push(w.filter(a => a.isCorrect).length / windowSize);
+    const window = answers.slice(i, i + windowSize);
+    windows.push(window.filter(answer => answer.isCorrect && !answer.isSkipped).length / windowSize);
   }
-  const mean = windows.length > 0 ? windows.reduce((s, v) => s + v, 0) / windows.length : rawScore / 100;
+  const mean = windows.length > 0 ? windows.reduce((sum, value) => sum + value, 0) / windows.length : rawScore / 100;
   const variance = windows.length > 0
-    ? windows.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / windows.length
+    ? windows.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / windows.length
     : 0;
   const stabilityScore = Math.round(Math.max(0, 1 - variance * 4) * 100);
 
-  // Percentile estimate (simplified — compare to gaussian distribution)
-  const z = (rawScore - 65) / 15;
-  const percentileRank = Math.round(Math.min(99, Math.max(1,
-    50 + 50 * Math.tanh(z * 0.8)
+  const skippedRate = answers.filter(answer => answer.isSkipped).length / total;
+  const finalScore = Math.max(0, Math.min(100, Math.round(
+    rawScore * 0.42 +
+    difficultyWeightedScore * 0.38 +
+    speedAdjustedScore * 0.12 +
+    stabilityScore * 0.08 -
+    skippedRate * 8
   )));
 
   const performanceLevel: 'low' | 'medium' | 'high' | 'very_high' =
-    rawScore >= 85 ? 'very_high' :
-    rawScore >= 70 ? 'high' :
-    rawScore >= 50 ? 'medium' : 'low';
+    finalScore >= 85 ? 'very_high' :
+    finalScore >= 70 ? 'high' :
+    finalScore >= 50 ? 'medium' : 'low';
 
   return {
     rawScore,
     difficultyWeightedScore,
     speedAdjustedScore,
     stabilityScore,
-    percentileRank,
+    percentileRank: estimatePercentileRank(finalScore),
     performanceLevel,
-    passed: rawScore >= passingScore,
+    passed: finalScore >= passingScore,
   };
 }

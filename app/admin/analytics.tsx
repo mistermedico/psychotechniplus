@@ -5,7 +5,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAdminStore } from '../../store/adminStore';
-import { TOPICS, TARGETS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -21,11 +20,11 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function Analytics() {
-  const { getStats, questions } = useAdminStore();
+  const { getStats, questions, topics, targets } = useAdminStore();
   const stats = getStats();
 
   // Per topic
-  const topicData = TOPICS.map(t => ({
+  const topicData = topics.map(t => ({
     id: t.id,
     name: t.name,
     icon: t.icon,
@@ -220,7 +219,7 @@ export default function Analytics() {
         {/* Per target breakdown */}
         <Text style={styles.chartTitle}>🎯 שאלות לפי מסלול</Text>
         <View style={styles.card}>
-          {TARGETS.map(t => {
+          {targets.map(t => {
             const count = questions.filter(q => q.targetIds.includes(t.id)).length;
             const pct = questions.length > 0 ? Math.round((count / questions.length) * 100) : 0;
             return (

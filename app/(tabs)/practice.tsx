@@ -8,12 +8,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
-import { TARGETS, TOPICS } from '../../data/mockData';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore, SmartExamTemplate, PremiumConfig } from '../../store/adminStore';
 import { canAccessMode, canAccessPremiumFeature, canAccessTopic } from '../../lib/accessControl';
+import { Target, Topic } from '../../data/types';
+import { visiblePracticeTopics } from '../../utils/topicVisibility';
 
 type PracticeTab = 'free' | 'simulations';
 
@@ -33,14 +34,6 @@ const FREE_MODES = [
     desc: 'תרגל בקצב שלך, קבל הסברים מיידיים',
     color: Colors.primary,
     gradient: Colors.gradients.primary,
-  },
-  {
-    id: 'adaptive',
-    icon: '🧠',
-    label: 'תרגול אדפטיבי',
-    desc: 'המנוע מתאים את הקושי לרמתך בזמן אמת',
-    color: Colors.accent,
-    gradient: ['#8B5CF6', '#6D28D9'] as [string, string],
   },
   {
     id: 'speed',
@@ -76,20 +69,21 @@ export default function PracticeTab() {
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyFilter>('all');
   const tabAnim = useRef(new Animated.Value(0)).current;
+  const paywallAutoShownRef = useRef(false);
   const indicatorLeft = tabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '50%'] });
 
-  const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, userId } = useUserStore();
-  const { freePracticeLimit, templates, appConfig, practiceSettings, premiumConfig } = useAdminStore();
+  const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, isGuest, userId } = useUserStore();
+  const { freePracticeLimit, templates, appConfig, practiceSettings, premiumConfig, targets, topics: allTopics } = useAdminStore();
   const featureFlags = appConfig.featureFlags;
   const premiumOnlyModes = practiceSettings.premiumOnlyModes;
   const [usage, setUsage] = useState<PracticeUsage>(emptyUsage);
 
-  const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
-  const topics = TOPICS.filter(t => t.targetId === target.id);
+  const target = targets.find(t => t.id === selectedTargetId) ?? targets[0];
+  const topics = target ? visiblePracticeTopics(allTopics.filter(t => t.targetId === target.id)) : [];
 
   const activeTemplates = useMemo(
-    () => templates.filter(t => t.isActive && t.targetId === target.id),
-    [templates, target.id]
+    () => target ? templates.filter(t => t.isActive && t.targetId === target.id) : [],
+    [templates, target?.id]
   );
 
   const enabledModes = useMemo(
@@ -142,6 +136,19 @@ export default function PracticeTab() {
     return null;
   };
 
+  const usageBlock = getFreeUsageBlock();
+
+  useEffect(() => {
+    if (!usageBlock) {
+      paywallAutoShownRef.current = false;
+      return;
+    }
+    if (!isGuest || isPremium || paywallAutoShownRef.current) return;
+    paywallAutoShownRef.current = true;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/paywall');
+  }, [isGuest, isPremium, usageBlock]);
+
   const consumeFreeUsage = () => {
     if (isPremium) return;
     const currentUsage = usage.date === todayKey() ? usage : emptyUsage();
@@ -173,8 +180,12 @@ export default function PracticeTab() {
       ]);
       return;
     }
-    const usageBlock = getFreeUsageBlock();
     if (usageBlock) {
+      if (isGuest) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        router.push('/paywall');
+        return;
+      }
       Alert.alert('מגבלת תרגול חינמי', usageBlock, [
         { text: 'שדרג', onPress: () => router.push('/paywall') },
         { text: 'בסדר', style: 'cancel' },
@@ -199,7 +210,7 @@ export default function PracticeTab() {
       pathname: '/practice-session',
       params: {
         topicId: selectedTopicId,
-        targetId: target.id,
+        targetId: target?.id ?? '',
         mode: selectedMode,
         difficulty: selectedDifficulty,
         questionLimit: isPremium ? '999' : String(freePracticeLimit),
@@ -210,6 +221,11 @@ export default function PracticeTab() {
   const handleStartSimulation = (templateId: string) => {
     const tmpl = templates.find(t => t.id === templateId);
     if (!tmpl) return;
+    if (!isPremium) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.push('/paywall');
+      return;
+    }
     if (!canAccessPremiumFeature('simulations', isPremium, premiumConfig)) {
       Alert.alert('פרימיום בלבד', 'מבחנים חכמים נעולים לפי הגדרות המנהל.', [
         { text: 'שדרג', onPress: () => router.push('/paywall') },
@@ -223,7 +239,7 @@ export default function PracticeTab() {
       params: {
         mode: 'simulation',
         templateId,
-        targetId: target.id,
+        targetId: target?.id ?? '',
         topicId: tmpl.rules[0]?.topicId ?? '',
       },
     });
@@ -284,16 +300,21 @@ export default function PracticeTab() {
             dailyLimit={premiumConfig.freeUserSessionLimit}
             dailyUsed={usage.date === todayKey() ? usage.count : 0}
             cooldownMinutes={appConfig.sessionCooldownMinutes}
-            usageBlock={getFreeUsageBlock()}
+            usageBlock={usageBlock}
             premiumConfig={premiumConfig}
           />
         ) : featureFlags.simulations !== false ? (
           <SimulationsPane
             templates={activeTemplates}
             target={target}
+            topics={visiblePracticeTopics(allTopics)}
             onStart={handleStartSimulation}
+            onLockedPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push('/paywall');
+            }}
             isPremium={isPremium}
-            canStartSimulations={canAccessPremiumFeature('simulations', isPremium, premiumConfig)}
+            canStartSimulations={isPremium}
           />
         ) : (
           <View style={styles.emptyState}>
@@ -316,7 +337,7 @@ function FreePracticePane({
   dailyLimit, dailyUsed, cooldownMinutes, usageBlock,
   premiumConfig,
 }: {
-  topics: typeof TOPICS;
+  topics: Topic[];
   selectedMode: string; setSelectedMode: (m: string) => void;
   selectedTopicId: string | null; setSelectedTopicId: (id: string | null) => void;
   selectedDifficulty: DifficultyFilter; setSelectedDifficulty: (d: DifficultyFilter) => void;
@@ -402,9 +423,8 @@ function FreePracticePane({
           </View>
         ))}
 
-        {/* Difficulty selector — hidden for adaptive (algo decides) */}
-        {selectedMode !== 'adaptive' && (
-          <>
+        {/* Difficulty selector */}
+        <>
             <Text style={styles.sectionLabel}>רמת קושי</Text>
             <View style={styles.difficultyRow}>
               {DIFFICULTY_OPTIONS.map(opt => {
@@ -427,8 +447,7 @@ function FreePracticePane({
                 );
               })}
             </View>
-          </>
-        )}
+        </>
 
         {/* Topic section */}
         <Text style={styles.sectionLabel}>בחר נושא</Text>
@@ -515,7 +534,10 @@ function FreePracticePane({
         <Pressable
           onPress={onStart}
           disabled={!canStart || !!usageBlock}
-          style={({ pressed }) => [{ opacity: pressed && canStart && !usageBlock ? 0.75 : 1 }]}
+          style={({ pressed }) => [
+            styles.startPressable,
+            { opacity: pressed && canStart && !usageBlock ? 0.75 : 1 },
+          ]}
         >
           <LinearGradient
             colors={canStart && !usageBlock ? Colors.gradients.primary : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.06)']}
@@ -565,11 +587,13 @@ function ModeChip({
 }
 
 function SimulationsPane({
-  templates, target, onStart, canStartSimulations,
+  templates, target, topics, onStart, onLockedPress, canStartSimulations,
 }: {
   templates: SmartExamTemplate[];
-  target: typeof TARGETS[0];
+  target: Target | undefined;
+  topics: Topic[];
   onStart: (id: string) => void;
+  onLockedPress: () => void;
   isPremium: boolean;
   canStartSimulations: boolean;
 }) {
@@ -627,7 +651,7 @@ function SimulationsPane({
 
               <View style={styles.simRulesBox}>
                 {(tmpl.smartRules ?? tmpl.rules).map((r) => {
-                  const topic = TOPICS.find(t => t.id === r.topicId);
+                  const topic = topics.find(t => t.id === r.topicId);
                   const count = r.count;
                   const minD = r.minDifficulty ?? 1;
                   const maxD = r.maxDifficulty ?? 10;
@@ -651,11 +675,19 @@ function SimulationsPane({
               ) : null}
 
               <Pressable
-                onPress={() => onStart(tmpl.id)}
-                disabled={!canStartSimulations}
-                style={({ pressed }) => [{ opacity: pressed && canStartSimulations ? 0.75 : 1 }]}
+                accessibilityRole="button"
+                onPress={() => {
+                  if (canStartSimulations) {
+                    onStart(tmpl.id);
+                  } else {
+                    onLockedPress();
+                  }
+                }}
+                hitSlop={10}
+                style={({ pressed }) => [styles.simStartPressable, { opacity: pressed ? 0.75 : 1 }]}
               >
                 <LinearGradient
+                  pointerEvents="none"
                   colors={canStartSimulations ? Colors.gradients.primary : ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.07)']}
                   style={styles.simStartGrad}
                 >
@@ -700,12 +732,21 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: { padding: 20, gap: 4 },
+  content: {
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
+    padding: 20,
+    gap: 4,
+  },
 
   /* ── Header row with home btn + tab switcher ── */
   headerRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
@@ -984,8 +1025,19 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     zIndex: 30,
     elevation: 30,
+    alignItems: 'center',
   },
-  startBtn: { borderRadius: Radius.xl, paddingVertical: 18, alignItems: 'center' },
+  startPressable: {
+    width: '100%',
+    maxWidth: 940,
+  },
+  startBtn: {
+    width: '100%',
+    borderRadius: Radius.xl,
+    paddingVertical: 18,
+    alignItems: 'center',
+    paddingHorizontal: 18,
+  },
   startBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 
   /* ── Simulations ── */
@@ -1050,6 +1102,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 12,
   },
+  simStartPressable: { borderRadius: Radius.xl, overflow: 'hidden' },
   simStartGrad: { borderRadius: Radius.xl, paddingVertical: 16, alignItems: 'center' },
   simStartText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
 });

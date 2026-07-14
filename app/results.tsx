@@ -9,10 +9,10 @@ import * as Haptics from '../utils/haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { VisualImage } from '../components/VisualImage';
-import { getTopicById } from '../data/mockData';
 import { getPerformanceLevel, formatTime } from '../utils/scoring';
 import { StatCard } from '../components/StatCard';
 import { usePracticeStore } from '../store/practiceStore';
+import { useAdminStore } from '../store/adminStore';
 import { Question } from '../data/types';
 import { detectDir, textAlign as ta } from '../utils/textDirection';
 
@@ -41,7 +41,7 @@ export default function Results() {
   const speedScore = parseInt(params.speedScore ?? '0');
   const stability = parseInt(params.stability ?? '100');
 
-  const topic = getTopicById(params.topicId ?? '');
+  const topic = useAdminStore(s => s.topics.find(t => t.id === (params.topicId ?? '')));
   const completedSession = usePracticeStore(s => s.completedSession);
   const reviewSession = completedSession?.id === params.sessionId ? completedSession : null;
   const isSimulationReview = reviewSession?.mode === 'simulation';
@@ -201,7 +201,7 @@ export default function Results() {
             {score < 70 && (
               <RecommendCard
                 icon="🎯" title="תרגל את החולשות שלך" desc="זיהינו תחומים לשיפור — תרגל שאלות ממוקדות" color={Colors.danger}
-                onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'adaptive', questionLimit: params.total } })}
+                onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice', questionLimit: params.total } })}
               />
             )}
             <RecommendCard
@@ -338,7 +338,11 @@ const recStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: {},
+  content: {
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
+  },
 
   hero: { padding: 32, paddingTop: 44, paddingBottom: 36, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   heroLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: 'rgba(255,255,255,0.75)', marginBottom: 24 },
@@ -375,7 +379,18 @@ const styles = StyleSheet.create({
 
   recsContainer: { paddingHorizontal: 20, marginBottom: 8 },
 
-  bottomCtas: { flexDirection: 'row-reverse', paddingHorizontal: 20, paddingTop: 14, gap: 12, backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border },
+  bottomCtas: {
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
+    flexDirection: 'row-reverse',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    gap: 12,
+    backgroundColor: Colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
   homeBtn: { paddingVertical: 17, paddingHorizontal: 20, borderRadius: Radius.xl, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)', justifyContent: 'center' },
   homeBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: 'rgba(255,255,255,0.65)' },
   againBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },

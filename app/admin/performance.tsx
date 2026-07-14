@@ -7,7 +7,6 @@ import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
-import { TOPICS } from '../../data/mockData';
 import { useAdminStore } from '../../store/adminStore';
 import { logger } from '../../utils/logger';
 
@@ -58,7 +57,7 @@ const MODE_META: Record<string, { label: string; color: string }> = {
 };
 
 export default function PerformanceScreen() {
-  const { questions } = useAdminStore();
+  const { questions, topics } = useAdminStore();
 
   const [loading, setLoading] = useState(true);
   const [generalStats, setGeneralStats] = useState<GeneralStats | null>(null);
@@ -117,7 +116,7 @@ export default function PerformanceScreen() {
         });
 
         const computed: TopicAccuracy[] = Object.entries(topicMap).map(([tid, vals]) => {
-          const topic = TOPICS.find(t => t.id === tid);
+          const topic = topics.find(t => t.id === tid);
           return {
             topicId: tid,
             name: topic?.name ?? tid,
@@ -284,7 +283,7 @@ export default function PerformanceScreen() {
             <Text style={styles.emptyText}>אין שאלות קשות מאומתות במאגר</Text>
           ) : (
             hardestQuestions.map((q, idx) => {
-              const topic = TOPICS.find(t => t.id === q.topicId);
+              const topic = topics.find(t => t.id === q.topicId);
               const diffColor = q.difficulty >= 9 ? Colors.danger : Colors.warning;
               const text = q.questionText.length > 60
                 ? q.questionText.slice(0, 60) + '...'

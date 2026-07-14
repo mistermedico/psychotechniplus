@@ -6,11 +6,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { supabase } from '../lib/supabase';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
+import { usePurchaseStore } from '../store/purchaseStore';
+import { notifySignup } from '../lib/adminEmail';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
 import { OAuthProvider, signInWithOAuthProvider } from '../lib/oauth';
@@ -18,6 +20,7 @@ import { OAuthProvider, signInWithOAuthProvider } from '../lib/oauth';
 type AuthMode = 'login' | 'register';
 
 export default function AuthScreen() {
+  const params = useLocalSearchParams<{ redirect?: string; mode?: AuthMode }>();
   const [mode, setMode] = useState<AuthMode>('login');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,6 +34,7 @@ export default function AuthScreen() {
 
   const initialize = useUserStore(s => s.initialize);
   const continueAsGuest = useUserStore(s => s.continueAsGuest);
+  const initializePurchases = usePurchaseStore(s => s.initialize);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
   const registrationOpen = useAdminStore(s => s.appConfig.registrationOpen);
   const announcementEnabled = useAdminStore(s => s.appConfig.announcementEnabled);
@@ -51,6 +55,21 @@ export default function AuthScreen() {
       Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  useEffect(() => {
+    if (params.mode === 'login' || params.mode === 'register') {
+      switchMode(params.mode);
+    }
+  }, [params.mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const completeAuthNavigation = async (userId: string, fallback: '/(tabs)' | '/onboarding') => {
+    await initializePurchases(userId).catch(() => null);
+    if (params.redirect === 'paywall') {
+      router.replace('/paywall');
+      return;
+    }
+    router.replace(fallback);
+  };
 
   const switchMode = (m: AuthMode) => {
     setMode(m);
@@ -111,7 +130,7 @@ export default function AuthScreen() {
       if (data.user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const { hasCompletedOnboarding } = useUserStore.getState();
-      router.replace(hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
+      await completeAuthNavigation(data.user.id, hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
 
     } else {
       const { data, error: err } = await supabase.auth.signUp({
@@ -130,6 +149,7 @@ export default function AuthScreen() {
       }
 
       if (!data.session) {
+        notifySignup(data.user?.id, data.user?.email ?? email.trim().toLowerCase(), displayName.trim() || data.user?.user_metadata?.display_name);
         setEmailPending(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         return;
@@ -141,9 +161,10 @@ export default function AuthScreen() {
       }
 
       await initialize(data.user.id);
+      notifySignup(data.user.id, data.user.email ?? email.trim().toLowerCase(), displayName.trim() || data.user.user_metadata?.display_name);
       if (data.user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace('/onboarding');
+      await completeAuthNavigation(data.user.id, '/onboarding');
     }
   };
 
@@ -161,10 +182,14 @@ export default function AuthScreen() {
     try {
       const user = await signInWithOAuthProvider(provider);
       await initialize(user.id);
+      const createdAt = user.created_at ? new Date(user.created_at).getTime() : 0;
+      if (createdAt > 0 && Date.now() - createdAt < 2 * 60 * 1000) {
+        notifySignup(user.id, user.email, user.user_metadata?.full_name ?? user.user_metadata?.name);
+      }
       if (user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const { hasCompletedOnboarding } = useUserStore.getState();
-      router.replace(hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
+      await completeAuthNavigation(user.id, hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
     } catch (err: any) {
       setError(translateError(err?.message ?? 'שגיאת התחברות'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -431,24 +456,6 @@ export default function AuthScreen() {
                         </>
                       )}
                     </Pressable>
-
-                    <Pressable
-                      onPress={() => handleOAuth('apple')}
-                      disabled={loading || !!oauthLoading}
-                      accessibilityRole="button"
-                      accessibilityLabel="התחברות באמצעות Apple ID"
-                      accessibilityState={{ disabled: loading || !!oauthLoading }}
-                      style={({ pressed }) => [styles.oauthBtn, styles.appleBtn, pressed && { opacity: 0.85 }, (loading || !!oauthLoading) && { opacity: 0.65 }]}
-                    >
-                      {oauthLoading === 'apple' ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <>
-                          <Text style={[styles.oauthIcon, styles.appleIcon]}></Text>
-                          <Text style={[styles.oauthText, styles.appleText]}>התחברות עם Apple ID</Text>
-                        </>
-                      )}
-                    </Pressable>
                   </View>
 
                   <Pressable
@@ -692,10 +699,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.20)',
   },
-  appleBtn: {
-    backgroundColor: '#050507',
-    borderColor: 'rgba(255,255,255,0.22)',
-  },
   oauthIcon: {
     width: 24,
     textAlign: 'center',
@@ -703,19 +706,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     color: '#111827',
   },
-  appleIcon: {
-    color: '#fff',
-    fontSize: FontSize.xl,
-  },
   oauthText: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.base,
     color: '#111827',
     textAlign: 'right',
     writingDirection: 'rtl',
-  },
-  appleText: {
-    color: '#fff',
   },
 
   guestBtn: {

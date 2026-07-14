@@ -1,17 +1,24 @@
 import React, { useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable,
-  Alert, ActionSheetIOS, Platform, Linking, Switch,
+  ActionSheetIOS,
+  Alert,
+  Appearance,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
 } from 'react-native';
-import { Appearance } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
-import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
-import { useSettingsStore, DifficultyOption } from '../../store/settingsStore';
-import { TARGETS } from '../../data/mockData';
+import { ADMIN_EMAIL, useAdminStore } from '../../store/adminStore';
+import { DifficultyOption, useSettingsStore } from '../../store/settingsStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 
@@ -24,7 +31,7 @@ interface SettingRowProps {
   isLast?: boolean;
   toggle?: boolean;
   toggleValue?: boolean;
-  onToggle?: (val: boolean) => void;
+  onToggle?: (value: boolean) => void;
   disabled?: boolean;
 }
 
@@ -42,7 +49,7 @@ function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggl
       {toggle ? (
         <Switch
           value={toggleValue}
-          onValueChange={v => { Haptics.selectionAsync(); onToggle?.(v); }}
+          onValueChange={value => { Haptics.selectionAsync(); onToggle?.(value); }}
           trackColor={{ false: 'rgba(255,255,255,0.15)', true: Colors.primary }}
           thumbColor="#fff"
           ios_backgroundColor="rgba(255,255,255,0.15)"
@@ -62,16 +69,16 @@ function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggl
 }
 
 const DIFFICULTY_LABELS: Record<string, string> = {
-  auto:   'אוטומטי (ELO)',
-  easy:   'קל',
+  auto: 'אוטומטי (ELO)',
+  easy: 'קל',
   medium: 'בינוני',
-  hard:   'קשה',
+  hard: 'קשה',
 };
 
 const FONT_SIZE_LABELS: Record<string, string> = {
-  small:  'קטן',
+  small: 'קטן',
   medium: 'בינוני',
-  large:  'גדול',
+  large: 'גדול',
 };
 
 const ACHIEVEMENT_BADGE_DEFS = [
@@ -86,19 +93,39 @@ const ACHIEVEMENT_BADGE_DEFS = [
 export default function ProfileTab() {
   const insets = useSafeAreaInsets();
   const {
-    name, level, xp: _xp, streak, selectedTargetId,
+    name, level, streak, selectedTargetId,
     totalSessions, totalCorrect, totalAnswered, badges,
     getTopicLevelLabel, reset, signOut, deleteAccount, isPremium,
   } = useUserStore();
-
-  const earnedBadgeTypes = new Set(badges.map(b => b.badgeType));
-  const ACHIEVEMENT_BADGES = ACHIEVEMENT_BADGE_DEFS.map(b => ({ ...b, earned: earnedBadgeTypes.has(b.type as any) }));
+  const email = useUserStore(state => state.email);
   const { hapticsEnabled, theme, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
+  const { isAdmin, setIsAdmin, targets } = useAdminStore();
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
-
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    if (email.toLowerCase() === ADMIN_EMAIL && !isAdmin) setIsAdmin(true);
+  }, [email, isAdmin, setIsAdmin]);
+
+  const showAdmin = isAdmin || email.toLowerCase() === ADMIN_EMAIL;
+  const target = targets.find(item => item.id === selectedTargetId) ?? targets[0] ?? null;
+  const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+  const mainLevelLabel = getTopicLevelLabel('topic_quantitative');
+  const earnedBadgeTypes = new Set(badges.map(badge => badge.badgeType));
+  const achievementBadges = ACHIEVEMENT_BADGE_DEFS.map(badge => ({ ...badge, earned: earnedBadgeTypes.has(badge.type as any) }));
+  const avatarEmoji = ['🧠', '🎯', '🚀', '💎', '🌟'][Math.min(Math.max(level - 1, 0), 4)];
+
+  const webConfirm = (message: string) => Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm(message);
+  const webAlert = (message: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(message);
+      return true;
+    }
+    return false;
+  };
+
   const handleVersionTap = () => {
     tapCount.current += 1;
     if (tapTimer.current) clearTimeout(tapTimer.current);
@@ -111,32 +138,6 @@ export default function ProfileTab() {
     }
   };
 
-  const target = TARGETS.find(t => t.id === selectedTargetId) ?? TARGETS[0];
-  const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
-  const mainLevelLabel = getTopicLevelLabel('topic_quantitative');
-
-  const { isAdmin, setIsAdmin } = useAdminStore();
-  const email = useUserStore(s => s.email);
-  React.useEffect(() => {
-    if (email.toLowerCase() === ADMIN_EMAIL && !isAdmin) setIsAdmin(true);
-  }, [email]); // eslint-disable-line react-hooks/exhaustive-deps
-  const showAdmin = isAdmin || email.toLowerCase() === ADMIN_EMAIL;
-
-  const avatarEmoji = ['🧠', '🎯', '🚀', '💎', '🌟'][Math.min(level - 1, 4)];
-
-  const webConfirm = (message: string) => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
-    return window.confirm(message);
-  };
-
-  const webAlert = (message: string) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.alert(message);
-      return true;
-    }
-    return false;
-  };
-
   const handleSignOut = () => {
     if (signingOut) return;
     const performSignOut = async () => {
@@ -147,17 +148,12 @@ export default function ProfileTab() {
       setSigningOut(false);
     };
     if (Platform.OS === 'web') {
-      if (webConfirm('האם אתה בטוח שברצונך לצאת מהחשבון?')) {
-        performSignOut();
-      }
+      if (webConfirm('האם אתה בטוח שברצונך לצאת מהחשבון?')) performSignOut();
       return;
     }
     Alert.alert('יציאה מהחשבון', 'האם אתה בטוח שברצונך לצאת?', [
       { text: 'ביטול', style: 'cancel' },
-      {
-        text: 'יציאה', style: 'destructive',
-        onPress: performSignOut,
-      },
+      { text: 'יציאה', style: 'destructive', onPress: performSignOut },
     ]);
   };
 
@@ -169,29 +165,21 @@ export default function ProfileTab() {
       const result = await deleteAccount().catch(() => ({ success: false, error: 'אירעה שגיאה. נסה שנית.' }));
       if (result.success) {
         router.replace('/landing');
-      } else {
-        setDeletingAccount(false);
-        const message = result.error ?? 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.';
-        if (!webAlert(message)) Alert.alert('שגיאה', message);
+        return;
       }
+      setDeletingAccount(false);
+      const message = result.error ?? 'לא ניתן היה למחוק את החשבון. נסה שנית או פנה לתמיכה.';
+      if (!webAlert(message)) Alert.alert('שגיאה', message);
     };
+    const message = 'פעולה זו תמחק את כל הנתונים שלך לצמיתות ולא ניתן לבטלה. האם אתה בטוח?';
     if (Platform.OS === 'web') {
-      if (webConfirm('פעולה זו תמחק את כל הנתונים שלך לצמיתות ולא ניתן לבטלה. האם אתה בטוח?')) {
-        performDelete();
-      }
+      if (webConfirm(message)) performDelete();
       return;
     }
-    Alert.alert(
-      'מחיקת חשבון לצמיתות',
-      'פעולה זו תמחק את כל הנתונים שלך לצמיתות ולא ניתן לבטלה. האם אתה בטוח?',
-      [
-        { text: 'ביטול', style: 'cancel' },
-        {
-          text: 'מחק חשבון', style: 'destructive',
-          onPress: performDelete,
-        },
-      ]
-    );
+    Alert.alert('מחיקת חשבון לצמיתות', message, [
+      { text: 'ביטול', style: 'cancel' },
+      { text: 'מחק חשבון', style: 'destructive', onPress: performDelete },
+    ]);
   };
 
   const handleReset = () => {
@@ -200,64 +188,36 @@ export default function ProfileTab() {
       reset();
       router.replace('/onboarding');
     };
+    const message = 'האם אתה בטוח? כל ההתקדמות תימחק.';
     if (Platform.OS === 'web') {
-      if (webConfirm('האם אתה בטוח? כל ההתקדמות תימחק.')) {
-        performReset();
-      }
+      if (webConfirm(message)) performReset();
       return;
     }
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title: 'איפוס כל הנתונים',
-          message: 'האם אתה בטוח? כל ההתקדמות תימחק לצמיתות.',
-          options: ['ביטול', 'איפוס'],
-          destructiveButtonIndex: 1,
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            performReset();
-          }
-        }
+        { title: 'איפוס כל הנתונים', message, options: ['ביטול', 'איפוס'], destructiveButtonIndex: 1, cancelButtonIndex: 0 },
+        index => { if (index === 1) performReset(); }
       );
-    } else {
-      Alert.alert('איפוס נתונים', 'האם אתה בטוח? כל ההתקדמות תימחק.', [
-        { text: 'ביטול', style: 'cancel' },
-        {
-          text: 'איפוס', style: 'destructive',
-          onPress: performReset,
-        },
-      ]);
+      return;
     }
+    Alert.alert('איפוס נתונים', message, [
+      { text: 'ביטול', style: 'cancel' },
+      { text: 'איפוס', style: 'destructive', onPress: performReset },
+    ]);
   };
 
   const handleContact = () => {
     Haptics.selectionAsync();
-    const supportEmail = 'mrmedico111@gmail.com';
-    const url = `mailto:${supportEmail}`;
-    Linking.canOpenURL(url)
-      .then(supported => {
-        if (supported) {
-          Linking.openURL(url).catch(() => {
-            Alert.alert('צור קשר', `שלח מייל לכתובת:\n${supportEmail}`);
-          });
-        } else {
-          Alert.alert('צור קשר', `שלח מייל לכתובת:\n${supportEmail}`);
-        }
-      })
-      .catch(() => {
-        Alert.alert('צור קשר', `שלח מייל לכתובת:\n${supportEmail}`);
-      });
+    router.push('/support' as any);
   };
 
   const handleNotifications = () => {
     Haptics.selectionAsync();
     if (Platform.OS !== 'web') {
       Linking.openSettings().catch(() => null);
-    } else {
-      Alert.alert('התראות', 'לניהול התראות — פתח את הגדרות הדפדפן שלך.');
+      return;
     }
+    Alert.alert('התראות', 'לניהול התראות פתח את הגדרות הדפדפן שלך.');
   };
 
   const handleThemeToggle = (isDark: boolean) => {
@@ -276,21 +236,20 @@ export default function ProfileTab() {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         { title: 'רמת קושי ברירת מחדל', options, cancelButtonIndex: 0 },
-        (idx) => {
-          if (idx === 0) return;
-          updateSetting('defaultDifficulty', values[idx]);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        index => {
+          if (index === 0) return;
+          updateSetting('defaultDifficulty', values[index]);
         }
       );
-    } else {
-      Alert.alert('רמת קושי', 'בחר רמת קושי ברירת מחדל:', [
-        { text: 'ביטול', style: 'cancel' },
-        { text: 'אוטומטי (ELO)', onPress: () => updateSetting('defaultDifficulty', 'auto') },
-        { text: 'קל', onPress: () => updateSetting('defaultDifficulty', 'easy') },
-        { text: 'בינוני', onPress: () => updateSetting('defaultDifficulty', 'medium') },
-        { text: 'קשה', onPress: () => updateSetting('defaultDifficulty', 'hard') },
-      ]);
+      return;
     }
+    Alert.alert('רמת קושי', 'בחר רמת קושי ברירת מחדל:', [
+      { text: 'ביטול', style: 'cancel' },
+      { text: 'אוטומטי (ELO)', onPress: () => updateSetting('defaultDifficulty', 'auto') },
+      { text: 'קל', onPress: () => updateSetting('defaultDifficulty', 'easy') },
+      { text: 'בינוני', onPress: () => updateSetting('defaultDifficulty', 'medium') },
+      { text: 'קשה', onPress: () => updateSetting('defaultDifficulty', 'hard') },
+    ]);
   };
 
   const handleFontSize = () => {
@@ -300,29 +259,24 @@ export default function ProfileTab() {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         { title: 'גודל טקסט שאלות', options, cancelButtonIndex: 0 },
-        (idx) => {
-          if (idx === 0) return;
-          updateSetting('questionFontSize', values[idx - 1]);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        index => {
+          if (index === 0) return;
+          updateSetting('questionFontSize', values[index - 1]);
         }
       );
-    } else {
-      Alert.alert('גודל טקסט', 'בחר גודל טקסט:', [
-        { text: 'ביטול', style: 'cancel' },
-        { text: 'קטן', onPress: () => updateSetting('questionFontSize', 'small') },
-        { text: 'בינוני', onPress: () => updateSetting('questionFontSize', 'medium') },
-        { text: 'גדול', onPress: () => updateSetting('questionFontSize', 'large') },
-      ]);
+      return;
     }
+    Alert.alert('גודל טקסט', 'בחר גודל טקסט:', [
+      { text: 'ביטול', style: 'cancel' },
+      { text: 'קטן', onPress: () => updateSetting('questionFontSize', 'small') },
+      { text: 'בינוני', onPress: () => updateSetting('questionFontSize', 'medium') },
+      { text: 'גדול', onPress: () => updateSetting('questionFontSize', 'large') },
+    ]);
   };
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={['#080A12', '#0D1020', '#14102A']}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* Ambient orb */}
+      <LinearGradient colors={['#080A12', '#0D1020', '#14102A']} style={StyleSheet.absoluteFill} />
       <View style={styles.orbTop} />
 
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -331,14 +285,9 @@ export default function ProfileTab() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Profile Hero ── */}
           <View style={styles.profileHero}>
             <View style={styles.avatarWrap}>
-              <LinearGradient
-                colors={[Colors.primary, Colors.accent]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={styles.avatarGradient}
-              >
+              <LinearGradient colors={[Colors.primary, Colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatarGradient}>
                 <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
               </LinearGradient>
               <View style={styles.levelBadge}>
@@ -351,12 +300,8 @@ export default function ProfileTab() {
             <Text style={styles.profileEmail}>{email}</Text>
 
             {isPremium ? (
-              <LinearGradient
-                colors={['#D97706', '#FBBF24', '#FDE68A']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.premiumPill}
-              >
-                <Text style={styles.premiumPillText}>💎 פרמיום</Text>
+              <LinearGradient colors={['#D97706', '#FBBF24', '#FDE68A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.premiumPill}>
+                <Text style={styles.premiumPillText}>💎 פרימיום</Text>
               </LinearGradient>
             ) : (
               <View style={styles.freePill}>
@@ -364,18 +309,8 @@ export default function ProfileTab() {
               </View>
             )}
 
-            <Pressable
-              onPress={handleSignOut}
-              disabled={signingOut}
-              style={({ pressed }) => [
-                styles.heroSignOutBtn,
-                pressed && !signingOut && { opacity: 0.78 },
-                signingOut && { opacity: 0.5 },
-              ]}
-            >
-              <Text style={styles.heroSignOutText}>
-                {signingOut ? 'יוצא...' : 'יציאה מהחשבון'}
-              </Text>
+            <Pressable onPress={handleSignOut} disabled={signingOut} style={({ pressed }) => [styles.heroSignOutBtn, pressed && !signingOut && { opacity: 0.78 }, signingOut && { opacity: 0.5 }]}>
+              <Text style={styles.heroSignOutText}>{signingOut ? 'יוצא...' : 'יציאה מהחשבון'}</Text>
             </Pressable>
 
             <View style={styles.heroStats}>
@@ -384,32 +319,24 @@ export default function ProfileTab() {
                 { val: `${accuracy}%`, lbl: 'דיוק' },
                 { val: `${streak}🔥`, lbl: 'רצף' },
                 { val: String(totalSessions), lbl: 'סשנים' },
-              ].map((s, i, arr) => (
-                <React.Fragment key={s.lbl}>
+              ].map((stat, index, arr) => (
+                <React.Fragment key={stat.lbl}>
                   <View style={styles.heroStat}>
-                    <Text style={styles.heroStatVal}>{s.val}</Text>
-                    <Text style={styles.heroStatLbl}>{s.lbl}</Text>
+                    <Text style={styles.heroStatVal}>{stat.val}</Text>
+                    <Text style={styles.heroStatLbl}>{stat.lbl}</Text>
                   </View>
-                  {i < arr.length - 1 && <View style={styles.heroStatDivider} />}
+                  {index < arr.length - 1 && <View style={styles.heroStatDivider} />}
                 </React.Fragment>
               ))}
             </View>
           </View>
 
-          {/* ── Admin shortcut ── */}
           {showAdmin && (
-            <Pressable
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/admin'); }}
-              style={({ pressed }) => [styles.adminCard, { opacity: pressed ? 0.82 : 1 }]}
-            >
-              <LinearGradient
-                colors={[Colors.primaryLighter, 'rgba(124,111,247,0.08)']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.adminCardGrad}
-              >
+            <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/admin'); }} style={({ pressed }) => [styles.adminCard, { opacity: pressed ? 0.82 : 1 }]}>
+              <LinearGradient colors={[Colors.primaryLighter, 'rgba(124,111,247,0.08)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.adminCardGrad}>
                 <Text style={styles.adminChevron}>‹</Text>
                 <View style={styles.adminCardText}>
-                  <Text style={styles.adminCardTitle}>🛠️ פאנל ניהול</Text>
+                  <Text style={styles.adminCardTitle}>פאנל ניהול</Text>
                   <Text style={styles.adminCardSub}>גישה מלאה לניהול המערכת</Text>
                 </View>
                 <View style={styles.adminBadgeWrap}>
@@ -419,187 +346,65 @@ export default function ProfileTab() {
             </Pressable>
           )}
 
-          {/* ── Achievements ── */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTag}>ACHIEVEMENTS</Text>
-            <Text style={styles.sectionTitle}>הישגים</Text>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.badgesScroll}
-            directionalLockEnabled
-            style={styles.badgesScrollOuter}
-          >
-            {ACHIEVEMENT_BADGES.map((badge, i) => (
-              <View key={i} style={styles.achievementBadge}>
+          <SectionTitle tag="ACHIEVEMENTS" title="הישגים" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesScroll} directionalLockEnabled style={styles.badgesScrollOuter}>
+            {achievementBadges.map((badge, index) => (
+              <View key={`${badge.type}-${index}`} style={styles.achievementBadge}>
                 <View style={[styles.achievementIconWrap, badge.earned ? styles.achievementIconEarned : styles.achievementIconLocked]}>
                   <Text style={[styles.achievementIcon, !badge.earned && { opacity: 0.4 }]}>{badge.icon}</Text>
                 </View>
-                <Text style={[styles.achievementLabel, !badge.earned && { color: Colors.textTertiary }]}>
-                  {badge.label}
-                </Text>
+                <Text style={[styles.achievementLabel, !badge.earned && { color: Colors.textTertiary }]}>{badge.label}</Text>
                 {!badge.earned && <Text style={styles.achievementLock}>🔒</Text>}
               </View>
             ))}
           </ScrollView>
 
-          {/* ── Current Target ── */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTag}>TRACK</Text>
-            <Text style={styles.sectionTitle}>המסלול שלי</Text>
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [styles.targetRow, { opacity: pressed ? 0.78 : 1 }]}
-            onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/targets'); }}
-          >
+          <SectionTitle tag="TRACK" title="המסלול שלי" />
+          <Pressable style={({ pressed }) => [styles.targetRow, { opacity: pressed ? 0.78 : 1 }]} onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/targets'); }}>
             <Text style={styles.settingChevron}>‹</Text>
             <View style={styles.targetInfo}>
-              <Text style={styles.targetName}>{target.name}</Text>
-              <Text style={styles.targetDesc} numberOfLines={1}>{target.description}</Text>
+              <Text style={styles.targetName}>{target?.name ?? 'לא נבחר מסלול'}</Text>
+              <Text style={styles.targetDesc} numberOfLines={1}>{target?.description ?? 'בחר מסלול כדי להתאים את התרגול'}</Text>
             </View>
             <View style={styles.targetIconCircle}>
-              <Text style={styles.targetIcon}>{target.icon}</Text>
+              <Text style={styles.targetIcon}>{target?.icon ?? '🎯'}</Text>
             </View>
           </Pressable>
 
-          {/* ── Settings ── */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTag}>SETTINGS</Text>
-            <Text style={styles.sectionTitle}>הגדרות</Text>
-          </View>
-
+          <SectionTitle tag="SETTINGS" title="הגדרות" />
           <View style={styles.settingsCard}>
-            <SettingRow
-              icon="🔔"
-              label="התראות"
-              value="הגדרות מכשיר"
-              onPress={handleNotifications}
-            />
-            <SettingRow
-              icon={theme === 'dark' ? '🌙' : '☀️'}
-              label="מצב תצוגה"
-              value={theme === 'dark' ? 'כהה' : 'בהיר'}
-              toggle
-              toggleValue={theme === 'dark'}
-              onToggle={handleThemeToggle}
-            />
-            <SettingRow
-              icon="📊"
-              label="קושי ברירת מחדל"
-              value={DIFFICULTY_LABELS[defaultDifficulty]}
-              onPress={handleDifficulty}
-            />
-            <SettingRow
-              icon="🔡"
-              label="גודל טקסט שאלות"
-              value={FONT_SIZE_LABELS[questionFontSize]}
-              onPress={handleFontSize}
-            />
-            <SettingRow
-              icon="🔊"
-              label="רטט והפטיקה"
-              toggle
-              toggleValue={hapticsEnabled}
-              onToggle={v => updateSetting('hapticsEnabled', v)}
-              isLast={!showAdmin}
-            />
+            <SettingRow icon="🔔" label="התראות" value="הגדרות מכשיר" onPress={handleNotifications} />
+            <SettingRow icon={theme === 'dark' ? '🌙' : '☀️'} label="מצב תצוגה" value={theme === 'dark' ? 'כהה' : 'בהיר'} toggle toggleValue={theme === 'dark'} onToggle={handleThemeToggle} />
+            <SettingRow icon="📊" label="קושי ברירת מחדל" value={DIFFICULTY_LABELS[defaultDifficulty]} onPress={handleDifficulty} />
+            <SettingRow icon="🔡" label="גודל טקסט שאלות" value={FONT_SIZE_LABELS[questionFontSize]} onPress={handleFontSize} />
+            <SettingRow icon="🔊" label="רטט והפטיקה" toggle toggleValue={hapticsEnabled} onToggle={value => updateSetting('hapticsEnabled', value)} isLast={!showAdmin} />
             {showAdmin && (
-              <SettingRow
-                icon="🖥️"
-                label="הגדרות תצוגה מתקדמות"
-                onPress={() => { Haptics.selectionAsync(); router.push('/admin/display-settings'); }}
-                isLast
-              />
+              <SettingRow icon="🖥️" label="הגדרות תצוגה מתקדמות" onPress={() => { Haptics.selectionAsync(); router.push('/admin/display-settings'); }} isLast />
             )}
           </View>
 
-          {/* ── Account ── */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTag}>ACCOUNT</Text>
-            <Text style={styles.sectionTitle}>חשבון</Text>
-          </View>
-
+          <SectionTitle tag="ACCOUNT" title="חשבון" />
           <View style={styles.settingsCard}>
-            <SettingRow
-              icon="⭐"
-              label="שאלות מועדפות"
-              value="בקרוב"
-              onPress={() => {
-                Haptics.selectionAsync();
-                Alert.alert('שאלות מועדפות 🌟', 'פיצ\'ר זה בפיתוח.\n\nבקרוב תוכל לסמן שאלות כמועדפות ולתרגל אותן בנפרד.');
-              }}
-            />
-            <SettingRow
-              icon="📝"
-              label="ההיסטוריה שלי"
-              onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/progress'); }}
-            />
-            <SettingRow
-              icon="💬"
-              label="צור קשר ותמיכה"
-              onPress={handleContact}
-            />
-            <SettingRow
-              icon="🔒"
-              label="מדיניות פרטיות"
-              onPress={() => { Haptics.selectionAsync(); router.push('/privacy'); }}
-            />
-            <SettingRow
-              icon="📄"
-              label="תנאי שימוש"
-              onPress={() => { Haptics.selectionAsync(); router.push('/terms'); }}
-              isLast
-            />
+            <SettingRow icon="📈" label="ההיסטוריה שלי" onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/progress'); }} />
+            <SettingRow icon="💬" label="צור קשר ותמיכה" onPress={handleContact} />
+            <SettingRow icon="🔒" label="מדיניות פרטיות" onPress={() => { Haptics.selectionAsync(); router.push('/privacy'); }} />
+            <SettingRow icon="📄" label="תנאי שימוש" onPress={() => { Haptics.selectionAsync(); router.push('/terms'); }} isLast />
           </View>
 
-          {/* ── Danger Zone ── */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTag}>DANGER ZONE</Text>
-            <Text style={[styles.sectionTitle, { color: Colors.danger }]}>פעולות חשבון</Text>
-          </View>
-
+          <SectionTitle tag="DANGER ZONE" title="פעולות חשבון" danger />
           <View style={styles.settingsCard}>
-            <SettingRow
-              icon="🚪"
-              label={signingOut ? 'יוצא...' : 'יציאה מהחשבון'}
-              onPress={handleSignOut}
-              danger
-              disabled={signingOut}
-            />
-            <SettingRow
-              icon="🗑️"
-              label="איפוס כל הנתונים"
-              onPress={handleReset}
-              danger
-            />
-            <SettingRow
-              icon="⛔"
-              label={deletingAccount ? 'מוחק חשבון...' : 'מחיקת חשבון לצמיתות'}
-              onPress={handleDeleteAccount}
-              danger
-              disabled={deletingAccount}
-              isLast
-            />
+            <SettingRow icon="🚪" label={signingOut ? 'יוצא...' : 'יציאה מהחשבון'} onPress={handleSignOut} danger disabled={signingOut} />
+            <SettingRow icon="🧹" label="איפוס כל הנתונים" onPress={handleReset} danger />
+            <SettingRow icon="⛔" label={deletingAccount ? 'מוחק חשבון...' : 'מחיקת חשבון לצמיתות'} onPress={handleDeleteAccount} danger disabled={deletingAccount} isLast />
           </View>
 
-          {/* ── Premium banner ── */}
           {!isPremium && (
-            <Pressable
-              style={({ pressed }) => [styles.premiumBanner, { opacity: pressed ? 0.82 : 1 }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/paywall'); }}
-            >
-              <LinearGradient
-                colors={['#92400E', '#D97706', '#FBBF24']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.premiumBannerGrad}
-              >
+            <Pressable style={({ pressed }) => [styles.premiumBanner, { opacity: pressed ? 0.82 : 1 }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/paywall'); }}>
+              <LinearGradient colors={['#92400E', '#D97706', '#FBBF24']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.premiumBannerGrad}>
                 <Text style={styles.premiumBannerChevron}>‹</Text>
                 <View style={styles.premiumBannerText}>
-                  <Text style={styles.premiumBannerTitle}>שדרג לפרמיום 💎</Text>
-                  <Text style={styles.premiumBannerSub}>תרגול ללא הגבלה, כל הנושאים, סימולציות</Text>
+                  <Text style={styles.premiumBannerTitle}>שדרג לפרימיום 💎</Text>
+                  <Text style={styles.premiumBannerSub}>תרגול ללא הגבלה, כל הנושאים וסימולציות מלאות</Text>
                 </View>
                 <Text style={styles.premiumBannerEmoji}>👑</Text>
               </LinearGradient>
@@ -607,10 +412,19 @@ export default function ProfileTab() {
           )}
 
           <Pressable onPress={handleVersionTap} style={styles.versionWrap}>
-            <Text style={styles.version}>PsychoTechniPlus v1.0.0</Text>
+            <Text style={styles.version}>PsychoTechniPlus v1.0.3</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+function SectionTitle({ tag, title, danger }: { tag: string; title: string; danger?: boolean }) {
+  return (
+    <View style={styles.sectionHeaderRow}>
+      <Text style={styles.sectionTag}>{tag}</Text>
+      <Text style={[styles.sectionTitle, danger && { color: Colors.danger }]}>{title}</Text>
     </View>
   );
 }
@@ -620,11 +434,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { flex: 1 },
   content: {},
-
   orbTop: {
     position: 'absolute',
-    top: -60, right: -40,
-    width: 240, height: 240,
+    top: -60,
+    right: -40,
+    width: 240,
+    height: 240,
     borderRadius: 120,
     backgroundColor: Colors.primary,
     opacity: 0.08,
@@ -634,8 +449,6 @@ const styles = StyleSheet.create({
     shadowRadius: 80,
     pointerEvents: 'none',
   },
-
-  // Hero
   profileHero: {
     paddingHorizontal: 20,
     paddingTop: 24,
@@ -647,182 +460,140 @@ const styles = StyleSheet.create({
   },
   avatarWrap: { position: 'relative', marginBottom: 14 },
   avatarGradient: {
-    width: 90, height: 90, borderRadius: 45,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(124,111,247,0.40)',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45, shadowRadius: 18, elevation: 12,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(124,111,247,0.40)',
   },
-  avatarEmoji: { fontSize: 38 },
+  avatarEmoji: { fontSize: 40 },
   levelBadge: {
-    position: 'absolute', bottom: -4, right: -4,
-    backgroundColor: Colors.warning,
-    borderRadius: Radius.full,
-    width: 26, height: 26,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#080A12',
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    minWidth: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.background,
   },
-  levelBadgeText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
-
-  profileName: {
-    fontFamily: FontFamily.heading, fontSize: FontSize['2xl'],
-    color: Colors.text, marginBottom: 3, textAlign: 'center',
-  },
-  profileEloTitle: {
-    fontFamily: FontFamily.medium, fontSize: FontSize.sm,
-    color: Colors.primaryLight, marginBottom: 3, textAlign: 'center',
-  },
-  profileEmail: {
-    fontFamily: FontFamily.regular, fontSize: FontSize.xs,
-    color: Colors.textTertiary, marginBottom: 14, textAlign: 'center',
-  },
-
-  premiumPill: { borderRadius: Radius.full, paddingHorizontal: 18, paddingVertical: 7, marginBottom: 18 },
-  premiumPillText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#1C1917' },
+  levelBadgeText: { fontFamily: FontFamily.bold, color: '#fff', fontSize: FontSize.xs },
+  profileName: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: Colors.text, textAlign: 'center' },
+  profileEloTitle: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary, textAlign: 'center', marginTop: 4 },
+  profileEmail: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'center', marginTop: 3 },
+  premiumPill: { borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 7, marginTop: 12 },
+  premiumPillText: { fontFamily: FontFamily.bold, color: '#111827', fontSize: FontSize.sm },
   freePill: {
-    borderRadius: Radius.full, paddingHorizontal: 18, paddingVertical: 7, marginBottom: 18,
-    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
-  },
-  freePillText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
-  heroSignOutBtn: {
-    alignSelf: 'center',
-    marginTop: -8,
-    marginBottom: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 9,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(239,68,68,0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 12,
+    backgroundColor: Colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.35)',
+    borderColor: Colors.border,
   },
-  heroSignOutText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.sm,
-    color: Colors.danger,
-    textAlign: 'center',
-  },
-
+  freePillText: { fontFamily: FontFamily.bold, color: Colors.textSecondary, fontSize: FontSize.sm },
+  heroSignOutBtn: { marginTop: 12, paddingHorizontal: 18, paddingVertical: 9, borderRadius: Radius.full, backgroundColor: Colors.surfaceSecondary },
+  heroSignOutText: { fontFamily: FontFamily.medium, color: Colors.textSecondary, fontSize: FontSize.sm },
   heroStats: {
+    marginTop: 18,
     flexDirection: 'row-reverse',
+    alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xl, padding: 16,
-    width: '100%', borderWidth: 1, borderColor: Colors.border,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    width: '100%',
   },
   heroStat: { flex: 1, alignItems: 'center' },
-  heroStatVal: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text },
-  heroStatLbl: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
-  heroStatDivider: { width: 1, backgroundColor: Colors.border },
-
-  // Section headers
-  sectionHeaderRow: { paddingHorizontal: 20, marginTop: 26, marginBottom: 10, alignItems: 'flex-end' },
-  sectionTag: {
-    fontFamily: FontFamily.semiBold, fontSize: FontSize.xs,
-    color: Colors.primaryLight, letterSpacing: 1.2,
-    textTransform: 'uppercase', marginBottom: 2,
-  },
-  sectionTitle: {
-    fontFamily: FontFamily.heading, fontSize: FontSize.xl,
-    color: Colors.text, textAlign: 'right',
-  },
-
-  // Admin card
-  adminCard: {
-    marginHorizontal: 20, marginTop: 14,
-    borderRadius: Radius.xl, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(124,111,247,0.30)',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25, shadowRadius: 12, elevation: 6,
-  },
-  adminCardGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 16, gap: 12 },
-  adminChevron: { fontFamily: FontFamily.bold, fontSize: 22, color: Colors.textTertiary },
+  heroStatVal: { fontFamily: FontFamily.heading, fontSize: FontSize.lg, color: Colors.text },
+  heroStatLbl: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, marginTop: 2 },
+  heroStatDivider: { width: 1, height: 34, backgroundColor: Colors.border },
+  adminCard: { marginHorizontal: 16, marginTop: 14, borderRadius: Radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: Colors.primary + '40' },
+  adminCardGrad: { minHeight: 70, padding: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
+  adminChevron: { fontSize: 28, color: Colors.primary },
   adminCardText: { flex: 1, alignItems: 'flex-end' },
-  adminCardTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
-  adminCardSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
-  adminBadgeWrap: {
-    backgroundColor: 'rgba(251,191,36,0.15)', borderRadius: Radius.full,
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
+  adminCardTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
+  adminCardSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginTop: 3 },
+  adminBadgeWrap: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 6 },
+  adminBadge: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
+  sectionHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, marginTop: 22, marginBottom: 10 },
+  sectionTag: { fontFamily: FontFamily.bold, fontSize: 10, color: Colors.textTertiary, letterSpacing: 0 },
+  sectionTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text, textAlign: 'right' },
+  badgesScrollOuter: { flexGrow: 0 },
+  badgesScroll: { flexDirection: 'row-reverse', gap: 12, paddingHorizontal: 16 },
+  achievementBadge: {
+    width: 94,
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+    minHeight: 118,
   },
-  adminBadge: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.warning },
-
-  // Achievements
-  badgesScrollOuter: { marginHorizontal: -20 },
-  badgesScroll: { paddingHorizontal: 20, flexDirection: 'row-reverse', gap: 14, paddingBottom: 4 },
-  achievementBadge: { alignItems: 'center', gap: 8, position: 'relative' },
-  achievementIconWrap: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },
-  achievementIconEarned: {
-    backgroundColor: 'rgba(251,191,36,0.18)',
-    borderWidth: 2, borderColor: 'rgba(251,191,36,0.50)',
-    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8,
-  },
-  achievementIconLocked: {
-    backgroundColor: Colors.surface, borderWidth: 2, borderColor: Colors.border,
-  },
-  achievementIcon: { fontSize: 26 },
-  achievementLabel: {
-    fontFamily: FontFamily.medium, fontSize: 10,
-    color: Colors.textSecondary, textAlign: 'center', maxWidth: 62,
-  },
-  achievementLock: { fontSize: 11, position: 'absolute', bottom: 24, right: -3 },
-
-  // Target row
+  achievementIconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  achievementIconEarned: { backgroundColor: Colors.primaryLighter },
+  achievementIconLocked: { backgroundColor: Colors.surfaceSecondary },
+  achievementIcon: { fontSize: 24 },
+  achievementLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.text, textAlign: 'center' },
+  achievementLock: { fontSize: 13, marginTop: 4, opacity: 0.6 },
   targetRow: {
-    flexDirection: 'row-reverse', alignItems: 'center',
-    backgroundColor: Colors.surface, marginHorizontal: 20,
-    borderRadius: Radius.xl, padding: 16, gap: 12,
-    borderWidth: 1, borderColor: Colors.border,
+    marginHorizontal: 16,
+    minHeight: 78,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 12,
   },
-  targetIconCircle: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: Colors.surfaceStrong, alignItems: 'center', justifyContent: 'center',
-  },
-  targetIcon: { fontSize: 24 },
   targetInfo: { flex: 1, alignItems: 'flex-end' },
   targetName: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
-  targetDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
-
-  // Settings cards
+  targetDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginTop: 3 },
+  targetIconCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: Colors.primaryLighter, alignItems: 'center', justifyContent: 'center' },
+  targetIcon: { fontSize: 24 },
   settingsCard: {
-    backgroundColor: Colors.surface, marginHorizontal: 20,
-    borderRadius: Radius.xl, overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.border,
+    marginHorizontal: 16,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
   },
   settingRow: {
-    flexDirection: 'row-reverse', alignItems: 'center',
-    paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
-    gap: 12, minHeight: 52,
+    minHeight: 62,
+    paddingHorizontal: 14,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   settingRowLast: { borderBottomWidth: 0 },
-  settingIconCircle: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Colors.surfaceStrong, alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  },
-  settingIconCircleDanger: { backgroundColor: Colors.dangerLight },
-  settingIcon: { fontSize: 17 },
+  settingChevron: { fontSize: 25, color: Colors.textTertiary },
   settingLabelWrap: { flex: 1, alignItems: 'flex-end' },
   settingLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
-  settingValue: {
-    fontFamily: FontFamily.regular, fontSize: FontSize.xs,
-    color: Colors.textTertiary, textAlign: 'right', marginTop: 1,
-  },
-  settingChevron: { color: Colors.textTertiary, fontSize: 22, fontWeight: '300' },
-
-  // Premium banner
-  premiumBanner: { marginHorizontal: 20, marginTop: 26, borderRadius: Radius.xl, overflow: 'hidden',
-    shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 10,
-  },
-  premiumBannerGrad: { flexDirection: 'row-reverse', alignItems: 'center', padding: 18, gap: 14 },
-  premiumBannerEmoji: { fontSize: 34 },
+  settingValue: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
+  settingIconCircle: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceSecondary },
+  settingIconCircleDanger: { backgroundColor: Colors.danger + '18' },
+  settingIcon: { fontSize: 19 },
+  premiumBanner: { marginHorizontal: 16, marginTop: 22, borderRadius: Radius.xl, overflow: 'hidden' },
+  premiumBannerGrad: { minHeight: 82, padding: 15, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
+  premiumBannerChevron: { fontSize: 28, color: '#fff' },
   premiumBannerText: { flex: 1, alignItems: 'flex-end' },
-  premiumBannerTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#1C1917', textAlign: 'right' },
-  premiumBannerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#44403C', textAlign: 'right', marginTop: 2, lineHeight: 18 },
-  premiumBannerChevron: { fontFamily: FontFamily.bold, fontSize: 22, color: 'rgba(28,25,23,0.5)' },
-
-  versionWrap: { alignItems: 'center', marginTop: 24, marginBottom: 8, padding: 12 },
-  version: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'center' },
-  versionSub: { fontFamily: FontFamily.regular, fontSize: 10, color: 'rgba(255,255,255,0.15)', marginTop: 2 },
+  premiumBannerTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff', textAlign: 'right' },
+  premiumBannerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.84)', textAlign: 'right', marginTop: 3 },
+  premiumBannerEmoji: { fontSize: 30 },
+  versionWrap: { alignItems: 'center', paddingVertical: 22 },
+  version: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
 });

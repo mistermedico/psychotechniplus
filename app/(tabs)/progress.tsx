@@ -13,7 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
-import { TOPICS } from '../../data/mockData';
+import { useAdminStore } from '../../store/adminStore';
 import { ProgressBar } from '../../components/ProgressBar';
 import { StatCard } from '../../components/StatCard';
 import { Colors } from '../../constants/colors';
@@ -44,9 +44,10 @@ export default function ProgressTab() {
     totalSessions, totalCorrect, totalAnswered,
     badges, selectedTargetId, getTopicAccuracy, getTopicLevel,
   } = useUserStore();
+  const { topics: allTopics } = useAdminStore();
 
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
-  const topics = TOPICS.filter(t => t.targetId === selectedTargetId);
+  const topics = allTopics.filter(t => t.targetId === selectedTargetId);
   const earnedBadgeTypes = new Set(badges.map(b => b.badgeType));
   const earnedCount = badges.filter(b => BADGE_INFO[b.badgeType]).length;
   const xpForNext = level * 100;

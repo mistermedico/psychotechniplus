@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Animated, RefreshControl, Platform, Alert,
+  Animated, RefreshControl, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
-import { TARGETS, TOPICS } from '../../data/mockData';
 import { TargetCard } from '../../components/TargetCard';
 import { ProgressBar } from '../../components/ProgressBar';
 import { Colors } from '../../constants/colors';
@@ -15,7 +14,8 @@ import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore } from '../../store/adminStore';
 import { LEVEL_LABELS } from '../../utils/adaptive';
-import { canAccessMode, canAccessTopic } from '../../lib/accessControl';
+import { canAccessTopic } from '../../lib/accessControl';
+import { visiblePracticeTopics } from '../../utils/topicVisibility';
 
 const BOTTOM_TAB_CLEARANCE = 112;
 
@@ -81,10 +81,11 @@ export default function TargetsTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { getTopicAccuracy, getTopicLevel, totalSessions, isPremium } = useUserStore();
-  const { premiumConfig, practiceSettings } = useAdminStore();
+  const { premiumConfig, targets, topics: allTopics } = useAdminStore();
 
-  const selected = TARGETS.find(t => t.id === selectedId);
-  const selectedTopics = selected ? TOPICS.filter(t => t.targetId === selected.id) : [];
+  const visibleTargets = targets.filter(t => t.isActive !== false);
+  const selected = visibleTargets.find(t => t.id === selectedId);
+  const selectedTopics = selected ? visiblePracticeTopics(allTopics.filter(t => t.targetId === selected.id)) : [];
 
   const handleTargetPress = (id: string, comingSoon: boolean) => {
     if (comingSoon) {
@@ -130,8 +131,8 @@ export default function TargetsTab() {
           />
         }
       >
-        {TARGETS.filter(t => t.id === 'target_psychometric').map(target => {
-          const topics = TOPICS.filter(t => t.targetId === target.id);
+        {visibleTargets.map(target => {
+          const topics = visiblePracticeTopics(allTopics.filter(t => t.targetId === target.id));
           const accuracies = topics.map(t => getTopicAccuracy(t.id));
           const avgAccuracy = accuracies.length > 0
             ? accuracies.reduce((s, a) => s + a, 0) / accuracies.length
@@ -243,42 +244,6 @@ export default function TargetsTab() {
                     })
                   )}
 
-                  {/* Adaptive practice button at bottom of expanded section */}
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.adaptiveBtn,
-                      pressed && { opacity: 0.85 },
-                    ]}
-                    onPress={() => {
-                      if (!canAccessMode('adaptive', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)) {
-                        Alert.alert('פרימיום בלבד', 'תרגול אדפטיבי נעול לפי הגדרות המנהל.');
-                        return;
-                      }
-                      const firstFreeTopic = selectedTopics.find(t => canAccessTopic(t, isPremium, premiumConfig));
-                      if (!firstFreeTopic) {
-                        Alert.alert('תרגול אדפטיבי', 'כל הנושאים במסלול זה דורשים מנוי פרמיום.');
-                        return;
-                      }
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      router.push({
-                        pathname: '/practice-session',
-                        params: {
-                          topicId: firstFreeTopic.id,
-                          targetId: target.id,
-                          mode: 'adaptive',
-                        },
-                      });
-                    }}
-                  >
-                    <LinearGradient
-                      colors={Colors.gradients.primary}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.adaptiveBtnGrad}
-                    >
-                      <Text style={styles.adaptiveBtnText}>⚡ תרגול אדפטיבי</Text>
-                    </LinearGradient>
-                  </Pressable>
                 </View>
               </AnimatedTopicsContainer>
             </View>
@@ -470,20 +435,4 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
   },
 
-  // Adaptive practice button at bottom
-  adaptiveBtn: {
-    borderRadius: Radius.lg,
-    marginTop: 12,
-    overflow: 'hidden',
-    ...Shadow.primary,
-  },
-  adaptiveBtnGrad: {
-    padding: 14,
-    alignItems: 'center',
-  },
-  adaptiveBtnText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: '#fff',
-  },
 });

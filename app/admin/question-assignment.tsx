@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Alert, Modal, FlatList, ActivityIndicator,
@@ -11,7 +11,6 @@ import { useAdminStore } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { AccessLevel, ValidationStatus } from '../../data/types';
-import { TARGETS } from '../../data/mockData';
 
 type Tab = 'topic' | 'target' | 'exam' | 'pool';
 
@@ -291,13 +290,20 @@ function TopicAssignmentTab() {
 // ── Tab 2: Target (track) assignment ─────────────────────────────────────────
 
 function TargetAssignmentTab() {
-  const { questions, topics, assignQuestionsToTargets } = useAdminStore();
+  const { questions, topics, targets, assignQuestionsToTargets } = useAdminStore();
   const [statusFilter, setStatusFilter] = useState<ValidationStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set(TARGETS.map(t => t.id)));
+  const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set(targets.map(t => t.id)));
   const [showTargetPicker, setShowTargetPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setSelectedTargets(prev => {
+      if (prev.size > 0 || targets.length === 0) return prev;
+      return new Set(targets.map(t => t.id));
+    });
+  }, [targets]);
 
   const pool = useMemo(() => {
     let q = questions;
@@ -318,7 +324,7 @@ function TargetAssignmentTab() {
     const ids = [...selected];
     const tIds = [...selectedTargets];
     if (tIds.length === 0) { Alert.alert('שגיאה', 'בחר לפחות מסלול אחד'); return; }
-    const names = tIds.map(id => TARGETS.find(t => t.id === id)?.name ?? id).join(', ');
+    const names = tIds.map(id => targets.find(t => t.id === id)?.name ?? id).join(', ');
     Alert.alert(
       'שיוך למסלולים',
       `לשייך ${ids.length} שאלות למסלולים:\n${names}?`,
@@ -351,7 +357,7 @@ function TargetAssignmentTab() {
     <View style={{ flex: 1 }}>
       {/* Target stats */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChips}>
-        {TARGETS.map(t => (
+        {targets.map(t => (
           <View key={t.id} style={styles.targetStatChip}>
             <Text style={styles.targetStatNum}>{targetCounts[t.id] ?? 0}</Text>
             <Text style={styles.targetStatLabel}>{t.name}</Text>
@@ -388,7 +394,7 @@ function TargetAssignmentTab() {
         keyExtractor={q => q.id}
         contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
         renderItem={({ item: q }) => {
-          const assignedTargets = (q.targetIds as string[]).map((tid: string) => TARGETS.find(t => t.id === tid)?.name ?? tid).join(', ');
+          const assignedTargets = (q.targetIds as string[]).map((tid: string) => targets.find(t => t.id === tid)?.name ?? tid).join(', ');
           return (
             <QuestionRow
               q={q}
@@ -412,7 +418,7 @@ function TargetAssignmentTab() {
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>בחר מסלולים ({selectedTargets.size} נבחרו)</Text>
             <Text style={styles.modalSubtitle}>הסימון יחליף את המסלולים הקיימים</Text>
-            {TARGETS.map(t => {
+            {targets.map(t => {
               const isOn = selectedTargets.has(t.id);
               return (
                 <Pressable key={t.id} onPress={() => toggleTarget(t.id)} style={[styles.modalOption, isOn && { backgroundColor: Colors.primaryLighter }]}>

@@ -16,7 +16,7 @@ interface TabIconProps {
 
 function TabIcon({ icon, label, focused }: TabIconProps) {
   const scale = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(focused ? 1 : 0.45)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -27,7 +27,7 @@ function TabIcon({ icon, label, focused }: TabIconProps) {
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
-        toValue: focused ? 1 : 0.45,
+        toValue: 1,
         duration: 200,
         useNativeDriver: true,
       }),
@@ -45,6 +45,7 @@ function TabIcon({ icon, label, focused }: TabIconProps) {
       {focused && (
         <View style={styles.activeGlow} />
       )}
+      {focused && <View style={styles.activeDot} />}
       <Text style={[styles.tabIcon, focused && styles.tabIconFocused]}>{icon}</Text>
       <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]}>{label}</Text>
     </Animated.View>
@@ -184,7 +185,7 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   blurBase: {},
   androidBackground: {
-    backgroundColor: 'rgba(8,10,18,0.97)',
+    backgroundColor: 'rgba(9,13,26,0.98)',
   },
   topBorder: {
     position: 'absolute',
@@ -201,9 +202,12 @@ const styles = StyleSheet.create({
     gap: 2,
     minWidth: 52,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   tabItemFocused: {
-    backgroundColor: 'rgba(124,111,247,0.15)',
+    backgroundColor: 'rgba(124,111,247,0.20)',
+    borderColor: 'rgba(158,153,250,0.55)',
   },
   activeGlow: {
     ...StyleSheet.absoluteFillObject,
@@ -215,9 +219,17 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 0,
   },
+  activeDot: {
+    position: 'absolute',
+    top: -5,
+    width: 22,
+    height: 3,
+    borderRadius: 99,
+    backgroundColor: '#9E99FA',
+  },
   tabIcon: {
     fontSize: 20,
-    color: 'rgba(240,244,255,0.45)',
+    color: 'rgba(240,244,255,0.88)',
     fontFamily: FontFamily.regular,
   },
   tabIconFocused: {
@@ -225,9 +237,9 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   tabLabel: {
-    fontFamily: FontFamily.regular,
+    fontFamily: FontFamily.medium,
     fontSize: 10,
-    color: 'rgba(240,244,255,0.35)',
+    color: 'rgba(240,244,255,0.76)',
     letterSpacing: 0.2,
   },
   tabLabelFocused: {

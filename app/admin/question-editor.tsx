@@ -7,7 +7,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
-import { TOPICS, TARGETS } from '../../data/mockData';
 import { Question, QuestionOption, QuestionType, AccessLevel, ValidationStatus } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -47,20 +46,22 @@ const DEFAULT_OPTIONS: AdminOption[] = [
 export default function QuestionEditor() {
   const insets = useSafeAreaInsets();
   const { questionId, mode } = useLocalSearchParams<{ questionId?: string; mode: string }>();
-  const { questions, addQuestion, updateQuestion } = useAdminStore();
+  const { questions, topics, targets, addQuestion, updateQuestion } = useAdminStore();
 
   const existing = questionId ? questions.find(q => q.id === questionId) : undefined;
   const isEdit = mode === 'edit' && !!existing;
+  const defaultTopicId = existing?.topicId ?? topics[0]?.id ?? '';
+  const defaultTargetId = existing?.targetIds?.[0] ?? targets[0]?.id ?? '';
 
   const [questionText, setQuestionText] = useState(existing?.questionText ?? '');
   const [readingPassage, setReadingPassage] = useState(existing?.readingPassage ?? '');
   const [explanation, setExplanation] = useState(existing?.explanation ?? '');
-  const [topicId, setTopicId] = useState(existing?.topicId ?? TOPICS[0]?.id ?? '');
+  const [topicId, setTopicId] = useState(defaultTopicId);
   const [questionType, setQuestionType] = useState<QuestionType>(existing?.questionType ?? 'multiple_choice');
   const [difficulty, setDifficulty] = useState(existing?.difficulty ?? 5);
   const [accessLevel, setAccessLevel] = useState<AccessLevel>(existing?.accessLevel ?? 'free');
   const [validationStatus, setValidationStatus] = useState<ValidationStatus>(existing?.validationStatus ?? 'draft');
-  const [targetIds, setTargetIds] = useState<string[]>(existing?.targetIds ?? [TARGETS[0]?.id ?? '']);
+  const [targetIds, setTargetIds] = useState<string[]>(existing?.targetIds ?? (defaultTargetId ? [defaultTargetId] : []));
   const [options, setOptions] = useState<AdminOption[]>(
     existing?.options.map(o => ({ ...o })) ?? DEFAULT_OPTIONS.map(o => ({ ...o }))
   );
@@ -75,9 +76,17 @@ export default function QuestionEditor() {
 
   const markDirty = () => { if (!isDirty) setIsDirty(true); };
 
+  useEffect(() => {
+    if (!topicId && topics[0]?.id) setTopicId(topics[0].id);
+  }, [topicId, topics]);
+
+  useEffect(() => {
+    if (targetIds.length === 0 && targets[0]?.id) setTargetIds([targets[0].id]);
+  }, [targetIds.length, targets]);
+
   // Auto-assign target when topic changes
   useEffect(() => {
-    const topic = TOPICS.find(t => t.id === topicId);
+    const topic = topics.find(t => t.id === topicId);
     if (topic?.targetId && !targetIds.includes(topic.targetId)) {
       setTargetIds(prev => [...prev, topic.targetId]);
       markDirty();
@@ -140,7 +149,7 @@ export default function QuestionEditor() {
   const handleTopicChange = (tId: string) => {
     setTopicId(tId);
     // Auto-assign the topic's parent target
-    const topic = TOPICS.find(t => t.id === tId);
+    const topic = topics.find(t => t.id === tId);
     if (topic?.targetId) {
       setTargetIds(prev => prev.includes(topic.targetId) ? prev : [...prev, topic.targetId]);
     }
@@ -393,7 +402,7 @@ export default function QuestionEditor() {
             <Text style={styles.fieldLabel}>נושא (בחירה אחת — המסלול יוגדר אוטומטית)</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
-                {TOPICS.map(t => (
+                {topics.map(t => (
                   <Pressable
                     key={t.id}
                     onPress={() => handleTopicChange(t.id)}
@@ -410,7 +419,7 @@ export default function QuestionEditor() {
 
             <Text style={[styles.fieldLabel, { marginTop: 4 }]}>מסלולים (ניתן לבחור כמה)</Text>
             <View style={styles.chipRow}>
-              {TARGETS.map(t => {
+              {targets.map(t => {
                 const isSelected = targetIds.includes(t.id);
                 return (
                   <Pressable
@@ -546,7 +555,7 @@ export default function QuestionEditor() {
 
           {isEdit && (
             <Pressable
-              onPress={() => router.push({ pathname: '/practice-session', params: { questionId } })}
+              onPress={() => router.push({ pathname: '/practice-session', params: { questionId, adminPreview: '1' } })}
               style={styles.previewBtn}
             >
               <Text style={styles.previewBtnText}>👁️ תצוגה מקדימה</Text>

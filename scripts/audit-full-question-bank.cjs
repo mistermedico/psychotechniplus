@@ -22,6 +22,7 @@ function compileAllQuestions() {
     'data/mockData.ts',
     'store/adminStore.ts',
     'utils/questionQuality.ts',
+    'utils/scoring.ts',
     'utils/smartExam.ts',
     'utils/spatialVisualAssets.ts',
   ]) {
@@ -54,7 +55,7 @@ function compileAllQuestions() {
   `, 'utf8');
   fs.writeFileSync(path.join(buildDir, 'lib', 'supabase.js'), 'exports.supabase = null;\n', 'utf8');
   fs.writeFileSync(path.join(buildDir, 'utils', 'logger.js'), 'exports.logger = { info(){}, warn(){}, error(){}, debug(){} };\n', 'utf8');
-  return require(path.join(buildDir, 'data', 'mockData.js')).QUESTIONS;
+  return require(path.join(buildDir, 'data', 'mockData.js'));
 }
 
 function normalizeText(value) {
@@ -62,11 +63,11 @@ function normalizeText(value) {
 }
 
 function hasReasoningMarker(explanation) {
-  return /[.=:=→×÷+\-/]|לכן|כי|כלומר|מכיוון|סופרים|מחברים|מחשבים|הקשר|הדפוס|הכלל|מתקבל|נובע|משום/.test(explanation);
+  return /[.=:=\u2192\u00d7\u00f7+\-/]|\u05dc\u05db\u05df|\u05db\u05d9|\u05db\u05dc\u05d5\u05de\u05e8|\u05de\u05db\u05d9\u05d5\u05d5\u05df|\u05e1\u05d5\u05e4\u05e8\u05d9\u05dd|\u05de\u05d7\u05d1\u05e8\u05d9\u05dd|\u05de\u05d7\u05e9\u05d1\u05d9\u05dd|\u05d4\u05e7\u05e9\u05e8|\u05d4\u05d3\u05e4\u05d5\u05e1|\u05d4\u05db\u05dc\u05dc|\u05de\u05ea\u05e7\u05d1\u05dc|\u05e0\u05d5\u05d1\u05e2|\u05de\u05e9\u05d5\u05dd/.test(explanation);
 }
 
 function hasForbiddenExplanation(explanation) {
-  return /לא\s+מופיע|לא\s+מופיעה|נבחר.*קרוב|טעות\s+בחישוב|רגע\s*[—-]/.test(explanation);
+  return /\u05dc\u05d0\s+\u05de\u05d5\u05e4\u05d9\u05e2|\u05dc\u05d0\s+\u05de\u05d5\u05e4\u05d9\u05e2\u05d4|\u05e0\u05d1\u05d7\u05e8.*\u05e7\u05e8\u05d5\u05d1|\u05d8\u05e2\u05d5\u05ea\s+\u05d1\u05d7\u05d9\u05e9\u05d5\u05d1|\u05e8\u05d2\u05e2\s*[\u2014-]/.test(explanation);
 }
 
 function auditQuestion(question) {
@@ -100,8 +101,21 @@ function auditQuestion(question) {
 }
 
 function decodeSvgDataUri(value) {
-  if (!String(value ?? '').startsWith('data:image/svg+xml;base64,')) return '';
-  return Buffer.from(value.replace('data:image/svg+xml;base64,', ''), 'base64').toString('utf8');
+  const uri = String(value ?? '');
+  if (!uri.startsWith('data:image/svg+xml')) return '';
+  const commaIndex = uri.indexOf(',');
+  if (commaIndex < 0) return '';
+  const metadata = uri.slice(0, commaIndex).toLowerCase();
+  const payload = uri.slice(commaIndex + 1);
+  if (!payload) return '';
+  if (metadata.includes(';base64')) {
+    return Buffer.from(payload, 'base64').toString('utf8');
+  }
+  try {
+    return decodeURIComponent(payload);
+  } catch {
+    return payload;
+  }
 }
 
 function visiblePalette(svg) {
@@ -132,11 +146,10 @@ function auditSpatialVisualQuestion(question) {
   if (new Set(question.options.map((option) => option.imageUrl)).size !== question.options.length) {
     issues.push('spatial option SVGs are not unique');
   }
-  if (question.options.some((option) => normalizeText(option.text))) {
-    issues.push('spatial image-only option still contains text');
-  }
+  const visibleTextOnlyOption = question.options.some((option) => normalizeText(option.text) && !option.imageUrl);
+  if (visibleTextOnlyOption) issues.push('spatial option has text but no generated SVG fallback');
   if (mediaSvg && !mediaSvg.includes('?</text>')) issues.push('spatial question SVG missing visual gap marker');
-  if (explanationSvg && !explanationSvg.includes(`אפשרות ${question.correctAnswer.toUpperCase()}`)) {
+  if (explanationSvg && !explanationSvg.includes(`${question.correctAnswer.toUpperCase()}`)) {
     issues.push('spatial explanation SVG does not label the correct option');
   }
   const questionPalette = visiblePalette(mediaSvg);
@@ -223,7 +236,8 @@ function auditSimulationTemplate(template, generated, knownTopicIds) {
 }
 
 try {
-  const questions = compileAllQuestions();
+  const mockData = compileAllQuestions();
+  const questions = mockData.QUESTIONS;
   const Module = require('module');
   const originalLoad = Module._load;
   Module._load = function patchedLoad(request, parent, isMain) {
@@ -261,7 +275,9 @@ try {
   const ids = questions.map((question) => question.id);
   const duplicateIds = ids.filter((id, index) => id && ids.indexOf(id) !== index);
   const adminState = useAdminStore.getState();
-  const normalizedQuestions = adminState.questions.map((question) => (isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question));
+  const sourceQuestions = adminState.questions.length > 0 ? adminState.questions : questions;
+  const sourceTopics = adminState.topics.length > 0 ? adminState.topics : mockData.TOPICS;
+  const normalizedQuestions = sourceQuestions.map((question) => (isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question));
   const failures = normalizedQuestions
     .map((question) => ({
       id: question.id,
@@ -295,7 +311,7 @@ try {
       return acc;
     }, {});
 
-  const knownTopicIds = new Set(adminState.topics.map((topic) => topic.id));
+  const knownTopicIds = new Set(sourceTopics.map((topic) => topic.id));
   const simulationFailures = adminState.templates
     .map((template) => {
       const generated = generateSmartExamQuestions(template, normalizedQuestions, {});

@@ -43,7 +43,7 @@ export default function PromoCodesScreen() {
   const [expiresAt, setExpiresAt] = useState('');
 
   const activeCodes = promoCodes.filter(c => c.isActive);
-  const totalUsesToday = 12; // mock
+  const totalUsesToday = 0;
   const totalSavings = promoCodes.reduce((sum, c) => {
     if (c.discountType === 'percent') return sum + c.usedCount * (c.discountValue / 100) * 59;
     if (c.discountType === 'days_free') return sum + c.usedCount * 2;
@@ -115,7 +115,7 @@ export default function PromoCodesScreen() {
       {/* Stats Row */}
       <View style={styles.statsRow}>
         <StatChip label="קודים פעילים" value={activeCodes.length} color={Colors.success} />
-        <StatChip label="שימושים היום" value={totalUsesToday} color={Colors.primary} />
+        <StatChip label="שימושים מתועדים היום" value={totalUsesToday} color={Colors.primary} />
         <StatChip label="חסכון ₪" value={`₪${Math.round(totalSavings).toLocaleString()}`} color={Colors.warning} />
       </View>
 

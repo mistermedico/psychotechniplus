@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView,
-  Animated, Alert, Dimensions, TextInput, Modal, KeyboardAvoidingView, Platform,
+  Animated, Alert, TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useRootNavigationState } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { usePracticeStore } from '../store/practiceStore';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore } from '../store/adminStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { getTopicById, getTargetById, TOPICS } from '../data/mockData';
 import { fetchQuestions } from '../lib/db';
 import { QuestionCard } from '../components/QuestionCard';
 import { VisualImage } from '../components/VisualImage';
@@ -23,29 +22,34 @@ import { SessionMode } from '../data/types';
 import { generateSmartExamQuestions, GeneratedExamSection } from '../utils/smartExam';
 import { logger } from '../utils/logger';
 import { canAccessMode, canAccessQuestion, canAccessTopic, getSessionQuestionLimit } from '../lib/accessControl';
+import { isEnglishPracticeTopic } from '../utils/topicVisibility';
 
-const { width: W } = Dimensions.get('window');
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 export default function PracticeSession() {
-  const { topicId, targetId, mode, templateId, questionLimit, difficulty } = useLocalSearchParams<{
+  const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, adminPreview } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
     mode?: SessionMode;
     templateId?: string;
     questionLimit?: string;
     difficulty?: string; // 'easy' | 'medium' | 'hard' | 'all'
+    questionId?: string;
+    challengeQuestionId?: string;
+    adminPreview?: string;
   }>();
 
+  const rootNavigationState = useRootNavigationState();
+  const rootNavigationReady = !!rootNavigationState?.key;
   const insets = useSafeAreaInsets();
 
   const {
     session, startSession, submitAnswer, skipQuestion,
-    nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
+    completeUnansweredAsSkipped, nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
   } = usePracticeStore();
 
   const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium } = useUserStore();
-  const { templates, questions: adminQuestions, practiceSettings, freePracticeLimit, premiumConfig, addSessionRecord } = useAdminStore();
+  const { templates, questions: adminQuestions, topics, targets, practiceSettings, freePracticeLimit, premiumConfig, addSessionRecord, isAdmin } = useAdminStore();
 
   const {
     showTimerInPractice,
@@ -76,7 +80,10 @@ export default function PracticeSession() {
   const [restCountdown, setRestCountdown] = useState(0);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isSimulation = mode === 'simulation' && !!templateId;
+  const effectiveMode = (challengeQuestionId ? 'speed' : mode) ?? 'practice';
+  const isSimulation = effectiveMode === 'simulation' && !!templateId;
+  const isAdminPreview = adminPreview === '1' && isAdmin;
+  const hasPremiumAccess = isPremium || isAdminPreview;
 
   const explanationAnim = useRef(new Animated.Value(0)).current;
   const resultAnim = useRef(new Animated.Value(0)).current;
@@ -84,9 +91,9 @@ export default function PracticeSession() {
   const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishingRef = useRef(false);
 
-  const topic = getTopicById(topicId ?? '');
-  const target = getTargetById(targetId ?? '');
-  const isSpeedMode = mode === 'speed';
+  const topic = topics.find(t => t.id === (topicId ?? ''));
+  const target = targets.find(t => t.id === (targetId ?? ''));
+  const isSpeedMode = effectiveMode === 'speed';
 
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice OR admin forced showTimerAlways)
   const showTimer = isSimulation || isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
@@ -119,10 +126,55 @@ export default function PracticeSession() {
 
   // Initialize session — simulation mode or free practice
   useEffect(() => {
+    if (!rootNavigationReady) return;
     let cancelled = false;
 
+    if (topic && isEnglishPracticeTopic(topic)) {
+      Alert.alert('תרגול לא זמין', 'תרגול אנגלית הוסר כרגע מהאפליקציה.');
+      exitToPractice();
+      return;
+    }
+
+    const singleQuestionId = challengeQuestionId ?? questionId;
+    if (singleQuestionId) {
+      const previewQuestion = adminQuestions.find(q => q.id === singleQuestionId);
+      if (!previewQuestion) {
+        Alert.alert('שגיאה', challengeQuestionId ? 'שאלת האתגר היומי לא נמצאה.' : 'השאלה לתצוגה מקדימה לא נמצאה.');
+        exitToPractice();
+        return;
+      }
+      const previewTopic = topics.find(t => t.id === previewQuestion.topicId);
+      if (previewTopic && isEnglishPracticeTopic(previewTopic)) {
+        Alert.alert('תרגול לא זמין', 'תרגול אנגלית הוסר כרגע מהאפליקציה.');
+        exitToPractice();
+        return;
+      }
+      if (!isAdminPreview && previewQuestion.validationStatus !== 'validated') {
+        Alert.alert('שאלה לא זמינה', 'שאלה זו עדיין ממתינה לאישור מנהל ולכן אינה זמינה לתרגול.');
+        exitToPractice();
+        return;
+      }
+      if (!canAccessQuestion(previewQuestion, hasPremiumAccess)) {
+        Alert.alert('פרימיום בלבד', 'השאלה הזו נעולה למנויי פרימיום.');
+        router.push('/paywall');
+        return;
+      }
+      startSession({
+        targetId: targetId ?? previewQuestion.targetIds[0] ?? '',
+        topicId: topicId ?? previewQuestion.topicId,
+        mode: challengeQuestionId ? 'speed' : 'practice',
+        questions: [previewQuestion],
+      });
+      return () => { cancelled = true; };
+    }
+
     if (isSimulation && templateId) {
-      if (!canAccessMode('simulation', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)) {
+      if (!hasPremiumAccess) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        router.push('/paywall');
+        return;
+      }
+      if (!canAccessMode('simulation', hasPremiumAccess, premiumConfig, practiceSettings.premiumOnlyModes)) {
         Alert.alert('פרימיום בלבד', 'מבחן זה נעול לפי הגדרות המנהל.');
         exitToPractice();
         return;
@@ -137,7 +189,7 @@ export default function PracticeSession() {
         template,
         adminQuestions.filter(q =>
           q.validationStatus === 'validated' &&
-          canAccessQuestion(q, isPremium)
+          canAccessQuestion(q, hasPremiumAccess)
         ),
         {}
       );
@@ -165,12 +217,12 @@ export default function PracticeSession() {
     // FREE / ADAPTIVE PRACTICE MODE
     const limit = questionLimit ? parseInt(questionLimit) : 10;
     const userLevel = getTopicLevel(topicId ?? '');
-    if (topic && !canAccessTopic(topic, isPremium, premiumConfig)) {
+    if (topic && !canAccessTopic(topic, hasPremiumAccess, premiumConfig)) {
       Alert.alert('פרימיום בלבד', 'הנושא הזה נעול לפי הגדרות המנהל.');
       exitToPractice();
       return;
     }
-    if (!canAccessMode(mode ?? 'practice', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)) {
+    if (!canAccessMode(effectiveMode, hasPremiumAccess, premiumConfig, practiceSettings.premiumOnlyModes)) {
       Alert.alert('פרימיום בלבד', 'מצב התרגול הזה נעול לפי הגדרות המנהל.');
       exitToPractice();
       return;
@@ -190,7 +242,7 @@ export default function PracticeSession() {
         return;
       }
       // Apply difficulty filter if provided
-      let filtered = questions.filter(q => canAccessQuestion(q, isPremium));
+      let filtered = questions.filter(q => canAccessQuestion(q, hasPremiumAccess));
       if (filtered.length === 0) {
         Alert.alert('פרימיום בלבד', 'כל השאלות הזמינות לנושא הזה נעולות כרגע.');
         exitToPractice();
@@ -199,8 +251,8 @@ export default function PracticeSession() {
       if (difficulty === 'easy') filtered = questions.filter(q => q.difficulty <= 4);
       else if (difficulty === 'medium') filtered = questions.filter(q => q.difficulty >= 3 && q.difficulty <= 7);
       else if (difficulty === 'hard') filtered = questions.filter(q => q.difficulty >= 6);
-      filtered = filtered.filter(q => canAccessQuestion(q, isPremium));
-      if (filtered.length === 0) filtered = questions.filter(q => canAccessQuestion(q, isPremium)); // fallback to all allowed
+      filtered = filtered.filter(q => canAccessQuestion(q, hasPremiumAccess));
+      if (filtered.length === 0) filtered = questions.filter(q => canAccessQuestion(q, hasPremiumAccess)); // fallback to all allowed
       if (filtered.length === 0) {
         Alert.alert('פרימיום בלבד', 'אין שאלות זמינות להרשאה הנוכחית.');
         exitToPractice();
@@ -208,14 +260,14 @@ export default function PracticeSession() {
       }
       // Apply free user difficulty cap
       let questionPool = filtered;
-      if (!isPremium) {
+      if (!hasPremiumAccess) {
         const capped = questionPool.filter(q => q.difficulty <= practiceSettings.freeUserMaxDifficulty);
         if (capped.length > 0) questionPool = capped;
       }
       // Apply free user question limit
       const effectiveLimit = getSessionQuestionLimit(
         limit,
-        isPremium,
+        hasPremiumAccess,
         freePracticeLimit,
         premiumConfig,
         practiceSettings.premiumUserQuestionLimit,
@@ -230,8 +282,8 @@ export default function PracticeSession() {
       startSession({
         targetId: targetId ?? '',
         topicId: topicId ?? '',
-        mode: mode ?? 'practice',
-        questions: questionPool.slice(0, effectiveLimit),
+        mode: effectiveMode,
+        questions: [...questionPool].sort(() => Math.random() - 0.5).slice(0, effectiveLimit),
         initialLevel: userLevel,
       });
     });
@@ -243,7 +295,7 @@ export default function PracticeSession() {
       if (restTimerRef.current) clearInterval(restTimerRef.current);
       if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rootNavigationReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Full simulation timer. In simulations, answers/explanations are revealed only on the results screen.
   useEffect(() => {
@@ -445,6 +497,7 @@ export default function PracticeSession() {
     if (finishingRef.current) return;
     finishingRef.current = true;
     if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+    completeUnansweredAsSkipped();
     const finished = endSession();
     if (!finished) { finishingRef.current = false; return; }
     const scores = calcAllScores(finished.answers);
@@ -456,9 +509,9 @@ export default function PracticeSession() {
       id: finished.id,
       userId: userId,
       userName: userName || undefined,
-      targetId: targetId ?? '',
-      topicId: topicId ?? '',
-      mode: mode ?? 'practice',
+      targetId: finished.targetId ?? targetId ?? '',
+      topicId: finished.topicId ?? topicId ?? '',
+      mode: finished.mode ?? mode ?? 'practice',
       templateId: templateId ?? undefined,
       templateName: template?.name ?? undefined,
       totalQuestions: finished.answers.length,
@@ -478,16 +531,16 @@ export default function PracticeSession() {
         difficulty: a.questionDifficulty ?? 5,
       })),
     };
-    if (userId) addSessionRecord(sessionRec);
+    if (userId && !isAdminPreview) addSessionRecord(sessionRec);
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
-    recordSession(correct, finished.answers.filter(a => !a.isSkipped).length);
+    if (!isAdminPreview) recordSession(correct, finished.answers.length);
 
     router.replace({
       pathname: '/results',
       params: {
         sessionId: finished.id,
-        topicId: topicId ?? '',
-        targetId: targetId ?? '',
+        topicId: finished.topicId ?? topicId ?? '',
+        targetId: finished.targetId ?? targetId ?? '',
         score: scores.score,
         correct,
         total: finished.answers.length,
@@ -506,7 +559,7 @@ export default function PracticeSession() {
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
       endSession();
-      router.replace('/(tabs)');
+      router.replace(isAdminPreview ? '/admin/simulation-builder' : '/(tabs)');
     };
     if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
       if (window.confirm('לצאת מהתרגול? ההתקדמות הנוכחית תיעצר.')) quit();
@@ -597,7 +650,7 @@ export default function PracticeSession() {
   if (showRestScreen) {
     const template = templates.find(t => t.id === templateId);
     const nextSection = examSections[currentSectionIdx + 1];
-    const nextTopic = nextSection ? TOPICS.find(t => t.id === nextSection.topicId) : null;
+    const nextTopic = nextSection ? topics.find(t => t.id === nextSection.topicId) : null;
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <LinearGradient colors={['#060912', '#1E1B4B', '#312E81']} style={styles.restScreen}>
@@ -676,7 +729,7 @@ export default function PracticeSession() {
         <View style={styles.headerCenter}>
           <Text style={styles.headerTopic}>
             {isSimulation && examSections.length > 1
-              ? `${examSections[currentSectionIdx] ? TOPICS.find(t => t.id === examSections[currentSectionIdx].topicId)?.name ?? 'תרגול' : 'תרגול'} (חלק ${currentSectionIdx + 1}/${examSections.length})`
+              ? `${examSections[currentSectionIdx] ? topics.find(t => t.id === examSections[currentSectionIdx].topicId)?.name ?? 'תרגול' : 'תרגול'} (חלק ${currentSectionIdx + 1}/${examSections.length})`
               : (topic?.name ?? 'תרגול')}
           </Text>
           <Text style={styles.headerProgress}>
@@ -713,6 +766,7 @@ export default function PracticeSession() {
         keyboardShouldPersistTaps="handled"
       >
         <QuestionCard
+          key={`question-card-${question.id}`}
           question={question}
           selectedId={selectedId}
           revealed={revealed}
@@ -783,6 +837,7 @@ export default function PracticeSession() {
               <Text style={styles.explanationTitle}>הסבר:</Text>
               {question.explanationImageUrl ? (
                 <VisualImage
+                  key={`explanation-image-${question.id}-${question.explanationImageUrl.length}`}
                   uri={question.explanationImageUrl}
                   style={styles.explanationImage}
                   resizeMode="contain"
@@ -879,6 +934,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    width: '100%',
+    maxWidth: 920,
+    alignSelf: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: Colors.surface,
@@ -907,10 +965,22 @@ const styles = StyleSheet.create({
   },
   timerText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
 
-  progressWrap: { paddingHorizontal: 0 },
+  progressWrap: {
+    width: '100%',
+    maxWidth: 920,
+    alignSelf: 'center',
+    paddingHorizontal: 0,
+  },
 
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 24, gap: 14 },
+  scrollContent: {
+    width: '100%',
+    maxWidth: 920,
+    alignSelf: 'center',
+    padding: 16,
+    paddingBottom: 24,
+    gap: 14,
+  },
 
   explanation: {
     borderRadius: Radius.xl,
@@ -984,6 +1054,9 @@ const styles = StyleSheet.create({
   },
 
   actions: {
+    width: '100%',
+    maxWidth: 920,
+    alignSelf: 'center',
     padding: 16,
     paddingBottom: 24,
     backgroundColor: Colors.surface,

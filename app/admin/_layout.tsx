@@ -28,8 +28,10 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/question-assignment': 'שיוך שאלות',
   '/admin/revenue': 'הכנסות ומנויים',
   '/admin/app-store': 'מדדי App Store',
+  '/admin/events': 'התקנות ורכישות',
   '/admin/notifications': 'הודעות Push',
   '/admin/promo-codes': 'קודי קופון',
+  '/admin/support': 'פניות משתמשים',
   '/admin/activity-log': 'יומן פעילות',
   '/admin/logs': 'לוגים',
 };
@@ -121,8 +123,10 @@ export default function AdminLayout() {
       <Stack.Screen name="question-assignment" options={{ title: 'שיוך שאלות' }} />
       <Stack.Screen name="revenue" options={{ title: 'הכנסות ומנויים' }} />
       <Stack.Screen name="app-store" options={{ title: 'מדדי App Store' }} />
+      <Stack.Screen name="events" options={{ title: 'התקנות ורכישות' }} />
       <Stack.Screen name="notifications" options={{ title: 'הודעות Push' }} />
       <Stack.Screen name="promo-codes" options={{ title: 'קודי קופון' }} />
+      <Stack.Screen name="support" options={{ title: 'פניות משתמשים' }} />
       <Stack.Screen name="activity-log" options={{ title: 'יומן פעילות' }} />
       <Stack.Screen name="logs" options={{ title: 'לוגים' }} />
     </Stack>

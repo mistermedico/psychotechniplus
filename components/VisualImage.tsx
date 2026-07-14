@@ -25,6 +25,34 @@ function decodeBase64(value: string): string | null {
       );
     }
   } catch {}
+
+  try {
+    const clean = value.replace(/\s/g, '');
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let output = '';
+    let buffer = 0;
+    let bits = 0;
+
+    for (let index = 0; index < clean.length; index += 1) {
+      const char = clean[index];
+      if (char === '=') break;
+      const charIndex = chars.indexOf(char);
+      if (charIndex < 0) continue;
+      buffer = (buffer << 6) | charIndex;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        output += String.fromCharCode((buffer >> bits) & 0xff);
+      }
+    }
+
+    return decodeURIComponent(
+      Array.prototype.map.call(output, (char: string) => (
+        `%${(`00${char.charCodeAt(0).toString(16)}`).slice(-2)}`
+      )).join('')
+    );
+  } catch {}
+
   return null;
 }
 
@@ -45,17 +73,38 @@ function svgXmlFromUri(uri?: string | null): string | null {
 
 export function VisualImage({ uri, style, resizeMode = 'contain', fallbackLabel = 'תמונה לא זמינה' }: VisualImageProps) {
   const xml = useMemo(() => svgXmlFromUri(uri), [uri]);
+  const renderKey = useMemo(() => {
+    const source = uri ?? 'missing';
+    let hash = 0;
+    for (let i = 0; i < source.length; i += 1) {
+      hash = ((hash << 5) - hash + source.charCodeAt(i)) | 0;
+    }
+    return `${source.length}:${hash}`;
+  }, [uri]);
 
   if (xml) {
     return (
-      <View style={[styles.svgBox, style]}>
-        <SvgXml xml={xml} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
+      <View key={`svg-wrap-${renderKey}`} style={[styles.svgBox, style]}>
+        <SvgXml
+          key={`svg-${renderKey}`}
+          xml={xml}
+          width="100%"
+          height="100%"
+          preserveAspectRatio="xMidYMid meet"
+        />
       </View>
     );
   }
 
   if (uri) {
-    return <Image source={{ uri }} style={style as StyleProp<ImageStyle>} resizeMode={resizeMode} />;
+    return (
+      <Image
+        key={`img-${renderKey}`}
+        source={{ uri }}
+        style={style as StyleProp<ImageStyle>}
+        resizeMode={resizeMode}
+      />
+    );
   }
 
   return (

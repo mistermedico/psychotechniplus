@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, Alert, Switch,
@@ -6,7 +6,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
-import { TARGETS } from '../../data/mockData';
 import { Topic } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -31,7 +30,7 @@ function makeSlug(name: string, existingId?: string): string {
 }
 
 export default function TopicsAdmin() {
-  const { topics, addTopic, updateTopic, deleteTopic, questions } = useAdminStore();
+  const { topics, targets, addTopic, updateTopic, deleteTopic, questions } = useAdminStore();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -40,16 +39,20 @@ export default function TopicsAdmin() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [targetId, setTargetId] = useState(TARGETS[0]?.id ?? '');
+  const [targetId, setTargetId] = useState(targets[0]?.id ?? '');
   const [icon, setIcon] = useState('🔢');
   const [color, setColor] = useState(Colors.primary);
   const [isPremium, setIsPremium] = useState(false);
 
   const markDirty = () => setIsDirty(true);
 
+  useEffect(() => {
+    if (!targetId && targets[0]?.id) setTargetId(targets[0].id);
+  }, [targetId, targets]);
+
   const resetForm = () => {
     setName(''); setDescription('');
-    setTargetId(TARGETS[0]?.id ?? '');
+    setTargetId(targets[0]?.id ?? '');
     setIcon('🔢'); setColor(Colors.primary);
     setIsPremium(false); setEditId(null);
     setIsDirty(false);
@@ -136,7 +139,7 @@ export default function TopicsAdmin() {
     return result.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [topics, filterTarget, search]);
 
-  const topicsByTarget = TARGETS.map(t => ({
+  const topicsByTarget = targets.map(t => ({
     target: t,
     topics: filteredTopics.filter(tp => tp.targetId === t.id),
   }));
@@ -197,7 +200,7 @@ export default function TopicsAdmin() {
 
             <Text style={[styles.label, { marginTop: 12 }]}>מסלול</Text>
             <View style={styles.chipRow}>
-              {TARGETS.filter(t => !t.comingSoon).map(t => (
+              {targets.filter(t => !t.comingSoon).map(t => (
                 <Pressable
                   key={t.id}
                   onPress={() => { setTargetId(t.id); markDirty(); }}
@@ -320,7 +323,7 @@ export default function TopicsAdmin() {
           >
             <Text style={[styles.filterChipText, !filterTarget && { color: '#fff' }]}>הכל</Text>
           </Pressable>
-          {TARGETS.filter(t => !t.comingSoon).map(t => (
+          {targets.filter(t => !t.comingSoon).map(t => (
             <Pressable
               key={t.id}
               onPress={() => setFilterTarget(filterTarget === t.id ? null : t.id)}
@@ -461,8 +464,8 @@ const scStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background, direction: 'rtl', writingDirection: 'rtl' },
-  content: { padding: 16, paddingBottom: 40, direction: 'rtl', writingDirection: 'rtl' },
+  safe: { flex: 1, backgroundColor: Colors.background, writingDirection: 'rtl' },
+  content: { padding: 16, paddingBottom: 40, writingDirection: 'rtl' },
 
   statsRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
 
@@ -488,7 +491,6 @@ const styles = StyleSheet.create({
   topicCard: {
     backgroundColor: Colors.surface, borderRadius: Radius.xl,
     padding: 12, marginBottom: 8, ...Shadow.sm, borderWidth: 1, borderColor: Colors.border,
-    direction: 'rtl',
     writingDirection: 'rtl',
   },
   topicMain: { flexDirection: 'row-reverse', gap: 10, marginBottom: 10, alignItems: 'flex-start' },

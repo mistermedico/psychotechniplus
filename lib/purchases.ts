@@ -80,6 +80,10 @@ function hasRevenueCatApiKey(): boolean {
   return getApiKey().trim().length > 0;
 }
 
+export function canSyncPremiumWithPurchases(): boolean {
+  return USE_REAL_PURCHASES && isRevenueCatSupported && hasRevenueCatApiKey();
+}
+
 function ensurePurchasesConfigured(userId?: string): boolean {
   if (!USE_REAL_PURCHASES || !isRevenueCatSupported || !hasRevenueCatApiKey()) return false;
   if (configured) return true;
@@ -107,9 +111,18 @@ function normalizePackageIdentifier(pkg: PurchasesPackage): PurchasePackageId | 
 
 function hasPremiumEntitlement(customerInfo: RevenueCatCustomerInfo | null | undefined): boolean {
   if (!customerInfo) return false;
-  return [PREMIUM_ENTITLEMENT, ...LEGACY_PREMIUM_ENTITLEMENTS].some(
+  const hasEntitlement = [PREMIUM_ENTITLEMENT, ...LEGACY_PREMIUM_ENTITLEMENTS].some(
     entitlement => !!customerInfo.entitlements.active[entitlement],
   );
+  if (hasEntitlement) return true;
+
+  const activeSubscriptions = new Set((customerInfo.activeSubscriptions ?? []) as string[]);
+  if (activeSubscriptions.has(PRODUCT_IDS.weekly) || activeSubscriptions.has(PRODUCT_IDS.monthly)) {
+    return true;
+  }
+
+  const purchasedProducts = new Set(((customerInfo as any).allPurchasedProductIdentifiers ?? []) as string[]);
+  return purchasedProducts.has(PRODUCT_IDS.lifetime);
 }
 
 function getErrorMessage(error: unknown): string {

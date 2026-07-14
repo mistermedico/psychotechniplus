@@ -6,6 +6,7 @@ import {
   purchasePackage as rcPurchase,
   restorePurchases,
   checkPremiumStatus,
+  canSyncPremiumWithPurchases,
   getCustomerInfo,
   logOutPurchases,
   presentRevenueCatPaywall,
@@ -15,6 +16,7 @@ import {
 } from '../lib/purchases';
 import { logger } from '../utils/logger';
 import { useUserStore } from './userStore';
+import { notifyPurchase } from '../lib/adminEmail';
 
 interface PurchaseState {
   isInitialized: boolean;
@@ -39,6 +41,14 @@ function messageFrom(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function syncUserPremium(isPremium: boolean) {
+  if (canSyncPremiumWithPurchases()) {
+    useUserStore.getState().setPremium(isPremium);
+  } else if (isPremium) {
+    useUserStore.getState().setPremium(true);
+  }
+}
+
 export const usePurchaseStore = create<PurchaseState>((set, get) => ({
   isInitialized: false,
   packages: [],
@@ -56,8 +66,8 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
       logger.info('purchaseStore:initialize', 'RevenueCat initialized');
 
       const isPremium = await checkPremiumStatus();
+      syncUserPremium(isPremium);
       if (isPremium) {
-        useUserStore.getState().setPremium(true);
         logger.info('purchaseStore:initialize', 'Active entitlement found');
       }
 
@@ -86,8 +96,21 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
     try {
       const result = await rcPurchase(pkg);
       if (result.success) {
-        useUserStore.getState().setPremium(true);
+        syncUserPremium(true);
         set({ customerInfo: result.customerInfo ?? null });
+        const user = useUserStore.getState();
+        notifyPurchase({
+          userId: user.userId,
+          email: user.email,
+          name: user.name,
+          packageId: pkg.identifier,
+          productIdentifier: pkg.productIdentifier,
+          price: pkg.price,
+          priceString: pkg.priceString,
+          isSubscription: pkg.isSubscription,
+          source: 'direct_package_purchase',
+          customerInfo: result.customerInfo,
+        });
         logger.success('purchaseStore:purchase', `Purchase completed: ${pkg.identifier}`);
       }
       return result;
@@ -106,8 +129,8 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
       const result = await restorePurchases();
       const customerInfo = await getCustomerInfo();
       set({ customerInfo });
+      syncUserPremium(result.isPremium);
       if (result.isPremium) {
-        useUserStore.getState().setPremium(true);
         logger.info('purchaseStore:restore', 'Purchase restored');
       }
       return result;
@@ -125,7 +148,7 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
       const isPremium = await checkPremiumStatus();
       const customerInfo = await getCustomerInfo();
       set({ customerInfo });
-      if (isPremium) useUserStore.getState().setPremium(true);
+      syncUserPremium(isPremium);
       return isPremium;
     } catch {
       return false;
@@ -136,7 +159,7 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
     try {
       const customerInfo = await getCustomerInfo();
       const isPremium = await checkPremiumStatus();
-      if (isPremium) useUserStore.getState().setPremium(true);
+      syncUserPremium(isPremium);
       set({ customerInfo, loadError: null });
       return customerInfo;
     } catch (error: unknown) {
@@ -150,6 +173,16 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
     const result = await presentRevenueCatPaywall();
     if (result.purchased || result.restored) {
       await get().checkStatus();
+      if (result.purchased) {
+        const user = useUserStore.getState();
+        notifyPurchase({
+          userId: user.userId,
+          email: user.email,
+          name: user.name,
+          source: 'revenuecat_paywall',
+          customerInfo: get().customerInfo,
+        });
+      }
     }
     return result;
   },

@@ -8,19 +8,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { useUserStore } from '../store/userStore';
-import { TARGETS } from '../data/mockData';
+import { useAdminStore } from '../store/adminStore';
 import { Target } from '../data/types';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 
 const haptic = (style: Haptics.ImpactFeedbackStyle) => Haptics.impactAsync(style);
 const hapticSuccess = () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+const DEFAULT_TARGET_ID = 'target_psychometric';
 
 export default function Onboarding() {
-  const [step, setStep] = useState(0);
   const [name, setName] = useState('');
-  const psychometricTarget = TARGETS.find(t => t.id === 'target_psychometric') ?? TARGETS[0];
-  const [selectedTarget, setSelectedTarget] = useState<Target | null>(psychometricTarget);
+  const { targets } = useAdminStore();
+  const psychometricTarget =
+    targets.find(t => t.id === DEFAULT_TARGET_ID) ??
+    targets.find(t => t.isActive !== false && !t.comingSoon) ??
+    targets[0];
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const completeOnboarding = useUserStore(s => s.completeOnboarding);
@@ -29,22 +32,11 @@ export default function Onboarding() {
     Animated.spring(progressAnim, { toValue, useNativeDriver: false, friction: 8 }).start();
   };
 
-  const goNext = () => {
-    haptic(Haptics.ImpactFeedbackStyle.Light);
-    setStep(1);
-    animateTo(0.5);
-  };
-
-  const handleTargetSelect = (t: Target) => {
-    haptic(Haptics.ImpactFeedbackStyle.Medium);
-    setSelectedTarget(t);
-  };
-
   const handleFinish = () => {
     hapticSuccess();
     animateTo(1);
     const finalName = name.trim() || 'מתאמן';
-    completeOnboarding(finalName, selectedTarget?.id ?? TARGETS[0].id);
+    completeOnboarding(finalName, psychometricTarget?.id ?? DEFAULT_TARGET_ID);
     router.replace('/(tabs)');
   };
 
@@ -60,14 +52,7 @@ export default function Onboarding() {
         <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
       </View>
 
-      {step === 0 && <StepWelcome name={name} setName={setName} onNext={goNext} />}
-      {step === 1 && (
-        <StepSelectTarget
-          selected={selectedTarget}
-          onSelect={handleTargetSelect}
-          onFinish={handleFinish}
-        />
-      )}
+      <StepWelcome name={name} setName={setName} onFinish={handleFinish} />
     </SafeAreaView>
     </LinearGradient>
   );
@@ -76,8 +61,8 @@ export default function Onboarding() {
 // ── Step 1: Welcome ────────────────────────────────────────────────────────
 
 function StepWelcome({
-  name, setName, onNext,
-}: { name: string; setName: (v: string) => void; onNext: () => void }) {
+  name, setName, onFinish,
+}: { name: string; setName: (v: string) => void; onFinish: () => void }) {
   return (
     <KeyboardAvoidingView
       style={styles.stepContainer}
@@ -107,7 +92,7 @@ function StepWelcome({
           textAlign="right"
           autoFocus
           returnKeyType="go"
-          onSubmitEditing={onNext}
+          onSubmitEditing={onFinish}
           textContentType="name"
           autoComplete="name"
         />
@@ -115,7 +100,7 @@ function StepWelcome({
 
       <Pressable
         style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
-        onPress={onNext}
+        onPress={onFinish}
       >
         <LinearGradient colors={Colors.gradients.primary} style={styles.primaryBtnGrad}>
           <Text style={styles.primaryBtnText}>בוא נתחיל ←</Text>
@@ -130,13 +115,14 @@ function StepWelcome({
 // ── Step 2: Select Target ──────────────────────────────────────────────────
 
 function StepSelectTarget({
-  selected, onSelect, onFinish,
+  selected, onSelect, onFinish, targets,
 }: {
   selected: Target | null;
   onSelect: (t: Target) => void;
   onFinish: () => void;
+  targets: Target[];
 }) {
-  const activeTargets = TARGETS.filter(t => t.id === 'target_psychometric');
+  const activeTargets = targets.filter(t => t.isActive !== false && !t.comingSoon);
 
   return (
     <View style={styles.stepContainer}>
