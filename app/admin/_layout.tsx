@@ -27,6 +27,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/topic-exam-map': 'מפת נושאים-מבחנים',
   '/admin/question-assignment': 'שיוך שאלות',
   '/admin/revenue': 'הכנסות ומנויים',
+  '/admin/app-store': 'מדדי App Store',
   '/admin/notifications': 'הודעות Push',
   '/admin/promo-codes': 'קודי קופון',
   '/admin/activity-log': 'יומן פעילות',
@@ -119,6 +120,7 @@ export default function AdminLayout() {
       <Stack.Screen name="topic-exam-map" options={{ title: 'מפת נושאים-מבחנים' }} />
       <Stack.Screen name="question-assignment" options={{ title: 'שיוך שאלות' }} />
       <Stack.Screen name="revenue" options={{ title: 'הכנסות ומנויים' }} />
+      <Stack.Screen name="app-store" options={{ title: 'מדדי App Store' }} />
       <Stack.Screen name="notifications" options={{ title: 'הודעות Push' }} />
       <Stack.Screen name="promo-codes" options={{ title: 'קודי קופון' }} />
       <Stack.Screen name="activity-log" options={{ title: 'יומן פעילות' }} />

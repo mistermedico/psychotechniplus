@@ -1,14 +1,23 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable,
-  TextInput, Alert, ActivityIndicator, RefreshControl,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { supabase } from '../../lib/supabase';
+import { useAdminStore } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
-import { TARGETS, TOPICS } from '../../data/mockData';
 import { logger } from '../../utils/logger';
 
 interface RealUser {
@@ -28,138 +37,236 @@ interface RealUser {
   last_practiced_date: string | null;
   created_at: string;
   updated_at: string;
+  sessions_last_7_days: number;
+  avg_score: number;
+  total_time_seconds: number;
 }
 
-type SortKey = 'sessions' | 'level' | 'streak' | 'correct_rate' | 'joined';
+interface SessionRow {
+  id: string;
+  user_id: string;
+  mode: string | null;
+  topic_id: string | null;
+  total_questions: number | null;
+  correct_answers: number | null;
+  score: number | null;
+  time_spent_seconds: number | null;
+  completed_at: string | null;
+}
+
+type SortKey = 'sessions' | 'level' | 'streak' | 'correct_rate' | 'joined' | 'recent';
+
+function formatDate(value?: string | null): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('he-IL');
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
+}
 
 function getPerformanceLevel(totalCorrect: number, totalAnswered: number): { label: string; color: string } {
-  if (totalAnswered === 0) return { label: 'מתחיל', color: Colors.danger };
+  if (totalAnswered === 0) return { label: 'מתחיל', color: Colors.textTertiary };
   const rate = totalCorrect / totalAnswered;
   if (rate >= 0.75) return { label: 'מתקדם', color: Colors.success };
-  if (rate >= 0.35) return { label: 'בינוני', color: Colors.warning };
-  return { label: 'מתחיל', color: Colors.danger };
+  if (rate >= 0.45) return { label: 'בינוני', color: Colors.warning };
+  return { label: 'צריך חיזוק', color: Colors.danger };
+}
+
+function getAccuracy(user: RealUser): number {
+  return user.total_answered > 0 ? Math.round((user.total_correct / user.total_answered) * 100) : 0;
 }
 
 export default function UsersScreen() {
+  const insets = useSafeAreaInsets();
+  const { targets } = useAdminStore();
   const [users, setUsers] = useState<RealUser[]>([]);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('sessions');
+  const [sortKey, setSortKey] = useState<SortKey>('recent');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [inactiveFilter, setInactiveFilter] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setSyncError(null);
     try {
-      const { data: profiles, error: pe } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('total_sessions', { ascending: false });
+      const [{ data: profiles, error: profilesError }, { data: sessionRows, error: sessionsError }] = await Promise.all([
+        supabase.from('user_profiles').select('*').order('updated_at', { ascending: false }),
+        supabase
+          .from('practice_sessions')
+          .select('id,user_id,mode,topic_id,total_questions,correct_answers,score,time_spent_seconds,completed_at')
+          .order('completed_at', { ascending: false })
+          .limit(5000),
+      ]);
 
-      if (pe) { logger.error('users:load', 'שגיאה בטעינת משתמשים', pe.message); return; }
-      if (!profiles?.length) { setUsers([]); return; }
+      if (profilesError) throw profilesError;
+      if (sessionsError) throw sessionsError;
 
-      const combined: RealUser[] = profiles.map(p => ({
-        id: p.id,
-        name: p.name || 'ללא שם',
-        selected_target_id: p.selected_target_id,
-        has_completed_onboarding: p.has_completed_onboarding ?? false,
-        is_premium: p.is_premium ?? false,
-        streak: p.streak ?? 0,
-        longest_streak: p.longest_streak ?? 0,
-        level: p.level ?? 1,
-        xp: p.xp ?? 0,
-        total_sessions: p.total_sessions ?? 0,
-        total_correct: p.total_correct ?? 0,
-        total_answered: p.total_answered ?? 0,
-        last_practiced_date: p.last_practiced_date ?? null,
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-      }));
+      const allSessions = (sessionRows ?? []) as SessionRow[];
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      setUsers(combined);
-    } catch (e: any) {
-      logger.error('users:load', 'חריגה בטעינת משתמשים', e?.message);
+      const sessionsByUser = new Map<string, SessionRow[]>();
+      for (const session of allSessions) {
+        if (!session.user_id) continue;
+        const list = sessionsByUser.get(session.user_id) ?? [];
+        list.push(session);
+        sessionsByUser.set(session.user_id, list);
+      }
+
+      const mapped = (profiles ?? []).map(profile => {
+        const userSessions = sessionsByUser.get(profile.id) ?? [];
+        const answeredFromSessions = userSessions.reduce((sum, session) => sum + (session.total_questions ?? 0), 0);
+        const correctFromSessions = userSessions.reduce((sum, session) => sum + (session.correct_answers ?? 0), 0);
+        const totalSessions = Math.max(profile.total_sessions ?? 0, userSessions.length);
+        const totalAnswered = Math.max(profile.total_answered ?? 0, answeredFromSessions);
+        const totalCorrect = Math.max(profile.total_correct ?? 0, correctFromSessions);
+        const avgScore = userSessions.length > 0
+          ? Math.round(userSessions.reduce((sum, session) => sum + (session.score ?? 0), 0) / userSessions.length)
+          : 0;
+        const lastSession = userSessions.find(session => !!session.completed_at);
+        const sessionsLast7Days = userSessions.filter(session => {
+          if (!session.completed_at) return false;
+          return new Date(session.completed_at) >= sevenDaysAgo;
+        }).length;
+
+        return {
+          id: profile.id,
+          name: profile.name || profile.email || 'משתמש ללא שם',
+          email: profile.email ?? undefined,
+          selected_target_id: profile.selected_target_id ?? null,
+          has_completed_onboarding: profile.has_completed_onboarding ?? false,
+          is_premium: profile.is_premium ?? false,
+          streak: profile.streak ?? 0,
+          longest_streak: profile.longest_streak ?? 0,
+          level: profile.level ?? 1,
+          xp: profile.xp ?? 0,
+          total_sessions: totalSessions,
+          total_correct: totalCorrect,
+          total_answered: totalAnswered,
+          last_practiced_date: lastSession?.completed_at ?? profile.last_practiced_date ?? null,
+          created_at: profile.created_at,
+          updated_at: profile.updated_at,
+          sessions_last_7_days: sessionsLast7Days,
+          avg_score: avgScore,
+          total_time_seconds: userSessions.reduce((sum, session) => sum + (session.time_spent_seconds ?? 0), 0),
+        } satisfies RealUser;
+      });
+
+      setUsers(mapped);
+      setSessions(allSessions);
+      setLastSyncedAt(new Date().toISOString());
+    } catch (error: any) {
+      const message = error?.message ?? 'לא ניתן לטעון משתמשים כרגע';
+      setSyncError(message);
+      logger.error('admin:users', 'שגיאה בטעינת משתמשים', message);
+      if (!silent) Alert.alert('שגיאה', message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { loadUsers(); }, [loadUsers]);
+  useEffect(() => {
+    loadUsers();
 
-  const onRefresh = () => { setRefreshing(true); loadUsers(); };
+    const scheduleReload = () => {
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+      reloadTimer.current = setTimeout(() => loadUsers(true), 500);
+    };
 
-  const handleExportCSV = () => {
-    const header = 'שם,סשנים,דיוק%,רצף,הצטרף';
-    const rows = users.map(u => {
-      const acc = u.total_answered > 0 ? Math.round((u.total_correct / u.total_answered) * 100) : 0;
-      const joined = new Date(u.created_at).toLocaleDateString('he-IL');
-      return `"${u.name}",${u.total_sessions},${acc}%,${u.streak},"${joined}"`;
-    });
-    const csv = [header, ...rows].join('\n');
-    const preview = [header, ...rows.slice(0, 3)].join('\n');
-    Alert.alert(
-      '📤 ייצוא CSV',
-      `${users.length} משתמשים\n\nתצוגה מקדימה (3 שורות ראשונות):\n\n${preview}`,
-      [{ text: 'סגור', style: 'cancel' }]
-    );
-    logger.info('users:export', `CSV generated with ${users.length} rows`);
-  };
+    const channel = supabase
+      .channel('admin-users-live-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_profiles' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'practice_sessions' }, scheduleReload)
+      .subscribe();
 
-  const sevenDaysAgo = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
+    return () => {
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+      supabase.removeChannel(channel);
+    };
+  }, [loadUsers]);
+
+  const sevenDaysAgoDate = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 7);
+    return date;
   }, []);
 
   const filtered = useMemo(() => {
-    let list = users;
-    if (search.trim()) {
-      const s = search.trim().toLowerCase();
-      list = list.filter(u =>
-        u.name.toLowerCase().includes(s) ||
-        (u.email ?? '').toLowerCase().includes(s) ||
-        u.id.toLowerCase().includes(s)
-      );
-    }
-    if (inactiveFilter) {
-      list = list.filter(u => {
-        if (!u.last_practiced_date) return true;
-        return u.last_practiced_date < sevenDaysAgo;
-      });
-    }
-    return [...list].sort((a, b) => {
-      switch (sortKey) {
-        case 'sessions':     return b.total_sessions - a.total_sessions;
-        case 'level':        return b.level - a.level;
-        case 'streak':       return b.streak - a.streak;
-        case 'correct_rate': {
-          const ra = a.total_answered ? a.total_correct / a.total_answered : 0;
-          const rb = b.total_answered ? b.total_correct / b.total_answered : 0;
-          return rb - ra;
-        }
-        case 'joined':       return b.created_at.localeCompare(a.created_at);
-        default:             return 0;
-      }
-    });
-  }, [users, search, sortKey, inactiveFilter, sevenDaysAgo]);
+    const term = search.trim().toLowerCase();
+    let list = users.filter(user => (
+      !term ||
+      user.name.toLowerCase().includes(term) ||
+      (user.email ?? '').toLowerCase().includes(term) ||
+      user.id.toLowerCase().includes(term)
+    ));
 
-  const selectedUser = users.find(u => u.id === selectedUserId);
+    if (inactiveFilter) {
+      list = list.filter(user => !user.last_practiced_date || new Date(user.last_practiced_date) < sevenDaysAgoDate);
+    }
+
+    return [...list].sort((a, b) => {
+      if (sortKey === 'sessions') return b.total_sessions - a.total_sessions;
+      if (sortKey === 'level') return b.level - a.level;
+      if (sortKey === 'streak') return b.streak - a.streak;
+      if (sortKey === 'joined') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      if (sortKey === 'recent') return new Date(b.last_practiced_date ?? b.updated_at ?? 0).getTime() - new Date(a.last_practiced_date ?? a.updated_at ?? 0).getTime();
+      return getAccuracy(b) - getAccuracy(a);
+    });
+  }, [inactiveFilter, search, sevenDaysAgoDate, sortKey, users]);
 
   const stats = useMemo(() => ({
     total: users.length,
-    withSessions: users.filter(u => u.total_sessions > 0).length,
-    premium: users.filter(u => u.is_premium).length,
-    avgSessions: users.length ? Math.round(users.reduce((s, u) => s + u.total_sessions, 0) / users.length) : 0,
+    active7: users.filter(user => user.sessions_last_7_days > 0).length,
+    premium: users.filter(user => user.is_premium).length,
+    sessions: users.reduce((sum, user) => sum + user.total_sessions, 0),
+    avgAccuracy: users.length
+      ? Math.round(users.reduce((sum, user) => sum + getAccuracy(user), 0) / users.length)
+      : 0,
   }), [users]);
+
+  const selectedUser = users.find(user => user.id === selectedUserId);
+  const selectedSessions = selectedUser ? sessions.filter(session => session.user_id === selectedUser.id) : [];
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadUsers(true);
+  };
+
+  const handleExportCSV = () => {
+    const header = 'שם,אימייל,פרימיום,סשנים,דיוק,פעיל בשבוע האחרון,הצטרף,פעילות אחרונה';
+    const rows = filtered.map(user => [
+      user.name,
+      user.email ?? '',
+      user.is_premium ? 'כן' : 'לא',
+      String(user.total_sessions),
+      `${getAccuracy(user)}%`,
+      String(user.sessions_last_7_days),
+      formatDate(user.created_at),
+      formatDateTime(user.last_practiced_date),
+    ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','));
+    const preview = [header, ...rows.slice(0, 5)].join('\n');
+    Alert.alert('יצוא CSV', `${filtered.length} משתמשים בתצוגה הנוכחית\n\nתצוגה מקדימה:\n\n${preview}`);
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <View style={styles.loadingWrap}>
           <ActivityIndicator color={Colors.primary} size="large" />
-          <Text style={styles.loadingText}>טוען משתמשים מ-Supabase...</Text>
+          <Text style={styles.loadingText}>טוען משתמשים וסשנים מ-Supabase...</Text>
         </View>
       </SafeAreaView>
     );
@@ -169,186 +276,162 @@ export default function UsersScreen() {
     return (
       <UserDetailScreen
         user={selectedUser}
-        onBack={() => { setSelectedUserId(null); loadUsers(); }}
-        onDeleted={() => { setSelectedUserId(null); loadUsers(); }}
+        sessions={selectedSessions}
+        onBack={() => { setSelectedUserId(null); loadUsers(true); }}
+        onDeleted={() => { setSelectedUserId(null); loadUsers(true); }}
       />
     );
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      {/* Stats bar */}
       <View style={styles.statsBar}>
-        <StatChip label="סה״כ" value={String(stats.total)} />
-        <StatChip label="פעילים" value={String(stats.withSessions)} />
-        <StatChip label="פרמיום" value={String(stats.premium)} />
-        <StatChip label="סשנים ממוצע" value={String(stats.avgSessions)} />
+        <StatChip label="משתמשים" value={String(stats.total)} />
+        <StatChip label="פעילים 7 ימים" value={String(stats.active7)} />
+        <StatChip label="פרימיום" value={String(stats.premium)} />
+        <StatChip label="סשנים" value={String(stats.sessions)} />
+        <StatChip label="דיוק ממוצע" value={`${stats.avgAccuracy}%`} />
       </View>
 
-      {/* Search + export */}
+      <View style={[styles.syncBanner, syncError && styles.syncBannerError]}>
+        <View style={styles.syncTextWrap}>
+          <Text style={styles.syncTitle}>{syncError ? 'יש בעיית סנכרון' : 'סנכרון חי פעיל'}</Text>
+          <Text style={styles.syncSub}>
+            {syncError ?? `עודכן לאחרונה: ${lastSyncedAt ? formatDateTime(lastSyncedAt) : '-'}`}
+          </Text>
+        </View>
+        <Pressable onPress={() => loadUsers()} style={styles.refreshBtn}>
+          <Text style={styles.refreshText}>רענן</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.controlRow}>
         <TextInput
-          style={[styles.searchInput, { flex: 1 }]}
-          placeholder="🔍 חפש משתמש..."
+          style={styles.searchInput}
+          placeholder="חפש לפי שם, אימייל או מזהה..."
           placeholderTextColor={Colors.textTertiary}
           value={search}
           onChangeText={setSearch}
           textAlign="right"
         />
         <Pressable onPress={handleExportCSV} style={styles.exportBtn}>
-          <Text style={styles.exportBtnText}>📤 CSV</Text>
+          <Text style={styles.exportBtnText}>CSV</Text>
         </Pressable>
       </View>
 
-      {/* Sort chips + inactive filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.sortChips} style={styles.sortScroll}>
-        <Pressable
-          onPress={() => setInactiveFilter(v => !v)}
-          style={[styles.sortChip, inactiveFilter && styles.sortChipWarning]}
-        >
-          <Text style={[styles.sortChipText, inactiveFilter && styles.sortChipTextActive]}>
-            לא פעיל 7+ ימים
-          </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortChips} style={styles.sortScroll}>
+        <Pressable onPress={() => setInactiveFilter(value => !value)} style={[styles.sortChip, inactiveFilter && styles.sortChipWarning]}>
+          <Text style={[styles.sortChipText, inactiveFilter && styles.sortChipTextActive]}>לא פעיל 7+ ימים</Text>
         </Pressable>
         {([
+          ['recent', 'אחרון'],
           ['sessions', 'סשנים'],
           ['level', 'רמה'],
           ['streak', 'רצף'],
-          ['correct_rate', '% נכון'],
+          ['correct_rate', 'דיוק'],
           ['joined', 'הצטרפות'],
         ] as [SortKey, string][]).map(([key, label]) => (
-          <Pressable
-            key={key}
-            onPress={() => setSortKey(key)}
-            style={[styles.sortChip, sortKey === key && styles.sortChipActive]}
-          >
-            <Text style={[styles.sortChipText, sortKey === key && styles.sortChipTextActive]}>
-              {label}
-            </Text>
+          <Pressable key={key} onPress={() => setSortKey(key)} style={[styles.sortChip, sortKey === key && styles.sortChipActive]}>
+            <Text style={[styles.sortChipText, sortKey === key && styles.sortChipTextActive]}>{label}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
-      <Text style={styles.resultCount}>{filtered.length} משתמשים</Text>
+      <Text style={styles.resultCount}>{filtered.length} משתמשים מוצגים</Text>
 
-      <ScrollView
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-      >
-        {filtered.length === 0 ? (
+      <FlatList
+        data={filtered}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => {
+          const target = targets.find(targetItem => targetItem.id === item.selected_target_id);
+          const perf = getPerformanceLevel(item.total_correct, item.total_answered);
+
+          return (
+            <Pressable onPress={() => setSelectedUserId(item.id)} style={({ pressed }) => [styles.userCard, pressed && { opacity: 0.85 }]}>
+              <View style={styles.userCardHeader}>
+                <View style={styles.userAvatarCircle}>
+                  <Text style={styles.userAvatarText}>{item.name.charAt(0).toUpperCase() || '?'}</Text>
+                </View>
+                <View style={styles.userMainInfo}>
+                  <View style={styles.userNameRow}>
+                    <Text style={styles.userName}>{item.name}</Text>
+                    {item.is_premium && <Text style={styles.premiumTag}>פרימיום</Text>}
+                  </View>
+                  <Text style={styles.userMeta} numberOfLines={1}>
+                    {item.email ?? item.id}
+                  </Text>
+                  <Text style={styles.userMeta} numberOfLines={1}>
+                    {target ? `${target.icon} ${target.name}` : 'ללא מסלול'}{!item.has_completed_onboarding ? ' · לא השלים אונבורדינג' : ''}
+                  </Text>
+                </View>
+                <View style={styles.userLevelBadge}>
+                  <Text style={styles.userLevelText}>Lv {item.level}</Text>
+                </View>
+              </View>
+
+              <View style={styles.userStats}>
+                <MiniStat value={String(item.total_sessions)} label="סשנים" />
+                <MiniStat value={`${getAccuracy(item)}%`} label="דיוק" />
+                <MiniStat value={String(item.sessions_last_7_days)} label="7 ימים" />
+                <MiniStat value={String(item.xp)} label="XP" />
+              </View>
+
+              <View style={styles.cardFooter}>
+                <Text style={styles.userJoined}>פעילות אחרונה: {formatDateTime(item.last_practiced_date)}</Text>
+                <View style={[styles.perfPill, { backgroundColor: perf.color + '22', borderColor: perf.color + '55' }]}>
+                  <Text style={[styles.perfPillText, { color: perf.color }]}>{perf.label}</Text>
+                </View>
+              </View>
+            </Pressable>
+          );
+        }}
+        ListEmptyComponent={(
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyIcon}>👤</Text>
-            <Text style={styles.emptyText}>
-              {users.length === 0 ? 'אין משתמשים רשומים עדיין' : 'לא נמצאו תוצאות'}
-            </Text>
-            <Text style={styles.emptyHint}>
-              {users.length === 0 ? 'משתמשים יופיעו כאן לאחר הרשמה' : 'נסה חיפוש אחר'}
-            </Text>
+            <Text style={styles.emptyIcon}>👥</Text>
+            <Text style={styles.emptyText}>{users.length === 0 ? 'אין משתמשים רשומים עדיין' : 'לא נמצאו תוצאות'}</Text>
+            <Text style={styles.emptyHint}>{users.length === 0 ? 'משתמשים יופיעו כאן לאחר הרשמה או פעילות ראשונה' : 'נסה חיפוש או סינון אחר'}</Text>
           </View>
-        ) : (
-          filtered.map(u => {
-            const target = TARGETS.find(t => t.id === u.selected_target_id);
-            const correctRate = u.total_answered > 0
-              ? Math.round((u.total_correct / u.total_answered) * 100)
-              : null;
-            const joinDate = new Date(u.created_at).toLocaleDateString('he-IL');
-            const perf = getPerformanceLevel(u.total_correct, u.total_answered);
-
-            return (
-              <Pressable
-                key={u.id}
-                onPress={() => setSelectedUserId(u.id)}
-                style={({ pressed }) => [styles.userCard, pressed && { opacity: 0.85 }]}
-              >
-                <View style={styles.userCardHeader}>
-                  <View style={styles.userAvatarCircle}>
-                    <Text style={styles.userAvatarText}>
-                      {u.name.charAt(0).toUpperCase() || '?'}
-                    </Text>
-                  </View>
-                  <View style={styles.userMainInfo}>
-                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.userName}>{u.name}</Text>
-                      {u.is_premium && <Text style={{ fontSize: 14 }}>💎</Text>}
-                    </View>
-                    <Text style={styles.userId} numberOfLines={1}>
-                      {target ? `${target.icon} ${target.name}` : 'ללא מסלול'}
-                      {!u.has_completed_onboarding ? ' · לא השלים אונבורדינג' : ''}
-                    </Text>
-                  </View>
-                  <View style={styles.userLevelBadge}>
-                    <Text style={styles.userLevelText}>Lv{u.level}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.userStats}>
-                  <MiniStat icon="🎯" value={String(u.total_sessions)} label="סשנים" />
-                  <MiniStat icon="✅" value={correctRate !== null ? `${correctRate}%` : '—'} label="נכון" />
-                  <MiniStat icon="🔥" value={String(u.streak)} label="רצף" />
-                  <MiniStat icon="⭐" value={String(u.xp)} label="XP" />
-                </View>
-
-                <View style={styles.cardFooter}>
-                  <Text style={styles.userJoined}>הצטרף: {joinDate}</Text>
-                  <View style={[styles.perfPill, { backgroundColor: perf.color + '22', borderColor: perf.color + '55' }]}>
-                    <Text style={[styles.perfPillText, { color: perf.color }]}>{perf.label}</Text>
-                  </View>
-                </View>
-              </Pressable>
-            );
-          })
         )}
-      </ScrollView>
+        contentContainerStyle={[styles.list, { paddingBottom: Math.max(insets.bottom + 80, 110) }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
     </SafeAreaView>
   );
 }
 
-// ── User Detail Screen ─────────────────────────────────────────────────────
-
 function UserDetailScreen({
   user,
+  sessions,
   onBack,
   onDeleted,
 }: {
   user: RealUser;
+  sessions: SessionRow[];
   onBack: () => void;
   onDeleted: () => void;
 }) {
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [loadingSessions, setLoadingSessions] = useState(true);
+  const insets = useSafeAreaInsets();
+  const { targets, topics } = useAdminStore();
   const [isPremium, setIsPremium] = useState(user.is_premium);
   const [togglingPremium, setTogglingPremium] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    supabase
-      .from('practice_sessions')
-      .select('id, mode, topic_id, total_questions, correct_answers, score, completed_at')
-      .eq('user_id', user.id)
-      .order('completed_at', { ascending: false })
-      .limit(20)
-      .then(({ data }) => {
-        setSessions(data ?? []);
-        setLoadingSessions(false);
-      });
-  }, [user.id]);
-
   const handleTogglePremium = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setTogglingPremium(true);
+    const next = !isPremium;
     try {
       const { error } = await supabase
         .from('user_profiles')
-        .update({ is_premium: !isPremium })
+        .update({ is_premium: next, updated_at: new Date().toISOString() })
         .eq('id', user.id);
-      if (error) {
-        Alert.alert('שגיאה', 'לא ניתן לעדכן סטטוס פרמיום: ' + error.message);
-      } else {
-        setIsPremium(prev => !prev);
-        Alert.alert('עודכן', !isPremium ? '💎 המשתמש עודכן לפרמיום' : '🔓 פרמיום הוסר מהמשתמש');
-      }
+      if (error) throw error;
+      setIsPremium(next);
+      Alert.alert('עודכן', next ? 'המשתמש עודכן לפרימיום' : 'פרימיום הוסר מהמשתמש');
+    } catch (error: any) {
+      Alert.alert('שגיאה', error?.message ?? 'לא ניתן לעדכן סטטוס פרימיום');
     } finally {
       setTogglingPremium(false);
     }
@@ -357,8 +440,8 @@ function UserDetailScreen({
   const handleDeleteUser = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Alert.alert(
-      'מחק משתמש',
-      `האם אתה בטוח שברצונך למחוק את ${user.name}?\nפעולה זו בלתי הפיכה ותמחק את כל הסשנים.`,
+      'מחיקת משתמש',
+      `האם למחוק את ${user.name} לגמרי?\nהפעולה אינה הפיכה ותמחק גם נתוני סשנים.`,
       [
         { text: 'ביטול', style: 'cancel' },
         {
@@ -367,29 +450,11 @@ function UserDetailScreen({
           onPress: async () => {
             setDeleting(true);
             try {
-              const { error: sessErr } = await supabase
-                .from('practice_sessions')
-                .delete()
-                .eq('user_id', user.id);
-              if (sessErr) {
-                Alert.alert('שגיאה', 'לא ניתן למחוק סשנים: ' + sessErr.message);
-                setDeleting(false);
-                return;
-              }
-              const { error: profErr } = await supabase
-                .from('user_profiles')
-                .delete()
-                .eq('id', user.id);
-              if (profErr) {
-                Alert.alert('שגיאה', 'לא ניתן למחוק פרופיל: ' + profErr.message);
-                setDeleting(false);
-                return;
-              }
-              Alert.alert('נמחק', `המשתמש ${user.name} נמחק בהצלחה`, [
-                { text: 'אישור', onPress: onDeleted },
-              ]);
-            } catch (e: any) {
-              Alert.alert('שגיאה', e?.message ?? 'שגיאה לא ידועה');
+              const { error } = await supabase.functions.invoke('admin-delete-user', { body: { userId: user.id } });
+              if (error) throw error;
+              Alert.alert('נמחק', `המשתמש ${user.name} נמחק בהצלחה`, [{ text: 'אישור', onPress: onDeleted }]);
+            } catch (error: any) {
+              Alert.alert('שגיאה', error?.message ?? 'לא ניתן למחוק את המשתמש');
               setDeleting(false);
             }
           },
@@ -398,61 +463,43 @@ function UserDetailScreen({
     );
   };
 
-  const target = TARGETS.find(t => t.id === user.selected_target_id);
-  const correctRate = user.total_answered > 0
-    ? Math.round((user.total_correct / user.total_answered) * 100)
-    : null;
+  const target = targets.find(item => item.id === user.selected_target_id);
   const perf = getPerformanceLevel(user.total_correct, user.total_answered);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        {/* Back */}
+      <ScrollView
+        contentContainerStyle={[styles.detailContent, { paddingBottom: Math.max(insets.bottom + 48, 80) }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <Pressable onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>→ חזרה לרשימה</Text>
+          <Text style={styles.backBtnText}>חזרה לרשימה</Text>
         </Pressable>
 
-        {/* User header */}
         <View style={styles.detailHeader}>
-          <View style={[styles.userAvatarCircle, { width: 64, height: 64, borderRadius: 32 }]}>
-            <Text style={[styles.userAvatarText, { fontSize: 28 }]}>
-              {user.name.charAt(0).toUpperCase() || '?'}
-            </Text>
+          <View style={[styles.userAvatarCircle, styles.detailAvatar]}>
+            <Text style={[styles.userAvatarText, styles.detailAvatarText]}>{user.name.charAt(0).toUpperCase() || '?'}</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={styles.detailName}>{user.name}</Text>
-            {isPremium && <Text style={{ fontSize: 22 }}>💎</Text>}
-          </View>
+          <Text style={styles.detailName}>{user.name}</Text>
+          <Text style={styles.detailSub}>{user.email ?? user.id}</Text>
           <Text style={styles.detailSub}>{target ? `${target.icon} ${target.name}` : 'ללא מסלול'}</Text>
-          <View style={[styles.perfPill, { backgroundColor: perf.color + '22', borderColor: perf.color + '55', marginTop: 4 }]}>
+          <View style={[styles.perfPill, { backgroundColor: perf.color + '22', borderColor: perf.color + '55', marginTop: 8 }]}>
             <Text style={[styles.perfPillText, { color: perf.color }]}>{perf.label}</Text>
           </View>
-          <Text style={[styles.detailSub, { fontSize: FontSize.xs, marginTop: 2, color: Colors.textTertiary }]}>
-            ID: {user.id.slice(0, 16)}...
-          </Text>
         </View>
 
-        {/* Stats grid */}
         <View style={styles.detailGrid}>
-          {[
-            ['🎯', 'סשנים', String(user.total_sessions)],
-            ['✅', 'נכון', correctRate !== null ? `${correctRate}%` : '—'],
-            ['🔥', 'רצף', String(user.streak)],
-            ['🏆', 'רצף שיא', String(user.longest_streak)],
-            ['⭐', 'XP', String(user.xp)],
-            ['🎖️', 'רמה', String(user.level)],
-          ].map(([icon, label, value]) => (
-            <View key={label} style={styles.detailStatCard}>
-              <Text style={styles.detailStatIcon}>{icon}</Text>
-              <Text style={styles.detailStatValue}>{value}</Text>
-              <Text style={styles.detailStatLabel}>{label}</Text>
-            </View>
-          ))}
+          <MiniDetail label="סשנים" value={String(user.total_sessions)} />
+          <MiniDetail label="דיוק" value={`${getAccuracy(user)}%`} />
+          <MiniDetail label="פעיל השבוע" value={String(user.sessions_last_7_days)} />
+          <MiniDetail label="רצף" value={String(user.streak)} />
+          <MiniDetail label="XP" value={String(user.xp)} />
+          <MiniDetail label="ציון ממוצע" value={user.avg_score ? `${user.avg_score}%` : '-'} />
         </View>
 
-        {/* Premium toggle */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚙️ פעולות ניהול</Text>
+          <Text style={styles.sectionTitle}>פעולות מנהל</Text>
           <Pressable
             onPress={handleTogglePremium}
             disabled={togglingPremium}
@@ -460,68 +507,51 @@ function UserDetailScreen({
           >
             {togglingPremium
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.actionBtnText}>
-                  {isPremium ? '🔓 הסר פרמיום' : '💎 הוסף פרמיום'}
-                </Text>
-            }
+              : <Text style={styles.actionBtnText}>{isPremium ? 'הסר פרימיום' : 'הפוך לפרימיום'}</Text>}
           </Pressable>
 
-          <Pressable
-            onPress={handleDeleteUser}
-            disabled={deleting}
-            style={[styles.actionBtn, styles.actionBtnDanger, { marginTop: 10 }]}
-          >
+          <Pressable onPress={handleDeleteUser} disabled={deleting} style={[styles.actionBtn, styles.actionBtnDanger]}>
             {deleting
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.actionBtnText}>🗑️ מחק משתמש</Text>
-            }
+              : <Text style={styles.actionBtnText}>מחק משתמש</Text>}
           </Pressable>
         </View>
 
-        {/* Recent sessions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🕐 סשנים אחרונים ({sessions.length})</Text>
-          {loadingSessions ? (
-            <ActivityIndicator color={Colors.primary} style={{ marginTop: 12 }} />
-          ) : sessions.length === 0 ? (
-            <Text style={styles.emptyHint}>אין סשנים מתועדים</Text>
-          ) : (
-            sessions.map(s => {
-              const topic = TOPICS.find(t => t.id === s.topic_id);
-              const date = s.completed_at ? new Date(s.completed_at).toLocaleDateString('he-IL') : '—';
-              const score = s.score ? `${Math.round(s.score)}%` : '—';
-              return (
-                <View key={s.id} style={styles.sessionRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sessionMode}>
-                      {s.mode === 'simulation' ? '🏆 סימולציה' : s.mode === 'speed' ? '⚡ מהירות' : s.mode === 'adaptive' ? '🧠 אדפטיבי' : '📝 תרגול'}
-                      {topic ? ` · ${topic.icon} ${topic.name}` : ''}
-                    </Text>
-                    <Text style={styles.sessionMeta}>
-                      {s.correct_answers}/{s.total_questions} נכון · ציון {score} · {date}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })
-          )}
+          <View style={styles.sectionHeader}>
+            <Pressable onPress={() => Linking.openURL(`mailto:${user.email ?? ''}`)} disabled={!user.email}>
+              <Text style={[styles.sectionLink, !user.email && { opacity: 0.4 }]}>שלח מייל</Text>
+            </Pressable>
+            <Text style={styles.sectionTitle}>פרטים</Text>
+          </View>
+          <Text style={styles.dateText}>הצטרף: {formatDateTime(user.created_at)}</Text>
+          <Text style={styles.dateText}>פעילות אחרונה: {formatDateTime(user.last_practiced_date)}</Text>
+          <Text style={styles.dateText}>עדכון אחרון: {formatDateTime(user.updated_at)}</Text>
+          <Text style={styles.dateText}>זמן תרגול כולל: {Math.round(user.total_time_seconds / 60)} דקות</Text>
+          <Text style={styles.dateText}>מזהה: {user.id}</Text>
         </View>
 
-        {/* Dates */}
-        <View style={[styles.section, { gap: 6 }]}>
-          <Text style={styles.sectionTitle}>📅 תאריכים</Text>
-          <Text style={styles.dateText}>הצטרף: {new Date(user.created_at).toLocaleString('he-IL')}</Text>
-          {user.last_practiced_date && (
-            <Text style={styles.dateText}>תרגל לאחרונה: {user.last_practiced_date}</Text>
-          )}
-          <Text style={styles.dateText}>עדכון אחרון: {new Date(user.updated_at).toLocaleString('he-IL')}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>סשנים אחרונים ({sessions.length})</Text>
+          {sessions.length === 0 ? (
+            <Text style={styles.emptyHint}>אין סשנים מתועדים</Text>
+          ) : sessions.slice(0, 30).map(session => {
+            const topic = topics.find(item => item.id === session.topic_id);
+            const score = typeof session.score === 'number' ? `${Math.round(session.score)}%` : '-';
+            return (
+              <View key={session.id} style={styles.sessionRow}>
+                <Text style={styles.sessionMode}>{topic ? `${topic.icon} ${topic.name}` : 'תרגול'} · {session.mode ?? '-'}</Text>
+                <Text style={styles.sessionMeta}>
+                  {session.correct_answers ?? 0}/{session.total_questions ?? 0} נכון · ציון {score} · {formatDateTime(session.completed_at)}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-// ── Small components ───────────────────────────────────────────────────────
 
 function StatChip({ label, value }: { label: string; value: string }) {
   return (
@@ -532,228 +562,201 @@ function StatChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MiniStat({ icon, value, label }: { icon: string; value: string; label: string }) {
+function MiniStat({ value, label }: { value: string; label: string }) {
   return (
     <View style={styles.miniStat}>
-      <Text style={styles.miniStatIcon}>{icon}</Text>
       <Text style={styles.miniStatValue}>{value}</Text>
       <Text style={styles.miniStatLabel}>{label}</Text>
     </View>
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────
+function MiniDetail({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.detailStatCard}>
+      <Text style={styles.detailStatValue}>{value}</Text>
+      <Text style={styles.detailStatLabel}>{label}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  loadingText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
-
-  statsBar: {
-    flexDirection: 'row-reverse',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center' },
+  statsBar: { flexDirection: 'row-reverse', flexWrap: 'wrap', padding: 12, gap: 8 },
   statChip: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceSecondary,
+    flexGrow: 1,
+    minWidth: 96,
+    backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 10,
+    alignItems: 'center',
+  },
+  statChipValue: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text },
+  statChipLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center' },
+  syncBanner: {
+    marginHorizontal: 12,
+    marginBottom: 10,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.success + '55',
+    backgroundColor: Colors.success + '12',
+    padding: 12,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  syncBannerError: { borderColor: Colors.dangerGlow, backgroundColor: Colors.dangerLight },
+  syncTextWrap: { flex: 1, alignItems: 'flex-end' },
+  syncTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  syncSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginTop: 2 },
+  refreshBtn: { borderRadius: Radius.md, backgroundColor: Colors.primary, paddingHorizontal: 14, paddingVertical: 9 },
+  refreshText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: '#fff' },
+  controlRow: { flexDirection: 'row-reverse', paddingHorizontal: 12, gap: 8, alignItems: 'center' },
+  searchInput: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    color: Colors.text,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontFamily: FontFamily.regular,
+    writingDirection: 'rtl',
+  },
+  exportBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 16, paddingVertical: 12 },
+  exportBtnText: { fontFamily: FontFamily.bold, color: '#fff', fontSize: FontSize.sm },
+  sortScroll: { maxHeight: 52, marginTop: 10 },
+  sortChips: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 12, alignItems: 'center' },
+  sortChip: {
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  statChipValue: { fontFamily: FontFamily.heading, fontSize: FontSize.lg, color: Colors.primary },
-  statChipLabel: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
-
-  controlRow: { paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row-reverse', gap: 8, alignItems: 'center' },
-  searchInput: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: 12,
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  exportBtn: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: Radius.lg,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exportBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
-
-  sortScroll: { maxHeight: 44 },
-  sortChips: { paddingHorizontal: 12, gap: 8, flexDirection: 'row-reverse' },
-  sortChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
   sortChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  sortChipWarning: { backgroundColor: Colors.warning + '30', borderColor: Colors.warning },
-  sortChipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
+  sortChipWarning: { backgroundColor: Colors.warning + '22', borderColor: Colors.warning },
+  sortChipText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
   sortChipTextActive: { color: '#fff' },
-
   resultCount: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
     textAlign: 'right',
-    paddingHorizontal: 14,
-    paddingBottom: 4,
+    paddingHorizontal: 16,
+    marginTop: 8,
   },
-
-  list: { padding: 12, gap: 10, paddingBottom: 40 },
-
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyIcon: { fontSize: 48 },
-  emptyText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textSecondary },
-  emptyHint: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textTertiary, textAlign: 'center' },
-
+  list: { padding: 12, gap: 12 },
+  emptyWrap: { alignItems: 'center', justifyContent: 'center', padding: 36 },
+  emptyIcon: { fontSize: 42, marginBottom: 10 },
+  emptyText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text, textAlign: 'center' },
+  emptyHint: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginTop: 6 },
   userCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
-    padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 10,
+    padding: 14,
     ...Shadow.sm,
   },
-  userCardHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  userCardHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
   userAvatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: Colors.primaryLighter,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.primary + '50',
   },
-  userAvatarText: {
-    fontFamily: FontFamily.heading,
-    fontSize: 18,
-    color: Colors.primary,
-  },
-  userMainInfo: { flex: 1 },
+  userAvatarText: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff' },
+  userMainInfo: { flex: 1, alignItems: 'flex-end', minWidth: 0 },
+  userNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   userName: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
-  userId: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
-  userLevelBadge: {
-    backgroundColor: Colors.primaryLighter,
-    borderRadius: Radius.lg,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: Colors.primary + '40',
-  },
-  userLevelText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary },
-
-  userStats: { flexDirection: 'row-reverse', justifyContent: 'space-around' },
-  miniStat: { alignItems: 'center', gap: 2 },
-  miniStatIcon: { fontSize: 14 },
-  miniStatValue: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text },
-  miniStatLabel: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary },
-
-  cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  perfPill: {
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderWidth: 1,
-  },
-  perfPillText: { fontFamily: FontFamily.medium, fontSize: 11 },
-
-  userJoined: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'right',
-  },
-
-  // Detail screen
-  backBtn: { alignSelf: 'flex-end', marginBottom: 16, minHeight: 44, justifyContent: 'center' },
-  backBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
-
-  detailHeader: { alignItems: 'center', marginBottom: 20, gap: 6 },
-  detailName: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: Colors.text },
-  detailSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
-
-  detailGrid: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 20,
-  },
-  detailStatCard: {
-    width: '30%',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: 14,
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadow.sm,
-  },
-  detailStatIcon: { fontSize: 22 },
-  detailStatValue: { fontFamily: FontFamily.heading, fontSize: FontSize.xl, color: Colors.primary },
-  detailStatLabel: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textTertiary },
-
-  section: { marginBottom: 20 },
-  sectionTitle: {
+  premiumTag: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: Colors.text,
-    textAlign: 'right',
-    marginBottom: 10,
+    fontSize: FontSize.xs,
+    color: '#111827',
+    backgroundColor: Colors.warning,
+    borderRadius: Radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
   },
-
-  actionBtn: {
-    borderRadius: Radius.xl,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-    borderWidth: 1,
-  },
-  actionBtnPrimary: {
-    backgroundColor: Colors.primaryLighter,
-    borderColor: Colors.primary + '60',
-  },
-  actionBtnWarning: {
-    backgroundColor: Colors.warning + '20',
-    borderColor: Colors.warning + '60',
-  },
-  actionBtnDanger: {
-    backgroundColor: Colors.danger + '20',
-    borderColor: Colors.danger + '60',
-  },
-  actionBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
-
-  sessionRow: {
+  userMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginTop: 3 },
+  userLevelBadge: { backgroundColor: Colors.primaryLighter, borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 5 },
+  userLevelText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary },
+  userStats: { flexDirection: 'row-reverse', gap: 8, marginTop: 12 },
+  miniStat: { flex: 1, alignItems: 'center', backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.md, padding: 8 },
+  miniStatValue: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
+  miniStatLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary },
+  cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, gap: 8 },
+  userJoined: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right' },
+  perfPill: { borderRadius: Radius.full, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
+  perfPillText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
+  detailContent: { padding: 16 },
+  backBtn: {
+    alignSelf: 'flex-end',
+    borderRadius: Radius.full,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: 12,
-    marginBottom: 6,
     borderWidth: 1,
     borderColor: Colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 12,
   },
-  sessionMode: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
-  sessionMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
-
+  backBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text },
+  detailHeader: {
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 18,
+    marginBottom: 14,
+  },
+  detailAvatar: { width: 64, height: 64, borderRadius: 32 },
+  detailAvatarText: { fontSize: 28 },
+  detailName: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: Colors.text, textAlign: 'center', marginTop: 8 },
+  detailSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginTop: 4 },
+  detailGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
+  detailStatCard: {
+    width: '31%',
+    minWidth: 96,
+    flexGrow: 1,
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+  },
+  detailStatValue: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text },
+  detailStatLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center' },
+  section: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    marginBottom: 14,
+    gap: 10,
+  },
+  sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  sectionTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
+  sectionLink: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primary },
+  actionBtn: { borderRadius: Radius.lg, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
+  actionBtnPrimary: { backgroundColor: Colors.primary },
+  actionBtnWarning: { backgroundColor: Colors.warning },
+  actionBtnDanger: { backgroundColor: Colors.danger },
+  actionBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+  sessionRow: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.md, padding: 10, gap: 4 },
+  sessionMode: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  sessionMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right' },
   dateText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right' },
 });

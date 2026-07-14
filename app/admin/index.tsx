@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable,
+  View, Text, StyleSheet, ScrollView, Pressable, useWindowDimensions,
   TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
@@ -40,6 +40,7 @@ const ADMIN_SECTIONS: NavSection[] = [
   { id: 'monitor',             icon: 'ב', label: 'ניטור הגשות',        desc: 'שאלות, פרקים, מבחנים והגשות',          route: '/admin/monitor',             category: 'users' },
   { id: 'leaderboard-admin',   icon: 'ד', label: 'לוח מובילים',        desc: 'ניהול דירוגים והישגים',                route: '/admin/leaderboard-admin',   category: 'users' },
   { id: 'revenue',             icon: 'ה', label: 'הכנסות',             desc: 'מנויים, המרות ומדדי הכנסה',            route: '/admin/revenue',             category: 'business' },
+  { id: 'app-store',           icon: 'A', label: 'App Store',          desc: 'צפיות, הורדות וקישורים לאפל',          route: '/admin/app-store',           category: 'business' },
   { id: 'promo-codes',         icon: 'ק', label: 'קודי קופון',         desc: 'הנחות וגישה זמנית',                   route: '/admin/promo-codes',         category: 'business' },
   { id: 'notifications',       icon: 'ה', label: 'הודעות Push',        desc: 'שליחת התראות למשתמשים',               route: '/admin/notifications',       category: 'business' },
   { id: 'app-settings',        icon: 'ג', label: 'הגדרות אפליקציה',    desc: 'פרמטרים גלובליים',                    route: '/admin/app-settings',        category: 'business' },
@@ -73,11 +74,15 @@ const QUICK_ACTIONS = [
   { icon: 'ב', label: 'ביצועים', route: '/admin/performance' },
   { icon: 'נ', label: 'ניטור', route: '/admin/monitor' },
   { icon: 'מ', label: 'משתמשים', route: '/admin/users' },
+  { icon: 'A', label: 'App Store', route: '/admin/app-store' },
   { icon: 'י', label: 'ייצוא', route: '/admin/export' },
   { icon: 'ש', label: 'שלח הודעה', route: '/admin/notifications' },
 ];
 
 export default function AdminDashboard() {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isCompact = width < 520;
   const {
     isAdmin, login, logout, setIsAdmin, getStats, getPendingQuestions,
     seedToSupabase, loadAdminData, syncAll,
@@ -168,7 +173,11 @@ export default function AdminDashboard() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 48, 88) }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
 
         {/* Hero Header */}
         <LinearGradient colors={['#0A0F1E', '#0F172A', '#1E293B']} style={styles.hero}>
@@ -360,7 +369,11 @@ export default function AdminDashboard() {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     router.push(section.route as any);
                   }}
-                  style={({ pressed }) => [styles.navCard, pressed && { transform: [{ scale: 0.95 }] }]}
+                  style={({ pressed }) => [
+                    styles.navCard,
+                    { width: isCompact ? '47.5%' : '30.5%' },
+                    pressed && { transform: [{ scale: 0.97 }] },
+                  ]}
                 >
                   <LinearGradient
                     colors={CATEGORY_COLORS[section.category]}
@@ -825,4 +838,3 @@ const styles = StyleSheet.create({
   },
   refreshBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#E2E8F0' },
 });
-
