@@ -113,10 +113,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!isAdmin) return;
     loadAdminData();
-    const interval = setInterval(() => {
-      loadAdminData();
-    }, 60000);
-    return () => clearInterval(interval);
   }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const contentHealth = useMemo(() => {

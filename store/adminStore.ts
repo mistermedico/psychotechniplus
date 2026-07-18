@@ -12,7 +12,11 @@ let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let adminDataLoadPromise: Promise<void> | null = null;
 let lastAdminDataLoadStartedAt = 0;
+let adminCollectionsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let adminRealtimeMutedUntil = 0;
 const ADMIN_RELOAD_MIN_INTERVAL_MS = 1500;
+const ADMIN_COLLECTION_SAVE_DEBOUNCE_MS = 700;
+const ADMIN_REALTIME_SELF_WRITE_MUTE_MS = 1800;
 
 function pickAdminCollections(s: any) {
   return {
@@ -28,7 +32,12 @@ function pickAdminCollections(s: any) {
 }
 
 function saveAdminCollections(s: any) {
-  saveAdminState(ADMIN_COLLECTIONS_KEY, pickAdminCollections(s));
+  if (adminCollectionsSaveTimer) clearTimeout(adminCollectionsSaveTimer);
+  adminCollectionsSaveTimer = setTimeout(() => {
+    adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
+    saveAdminState(ADMIN_COLLECTIONS_KEY, pickAdminCollections(s));
+    adminCollectionsSaveTimer = null;
+  }, ADMIN_COLLECTION_SAVE_DEBOUNCE_MS);
 }
 
 function normalizeAdminCollections(collections: any) {
@@ -1990,9 +1999,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         if (templates && templates.length > 0) {
           const normalizedTemplates = templates.map(normalizeTemplateRules);
           set({ templates: normalizedTemplates });
-          saveTemplates(normalizedTemplates);
-        } else {
-          saveTemplates(get().templates);
         }
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'שגיאה בטעינת תבניות', e?.message);
@@ -2007,15 +2013,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           if (settings.premiumConfig) set({ premiumConfig: withDefaultPremiumConfig(settings.premiumConfig) });
           if (settings.freePracticeLimit) set({ freePracticeLimit: settings.freePracticeLimit });
           if (settings.appConfig) set({ appConfig: withDefaultAppConfig(settings.appConfig) });
-        } else {
-          const s = get();
-          saveAdminSettings({
-            practiceSettings: s.practiceSettings,
-            examSettings: s.examSettings,
-            premiumConfig: s.premiumConfig,
-            freePracticeLimit: s.freePracticeLimit,
-            appConfig: s.appConfig,
-          });
         }
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הגדרות', e?.message);
@@ -2026,8 +2023,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         const collections = normalizeAdminCollections(await loadAdminState<any>(ADMIN_COLLECTIONS_KEY));
         if (collections) {
           set(collections);
-        } else {
-          saveAdminCollections(get());
         }
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'שגיאה בטעינת אוספי אדמין', e?.message);
@@ -2084,8 +2079,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   startRealtimeSync: () => {
     if (adminRealtimeChannel) return;
     const scheduleReload = () => {
+      if (Date.now() < adminRealtimeMutedUntil) return;
       if (adminRealtimeReloadTimer) clearTimeout(adminRealtimeReloadTimer);
       adminRealtimeReloadTimer = setTimeout(() => {
+        if (Date.now() < adminRealtimeMutedUntil) return;
         get().loadAdminData().catch((e: any) => {
           const message = e?.message ?? 'Realtime sync failed';
           set({ syncError: message, isSyncing: false });

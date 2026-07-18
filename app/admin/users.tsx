@@ -310,8 +310,12 @@ export default function UsersScreen() {
             {syncError ?? `עודכן לאחרונה: ${lastSyncedAt ? formatDateTime(lastSyncedAt) : '-'}`}
           </Text>
         </View>
-        <Pressable onPress={() => loadUsers()} style={styles.refreshBtn}>
-          <Text style={styles.refreshText}>רענן</Text>
+        <Pressable
+          disabled={loading || refreshing}
+          onPress={() => loadUsers()}
+          style={[styles.refreshBtn, (loading || refreshing) && { opacity: 0.65 }]}
+        >
+          <Text style={styles.refreshText}>{loading || refreshing ? 'טוען...' : 'רענן'}</Text>
         </Pressable>
       </View>
 

@@ -116,9 +116,14 @@ export default function RootLayout() {
         notifyFirstOpenOnce(userId, isGuest ? null : email).catch(() => null);
         // Ensure targets+topics exist in Supabase for all users (FK prerequisite)
         ensureDbSeeded().then(() => {
-          if (email.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
-          loadAdminData();
-          startRealtimeSync();
+          if (email.toLowerCase() === ADMIN_EMAIL) {
+            setIsAdmin(true);
+            loadAdminData();
+            startRealtimeSync();
+          } else {
+            setIsAdmin(false);
+            stopRealtimeSync();
+          }
         });
         // Guests receive an anonymous RevenueCat ID so StoreKit prices and purchase restoration work before sign-in.
         initializePurchases(userId && !isGuest ? userId : undefined).catch(() => null);
