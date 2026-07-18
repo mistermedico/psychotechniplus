@@ -33,11 +33,15 @@ export default function AppSettingsScreen() {
           text: 'אשר',
           style: 'destructive',
           onPress: async () => {
+            if (syncing) return;
             setSyncing(true);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            const result = await seedToSupabase();
-            setSyncing(false);
-            Alert.alert(result.ok ? '✅ הצלחה' : '❌ שגיאה', result.message);
+            try {
+              const result = await seedToSupabase();
+              Alert.alert(result.ok ? '✅ הצלחה' : '❌ שגיאה', result.message);
+            } finally {
+              setSyncing(false);
+            }
           },
         },
       ],
@@ -45,11 +49,15 @@ export default function AppSettingsScreen() {
   };
 
   const handleLoadFromSupabase = async () => {
+    if (loading) return;
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await loadQuestionsFromSupabase();
-    setLoading(false);
-    Alert.alert('✅ עודכן', 'השאלות נטענו מ-Supabase בהצלחה');
+    try {
+      await loadQuestionsFromSupabase();
+      Alert.alert('✅ עודכן', 'השאלות נטענו מ-Supabase בהצלחה');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveSettings = () => {
@@ -184,7 +192,7 @@ export default function AppSettingsScreen() {
             <Pressable
               onPress={handleLoadFromSupabase}
               disabled={loading}
-              style={[styles.dbBtn, { borderColor: Colors.primary }]}
+              style={[styles.dbBtn, { borderColor: Colors.primary }, loading && { opacity: 0.65 }]}
             >
               <Text style={[styles.dbBtnText, { color: Colors.primary }]}>
                 {loading ? 'טוען...' : '↓ טעון'}
@@ -202,7 +210,7 @@ export default function AppSettingsScreen() {
             <Pressable
               onPress={handleSeed}
               disabled={syncing}
-              style={[styles.dbBtn, { borderColor: Colors.danger }]}
+              style={[styles.dbBtn, { borderColor: Colors.danger }, syncing && { opacity: 0.65 }]}
             >
               <Text style={[styles.dbBtnText, { color: Colors.danger }]}>
                 {syncing ? 'מזריע...' : '↑ זרע'}

@@ -596,8 +596,12 @@ export default function SimulationBuilder() {
             </Text>
           </View>
           <Pressable
-            onPress={() => syncAll()}
-            style={({ pressed }) => [styles.syncBtn, pressed && { opacity: 0.75 }]}
+            disabled={isSyncing}
+            onPress={() => {
+              if (isSyncing) return;
+              syncAll();
+            }}
+            style={({ pressed }) => [styles.syncBtn, (pressed || isSyncing) && { opacity: 0.75 }]}
           >
             <Text style={styles.syncBtnText}>{isSyncing ? 'מסנכרן' : 'רענן'}</Text>
           </Pressable>

@@ -10,6 +10,9 @@ const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
 const ADMIN_COLLECTIONS_KEY = 'collections';
 let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
+let adminDataLoadPromise: Promise<void> | null = null;
+let lastAdminDataLoadStartedAt = 0;
+const ADMIN_RELOAD_MIN_INTERVAL_MS = 1500;
 
 function pickAdminCollections(s: any) {
   return {
@@ -1943,114 +1946,127 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   seedToSupabase: () => seedDatabase(),
 
   loadAdminData: async () => {
-    logger.info('adminStore:loadAdminData', 'טוען נתוני אדמין...');
-    set({ isSyncing: true, syncError: null });
+    if (adminDataLoadPromise) return adminDataLoadPromise;
 
-    // 1. Load all questions from Supabase. In admin, Supabase is the source of truth.
-    try {
-      const remote = await fetchAllQuestions();
-      set({ questions: remote });
-      logger.success('adminStore:loadAdminData', `Loaded ${remote.length} questions from Supabase`);
-    } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'Failed loading questions', e?.message);
-      set({ questions: [] });
-    }
+    const now = Date.now();
+    const recentlyLoaded = now - lastAdminDataLoadStartedAt < ADMIN_RELOAD_MIN_INTERVAL_MS;
+    if (recentlyLoaded && get().lastSyncedAt) return;
 
-    // 2. Load targets and topics from Supabase. Admin views must not mask DB issues with mock data.
-    try {
-      const remoteTargets = await fetchTargets();
-      set({ targets: remoteTargets });
-    } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'Failed loading targets', e?.message);
-      set({ targets: [] });
-    }
+    lastAdminDataLoadStartedAt = now;
+    adminDataLoadPromise = (async () => {
+      logger.info('adminStore:loadAdminData', 'טוען נתוני אדמין...');
+      set({ isSyncing: true, syncError: null });
 
-    try {
-      const remoteTopics = await fetchTopics();
-      set({ topics: remoteTopics });
-    } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'Failed loading topics', e?.message);
-      set({ topics: [] });
-    }
-
-    // 3. Load simulation templates from AsyncStorage
-    try {
-      const templates = await loadTemplates();
-      if (templates && templates.length > 0) {
-        const normalizedTemplates = templates.map(normalizeTemplateRules);
-        set({ templates: normalizedTemplates });
-        saveTemplates(normalizedTemplates);
-      } else {
-        saveTemplates(get().templates);
+      // 1. Load all questions from Supabase. In admin, Supabase is the source of truth.
+      try {
+        const remote = await fetchAllQuestions();
+        set({ questions: remote });
+        logger.success('adminStore:loadAdminData', `Loaded ${remote.length} questions from Supabase`);
+      } catch (e: any) {
+        logger.error('adminStore:loadAdminData', 'Failed loading questions', e?.message);
+        set({ questions: [] });
       }
-    } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת תבניות', e?.message);
-    }
 
-    // 4. Load admin settings from AsyncStorage
-    try {
-      const settings = await loadAdminSettings();
-      if (settings) {
-        if (settings.practiceSettings) set({ practiceSettings: settings.practiceSettings });
-        if (settings.examSettings) set({ examSettings: settings.examSettings });
-        if (settings.premiumConfig) set({ premiumConfig: withDefaultPremiumConfig(settings.premiumConfig) });
-        if (settings.freePracticeLimit) set({ freePracticeLimit: settings.freePracticeLimit });
-        if (settings.appConfig) set({ appConfig: withDefaultAppConfig(settings.appConfig) });
-      } else {
-        const s = get();
-        saveAdminSettings({
-          practiceSettings: s.practiceSettings,
-          examSettings: s.examSettings,
-          premiumConfig: s.premiumConfig,
-          freePracticeLimit: s.freePracticeLimit,
-          appConfig: s.appConfig,
-        });
+      // 2. Load targets and topics from Supabase. Admin views must not mask DB issues with mock data.
+      try {
+        const remoteTargets = await fetchTargets();
+        set({ targets: remoteTargets });
+      } catch (e: any) {
+        logger.error('adminStore:loadAdminData', 'Failed loading targets', e?.message);
+        set({ targets: [] });
       }
-    } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הגדרות', e?.message);
-    }
 
-    // 5. Load synced admin collections from Supabase when available.
-    try {
-      const collections = normalizeAdminCollections(await loadAdminState<any>(ADMIN_COLLECTIONS_KEY));
-      if (collections) {
-        set(collections);
-      } else {
-        saveAdminCollections(get());
+      try {
+        const remoteTopics = await fetchTopics();
+        set({ topics: remoteTopics });
+      } catch (e: any) {
+        logger.error('adminStore:loadAdminData', 'Failed loading topics', e?.message);
+        set({ topics: [] });
       }
-    } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'שגיאה בטעינת אוספי אדמין', e?.message);
-    }
 
-    // 6. Revenue snapshots are derived from real profiles only. MRR stays 0
-    // until a real purchases/subscriptions table is connected.
-    try {
-      const revenueSnapshots = await buildRevenueSnapshotsFromProfiles();
-      set({ revenueSnapshots });
-    } catch (e: any) {
-      logger.error('adminStore:loadAdminData', 'Failed building revenue snapshots from real profiles', e?.message);
-      set({ revenueSnapshots: [] });
-    }
+      // 3. Load simulation templates from AsyncStorage
+      try {
+        const templates = await loadTemplates();
+        if (templates && templates.length > 0) {
+          const normalizedTemplates = templates.map(normalizeTemplateRules);
+          set({ templates: normalizedTemplates });
+          saveTemplates(normalizedTemplates);
+        } else {
+          saveTemplates(get().templates);
+        }
+      } catch (e: any) {
+        logger.error('adminStore:loadAdminData', 'שגיאה בטעינת תבניות', e?.message);
+      }
 
-    // 7. Load persisted activityLog from AsyncStorage
-    try {
-      const saved = await AsyncStorage.getItem(ACTIVITY_LOG_KEY);
-      if (saved) {
-        const parsed: AdminActivityLog[] = JSON.parse(saved).filter((item: AdminActivityLog) =>
-          !/^log_00[1-8]$/.test(String(item?.id ?? ''))
-        );
-        if (parsed.length > 0) {
-          set(s => {
-            const existingIds = new Set(s.activityLog.map(l => l.id));
-            const fresh = parsed.filter(l => !existingIds.has(l.id));
-            return { activityLog: [...s.activityLog, ...fresh].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 500) };
+      // 4. Load admin settings from AsyncStorage
+      try {
+        const settings = await loadAdminSettings();
+        if (settings) {
+          if (settings.practiceSettings) set({ practiceSettings: settings.practiceSettings });
+          if (settings.examSettings) set({ examSettings: settings.examSettings });
+          if (settings.premiumConfig) set({ premiumConfig: withDefaultPremiumConfig(settings.premiumConfig) });
+          if (settings.freePracticeLimit) set({ freePracticeLimit: settings.freePracticeLimit });
+          if (settings.appConfig) set({ appConfig: withDefaultAppConfig(settings.appConfig) });
+        } else {
+          const s = get();
+          saveAdminSettings({
+            practiceSettings: s.practiceSettings,
+            examSettings: s.examSettings,
+            premiumConfig: s.premiumConfig,
+            freePracticeLimit: s.freePracticeLimit,
+            appConfig: s.appConfig,
           });
         }
+      } catch (e: any) {
+        logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הגדרות', e?.message);
       }
-    } catch {}
 
-    set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
-    logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');
+      // 5. Load synced admin collections from Supabase when available.
+      try {
+        const collections = normalizeAdminCollections(await loadAdminState<any>(ADMIN_COLLECTIONS_KEY));
+        if (collections) {
+          set(collections);
+        } else {
+          saveAdminCollections(get());
+        }
+      } catch (e: any) {
+        logger.error('adminStore:loadAdminData', 'שגיאה בטעינת אוספי אדמין', e?.message);
+      }
+
+      // 6. Revenue snapshots are derived from real profiles only. MRR stays 0
+      // until a real purchases/subscriptions table is connected.
+      try {
+        const revenueSnapshots = await buildRevenueSnapshotsFromProfiles();
+        set({ revenueSnapshots });
+      } catch (e: any) {
+        logger.error('adminStore:loadAdminData', 'Failed building revenue snapshots from real profiles', e?.message);
+        set({ revenueSnapshots: [] });
+      }
+
+      // 7. Load persisted activityLog from AsyncStorage
+      try {
+        const saved = await AsyncStorage.getItem(ACTIVITY_LOG_KEY);
+        if (saved) {
+          const parsed: AdminActivityLog[] = JSON.parse(saved).filter((item: AdminActivityLog) =>
+            !/^log_00[1-8]$/.test(String(item?.id ?? ''))
+          );
+          if (parsed.length > 0) {
+            set(s => {
+              const existingIds = new Set(s.activityLog.map(l => l.id));
+              const fresh = parsed.filter(l => !existingIds.has(l.id));
+              return { activityLog: [...s.activityLog, ...fresh].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 500) };
+            });
+          }
+        }
+      } catch {}
+
+      set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
+      logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');
+    })().finally(() => {
+      adminDataLoadPromise = null;
+    });
+
+    return adminDataLoadPromise;
   },
 
   syncAll: async () => {

@@ -225,11 +225,15 @@ export default function AdminDashboard() {
           <Pressable
             disabled={syncingAll || isSyncing}
             onPress={async () => {
+              if (syncingAll || isSyncing) return;
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setSyncingAll(true);
-              const result = await syncAll();
-              setSyncingAll(false);
-              Alert.alert(result.ok ? 'סונכרן' : 'שגיאת סנכרון', result.message);
+              try {
+                const result = await syncAll();
+                Alert.alert(result.ok ? 'סונכרן' : 'שגיאת סנכרון', result.message);
+              } finally {
+                setSyncingAll(false);
+              }
             }}
             style={({ pressed }) => [styles.syncAllBtn, (pressed || syncingAll || isSyncing) && { opacity: 0.72 }]}
           >
@@ -329,14 +333,19 @@ export default function AdminDashboard() {
             </Pressable>
           ))}
           <Pressable
+            disabled={syncingAll || isSyncing}
             onPress={async () => {
+              if (syncingAll || isSyncing) return;
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setSyncingAll(true);
-              const result = await syncAll();
-              setSyncingAll(false);
-              Alert.alert(result.ok ? 'סונכרן' : 'שגיאת סנכרון', result.message);
+              try {
+                const result = await syncAll();
+                Alert.alert(result.ok ? 'סונכרן' : 'שגיאת סנכרון', result.message);
+              } finally {
+                setSyncingAll(false);
+              }
             }}
-            style={({ pressed }) => [styles.quickActionChip, styles.quickSyncChip, pressed && { opacity: 0.75 }]}
+            style={({ pressed }) => [styles.quickActionChip, styles.quickSyncChip, (pressed || syncingAll || isSyncing) && { opacity: 0.75 }]}
           >
             <Text style={styles.quickActionIcon}>ר</Text>
             <Text style={styles.quickActionLabel}>סנכרן הכל</Text>
@@ -403,12 +412,16 @@ export default function AdminDashboard() {
         <View style={styles.seedRow}>
           <Pressable
             onPress={async () => {
+              if (seeding) return;
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setSeeding(true);
-              const result = await seedToSupabase();
-              setSeeding(false);
-              Alert.alert(result.ok ? 'הצלחה' : 'שגיאה', result.message);
-              if (result.ok) syncAll();
+              try {
+                const result = await seedToSupabase();
+                Alert.alert(result.ok ? 'הצלחה' : 'שגיאה', result.message);
+                if (result.ok) await syncAll();
+              } finally {
+                setSeeding(false);
+              }
             }}
             style={({ pressed }) => [styles.seedBtn, pressed && { opacity: 0.85 }]}
             disabled={seeding}
@@ -418,12 +431,19 @@ export default function AdminDashboard() {
             </LinearGradient>
           </Pressable>
           <Pressable
+            disabled={syncingAll || isSyncing}
             onPress={async () => {
+              if (syncingAll || isSyncing) return;
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              const result = await syncAll();
-              Alert.alert(result.ok ? 'עודכן' : 'שגיאת סנכרון', result.message);
+              setSyncingAll(true);
+              try {
+                const result = await syncAll();
+                Alert.alert(result.ok ? 'עודכן' : 'שגיאת סנכרון', result.message);
+              } finally {
+                setSyncingAll(false);
+              }
             }}
-            style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.refreshBtn, (pressed || syncingAll || isSyncing) && { opacity: 0.85 }]}
           >
             <Text style={styles.refreshBtnText}>טען מחדש</Text>
           </Pressable>

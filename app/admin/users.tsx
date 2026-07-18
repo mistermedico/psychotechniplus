@@ -96,8 +96,15 @@ export default function UsersScreen() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingRef = useRef(false);
 
   const loadUsers = useCallback(async (silent = false) => {
+    if (loadingRef.current) {
+      setRefreshing(false);
+      if (!silent) setLoading(false);
+      return;
+    }
+    loadingRef.current = true;
     if (!silent) setLoading(true);
     setSyncError(null);
     try {
@@ -173,6 +180,7 @@ export default function UsersScreen() {
       logger.error('admin:users', 'שגיאה בטעינת משתמשים', message);
       if (!silent) Alert.alert('שגיאה', message);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -183,7 +191,9 @@ export default function UsersScreen() {
 
     const scheduleReload = () => {
       if (reloadTimer.current) clearTimeout(reloadTimer.current);
-      reloadTimer.current = setTimeout(() => loadUsers(true), 500);
+      reloadTimer.current = setTimeout(() => {
+        if (!loadingRef.current) loadUsers(true);
+      }, 900);
     };
 
     const channel = supabase
