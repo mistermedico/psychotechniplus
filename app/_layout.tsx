@@ -18,6 +18,7 @@ import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { ensureDbSeeded } from '../lib/db';
 import { notifyFirstOpenOnce } from '../lib/adminEmail';
+import { initializeAds } from '../lib/ads';
 
 // Force RTL for Hebrew
 I18nManager.allowRTL(true);
@@ -127,6 +128,7 @@ export default function RootLayout() {
         });
         // Guests receive an anonymous RevenueCat ID so StoreKit prices and purchase restoration work before sign-in.
         initializePurchases(userId && !isGuest ? userId : undefined).catch(() => null);
+        initializeAds().catch(() => null);
       });
     }
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps
