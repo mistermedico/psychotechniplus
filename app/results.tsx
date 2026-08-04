@@ -13,8 +13,10 @@ import { getPerformanceLevel, formatTime } from '../utils/scoring';
 import { StatCard } from '../components/StatCard';
 import { usePracticeStore } from '../store/practiceStore';
 import { useAdminStore } from '../store/adminStore';
+import { useUserStore } from '../store/userStore';
 import { Question } from '../data/types';
 import { detectDir, textAlign as ta } from '../utils/textDirection';
+import { showInterstitialAfterSession } from '../lib/ads';
 
 export default function Results() {
   const insets = useSafeAreaInsets();
@@ -42,6 +44,8 @@ export default function Results() {
   const stability = parseInt(params.stability ?? '100');
 
   const topic = useAdminStore(s => s.topics.find(t => t.id === (params.topicId ?? '')));
+  const isAdmin = useAdminStore(s => s.isAdmin);
+  const isPremium = useUserStore(s => s.isPremium);
   const completedSession = usePracticeStore(s => s.completedSession);
   const reviewSession = completedSession?.id === params.sessionId ? completedSession : null;
   const isSimulationReview = reviewSession?.mode === 'simulation';
@@ -81,6 +85,14 @@ export default function Results() {
 
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (isPremium || isAdmin) return;
+    const timer = setTimeout(() => {
+      showInterstitialAfterSession().catch(() => null);
+    }, 1300);
+    return () => clearTimeout(timer);
+  }, [isPremium, isAdmin]);
 
   const avgTime = total > 0 ? Math.round(timeSpent / total) : 0;
 
