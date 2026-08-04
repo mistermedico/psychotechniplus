@@ -8,6 +8,7 @@ const TEST_BANNER_IDS = {
 };
 
 const ADMOB_ENABLED = process.env.EXPO_PUBLIC_ADMOB_ENABLED !== 'false';
+const ALLOW_TEST_ADS = __DEV__ || process.env.EXPO_PUBLIC_ADMOB_ALLOW_TEST_ADS === 'true';
 
 let initialized = false;
 
@@ -20,7 +21,11 @@ export function getBannerAdUnitId(): string {
     ios: process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID,
     android: process.env.EXPO_PUBLIC_ADMOB_ANDROID_BANNER_AD_UNIT_ID,
   });
-  return configured || Platform.select(TEST_BANNER_IDS) || TEST_BANNER_IDS.ios;
+
+  if (configured) return configured;
+  if (ALLOW_TEST_ADS) return Platform.select(TEST_BANNER_IDS) || TEST_BANNER_IDS.ios;
+
+  return '';
 }
 
 export async function initializeAds(): Promise<void> {
