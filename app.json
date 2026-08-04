@@ -2,7 +2,7 @@
   "expo": {
     "name": "פסיכוטכני פלוס",
     "slug": "psychotechniplus",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "psychotechniplus",
