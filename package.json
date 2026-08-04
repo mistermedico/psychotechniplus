@@ -39,7 +39,7 @@
     "react-dom": "^18.3.1",
     "react-native": "0.76.9",
     "react-native-gesture-handler": "~2.20.2",
-    "react-native-google-mobile-ads": "^16.4.0",
+    "react-native-google-mobile-ads": "^15.8.3",
     "react-native-purchases": "^10.2.0",
     "react-native-purchases-ui": "^10.2.0",
     "react-native-reanimated": "~3.16.7",
