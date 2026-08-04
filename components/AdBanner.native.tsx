@@ -4,11 +4,12 @@ import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
 import { getBannerAdUnitId, isAdMobRuntimeSupported } from '../lib/ads';
+import { logger } from '../utils/logger';
 
 interface AdBannerProps {
   isPremium: boolean;
   isAdmin?: boolean;
-  placement?: 'practice' | 'profile' | 'session';
+  placement?: 'practice' | 'profile' | 'session' | 'tabs';
 }
 
 export function AdBanner({ isPremium, isAdmin = false, placement = 'practice' }: AdBannerProps) {
@@ -25,11 +26,20 @@ export function AdBanner({ isPremium, isAdmin = false, placement = 'practice' }:
   }
 
   return (
-    <View style={[styles.container, placement === 'session' && styles.sessionContainer]}>
+    <View
+      style={[
+        styles.container,
+        placement === 'session' && styles.sessionContainer,
+        placement === 'tabs' && styles.tabsContainer,
+      ]}
+    >
       <BannerAd
         unitId={adUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+        onAdFailedToLoad={(error) => {
+          logger.warn('ads', `Banner failed to load (${placement}): ${error.message}`);
+        }}
       />
     </View>
   );
@@ -47,6 +57,12 @@ const styles = StyleSheet.create({
   sessionContainer: {
     marginTop: 10,
     marginBottom: 4,
+  },
+  tabsContainer: {
+    marginHorizontal: 0,
+    marginTop: 0,
+    minHeight: 50,
+    backgroundColor: 'rgba(8,10,18,0.96)',
   },
   placeholder: {
     alignItems: 'center',

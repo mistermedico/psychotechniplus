@@ -7,6 +7,8 @@ import * as Haptics from '../../utils/haptics';
 import { FontFamily } from '../../constants/theme';
 import { Colors } from '../../constants/colors';
 import { useAdminStore } from '../../store/adminStore';
+import { useUserStore } from '../../store/userStore';
+import { AdBanner } from '../../components/AdBanner';
 
 interface TabIconProps {
   icon: string;
@@ -101,6 +103,8 @@ function AnnouncementBanner() {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const isPremium = useUserStore(s => s.isPremium);
+  const isAdmin = useAdminStore(s => s.isAdmin);
   const TAB_HEIGHT = 64;
   const BAR_HEIGHT = TAB_HEIGHT + Math.max(insets.bottom, 12);
 
@@ -178,6 +182,17 @@ export default function TabLayout() {
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
     </Tabs>
+      {!isPremium && !isAdmin && (
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.globalAdSlot,
+            { bottom: BAR_HEIGHT },
+          ]}
+        >
+          <AdBanner isPremium={isPremium} isAdmin={isAdmin} placement="tabs" />
+        </View>
+      )}
     </View>
   );
 }
@@ -247,5 +262,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#9E99FA',
     letterSpacing: 0.3,
+  },
+  globalAdSlot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(8,10,18,0.94)',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(124,111,247,0.14)',
+    zIndex: 35,
+    elevation: 35,
   },
 });

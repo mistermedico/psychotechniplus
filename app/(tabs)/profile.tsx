@@ -21,7 +21,6 @@ import { ADMIN_EMAIL, useAdminStore } from '../../store/adminStore';
 import { DifficultyOption, useSettingsStore } from '../../store/settingsStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
-import { AdBanner } from '../../components/AdBanner';
 
 interface SettingRowProps {
   icon: string;
@@ -411,8 +410,6 @@ export default function ProfileTab() {
               </LinearGradient>
             </Pressable>
           )}
-
-          <AdBanner isPremium={isPremium} isAdmin={showAdmin} placement="profile" />
 
           <Pressable onPress={handleVersionTap} style={styles.versionWrap}>
             <Text style={styles.version}>PsychoTechniPlus v1.0.3</Text>

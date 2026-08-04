@@ -15,7 +15,6 @@ import { useAdminStore, SmartExamTemplate, PremiumConfig } from '../../store/adm
 import { canAccessMode, canAccessPremiumFeature, canAccessTopic } from '../../lib/accessControl';
 import { Target, Topic } from '../../data/types';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
-import { AdBanner } from '../../components/AdBanner';
 
 type PracticeTab = 'free' | 'simulations';
 
@@ -391,8 +390,6 @@ function FreePracticePane({
             </Text>
           </View>
         )}
-
-        <AdBanner isPremium={isPremium} placement="practice" />
 
         {/* Mode label */}
         <Text style={styles.sectionLabel}>מצב תרגול</Text>
