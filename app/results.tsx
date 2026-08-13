@@ -9,6 +9,7 @@ import * as Haptics from '../utils/haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { VisualImage } from '../components/VisualImage';
+import { AdBanner } from '../components/AdBanner';
 import { getPerformanceLevel, formatTime } from '../utils/scoring';
 import { StatCard } from '../components/StatCard';
 import { usePracticeStore } from '../store/practiceStore';
@@ -16,7 +17,7 @@ import { useAdminStore } from '../store/adminStore';
 import { useUserStore } from '../store/userStore';
 import { Question } from '../data/types';
 import { detectDir, textAlign as ta } from '../utils/textDirection';
-import { showInterstitialAfterSession } from '../lib/ads';
+import { canShowAdsForUser, showInterstitialAfterSession } from '../lib/ads';
 
 export default function Results() {
   const insets = useSafeAreaInsets();
@@ -87,7 +88,7 @@ export default function Results() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (isPremium || isAdmin) return;
+    if (!canShowAdsForUser(isPremium, isAdmin)) return;
     const timer = setTimeout(() => {
       showInterstitialAfterSession().catch(() => null);
     }, 1300);
@@ -225,6 +226,8 @@ export default function Results() {
               onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'speed', questionLimit: params.total } })}
             />
           </View>
+
+          <AdBanner isPremium={isPremium} isAdmin={isAdmin} placement="session" />
         </Animated.View>
       </ScrollView>
 

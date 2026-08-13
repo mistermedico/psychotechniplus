@@ -55,6 +55,7 @@ interface SessionRow {
 }
 
 type SortKey = 'sessions' | 'level' | 'streak' | 'correct_rate' | 'joined' | 'recent';
+type UserSegment = 'all' | 'free' | 'premium' | 'active7' | 'low_accuracy' | 'incomplete_onboarding';
 
 function formatDate(value?: string | null): string {
   if (!value) return '-';
@@ -82,6 +83,14 @@ function getAccuracy(user: RealUser): number {
   return user.total_answered > 0 ? Math.round((user.total_correct / user.total_answered) * 100) : 0;
 }
 
+function formatDuration(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} דק׳`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest > 0 ? `${hours} ש׳ ${rest} דק׳` : `${hours} ש׳`;
+}
+
 export default function UsersScreen() {
   const insets = useSafeAreaInsets();
   const { targets } = useAdminStore();
@@ -91,6 +100,7 @@ export default function UsersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('recent');
+  const [segment, setSegment] = useState<UserSegment>('all');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [inactiveFilter, setInactiveFilter] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -227,6 +237,12 @@ export default function UsersScreen() {
       list = list.filter(user => !user.last_practiced_date || new Date(user.last_practiced_date) < sevenDaysAgoDate);
     }
 
+    if (segment === 'free') list = list.filter(user => !user.is_premium);
+    if (segment === 'premium') list = list.filter(user => user.is_premium);
+    if (segment === 'active7') list = list.filter(user => user.sessions_last_7_days > 0);
+    if (segment === 'low_accuracy') list = list.filter(user => user.total_answered >= 10 && getAccuracy(user) < 45);
+    if (segment === 'incomplete_onboarding') list = list.filter(user => !user.has_completed_onboarding);
+
     return [...list].sort((a, b) => {
       if (sortKey === 'sessions') return b.total_sessions - a.total_sessions;
       if (sortKey === 'level') return b.level - a.level;
@@ -235,7 +251,7 @@ export default function UsersScreen() {
       if (sortKey === 'recent') return new Date(b.last_practiced_date ?? b.updated_at ?? 0).getTime() - new Date(a.last_practiced_date ?? a.updated_at ?? 0).getTime();
       return getAccuracy(b) - getAccuracy(a);
     });
-  }, [inactiveFilter, search, sevenDaysAgoDate, sortKey, users]);
+  }, [inactiveFilter, search, segment, sevenDaysAgoDate, sortKey, users]);
 
   const stats = useMemo(() => ({
     total: users.length,
@@ -256,14 +272,20 @@ export default function UsersScreen() {
   };
 
   const handleExportCSV = () => {
-    const header = 'שם,אימייל,פרימיום,סשנים,דיוק,פעיל בשבוע האחרון,הצטרף,פעילות אחרונה';
+    const header = 'מזהה,שם,אימייל,פרימיום,אונבורדינג,מסלול,רמה,XP,סשנים,דיוק,פעיל בשבוע האחרון,זמן תרגול בדקות,הצטרף,פעילות אחרונה';
     const rows = filtered.map(user => [
+      user.id,
       user.name,
       user.email ?? '',
       user.is_premium ? 'כן' : 'לא',
+      user.has_completed_onboarding ? 'כן' : 'לא',
+      targets.find(targetItem => targetItem.id === user.selected_target_id)?.name ?? '',
+      String(user.level),
+      String(user.xp),
       String(user.total_sessions),
       `${getAccuracy(user)}%`,
       String(user.sessions_last_7_days),
+      String(Math.round(user.total_time_seconds / 60)),
       formatDate(user.created_at),
       formatDateTime(user.last_practiced_date),
     ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','));
@@ -332,6 +354,21 @@ export default function UsersScreen() {
           <Text style={styles.exportBtnText}>CSV</Text>
         </Pressable>
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortChips} style={styles.sortScroll}>
+        {([
+          ['all', 'כולם'],
+          ['free', 'חינמיים'],
+          ['premium', 'פרימיום'],
+          ['active7', 'פעילים השבוע'],
+          ['low_accuracy', 'דיוק נמוך'],
+          ['incomplete_onboarding', 'לא השלימו פתיחה'],
+        ] as [UserSegment, string][]).map(([key, label]) => (
+          <Pressable key={key} onPress={() => setSegment(key)} style={[styles.segmentChip, segment === key && styles.segmentChipActive]}>
+            <Text style={[styles.segmentChipText, segment === key && styles.segmentChipTextActive]}>{label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortChips} style={styles.sortScroll}>
         <Pressable onPress={() => setInactiveFilter(value => !value)} style={[styles.sortChip, inactiveFilter && styles.sortChipWarning]}>
@@ -427,7 +464,7 @@ function UserDetailScreen({
   onDeleted: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { targets, topics } = useAdminStore();
+  const { targets, topics, premiumConfig } = useAdminStore();
   const [isPremium, setIsPremium] = useState(user.is_premium);
   const [togglingPremium, setTogglingPremium] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -479,6 +516,42 @@ function UserDetailScreen({
 
   const target = targets.find(item => item.id === user.selected_target_id);
   const perf = getPerformanceLevel(user.total_correct, user.total_answered);
+  const topicSummary = useMemo(() => {
+    const byTopic = new Map<string, { topicId: string; sessions: number; correct: number; total: number; time: number }>();
+    for (const session of sessions) {
+      const topicId = session.topic_id ?? 'unknown';
+      const current = byTopic.get(topicId) ?? { topicId, sessions: 0, correct: 0, total: 0, time: 0 };
+      current.sessions += 1;
+      current.correct += session.correct_answers ?? 0;
+      current.total += session.total_questions ?? 0;
+      current.time += session.time_spent_seconds ?? 0;
+      byTopic.set(topicId, current);
+    }
+    return [...byTopic.values()]
+      .map(row => ({
+        ...row,
+        accuracy: row.total > 0 ? Math.round((row.correct / row.total) * 100) : 0,
+        topic: topics.find(item => item.id === row.topicId),
+      }))
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 8);
+  }, [sessions, topics]);
+  const modeSummary = useMemo(() => {
+    const byMode = new Map<string, number>();
+    for (const session of sessions) {
+      const mode = session.mode || 'practice';
+      byMode.set(mode, (byMode.get(mode) ?? 0) + 1);
+    }
+    return [...byMode.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  }, [sessions]);
+  const premiumAccessRows = [
+    { label: 'כל הנושאים', active: isPremium && premiumConfig.premiumFeatures.allTopics },
+    { label: 'סימולציות מלאות', active: isPremium && premiumConfig.premiumFeatures.simulations },
+    { label: 'שאלות ללא הגבלה', active: isPremium && premiumConfig.premiumFeatures.unlimitedQuestions },
+    { label: 'תרגול אדפטיבי', active: isPremium && premiumConfig.premiumFeatures.adaptiveAlgorithm },
+    { label: 'מצב מהירות', active: isPremium && premiumConfig.premiumFeatures.speedMode },
+    { label: 'ללא מודעות', active: isPremium },
+  ];
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -513,6 +586,28 @@ function UserDetailScreen({
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>בקרת גישה ופרימיום</Text>
+          <View style={[styles.accessStatusCard, isPremium ? styles.accessStatusPremium : styles.accessStatusFree]}>
+            <Text style={styles.accessStatusTitle}>{isPremium ? 'משתמש פרימיום פעיל' : 'משתמש חינמי'}</Text>
+            <Text style={styles.accessStatusText}>
+              {isPremium
+                ? 'גישה מלאה, ללא מודעות וללא מגבלת סשנים יומית.'
+                : 'גישה בסיסית עם מגבלות חינמיות ומודעות לא פולשניות.'}
+            </Text>
+          </View>
+          <View style={styles.accessRows}>
+            {premiumAccessRows.map(row => (
+              <View key={row.label} style={styles.accessRowItem}>
+                <Text style={[styles.accessRowMark, { color: row.active ? Colors.success : Colors.textTertiary }]}>
+                  {row.active ? '✓' : '—'}
+                </Text>
+                <Text style={styles.accessRowText}>{row.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>פעולות מנהל</Text>
           <Pressable
             onPress={handleTogglePremium}
@@ -541,8 +636,49 @@ function UserDetailScreen({
           <Text style={styles.dateText}>הצטרף: {formatDateTime(user.created_at)}</Text>
           <Text style={styles.dateText}>פעילות אחרונה: {formatDateTime(user.last_practiced_date)}</Text>
           <Text style={styles.dateText}>עדכון אחרון: {formatDateTime(user.updated_at)}</Text>
-          <Text style={styles.dateText}>זמן תרגול כולל: {Math.round(user.total_time_seconds / 60)} דקות</Text>
+          <Text style={styles.dateText}>זמן תרגול כולל: {formatDuration(user.total_time_seconds)}</Text>
           <Text style={styles.dateText}>מזהה: {user.id}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>פירוט פעילות לפי נושאים</Text>
+          {topicSummary.length === 0 ? (
+            <Text style={styles.emptyHint}>אין עדיין מספיק פעילות לפי נושא</Text>
+          ) : topicSummary.map(row => (
+            <View key={row.topicId} style={styles.topicInsightRow}>
+              <View style={styles.topicInsightInfo}>
+                <Text style={styles.topicInsightTitle}>{row.topic ? `${row.topic.icon} ${row.topic.name}` : row.topicId}</Text>
+                <Text style={styles.topicInsightMeta}>
+                  {row.sessions} סשנים · {row.correct}/{row.total} נכון · {formatDuration(row.time)}
+                </Text>
+              </View>
+              <View style={[
+                styles.topicAccuracyBadge,
+                { borderColor: row.accuracy >= 70 ? Colors.success + '66' : row.accuracy >= 45 ? Colors.warning + '66' : Colors.dangerGlow },
+              ]}>
+                <Text style={[
+                  styles.topicAccuracyText,
+                  { color: row.accuracy >= 70 ? Colors.success : row.accuracy >= 45 ? Colors.warning : Colors.danger },
+                ]}>{row.accuracy}%</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>מצבי תרגול בשימוש</Text>
+          {modeSummary.length === 0 ? (
+            <Text style={styles.emptyHint}>אין עדיין סשנים מתועדים</Text>
+          ) : (
+            <View style={styles.modeSummaryWrap}>
+              {modeSummary.map(([mode, count]) => (
+                <View key={mode} style={styles.modeSummaryChip}>
+                  <Text style={styles.modeSummaryCount}>{count}</Text>
+                  <Text style={styles.modeSummaryText}>{mode}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -658,6 +794,20 @@ const styles = StyleSheet.create({
   sortChipWarning: { backgroundColor: Colors.warning + '22', borderColor: Colors.warning },
   sortChipText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
   sortChipTextActive: { color: '#fff' },
+  segmentChip: {
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.primary + '44',
+    backgroundColor: Colors.primary + '12',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  segmentChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  segmentChipText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primaryLight },
+  segmentChipTextActive: { color: '#fff' },
   resultCount: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
@@ -764,11 +914,84 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   sectionTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
   sectionLink: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primary },
+  accessStatusCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    padding: 12,
+    alignItems: 'flex-end',
+  },
+  accessStatusPremium: {
+    backgroundColor: Colors.warning + '18',
+    borderColor: Colors.warning + '66',
+  },
+  accessStatusFree: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderColor: Colors.border,
+  },
+  accessStatusTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  accessStatusText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    textAlign: 'right',
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  accessRows: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  accessRowItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  accessRowMark: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
+  accessRowText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
   actionBtn: { borderRadius: Radius.lg, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
   actionBtnPrimary: { backgroundColor: Colors.primary },
   actionBtnWarning: { backgroundColor: Colors.warning },
   actionBtnDanger: { backgroundColor: Colors.danger },
   actionBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+  topicInsightRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: Radius.md,
+    padding: 10,
+  },
+  topicInsightInfo: { flex: 1, alignItems: 'flex-end', minWidth: 0 },
+  topicInsightTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  topicInsightMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginTop: 3 },
+  topicAccuracyBadge: {
+    minWidth: 58,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    backgroundColor: Colors.background,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  topicAccuracyText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm },
+  modeSummaryWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  modeSummaryChip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primary + '16',
+    borderWidth: 1,
+    borderColor: Colors.primary + '44',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  modeSummaryCount: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primaryLight },
+  modeSummaryText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
   sessionRow: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.md, padding: 10, gap: 4 },
   sessionMode: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
   sessionMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right' },

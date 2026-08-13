@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
-import { getBannerAdUnitId, isAdMobRuntimeSupported } from '../lib/ads';
+import { canShowAdsForUser, getBannerAdUnitId } from '../lib/ads';
 import { logger } from '../utils/logger';
 
 interface AdBannerProps {
@@ -15,7 +15,7 @@ interface AdBannerProps {
 export function AdBanner({ isPremium, isAdmin = false, placement = 'practice' }: AdBannerProps) {
   const adUnitId = useMemo(() => getBannerAdUnitId(), []);
 
-  if (isPremium || isAdmin || !isAdMobRuntimeSupported()) return null;
+  if (!canShowAdsForUser(isPremium, isAdmin)) return null;
 
   if (!adUnitId) {
     return (

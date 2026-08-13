@@ -10,11 +10,20 @@ const TEST_INTERSTITIAL_IDS = {
   android: 'ca-app-pub-3940256099942544/1033173712',
 };
 
+const TEST_REWARDED_IDS = {
+  ios: 'ca-app-pub-3940256099942544/1712485313',
+  android: 'ca-app-pub-3940256099942544/5224354917',
+};
+
 const ADMOB_ENABLED = process.env.EXPO_PUBLIC_ADMOB_ENABLED !== 'false';
 const ALLOW_TEST_ADS = __DEV__ || process.env.EXPO_PUBLIC_ADMOB_ALLOW_TEST_ADS === 'true';
 
 export function isAdMobRuntimeSupported(): boolean {
   return ADMOB_ENABLED && (Platform.OS === 'ios' || Platform.OS === 'android');
+}
+
+export function canShowAdsForUser(isPremium: boolean, isAdmin = false): boolean {
+  return !isPremium && !isAdmin && isAdMobRuntimeSupported();
 }
 
 export function getBannerAdUnitId(): string {
@@ -41,10 +50,26 @@ export function getInterstitialAdUnitId(): string {
   return '';
 }
 
+export function getRewardedAdUnitId(): string {
+  const configured = Platform.select({
+    ios: process.env.EXPO_PUBLIC_ADMOB_IOS_REWARDED_AD_UNIT_ID,
+    android: process.env.EXPO_PUBLIC_ADMOB_ANDROID_REWARDED_AD_UNIT_ID,
+  });
+
+  if (configured) return configured;
+  if (ALLOW_TEST_ADS) return Platform.select(TEST_REWARDED_IDS) || TEST_REWARDED_IDS.ios;
+
+  return '';
+}
+
 export async function initializeAds(): Promise<void> {
   return;
 }
 
 export async function showInterstitialAfterSession(): Promise<boolean> {
+  return false;
+}
+
+export async function showRewardedAdForBonus(): Promise<boolean> {
   return false;
 }

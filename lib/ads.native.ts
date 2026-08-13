@@ -3,6 +3,8 @@ import mobileAds, {
   AdEventType,
   InterstitialAd,
   MaxAdContentRating,
+  RewardedAd,
+  RewardedAdEventType,
 } from 'react-native-google-mobile-ads';
 import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
@@ -17,6 +19,11 @@ const TEST_INTERSTITIAL_IDS = {
   android: 'ca-app-pub-3940256099942544/1033173712',
 };
 
+const TEST_REWARDED_IDS = {
+  ios: 'ca-app-pub-3940256099942544/1712485313',
+  android: 'ca-app-pub-3940256099942544/5224354917',
+};
+
 const ADMOB_ENABLED = process.env.EXPO_PUBLIC_ADMOB_ENABLED !== 'false';
 const ALLOW_TEST_ADS = __DEV__ || process.env.EXPO_PUBLIC_ADMOB_ALLOW_TEST_ADS === 'true';
 const INTERSTITIAL_STATE_KEY = '@psychotechniplus/ads/interstitialState';
@@ -27,6 +34,10 @@ let initialized = false;
 
 export function isAdMobRuntimeSupported(): boolean {
   return ADMOB_ENABLED && (Platform.OS === 'ios' || Platform.OS === 'android');
+}
+
+export function canShowAdsForUser(isPremium: boolean, isAdmin = false): boolean {
+  return !isPremium && !isAdmin && isAdMobRuntimeSupported();
 }
 
 export function getBannerAdUnitId(): string {
@@ -49,6 +60,18 @@ export function getInterstitialAdUnitId(): string {
 
   if (configured) return configured;
   if (ALLOW_TEST_ADS) return Platform.select(TEST_INTERSTITIAL_IDS) || TEST_INTERSTITIAL_IDS.ios;
+
+  return '';
+}
+
+export function getRewardedAdUnitId(): string {
+  const configured = Platform.select({
+    ios: process.env.EXPO_PUBLIC_ADMOB_IOS_REWARDED_AD_UNIT_ID,
+    android: process.env.EXPO_PUBLIC_ADMOB_ANDROID_REWARDED_AD_UNIT_ID,
+  });
+
+  if (configured) return configured;
+  if (ALLOW_TEST_ADS) return Platform.select(TEST_REWARDED_IDS) || TEST_REWARDED_IDS.ios;
 
   return '';
 }
@@ -146,5 +169,63 @@ export async function showInterstitialAfterSession(): Promise<boolean> {
     });
 
     interstitial.load();
+  });
+}
+
+export async function showRewardedAdForBonus(): Promise<boolean> {
+  if (!isAdMobRuntimeSupported()) return false;
+  const adUnitId = getRewardedAdUnitId();
+  if (!adUnitId) return false;
+
+  await initializeAds();
+
+  return new Promise(resolve => {
+    const rewarded = RewardedAd.createForAdRequest(adUnitId, {
+      requestNonPersonalizedAdsOnly: true,
+    });
+    let settled = false;
+    let earnedReward = false;
+
+    const settle = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      unsubscribeLoaded();
+      unsubscribeError();
+      unsubscribeClosed();
+      unsubscribeEarned();
+      resolve(value);
+    };
+
+    const timeout = setTimeout(() => {
+      logger.warn('ads', 'Rewarded ad timed out before loading');
+      settle(false);
+    }, 8000);
+
+    const unsubscribeLoaded = rewarded.addAdEventListener(AdEventType.LOADED, async () => {
+      clearTimeout(timeout);
+      try {
+        await rewarded.show();
+      } catch (error: any) {
+        logger.warn('ads', `Rewarded ad failed to show: ${error?.message ?? 'unknown error'}`);
+        settle(false);
+      }
+    });
+
+    const unsubscribeError = rewarded.addAdEventListener(AdEventType.ERROR, error => {
+      clearTimeout(timeout);
+      logger.warn('ads', `Rewarded ad failed to load: ${error.message}`);
+      settle(false);
+    });
+
+    const unsubscribeEarned = rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
+      earnedReward = true;
+    });
+
+    const unsubscribeClosed = rewarded.addAdEventListener(AdEventType.CLOSED, () => {
+      clearTimeout(timeout);
+      settle(earnedReward);
+    });
+
+    rewarded.load();
   });
 }

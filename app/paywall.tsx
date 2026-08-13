@@ -28,6 +28,14 @@ const PLAN_META: Record<string, { label: string; badge?: string; period: string;
   lifetime: { label: 'לצמיתות', period: 'חד-פעמי',  badgeColor: Colors.warning, badge: 'ללא מנוי' },
 };
 
+const PREMIUM_UNLOCKS = [
+  'כל הנושאים וכל מאגר השאלות',
+  'סימולציות מלאות עם טיימר וניתוח תוצאות',
+  'תרגול אדפטיבי, מצב מהירות ואתגרים מתקדמים',
+  'הסברים מלאים וסטטיסטיקות מפורטות',
+  'ללא מודעות וללא מגבלת סשנים יומית',
+];
+
 export default function PaywallScreen() {
   const {
     packages, isPurchasing, isRestoring, loadError,
@@ -195,6 +203,19 @@ export default function PaywallScreen() {
                 <Text style={styles.benefitIcon}>{b.icon}</Text>
               </View>
             ))}
+          </Animated.View>
+
+          <Animated.View style={[styles.unlocksCard, { opacity: fadeIn }]}>
+            <Text style={styles.unlocksTitle}>מה נפתח בפרימיום?</Text>
+            {PREMIUM_UNLOCKS.map(item => (
+              <View key={item} style={styles.unlockRow}>
+                <Text style={styles.unlockCheck}>✓</Text>
+                <Text style={styles.unlockText}>{item}</Text>
+              </View>
+            ))}
+            <Text style={styles.unlockNote}>
+              משתמש חינמי ממשיך לקבל תרגול בסיסי. פרימיום מקבל גישה מלאה ונקי ממודעות בכל מסכי האפליקציה.
+            </Text>
           </Animated.View>
 
           {!isGuest && (
@@ -476,6 +497,53 @@ const styles = StyleSheet.create({
   benefitCheck: {
     fontFamily: FontFamily.bold, fontSize: FontSize.sm,
     color: Colors.success, width: 20, textAlign: 'center',
+  },
+  unlocksCard: {
+    backgroundColor: 'rgba(16,185,129,0.09)',
+    borderRadius: Radius['2xl'],
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.26)',
+    padding: 16,
+    marginBottom: 22,
+    alignItems: 'flex-end',
+  },
+  unlocksTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.text,
+    textAlign: 'right',
+    marginBottom: 10,
+  },
+  unlockRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 5,
+  },
+  unlockCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.success,
+    color: '#fff',
+    textAlign: 'center',
+    fontFamily: FontFamily.bold,
+    lineHeight: 22,
+  },
+  unlockText: {
+    flex: 1,
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    textAlign: 'right',
+  },
+  unlockNote: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    textAlign: 'right',
+    lineHeight: 18,
+    marginTop: 10,
   },
 
   // Plans

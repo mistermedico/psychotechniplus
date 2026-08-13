@@ -13,6 +13,7 @@ import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore, SmartExamTemplate, PremiumConfig } from '../../store/adminStore';
 import { canAccessMode, canAccessPremiumFeature, canAccessTopic } from '../../lib/accessControl';
+import { getRewardedAdUnitId, showRewardedAdForBonus } from '../../lib/ads';
 import { Target, Topic } from '../../data/types';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
 
@@ -72,14 +73,16 @@ export default function PracticeTab() {
   const paywallAutoShownRef = useRef(false);
   const indicatorLeft = tabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '50%'] });
 
-  const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, isGuest, userId } = useUserStore();
-  const { freePracticeLimit, templates, appConfig, practiceSettings, premiumConfig, targets, topics: allTopics } = useAdminStore();
+  const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, isGuest, userId, addXp } = useUserStore();
+  const { freePracticeLimit, templates, appConfig, practiceSettings, premiumConfig, targets, topics: allTopics, isAdmin } = useAdminStore();
   const featureFlags = appConfig.featureFlags;
   const premiumOnlyModes = practiceSettings.premiumOnlyModes;
   const [usage, setUsage] = useState<PracticeUsage>(emptyUsage);
+  const [rewardedLoading, setRewardedLoading] = useState(false);
 
   const target = targets.find(t => t.id === selectedTargetId) ?? targets[0];
   const topics = target ? visiblePracticeTopics(allTopics.filter(t => t.targetId === target.id)) : [];
+  const hasRewardedBonusAd = useMemo(() => !isPremium && !isAdmin && !!getRewardedAdUnitId(), [isAdmin, isPremium]);
 
   const activeTemplates = useMemo(
     () => target ? templates.filter(t => t.isActive && t.targetId === target.id) : [],
@@ -302,6 +305,27 @@ export default function PracticeTab() {
             cooldownMinutes={appConfig.sessionCooldownMinutes}
             usageBlock={usageBlock}
             premiumConfig={premiumConfig}
+            isAdmin={isAdmin}
+            showRewardedBonus={hasRewardedBonusAd}
+            rewardedLoading={rewardedLoading}
+            onRewardedBonus={async () => {
+              if (rewardedLoading) return;
+              setRewardedLoading(true);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              try {
+                const earned = await showRewardedAdForBonus();
+                if (earned) {
+                  addXp(25);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  Alert.alert('בונוס התקבל', 'נוספו לחשבון שלך 25 XP. משתמשי פרימיום מקבלים חוויה בלי מודעות בכלל.');
+                } else {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  Alert.alert('המודעה לא נטענה', 'אפשר לנסות שוב מאוחר יותר. אם תרצה חוויה בלי מודעות, ניתן לשדרג לפרימיום.');
+                }
+              } finally {
+                setRewardedLoading(false);
+              }
+            }}
           />
         ) : featureFlags.simulations !== false ? (
           <SimulationsPane
@@ -336,6 +360,10 @@ function FreePracticePane({
   isPremium, freePracticeLimit, canStart, onStart, showSpeedMode,
   dailyLimit, dailyUsed, cooldownMinutes, usageBlock,
   premiumConfig,
+  isAdmin,
+  showRewardedBonus,
+  rewardedLoading,
+  onRewardedBonus,
 }: {
   topics: Topic[];
   selectedMode: string; setSelectedMode: (m: string) => void;
@@ -351,6 +379,10 @@ function FreePracticePane({
   cooldownMinutes: number;
   usageBlock: string | null;
   premiumConfig: PremiumConfig;
+  isAdmin: boolean;
+  showRewardedBonus: boolean;
+  rewardedLoading: boolean;
+  onRewardedBonus: () => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -389,6 +421,30 @@ function FreePracticePane({
               {usageBlock ?? `כל סשן חינמי מוגבל לעד ${freePracticeLimit} שאלות${cooldownMinutes > 0 ? `, עם המתנה של ${cooldownMinutes} דקות בין סשנים` : ''}.`}
             </Text>
           </View>
+        )}
+
+        {showRewardedBonus && (
+          <Pressable
+            onPress={onRewardedBonus}
+            disabled={rewardedLoading}
+            style={({ pressed }) => [styles.rewardedCard, { opacity: rewardedLoading ? 0.62 : pressed ? 0.82 : 1 }]}
+            accessibilityRole="button"
+            accessibilityLabel="צפה במודעה וקבל בונוס XP"
+            accessibilityState={{ disabled: rewardedLoading }}
+          >
+            <LinearGradient
+              colors={['rgba(16,185,129,0.24)', 'rgba(99,102,241,0.16)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.rewardedInner}
+            >
+              <Text style={styles.rewardedIcon}>🎁</Text>
+              <View style={styles.rewardedTextWrap}>
+                <Text style={styles.rewardedTitle}>{rewardedLoading ? 'טוען מודעה...' : 'בונוס לחינמיים'}</Text>
+                <Text style={styles.rewardedText}>צפה במודעה קצרה וקבל 25 XP. פרימיום מקבל חוויה ללא מודעות וללא מגבלות.</Text>
+              </View>
+            </LinearGradient>
+          </Pressable>
         )}
 
         {/* Mode label */}
@@ -861,6 +917,36 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.65)',
     textAlign: 'right',
     lineHeight: 18,
+  },
+  rewardedCard: {
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.32)',
+  },
+  rewardedInner: {
+    minHeight: 86,
+    padding: 14,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+  },
+  rewardedIcon: { fontSize: 30 },
+  rewardedTextWrap: { flex: 1, alignItems: 'flex-end' },
+  rewardedTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: '#ECFDF5',
+    textAlign: 'right',
+  },
+  rewardedText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: 'rgba(236,253,245,0.72)',
+    textAlign: 'right',
+    lineHeight: 18,
+    marginTop: 3,
   },
 
   sectionLabel: {
