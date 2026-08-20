@@ -107,7 +107,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "מאפשר למנהל לבחור תמונה לשאלה או להסבר מתוך ספריית התמונות."
+          "photosPermission": "מאפשר למנהל לבחור תמונה לשאלה או להסבר מתוך ספריית התמונות.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [
