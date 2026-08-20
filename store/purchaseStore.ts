@@ -11,6 +11,7 @@ import {
   logOutPurchases,
   presentRevenueCatPaywall,
   presentCustomerCenter,
+  DEFAULT_PURCHASE_PACKAGES,
   type CustomerInfo,
   type PurchasePackage,
 } from '../lib/purchases';
@@ -86,7 +87,7 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
     } catch (error: unknown) {
       const msg = messageFrom(error);
       logger.error('purchaseStore:fetchOfferings', 'Failed loading RevenueCat offerings', msg);
-      set({ loadError: msg });
+      set({ packages: DEFAULT_PURCHASE_PACKAGES, loadError: msg });
     }
   },
 

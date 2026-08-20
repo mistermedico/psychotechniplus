@@ -69,9 +69,7 @@ export default function PracticeTab() {
   const [selectedMode, setSelectedMode] = useState('practice');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyFilter>('all');
-  const tabAnim = useRef(new Animated.Value(0)).current;
   const paywallAutoShownRef = useRef(false);
-  const indicatorLeft = tabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '50%'] });
 
   const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, isGuest, userId, addXp } = useUserStore();
   const { freePracticeLimit, templates, appConfig, practiceSettings, premiumConfig, targets, topics: allTopics, isAdmin } = useAdminStore();
@@ -165,12 +163,6 @@ export default function PracticeTab() {
   const switchTab = (tab: PracticeTab) => {
     Haptics.selectionAsync();
     setActiveTab(tab);
-    Animated.spring(tabAnim, {
-      toValue: tab === 'free' ? 0 : 1,
-      useNativeDriver: false,
-      tension: 200,
-      friction: 18,
-    }).start();
   };
 
   const handleStartFree = () => {
@@ -262,13 +254,24 @@ export default function PracticeTab() {
 
           <View style={styles.tabBarWrap}>
             <View style={styles.tabBar}>
-              <Animated.View pointerEvents="none" style={[styles.tabIndicator, { left: indicatorLeft }]} />
-              <Pressable hitSlop={8} onPress={() => switchTab('free')} style={styles.tabBtn}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => switchTab('free')}
+                style={[styles.tabBtn, activeTab === 'free' && styles.tabBtnActive]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activeTab === 'free' }}
+              >
                 <Text style={[styles.tabBtnText, activeTab === 'free' && styles.tabBtnTextActive]}>
                   📖 תרגול חופשי
                 </Text>
               </Pressable>
-              <Pressable hitSlop={8} onPress={() => switchTab('simulations')} style={styles.tabBtn}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => switchTab('simulations')}
+                style={[styles.tabBtn, activeTab === 'simulations' && styles.tabBtnActive]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activeTab === 'simulations' }}
+              >
                 <View style={styles.tabBtnInner}>
                   <Text style={[styles.tabBtnText, activeTab === 'simulations' && styles.tabBtnTextActive]}>
                     🏗️ מבחנים חכמים
@@ -834,16 +837,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
     zIndex: 22,
   },
-  tabIndicator: {
-    position: 'absolute',
-    top: 4,
-    bottom: 4,
-    width: '50%',
-    backgroundColor: 'rgba(99,102,241,0.2)',
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.4)',
-  },
   tabBtn: {
     flex: 1,
     paddingVertical: 11,
@@ -851,6 +844,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 23,
     elevation: 23,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  tabBtnActive: {
+    backgroundColor: 'rgba(99,102,241,0.24)',
+    borderColor: 'rgba(99,102,241,0.45)',
   },
   tabBtnInner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   tabBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.45)' },

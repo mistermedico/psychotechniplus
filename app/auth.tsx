@@ -15,7 +15,6 @@ import { usePurchaseStore } from '../store/purchaseStore';
 import { notifySignup } from '../lib/adminEmail';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
-import { OAuthProvider, signInWithOAuthProvider } from '../lib/oauth';
 
 type AuthMode = 'login' | 'register';
 
@@ -27,7 +26,6 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
   const [emailPending, setEmailPending] = useState(false);
@@ -88,9 +86,6 @@ export default function AuthScreen() {
     if (m.includes('unable to validate email address')) return 'כתובת מייל לא תקינה';
     if (m.includes('signup disabled')) return 'ההרשמה מושבתת זמנית';
     if (m.includes('email rate limit')) return 'יותר מדי ניסיונות — נסה שוב בעוד מספר דקות';
-    if (m.includes('provider is not enabled') || m.includes('unsupported provider') || m.includes('oauth')) {
-      return 'ספק ההתחברות עדיין לא מופעל ב-Supabase. יש להפעיל את Google/Apple תחת Authentication > Providers.';
-    }
     return msg;
   };
 
@@ -173,29 +168,6 @@ export default function AuthScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await continueAsGuest();
     router.replace('/(tabs)');
-  };
-
-  const handleOAuth = async (provider: OAuthProvider) => {
-    setError('');
-    setEmailPending(false);
-    setOauthLoading(provider);
-    try {
-      const user = await signInWithOAuthProvider(provider);
-      await initialize(user.id);
-      const createdAt = user.created_at ? new Date(user.created_at).getTime() : 0;
-      if (createdAt > 0 && Date.now() - createdAt < 2 * 60 * 1000) {
-        notifySignup(user.id, user.email, user.user_metadata?.full_name ?? user.user_metadata?.name);
-      }
-      if (user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const { hasCompletedOnboarding } = useUserStore.getState();
-      await completeAuthNavigation(user.id, hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
-    } catch (err: any) {
-      setError(translateError(err?.message ?? 'שגיאת התחברות'));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setOauthLoading(null);
-    }
   };
 
   if (emailPending) {
@@ -413,11 +385,11 @@ export default function AuthScreen() {
 
                   <Pressable
                     onPress={handleSubmit}
-                    disabled={loading || !!oauthLoading}
+                    disabled={loading}
                     accessibilityRole="button"
                     accessibilityLabel={mode === 'login' ? 'כניסה לחשבון' : 'יצירת חשבון'}
-                    accessibilityState={{ disabled: loading || !!oauthLoading }}
-                    style={({ pressed }) => [styles.submitBtn, { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: loading || !!oauthLoading ? 0.85 : 1 }]}
+                    accessibilityState={{ disabled: loading }}
+                    style={({ pressed }) => [styles.submitBtn, { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: loading ? 0.85 : 1 }]}
                   >
                     <LinearGradient
                       colors={[Colors.primary, Colors.primaryDark]}
@@ -432,38 +404,12 @@ export default function AuthScreen() {
                     </LinearGradient>
                   </Pressable>
 
-                  <View style={styles.oauthDivider}>
-                    <View style={styles.oauthLine} />
-                    <Text style={styles.oauthDividerText}>או</Text>
-                    <View style={styles.oauthLine} />
-                  </View>
-
-                  <View style={styles.oauthButtons}>
-                    <Pressable
-                      onPress={() => handleOAuth('google')}
-                      disabled={loading || !!oauthLoading}
-                      accessibilityRole="button"
-                      accessibilityLabel="התחברות באמצעות Google"
-                      accessibilityState={{ disabled: loading || !!oauthLoading }}
-                      style={({ pressed }) => [styles.oauthBtn, pressed && { opacity: 0.85 }, (loading || !!oauthLoading) && { opacity: 0.65 }]}
-                    >
-                      {oauthLoading === 'google' ? (
-                        <ActivityIndicator color={Colors.text} />
-                      ) : (
-                        <>
-                          <Text style={styles.oauthIcon}>G</Text>
-                          <Text style={styles.oauthText}>התחברות עם Google</Text>
-                        </>
-                      )}
-                    </Pressable>
-                  </View>
-
                   <Pressable
                     onPress={handleGuestAccess}
-                    disabled={loading || !!oauthLoading}
+                    disabled={loading}
                     accessibilityRole="button"
                     accessibilityLabel="המשך כאורח ללא הרשמה"
-                    style={({ pressed }) => [styles.guestBtn, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: loading || !!oauthLoading ? 0.75 : 1 }]}
+                    style={({ pressed }) => [styles.guestBtn, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: loading ? 0.75 : 1 }]}
                   >
                     <Text style={styles.guestBtnText}>המשך כאורח ללא הרשמה</Text>
                     <Text style={styles.guestBtnSubText}>גישה חינמית לתרגול בסיסי בלי אימייל או סיסמה</Text>
@@ -665,53 +611,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     color: '#fff',
     letterSpacing: 0.3,
-  },
-
-  oauthDivider: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
-    marginVertical: 4,
-  },
-  oauthLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  oauthDividerText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-  },
-  oauthButtons: {
-    gap: 10,
-  },
-  oauthBtn: {
-    minHeight: 52,
-    borderRadius: Radius.xl,
-    paddingHorizontal: 16,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.20)',
-  },
-  oauthIcon: {
-    width: 24,
-    textAlign: 'center',
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: '#111827',
-  },
-  oauthText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
-    color: '#111827',
-    textAlign: 'right',
-    writingDirection: 'rtl',
   },
 
   guestBtn: {

@@ -225,10 +225,18 @@ export default function PaywallScreen() {
             <Text style={styles.plansTitle}>בחר תוכנית</Text>
 
             {loadError && packages.length === 0 && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorBannerText}>שגיאה בטעינת מחירים. בדוק חיבור לאינטרנט.</Text>
+              <View style={styles.storeNotice}>
+                <Text style={styles.storeNoticeText}>טוען מחירים מאובטחים מה-App Store. אם זה נמשך, אפשר לנסות שוב.</Text>
                 <Pressable onPress={() => fetchOfferings().catch(() => null)} style={styles.retryBtn}>
                   <Text style={styles.retryBtnText}>נסה שוב</Text>
+                </Pressable>
+              </View>
+            )}
+            {loadError && packages.length > 0 && (
+              <View style={styles.storeNotice}>
+                <Text style={styles.storeNoticeText}>המחירים יוצגו ויאושרו דרך ה-App Store לפני כל חיוב.</Text>
+                <Pressable onPress={() => fetchOfferings().catch(() => null)} style={styles.retryBtn}>
+                  <Text style={styles.retryBtnText}>רענן מחירים</Text>
                 </Pressable>
               </View>
             )}
@@ -551,14 +559,14 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading, fontSize: FontSize.xl,
     color: Colors.text, textAlign: 'right', marginBottom: 12,
   },
-  errorBanner: {
-    backgroundColor: Colors.dangerLight, borderRadius: Radius.lg, padding: 14,
-    borderWidth: 1, borderColor: Colors.dangerGlow, marginBottom: 12,
+  storeNotice: {
+    backgroundColor: 'rgba(124,111,247,0.12)', borderRadius: Radius.lg, padding: 14,
+    borderWidth: 1, borderColor: 'rgba(124,111,247,0.28)', marginBottom: 12,
     alignItems: 'flex-end', gap: 8,
   },
-  errorBannerText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.danger, textAlign: 'right' },
-  retryBtn: { backgroundColor: Colors.dangerLight, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 6 },
-  retryBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.danger },
+  storeNoticeText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right' },
+  retryBtn: { backgroundColor: 'rgba(124,111,247,0.16)', borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 6 },
+  retryBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primaryLight },
 
   planCard: {
     borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.border,
