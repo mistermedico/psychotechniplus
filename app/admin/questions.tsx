@@ -13,6 +13,7 @@ import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
 import { buildQuestionPerformanceMap, getQuestionVisibilityLabel } from '../../utils/questionQaAgent';
 import AdminSyncToolbar from '../../components/AdminSyncToolbar';
+import { VisualImage } from '../../components/VisualImage';
 
 const STATUS_COLORS: Record<ValidationStatus, string> = {
   validated: Colors.success,
@@ -278,6 +279,8 @@ export default function QuestionsAdmin() {
             ))}
           </View>
         )}
+
+        <QuestionAssetPreview question={item} />
 
         {/* Topic + type */}
         <View style={styles.cardFooter}>
@@ -664,6 +667,68 @@ function AuditPill({ label, value, color }: { label: string; value: string | num
   );
 }
 
+function QuestionAssetPreview({ question }: { question: Question }) {
+  const hasQuestionImage = !!question.mediaUrl;
+  const hasOptionImages = question.options.some(option => !!option.imageUrl);
+  const hasExplanationImage = !!question.explanationImageUrl;
+  const shouldShow = hasQuestionImage || hasOptionImages || hasExplanationImage || !!question.explanation?.trim();
+  if (!shouldShow) return null;
+
+  return (
+    <View style={styles.previewPanel}>
+      <View style={styles.previewHeader}>
+        <Text style={styles.previewTitle}>תצוגה מלאה לפני פרסום</Text>
+        <Text style={styles.previewHint}>שאלה, תשובות, תשובה נכונה והסבר כפי שהמשתמש יקבל</Text>
+      </View>
+
+      <View style={styles.previewGrid}>
+        <View style={styles.previewMain}>
+          <Text style={styles.previewLabel}>תמונת השאלה</Text>
+          <VisualImage uri={question.mediaUrl} style={styles.questionPreviewImage} fallbackLabel="אין תמונת שאלה" />
+        </View>
+
+        <View style={styles.previewOptions}>
+          <Text style={styles.previewLabel}>תמונות התשובות</Text>
+          <View style={styles.optionPreviewGrid}>
+            {question.options.map(option => (
+              <View key={option.id} style={[styles.optionPreviewCard, option.isCorrect && styles.optionPreviewCorrect]}>
+                <View style={styles.optionPreviewTop}>
+                  <Text style={[styles.optionPreviewId, option.isCorrect && styles.optionPreviewCorrectText]}>
+                    {option.id.toUpperCase()}
+                  </Text>
+                  {option.isCorrect && <Text style={styles.correctBadge}>נכונה</Text>}
+                </View>
+                <VisualImage uri={option.imageUrl} style={styles.optionPreviewImage} fallbackLabel="אין תמונה" />
+                {!!option.text?.trim() && (
+                  <Text
+                    style={[styles.optionPreviewText, { textAlign: ta(option.text), writingDirection: detectDir(option.text) }]}
+                    numberOfLines={2}
+                  >
+                    {option.text}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.explanationPreview}>
+        <View style={styles.explanationPreviewTextWrap}>
+          <Text style={styles.previewLabel}>הסבר למשתמש</Text>
+          <Text
+            style={[styles.explanationPreviewText, { textAlign: ta(question.explanation), writingDirection: detectDir(question.explanation) }]}
+            numberOfLines={5}
+          >
+            {question.explanation?.trim() || 'אין הסבר'}
+          </Text>
+        </View>
+        <VisualImage uri={question.explanationImageUrl} style={styles.explanationPreviewImage} fallbackLabel="אין תמונת הסבר" />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background, writingDirection: 'rtl' },
 
@@ -795,6 +860,113 @@ const styles = StyleSheet.create({
   qualityRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   qualityBadge: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: Colors.warningLight, borderWidth: 1, borderColor: Colors.warning + '44' },
   qualityBadgeText: { fontFamily: FontFamily.bold, fontSize: 10, color: Colors.warning, textAlign: 'right' },
+
+  previewPanel: {
+    marginTop: 12,
+    marginBottom: 10,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    backgroundColor: Colors.background2,
+    padding: 12,
+    gap: 12,
+    writingDirection: 'rtl',
+  },
+  previewHeader: { alignItems: 'flex-end', gap: 2 },
+  previewTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  previewHint: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.textTertiary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  previewGrid: { flexDirection: 'row-reverse', gap: 12, flexWrap: 'wrap' },
+  previewMain: { flexGrow: 1, flexBasis: 280, minWidth: 240, alignItems: 'flex-end', gap: 6 },
+  previewOptions: { flexGrow: 2, flexBasis: 420, minWidth: 280, alignItems: 'flex-end', gap: 6 },
+  previewLabel: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: Colors.primaryLight,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  questionPreviewImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundDark,
+  },
+  optionPreviewGrid: { width: '100%', flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  optionPreviewCard: {
+    flexGrow: 1,
+    flexBasis: 145,
+    minWidth: 135,
+    maxWidth: 220,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    padding: 8,
+    gap: 6,
+  },
+  optionPreviewCorrect: { borderColor: Colors.success, backgroundColor: Colors.successLight },
+  optionPreviewTop: {
+    minHeight: 20,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  optionPreviewId: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textSecondary },
+  optionPreviewCorrectText: { color: Colors.success },
+  correctBadge: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.success,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  optionPreviewImage: {
+    width: '100%',
+    height: 104,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundDark,
+  },
+  optionPreviewText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    minHeight: 18,
+  },
+  explanationPreview: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12, alignItems: 'stretch' },
+  explanationPreviewTextWrap: { flex: 2, minWidth: 260, alignItems: 'flex-end', gap: 6 },
+  explanationPreviewText: {
+    width: '100%',
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  explanationPreviewImage: {
+    flex: 1,
+    minWidth: 220,
+    height: 150,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundDark,
+  },
 
   cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   footerMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },

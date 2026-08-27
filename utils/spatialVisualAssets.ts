@@ -433,20 +433,20 @@ export function ensureSpatialVisualAssets(question: Question): Question {
   const correctId = correctOptionId(question);
   const options = question.options.map((option, index) => ({
     ...option,
-    text: `אפשרות ${option.id.toUpperCase()}`,
+    text: option.text?.trim() || `אפשרות ${option.id.toUpperCase()}`,
     isCorrect: option.id === correctId,
-    imageUrl: optionSvg(question, option, index),
+    imageUrl: option.imageUrl || optionSvg(question, option, index),
   }));
 
   return {
     ...question,
     correctAnswer: correctId,
     questionType: 'shapes',
-    questionText: modePrompt(visualMode(question)),
-    mediaUrl: questionSvg(question),
+    questionText: question.questionText?.trim() || modePrompt(visualMode(question)),
+    mediaUrl: question.mediaUrl || questionSvg(question),
     mediaType: 'image',
-    explanation: spatialExplanation(question),
-    explanationImageUrl: explanationSvg(question),
+    explanation: question.explanation?.trim() || spatialExplanation(question),
+    explanationImageUrl: question.explanationImageUrl || explanationSvg(question),
     options,
   };
 }

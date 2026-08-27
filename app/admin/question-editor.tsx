@@ -69,6 +69,7 @@ export default function QuestionEditor() {
   const eloManuallyEdited = useRef(!!existing);
   const [isDirty, setIsDirty] = useState(false);
   const [mediaUrl, setMediaUrl] = useState(existing?.mediaUrl ?? '');
+  const [explanationImageUrl, setExplanationImageUrl] = useState(existing?.explanationImageUrl ?? '');
   const [mediaType, setMediaType] = useState<'image' | undefined>(
     existing?.mediaType === 'image' ? 'image' : undefined
   );
@@ -203,6 +204,7 @@ export default function QuestionEditor() {
       })),
       correctAnswer: correctOpt.id,
       explanation: explanation.trim(),
+      explanationImageUrl: explanationImageUrl || undefined,
       difficulty,
       psychometricStats: { elo, discrimination: 0.75, guessProbability: 0.25 },
       accessLevel,
@@ -229,6 +231,7 @@ export default function QuestionEditor() {
           { text: 'הוסף עוד', onPress: () => {
             setQuestionText('');
             setExplanation('');
+            setExplanationImageUrl('');
             setOptions(DEFAULT_OPTIONS.map(o => ({ ...o })));
             setDifficulty(5);
             setEloOverride(String(difficultyToElo(5)));
@@ -505,6 +508,14 @@ export default function QuestionEditor() {
               textAlign={ta(explanation)}
               textAlignVertical="top"
             />
+            <View style={styles.explanationImagePicker}>
+              <AdminImagePicker
+                imageUri={explanationImageUrl}
+                onImageChange={uri => { setExplanationImageUrl(uri); markDirty(); }}
+                placeholder="תמונה להסבר"
+                compact={false}
+              />
+            </View>
           </Section>
 
           {/* Access + Status */}
@@ -648,6 +659,7 @@ const styles = StyleSheet.create({
   },
 
   charCount: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 4 },
+  explanationImagePicker: { marginTop: 12 },
   eloHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 4 },
   warningText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.danger, textAlign: 'right', marginTop: 6 },
   validatedHint: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.success, textAlign: 'right', marginTop: 6 },
