@@ -265,7 +265,7 @@ export default function AuthScreen() {
                 </LinearGradient>
               </View>
               <Text style={styles.appName}>פסיכוטכניPlus</Text>
-              <Text style={styles.logoSub}>הכנה חכמה למבחן הפסיכוטכני</Text>
+              <Text style={styles.logoSub}>אפשר להתחיל מיד כאורח, חשבון שומר סנכרון והתקדמות</Text>
             </Animated.View>
 
             {/* Form Card */}
@@ -411,14 +411,14 @@ export default function AuthScreen() {
                     accessibilityLabel="המשך כאורח ללא הרשמה"
                     style={({ pressed }) => [styles.guestBtn, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: loading ? 0.75 : 1 }]}
                   >
-                    <Text style={styles.guestBtnText}>המשך כאורח ללא הרשמה</Text>
-                    <Text style={styles.guestBtnSubText}>גישה חינמית לתרגול בסיסי בלי אימייל או סיסמה</Text>
+                    <Text style={styles.guestBtnText}>התחל עכשיו כאורח</Text>
+                    <Text style={styles.guestBtnSubText}>בלי מייל ובלי סיסמה. אפשר להירשם אחר כך כדי לסנכרן ולרכוש פרימיום.</Text>
                   </Pressable>
 
                   <Text style={styles.hint}>
                     {mode === 'login'
-                      ? 'אין לך חשבון? לחץ על "הרשמה" למעלה'
-                      : 'יש לך חשבון? לחץ על "התחברות" למעלה'}
+                      ? 'חשבון דרוש רק לסנכרון, שחזור התקדמות ופרימיום'
+                      : 'רק מייל וסיסמה. שם מלא נשאר אופציונלי'}
                   </Text>
                 </View>
               )}

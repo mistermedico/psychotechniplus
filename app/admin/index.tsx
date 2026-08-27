@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
 import { supabase } from '../../lib/supabase';
+import { loadSupportTickets } from '../../lib/supportTickets';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -85,6 +86,12 @@ const QUICK_ACTIONS = [
   { icon: 'ש', label: 'שלח הודעה', route: '/admin/notifications' },
 ];
 
+type DashboardCounts = {
+  users: number;
+  sessions: number;
+  supportTickets: number;
+};
+
 export default function AdminDashboard() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -93,7 +100,7 @@ export default function AdminDashboard() {
     isAdmin, login, logout, setIsAdmin, getStats, getPendingQuestions,
     seedToSupabase, loadAdminData, syncAll,
     isSyncing, lastSyncedAt, syncError,
-    revenueSnapshots, activityLog, questions, topics, templates, sessionHistory,
+    revenueSnapshots, activityLog, questions, topics, templates, sessionHistory, pushNotifications,
   } = useAdminStore();
 
   const [email, setEmail] = useState('mrmedico111@gmail.com');
@@ -102,6 +109,7 @@ export default function AdminDashboard() {
   const [loggingIn, setLoggingIn] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [dashboardCounts, setDashboardCounts] = useState<DashboardCounts>({ users: 0, sessions: 0, supportTickets: 0 });
 
   useEffect(() => {
     if (isAdmin) return;
@@ -116,6 +124,31 @@ export default function AdminDashboard() {
     if (!isAdmin) return;
     loadAdminData();
   }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    async function loadCounts() {
+      const [{ count: usersCount }, { count: sessionsCount }, supportTickets] = await Promise.all([
+        supabase.from('user_profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('practice_sessions').select('id', { count: 'exact', head: true }),
+        loadSupportTickets().catch(() => []),
+      ]);
+      if (!cancelled) {
+        setDashboardCounts({
+          users: usersCount ?? 0,
+          sessions: sessionsCount ?? 0,
+          supportTickets: supportTickets.length,
+        });
+      }
+    }
+    loadCounts().catch(() => null);
+    const timer = setInterval(() => loadCounts().catch(() => null), 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isAdmin, lastSyncedAt]);
 
   const contentHealth = useMemo(() => {
     const validatedPerTopic = topics.map(topic => ({
@@ -172,6 +205,31 @@ export default function AdminDashboard() {
     cat,
     sections: ADMIN_SECTIONS.filter(s => s.category === cat),
   }));
+
+  const sectionCounts: Record<string, number | string | undefined> = {
+    questions: stats.totalQuestions,
+    validate: pendingCount,
+    'qa-agent': contentHealth.lowCoverageTopics + contentHealth.templateShortages,
+    'json-import': stats.draftCount,
+    export: stats.totalQuestions,
+    'topics-admin': stats.totalTopics,
+    'simulation-builder': templates.length,
+    'topic-exam-map': stats.totalTopics,
+    'question-assignment': stats.totalQuestions,
+    users: dashboardCounts.users,
+    monitor: dashboardCounts.sessions,
+    revenue: latestRevenue ? latestRevenue.totalPremiumUsers : undefined,
+    'app-store': 'חי',
+    events: dashboardCounts.sessions,
+    support: dashboardCounts.supportTickets,
+    notifications: pushNotificationsCount(pushNotifications),
+    performance: `${approvedPct}%`,
+    analytics: dashboardCounts.sessions,
+    'app-control': syncError ? '!' : 'OK',
+    'session-settings': templates.length,
+    'activity-log': activityLog.length,
+    logs: activityLog.filter(log => log.category === 'system').length,
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -392,9 +450,9 @@ export default function AdminDashboard() {
                     end={{ x: 1, y: 1 }}
                     style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]}
                   />
-                  {section.id === 'validate' && pendingCount > 0 && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{pendingCount}</Text>
+                  {sectionCounts[section.id] !== undefined && (
+                    <View style={styles.navMetricBadge}>
+                      <Text style={styles.navMetricText}>{sectionCounts[section.id]}</Text>
                     </View>
                   )}
                   <Text style={styles.navIcon}>{section.icon}</Text>
@@ -459,6 +517,10 @@ const CATEGORY_ICON_COLORS: Record<string, string> = {
   notification: '#F59E0B',
   system: Colors.textTertiary,
 };
+
+function pushNotificationsCount(pushNotifications: { status: string }[]): number {
+  return pushNotifications.filter(item => item.status !== 'sent').length;
+}
 
 function relativeTime(isoString: string): string {
   const now = new Date();
@@ -834,14 +896,22 @@ const styles = StyleSheet.create({
     position: 'relative',
     ...Shadow.md,
   },
-  badge: {
-    position: 'absolute', top: 6, left: 6,
-    backgroundColor: Colors.danger,
-    borderRadius: 10, minWidth: 18, height: 18,
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 3, zIndex: 10,
+  navMetricBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    minWidth: 34,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(15,23,42,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
-  badgeText: { fontFamily: FontFamily.bold, fontSize: 10, color: '#fff' },
+  navMetricText: { fontFamily: FontFamily.bold, fontSize: 10, color: '#fff', textAlign: 'center' },
   navIcon: { fontSize: 22, textAlign: 'right' },
   navLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff', textAlign: 'right', marginTop: 4 },
   navDesc: { fontFamily: FontFamily.regular, fontSize: 9, color: 'rgba(255,255,255,0.7)', textAlign: 'right' },

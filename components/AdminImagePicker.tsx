@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Image, Modal,
+  View, Text, StyleSheet, Pressable, Modal,
   TextInput, Platform, Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
+import { VisualImage } from './VisualImage';
 
 export interface AdminImagePickerProps {
   imageUri: string;
@@ -66,8 +67,8 @@ export function AdminImagePicker({
       <View style={[styles.imageBox, { height: boxHeight }, !imageUri && styles.imageBoxEmpty]}>
         {imageUri ? (
           <>
-            <Image
-              source={{ uri: imageUri }}
+            <VisualImage
+              uri={imageUri}
               style={[styles.image, { height: imageHeight }]}
               resizeMode="contain"
             />

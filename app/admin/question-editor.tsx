@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  TextInput, KeyboardAvoidingView, Platform, Alert, Switch,
+  TextInput, KeyboardAvoidingView, Platform, Alert, Switch, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -12,6 +12,8 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
 import { AdminImagePicker } from '../../components/AdminImagePicker';
+import { VisualImage } from '../../components/VisualImage';
+import { loadQuestionUsageStats, QuestionUsageStats } from '../../lib/db';
 
 const QUESTION_TYPES: QuestionType[] = [
   'multiple_choice', 'true_false', 'logic', 'verbal', 'quantitative', 'shapes',
@@ -70,6 +72,8 @@ export default function QuestionEditor() {
   const [isDirty, setIsDirty] = useState(false);
   const [mediaUrl, setMediaUrl] = useState(existing?.mediaUrl ?? '');
   const [explanationImageUrl, setExplanationImageUrl] = useState(existing?.explanationImageUrl ?? '');
+  const [usageStats, setUsageStats] = useState<QuestionUsageStats | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
   const [mediaType, setMediaType] = useState<'image' | undefined>(
     existing?.mediaType === 'image' ? 'image' : undefined
   );
@@ -100,6 +104,20 @@ export default function QuestionEditor() {
       setEloOverride(String(difficultyToElo(difficulty)));
     }
   }, [difficulty]);
+
+  useEffect(() => {
+    if (!isEdit || !questionId) return;
+    let cancelled = false;
+    setUsageLoading(true);
+    loadQuestionUsageStats(questionId)
+      .then(stats => {
+        if (!cancelled) setUsageStats(stats);
+      })
+      .finally(() => {
+        if (!cancelled) setUsageLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isEdit, questionId]);
 
   const handleBack = () => {
     if (isDirty) {
@@ -518,6 +536,22 @@ export default function QuestionEditor() {
             </View>
           </Section>
 
+          <Section title="👁️ תצוגה חיה של רכיבי השאלה">
+            <QuestionEditorPreview
+              questionText={questionText}
+              mediaUrl={mediaUrl}
+              options={options}
+              explanation={explanation}
+              explanationImageUrl={explanationImageUrl}
+            />
+          </Section>
+
+          {isEdit && (
+            <Section title="📊 סטטיסטיקה והיסטוריית מענה">
+              <QuestionUsagePanel stats={usageStats} loading={usageLoading} />
+            </Section>
+          )}
+
           {/* Access + Status */}
           <Section title="⚙️ הגדרות גישה וסטטוס">
             <View style={styles.accessRow}>
@@ -583,6 +617,107 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <View style={sectionStyles.container}>
       <Text style={sectionStyles.title}>{title}</Text>
       {children}
+    </View>
+  );
+}
+
+function QuestionEditorPreview({
+  questionText,
+  mediaUrl,
+  options,
+  explanation,
+  explanationImageUrl,
+}: {
+  questionText: string;
+  mediaUrl: string;
+  options: AdminOption[];
+  explanation: string;
+  explanationImageUrl: string;
+}) {
+  return (
+    <View style={styles.livePreviewWrap}>
+      <Text style={[styles.livePreviewQuestion, { textAlign: ta(questionText), writingDirection: detectDir(questionText) }]}>
+        {questionText.trim() || 'נוסח השאלה יוצג כאן'}
+      </Text>
+      <VisualImage uri={mediaUrl} style={styles.livePreviewQuestionImage} fallbackLabel="אין תמונת שאלה" />
+      <View style={styles.livePreviewOptions}>
+        {options.map(option => (
+          <View key={option.id} style={[styles.livePreviewOption, option.isCorrect && styles.livePreviewOptionCorrect]}>
+            <View style={styles.livePreviewOptionHeader}>
+              <Text style={styles.livePreviewOptionId}>{option.id.toUpperCase()}</Text>
+              {option.isCorrect && <Text style={styles.livePreviewCorrectBadge}>תשובה נכונה</Text>}
+            </View>
+            <VisualImage uri={option.imageUrl} style={styles.livePreviewOptionImage} fallbackLabel="אין תמונה" />
+            <Text style={[styles.livePreviewOptionText, { textAlign: ta(option.text), writingDirection: detectDir(option.text) }]} numberOfLines={2}>
+              {option.text?.trim() || 'טקסט תשובה ריק'}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <View style={styles.livePreviewExplanation}>
+        <View style={styles.livePreviewExplanationTextBox}>
+          <Text style={styles.previewMiniTitle}>הסבר</Text>
+          <Text style={[styles.livePreviewExplanationText, { textAlign: ta(explanation), writingDirection: detectDir(explanation) }]}>
+            {explanation.trim() || 'הסבר יוצג כאן'}
+          </Text>
+        </View>
+        <VisualImage uri={explanationImageUrl} style={styles.livePreviewExplanationImage} fallbackLabel="אין תמונת הסבר" />
+      </View>
+    </View>
+  );
+}
+
+function QuestionUsagePanel({ stats, loading }: { stats: QuestionUsageStats | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <View style={styles.usageLoading}>
+        <ActivityIndicator color={Colors.primary} />
+        <Text style={styles.usageLoadingText}>טוען נתוני מענה מסופאבייס...</Text>
+      </View>
+    );
+  }
+
+  if (!stats || stats.attempts === 0) {
+    return (
+      <View style={styles.usageEmpty}>
+        <Text style={styles.usageEmptyTitle}>אין עדיין היסטוריית מענה לשאלה הזו</Text>
+        <Text style={styles.usageEmptyText}>ברגע שמשתמש או אורח יענה עליה, הניסיונות, אחוזי ההצלחה והזמנים יופיעו כאן.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.usageWrap}>
+      <View style={styles.usageStatsGrid}>
+        <UsageChip label="ניסיונות" value={stats.attempts} tone={Colors.primary} />
+        <UsageChip label="הצלחה" value={`${stats.correctRate}%`} tone={stats.correctRate >= 60 ? Colors.success : Colors.warning} />
+        <UsageChip label="נכונות" value={stats.correctCount} tone={Colors.success} />
+        <UsageChip label="דילוגים" value={stats.skippedCount} tone={stats.skippedCount ? Colors.warning : Colors.textTertiary} />
+        <UsageChip label="זמן ממוצע" value={`${stats.avgTimeSeconds}s`} tone={Colors.accent} />
+      </View>
+      <Text style={styles.usageHistoryTitle}>מענה אחרון</Text>
+      {stats.recentEvents.map(event => (
+        <View key={`${event.sessionId}-${event.completedAt}`} style={styles.usageEventRow}>
+          <Text style={[styles.usageEventResult, { color: event.isCorrect ? Colors.success : event.isSkipped ? Colors.warning : Colors.danger }]}>
+            {event.isCorrect ? 'נכון' : event.isSkipped ? 'דילוג' : 'שגוי'}
+          </Text>
+          <Text style={styles.usageEventText}>
+            {(event.userName || (event.userId.startsWith('guest_') ? 'אורח' : event.userId.slice(0, 8)))} · נבחרה {event.selectedAnswerId || '-'} · נכונה {event.correctAnswerId || '-'} · {event.timeSpentSeconds}s
+          </Text>
+          <Text style={styles.usageEventDate}>
+            {event.completedAt ? new Date(event.completedAt).toLocaleString('he-IL') : ''}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function UsageChip({ label, value, tone }: { label: string; value: string | number; tone: string }) {
+  return (
+    <View style={[styles.usageChip, { borderColor: tone + '55', backgroundColor: tone + '12' }]}>
+      <Text style={[styles.usageChipValue, { color: tone }]}>{value}</Text>
+      <Text style={styles.usageChipLabel}>{label}</Text>
     </View>
   );
 }
@@ -663,6 +798,70 @@ const styles = StyleSheet.create({
   eloHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', marginTop: 4 },
   warningText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.danger, textAlign: 'right', marginTop: 6 },
   validatedHint: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.success, textAlign: 'right', marginTop: 6 },
+
+  livePreviewWrap: { gap: 12, writingDirection: 'rtl' },
+  livePreviewQuestion: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, lineHeight: 24 },
+  livePreviewQuestionImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundDark,
+  },
+  livePreviewOptions: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
+  livePreviewOption: {
+    flexGrow: 1,
+    flexBasis: 150,
+    minWidth: 140,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    padding: 10,
+    gap: 8,
+  },
+  livePreviewOptionCorrect: { borderColor: Colors.success, backgroundColor: Colors.successLight },
+  livePreviewOptionHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  livePreviewOptionId: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textSecondary },
+  livePreviewCorrectBadge: { fontFamily: FontFamily.bold, fontSize: 10, color: Colors.success, textAlign: 'right' },
+  livePreviewOptionImage: {
+    width: '100%',
+    height: 112,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundDark,
+  },
+  livePreviewOptionText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary, minHeight: 18 },
+  livePreviewExplanation: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12, alignItems: 'stretch' },
+  livePreviewExplanationTextBox: { flex: 2, minWidth: 240, gap: 6 },
+  previewMiniTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'right' },
+  livePreviewExplanationText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 21 },
+  livePreviewExplanationImage: {
+    flex: 1,
+    minWidth: 200,
+    height: 150,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundDark,
+  },
+  usageLoading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 18 },
+  usageLoadingText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right' },
+  usageEmpty: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 14, borderWidth: 1, borderColor: Colors.border },
+  usageEmptyTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', marginBottom: 4 },
+  usageEmptyText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'right', lineHeight: 18 },
+  usageWrap: { gap: 12 },
+  usageStatsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  usageChip: { flexGrow: 1, minWidth: 100, borderRadius: Radius.lg, borderWidth: 1, padding: 10, alignItems: 'flex-end' },
+  usageChipValue: { fontFamily: FontFamily.heading, fontSize: FontSize.lg, textAlign: 'right' },
+  usageChipLabel: { fontFamily: FontFamily.medium, fontSize: 10, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
+  usageHistoryTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  usageEventRow: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.md, padding: 10, borderWidth: 1, borderColor: Colors.border, alignItems: 'flex-end', gap: 2 },
+  usageEventResult: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'right' },
+  usageEventText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', writingDirection: 'rtl' },
+  usageEventDate: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'right' },
 
   // Difficulty
   diffHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },

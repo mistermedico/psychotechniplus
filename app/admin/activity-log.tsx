@@ -119,35 +119,60 @@ function groupByIsraeliDate(
 
 export default function ActivityLogScreen() {
   const insets = useSafeAreaInsets();
-  const { activityLog, clearActivityLog } = useAdminStore();
+  const { activityLog, clearActivityLog, sessionHistory, loadSessionHistory } = useAdminStore();
   const [filter, setFilter] = useState<FilterKey>('all');
   const [search, setSearch] = useState('');
 
+  React.useEffect(() => {
+    loadSessionHistory().catch(() => null);
+  }, [loadSessionHistory]);
+
+  const sessionLogs = useMemo<AdminActivityLog[]>(() => sessionHistory.slice(0, 300).map(session => {
+    const userLabel = session.userName || (session.userId?.startsWith('guest_') ? 'אורח' : `משתמש ${session.userId.slice(0, 8)}`);
+    return {
+      id: `session_${session.id}`,
+      category: 'session',
+      timestamp: session.completedAt || session.startedAt || new Date().toISOString(),
+      action: `${userLabel} סיים ${session.mode === 'simulation' ? 'סימולציה' : 'תרגול'} — ${session.correctAnswers}/${session.totalQuestions} נכון, ציון ${session.score}${session.userId?.startsWith('guest_') ? ' (אורח ללא הרשמה)' : ''}`,
+    };
+  }), [sessionHistory]);
+
+  const combinedLog = useMemo(() => {
+    const byId = new Map<string, AdminActivityLog>();
+    [...activityLog, ...sessionLogs].forEach(log => byId.set(log.id, log));
+    return Array.from(byId.values()).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }, [activityLog, sessionLogs]);
+
   const filtered = useMemo(() => {
-    let list = activityLog;
+    let list = combinedLog;
     if (filter !== 'all') list = list.filter(l => l.category === filter);
     if (search.trim()) {
       const s = search.trim().toLowerCase();
       list = list.filter(l => l.action.toLowerCase().includes(s));
     }
     return list;
-  }, [activityLog, filter, search]);
+  }, [combinedLog, filter, search]);
 
   const grouped = useMemo(() => groupByIsraeliDate(filtered), [filtered]);
 
   // Count by category
   const counts = useMemo(() => {
-    const c: Partial<Record<FilterKey, number>> = { all: activityLog.length };
-    for (const log of activityLog) {
+    const c: Partial<Record<FilterKey, number>> = { all: combinedLog.length };
+    for (const log of combinedLog) {
       c[log.category] = (c[log.category] ?? 0) + 1;
     }
     return c;
-  }, [activityLog]);
+  }, [combinedLog]);
+
+  const guestSessionsCount = useMemo(
+    () => sessionHistory.filter(session => session.userId?.startsWith('guest_')).length,
+    [sessionHistory],
+  );
 
   const handleClear = () => {
     Alert.alert(
       'ניקוי יומן',
-      `האם לנקות את כל ${activityLog.length} הפעולות המתועדות?`,
+      `האם לנקות את ${activityLog.length} פעולות המנהל המקומיות? סשנים מסופאבייס לא יימחקו.`,
       [
         { text: 'ביטול', style: 'cancel' },
         {
@@ -209,8 +234,8 @@ export default function ActivityLogScreen() {
             <Text style={styles.heroSub}>תיעוד בזמן ישראל (UTC+3)</Text>
           </View>
           <View style={styles.heroStats}>
-            <Text style={styles.heroCount}>{activityLog.length}</Text>
-            <Text style={styles.heroCountLabel}>פעולות</Text>
+            <Text style={styles.heroCount}>{combinedLog.length}</Text>
+            <Text style={styles.heroCountLabel}>אירועים · {guestSessionsCount} אורחים</Text>
           </View>
         </View>
 
@@ -268,7 +293,7 @@ export default function ActivityLogScreen() {
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyIcon}>📭</Text>
           <Text style={styles.emptyText}>אין פעולות מתועדות</Text>
-          <Text style={styles.emptyHint}>פעולות ניהול יתועדו כאן אוטומטית</Text>
+          <Text style={styles.emptyHint}>פעולות ניהול וסשנים של משתמשים ואורחים יתועדו כאן אוטומטית</Text>
         </View>
       ) : (
         <SectionList

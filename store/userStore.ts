@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserBadge, BadgeType } from '../data/types';
 import { supabase } from '../lib/supabase';
 import {
@@ -15,9 +16,17 @@ const PREMIUM_REVIEW_EMAILS = new Set([
   'apple-review-2026@psychotechniplus.app',
 ]);
 
-const GUEST_USER_ID = 'guest_local_free_access';
+const GUEST_USER_ID_KEY = '@psychotechniplus/guestUserId';
 const GUEST_NAME = 'אורח';
 const DEFAULT_TARGET_ID = 'target_psychometric';
+
+async function getOrCreateGuestUserId(): Promise<string> {
+  const saved = await AsyncStorage.getItem(GUEST_USER_ID_KEY).catch(() => null);
+  if (saved?.startsWith('guest_')) return saved;
+  const id = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  await AsyncStorage.setItem(GUEST_USER_ID_KEY, id).catch(() => null);
+  return id;
+}
 
 export interface TopicPerformanceEntry {
   isCorrect: boolean;
@@ -206,9 +215,10 @@ export const useUserStore = create<UserState>((set, get) => ({
     await logOutPurchases().catch(() => null);
     await supabase.auth.signOut().catch(() => null);
     useAdminStore.getState().setIsAdmin(false);
+    const guestUserId = await getOrCreateGuestUserId();
     set({
       ...INITIAL_STATE,
-      userId: GUEST_USER_ID,
+      userId: guestUserId,
       email: '',
       name: GUEST_NAME,
       selectedTargetId: DEFAULT_TARGET_ID,

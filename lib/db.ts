@@ -162,6 +162,90 @@ export async function deleteQuestion(id: string): Promise<{ error?: string }> {
   return {};
 }
 
+// ── Question analytics ────────────────────────────────────────────────────
+
+export interface QuestionUsageEvent {
+  sessionId: string;
+  userId: string;
+  userName?: string;
+  mode: string;
+  templateName?: string;
+  completedAt: string;
+  selectedAnswerId: string;
+  correctAnswerId: string;
+  isCorrect: boolean;
+  isSkipped: boolean;
+  timeSpentSeconds: number;
+  difficulty: number;
+}
+
+export interface QuestionUsageStats {
+  questionId: string;
+  attempts: number;
+  correctCount: number;
+  skippedCount: number;
+  avgTimeSeconds: number;
+  correctRate: number;
+  recentEvents: QuestionUsageEvent[];
+}
+
+export async function loadQuestionUsageStats(questionId: string): Promise<QuestionUsageStats> {
+  const empty: QuestionUsageStats = {
+    questionId,
+    attempts: 0,
+    correctCount: 0,
+    skippedCount: 0,
+    avgTimeSeconds: 0,
+    correctRate: 0,
+    recentEvents: [],
+  };
+
+  try {
+    const [{ data: statsRow, error: statsError }, { data: eventRows, error: eventsError }] = await Promise.all([
+      supabase
+        .from('question_usage_stats')
+        .select('question_id,attempts,correct_count,skipped_count,avg_time_seconds,correct_rate')
+        .eq('question_id', questionId)
+        .maybeSingle(),
+      supabase
+        .from('practice_answer_events')
+        .select('session_id,user_id,user_name,mode,template_name,completed_at,selected_answer_id,correct_answer_id,is_correct,is_skipped,time_spent_seconds,difficulty')
+        .eq('question_id', questionId)
+        .order('completed_at', { ascending: false })
+        .limit(20),
+    ]);
+
+    if (statsError) logger.warn('db:loadQuestionUsageStats', 'שגיאה בטעינת סטטיסטיקת שאלה', statsError.message);
+    if (eventsError) logger.warn('db:loadQuestionUsageStats', 'שגיאה בטעינת היסטוריית מענה לשאלה', eventsError.message);
+
+    return {
+      questionId,
+      attempts: statsRow?.attempts ?? 0,
+      correctCount: statsRow?.correct_count ?? 0,
+      skippedCount: statsRow?.skipped_count ?? 0,
+      avgTimeSeconds: statsRow?.avg_time_seconds ?? 0,
+      correctRate: statsRow?.correct_rate ?? 0,
+      recentEvents: (eventRows ?? []).map((row: any) => ({
+        sessionId: row.session_id,
+        userId: row.user_id,
+        userName: row.user_name ?? undefined,
+        mode: row.mode ?? '',
+        templateName: row.template_name ?? undefined,
+        completedAt: row.completed_at ?? '',
+        selectedAnswerId: row.selected_answer_id ?? '',
+        correctAnswerId: row.correct_answer_id ?? '',
+        isCorrect: !!row.is_correct,
+        isSkipped: !!row.is_skipped,
+        timeSpentSeconds: row.time_spent_seconds ?? 0,
+        difficulty: row.difficulty ?? 5,
+      })),
+    };
+  } catch (e: any) {
+    logger.warn('db:loadQuestionUsageStats', 'חריגה בטעינת סטטיסטיקת שאלה', e?.message);
+    return empty;
+  }
+}
+
 // ── Targets & Topics ───────────────────────────────────────────────────────
 
 export async function fetchTargets(): Promise<Target[]> {
@@ -585,14 +669,10 @@ export interface SessionRecord {
 
 export async function saveSessionRecord(record: SessionRecord): Promise<void> {
   if (!record.userId) { logger.error('db:saveSessionRecord', 'userId חסר — סשן לא נשמר'); return; }
-  if (record.userId.startsWith('guest_')) {
-    logger.info('db:saveSessionRecord', 'סשן אורח נשמר מקומית בלבד');
-    return;
-  }
   try {
     await supabase.from('user_profiles').upsert({
       id: record.userId,
-      name: record.userName ?? '',
+      name: record.userName ?? (record.userId.startsWith('guest_') ? 'אורח' : ''),
       updated_at: new Date().toISOString(),
     });
 

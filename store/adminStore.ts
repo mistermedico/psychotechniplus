@@ -2057,7 +2057,15 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         set({ revenueSnapshots: [] });
       }
 
-      // 7. Load persisted activityLog from AsyncStorage
+      // 7. Load real practice sessions, including guest sessions.
+      try {
+        const sessionHistory = await loadAllSessionHistory(800);
+        set({ sessionHistory });
+      } catch (e: any) {
+        logger.error('adminStore:loadAdminData', 'שגיאה בטעינת היסטוריית סשנים', e?.message);
+      }
+
+      // 8. Load persisted activityLog from AsyncStorage
       try {
         const saved = await AsyncStorage.getItem(ACTIVITY_LOG_KEY);
         if (saved) {
@@ -2113,6 +2121,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       .channel('psychotechniplus-admin-live-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_state' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'practice_sessions' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'topics' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'targets' }, scheduleReload)
       .subscribe(status => {
