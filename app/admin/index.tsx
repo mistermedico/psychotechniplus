@@ -28,6 +28,7 @@ interface NavSection {
 const ADMIN_SECTIONS: NavSection[] = [
   { id: 'questions',           icon: 'ש', label: 'שאלות',              desc: 'עריכה, מחיקה וסינון',                 route: '/admin/questions',           category: 'content' },
   { id: 'validate',            icon: 'א', label: 'אימות שאלות',        desc: 'אישור שאלות לפני פרסום',              route: '/admin/validate',            category: 'content' },
+  { id: 'qa-agent',            icon: 'Q', label: 'סוכן QA',             desc: 'איתור ותיקון שאלות בעייתיות',          route: '/admin/qa-agent',            category: 'content' },
   { id: 'json-import',         icon: 'י', label: 'ייבוא JSON',         desc: 'העלאת שאלות למאגר',                   route: '/admin/json-import',         category: 'content' },
   { id: 'ai-generator',        icon: 'מ', label: 'מחולל שאלות',        desc: 'יצירה לפי תבניות',                    route: '/admin/ai-generator',        category: 'content' },
   { id: 'export',              icon: 'צ', label: 'ייצוא',              desc: 'ייצוא נתונים לקובץ JSON',              route: '/admin/export',              category: 'content' },
@@ -72,6 +73,7 @@ const CATEGORY_LABELS: Record<NavCategory, string> = {
 
 const QUICK_ACTIONS = [
   { icon: 'א', label: 'אמת שאלות', route: '/admin/validate' },
+  { icon: 'Q', label: 'סוכן QA', route: '/admin/qa-agent' },
   { icon: '+', label: 'הוסף שאלה', route: '/admin/question-editor?mode=add' },
   { icon: 'ב', label: 'ביצועים', route: '/admin/performance' },
   { icon: 'נ', label: 'ניטור', route: '/admin/monitor' },

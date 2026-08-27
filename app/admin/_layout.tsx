@@ -10,6 +10,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/admin/questions': 'מאגר שאלות',
   '/admin/question-editor': 'עורך שאלה',
   '/admin/validate': 'תור ולידציה',
+  '/admin/qa-agent': 'סוכן QA לשאלות',
   '/admin/analytics': 'אנליטיקס',
   '/admin/monitor': 'ניטור תרגולים ומבחנים',
   '/admin/ai-generator': 'מחולל שאלות',
@@ -105,6 +106,7 @@ export default function AdminLayout() {
       <Stack.Screen name="questions" options={{ title: 'מאגר שאלות' }} />
       <Stack.Screen name="question-editor" options={{ title: 'עריכת שאלה' }} />
       <Stack.Screen name="validate" options={{ title: 'תור ולידציה' }} />
+      <Stack.Screen name="qa-agent" options={{ title: 'סוכן QA לשאלות' }} />
       <Stack.Screen name="analytics" options={{ title: 'אנליטיקס' }} />
       <Stack.Screen name="monitor" options={{ title: 'ניטור תרגולים ומבחנים' }} />
       <Stack.Screen name="ai-generator" options={{ title: 'מחולל שאלות' }} />

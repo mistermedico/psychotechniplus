@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
   TextInput, Alert, ScrollView,
@@ -11,6 +11,7 @@ import { AccessLevel, Question, QuestionType, ValidationStatus } from '../../dat
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
+import { buildQuestionPerformanceMap, getQuestionVisibilityLabel } from '../../utils/questionQaAgent';
 
 const STATUS_COLORS: Record<ValidationStatus, string> = {
   validated: Colors.success,
@@ -64,7 +65,8 @@ export default function QuestionsAdmin() {
   const insets = useSafeAreaInsets();
   const { questions, topics, selectedQuestionIds, toggleSelectQuestion, clearSelection,
     selectAll, deleteQuestions, bulkValidate, deleteQuestion, addQuestion,
-    setQuestionsAccessLevel, setQuestionsAdaptiveEligibility } = useAdminStore();
+    setQuestionsAccessLevel, setQuestionsAdaptiveEligibility,
+    sessionHistory, loadSessionHistory } = useAdminStore();
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<ValidationStatus | 'all'>('all');
@@ -75,6 +77,10 @@ export default function QuestionsAdmin() {
   const [qualityFilter, setQualityFilter] = useState<QualityFilter>('all');
   const [sortIdx, setSortIdx] = useState(0);
   const [bulkMode, setBulkMode] = useState(false);
+
+  useEffect(() => {
+    loadSessionHistory();
+  }, [loadSessionHistory]);
 
   const filtered = useMemo(() => {
     let q = [...questions];
@@ -138,6 +144,11 @@ export default function QuestionsAdmin() {
     }).sort((a, b) => b.qualityIssues - a.qualityIssues || b.pending - a.pending || b.total - a.total);
   }, [questions, topics]);
 
+  const performanceByQuestion = useMemo(
+    () => buildQuestionPerformanceMap(sessionHistory),
+    [sessionHistory]
+  );
+
   const handleBulkAction = (action: 'approve' | 'reject' | 'delete') => {
     if (selectedQuestionIds.length === 0) return;
     Alert.alert(
@@ -194,6 +205,8 @@ export default function QuestionsAdmin() {
       ['invalidAnswer', 'תשובה לבדיקה'],
       ['difficulty', 'קושי חריג'],
     ] as Array<[Exclude<QualityFilter, 'all'>, string]>).filter(([issue]) => hasQualityIssue(item, issue));
+    const itemStats = performanceByQuestion[item.id];
+    const visibility = getQuestionVisibilityLabel(item);
 
     return (
       <Pressable
@@ -275,6 +288,15 @@ export default function QuestionsAdmin() {
               </Text>
             </View>
           )}
+        </View>
+
+        <View style={styles.visibilityPanel}>
+          <Text style={styles.visibilityText}>{visibility}</Text>
+          <View style={styles.performanceRow}>
+            <Text style={styles.performanceText}>ענו: {itemStats?.attempts ?? 0}</Text>
+            <Text style={styles.performanceText}>דיוק: {itemStats?.accuracy === null || itemStats?.accuracy === undefined ? '—' : `${itemStats.accuracy}%`}</Text>
+            <Text style={styles.performanceText}>דילוגים: {itemStats?.skipRate === null || itemStats?.skipRate === undefined ? '—' : `${itemStats.skipRate}%`}</Text>
+          </View>
         </View>
 
         {/* Quick actions — horizontal scroll so they never wrap */}
@@ -767,6 +789,39 @@ const styles = StyleSheet.create({
   footerMeta: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
   topicPill: { borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
   topicPillText: { fontFamily: FontFamily.medium, fontSize: 11 },
+  visibilityPanel: {
+    marginTop: 10,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    padding: 9,
+    alignItems: 'flex-end',
+  },
+  visibilityText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: Colors.text,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  performanceRow: {
+    marginTop: 6,
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  performanceText: {
+    fontFamily: FontFamily.medium,
+    fontSize: 10,
+    color: Colors.textSecondary,
+    backgroundColor: Colors.surfaceStrong,
+    borderRadius: Radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
+    textAlign: 'right',
+  },
 
   quickActionsScroll: { marginTop: 8, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8 },
   quickActionsContent: { flexDirection: 'row-reverse', gap: 6 },
