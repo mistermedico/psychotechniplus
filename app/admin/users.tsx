@@ -19,6 +19,7 @@ import { useAdminStore } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { logger } from '../../utils/logger';
+import AdminSyncToolbar from '../../components/AdminSyncToolbar';
 
 interface RealUser {
   id: string;
@@ -317,6 +318,16 @@ export default function UsersScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <AdminSyncToolbar
+        title="ניהול משתמשים"
+        subtitle="משתמשים, סשנים, דיוק וסטטוס פרימיום נטענים ישירות מ-Supabase ומתעדכנים בזמן אמת."
+        counters={[
+          { label: 'משתמשים', value: stats.total, tone: 'primary' },
+          { label: 'פעילים השבוע', value: stats.active7, tone: 'success' },
+          { label: 'פרימיום', value: stats.premium, tone: 'warning' },
+          { label: 'דיוק ממוצע', value: `${stats.avgAccuracy}%`, tone: stats.avgAccuracy >= 60 ? 'success' : 'warning' },
+        ]}
+      />
       <View style={styles.statsBar}>
         <StatChip label="משתמשים" value={String(stats.total)} />
         <StatChip label="פעילים 7 ימים" value={String(stats.active7)} />
@@ -560,6 +571,16 @@ function UserDetailScreen({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <AdminSyncToolbar
+          title="כרטיס משתמש"
+          subtitle="שינוי פרימיום, מחיקה ונתוני ביצועים נשמרים ב-Supabase ומשתקפים בחזרה ברשימת המשתמשים."
+          counters={[
+            { label: 'סשנים', value: user.total_sessions, tone: 'primary' },
+            { label: 'דיוק', value: `${getAccuracy(user)}%`, tone: getAccuracy(user) >= 60 ? 'success' : 'warning' },
+            { label: 'רמה', value: user.level, tone: 'primary' },
+            { label: 'סטטוס', value: isPremium ? 'פרימיום' : 'חינמי', tone: isPremium ? 'warning' : 'primary' },
+          ]}
+        />
         <Pressable onPress={onBack} style={styles.backBtn}>
           <Text style={styles.backBtnText}>חזרה לרשימה</Text>
         </Pressable>

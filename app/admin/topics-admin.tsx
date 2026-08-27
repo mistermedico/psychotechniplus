@@ -9,6 +9,7 @@ import { useAdminStore } from '../../store/adminStore';
 import { Topic } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import AdminSyncToolbar from '../../components/AdminSyncToolbar';
 
 const TOPIC_ICONS = ['🔢', '📚', '🧩', '🔷', '🇬🇧', '🧪', '🗺️', '💡', '🎵', '🏛️', '⚡', '🔬', '🎯', '🌍', '🧮'];
 const TOPIC_COLORS = [
@@ -285,6 +286,16 @@ export default function TopicsAdmin() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
+        <AdminSyncToolbar
+          title="ניהול נושאים ופרקים"
+          subtitle="שינוי שם, תיאור, סדר, שיוך למסלול וגישה לפרימיום נשמרים מול Supabase ומשפיעים על האפליקציה."
+          counters={[
+            { label: 'נושאים', value: totalTopics, tone: 'primary' },
+            { label: 'פרימיום', value: premiumCount, tone: 'warning' },
+            { label: 'מסלולים', value: targets.length, tone: 'primary' },
+            { label: 'שאלות משויכות', value: questions.length, tone: 'success' },
+          ]}
+        />
 
         {/* Stats */}
         <View style={styles.statsRow}>

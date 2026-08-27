@@ -10,6 +10,7 @@ import * as Haptics from '../../utils/haptics';
 import { useAdminStore, SmartExamTemplate, SimulationRule } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import AdminSyncToolbar from '../../components/AdminSyncToolbar';
 
 export default function SimulationBuilder() {
   const {
@@ -574,6 +575,16 @@ export default function SimulationBuilder() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
         <ScrollView contentContainerStyle={[styles.content, isCompact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
+        <AdminSyncToolbar
+          title="ניהול מבחנים וסימולציות"
+          subtitle="כל תבנית, כלל פרק, זמן מבחן וציון מעבר נשמרים ומסונכרנים לניהול אונליין."
+          counters={[
+            { label: 'תבניות', value: templates.length, tone: 'primary' },
+            { label: 'פעילות', value: templates.filter(t => t.isActive).length, tone: 'success' },
+            { label: 'מושבתות', value: templates.filter(t => !t.isActive).length, tone: 'warning' },
+            { label: 'עם מחסור', value: templates.filter(t => getTemplateAudit(t).shortages.length > 0).length, tone: 'danger' },
+          ]}
+        />
 
         <LinearGradient colors={Colors.gradients.gold} style={styles.hero}>
           <View style={styles.heroTopRow}>

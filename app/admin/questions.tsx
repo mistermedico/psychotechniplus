@@ -12,6 +12,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { detectDir, textAlign as ta } from '../../utils/textDirection';
 import { buildQuestionPerformanceMap, getQuestionVisibilityLabel } from '../../utils/questionQaAgent';
+import AdminSyncToolbar from '../../components/AdminSyncToolbar';
 
 const STATUS_COLORS: Record<ValidationStatus, string> = {
   validated: Colors.success,
@@ -362,6 +363,16 @@ export default function QuestionsAdmin() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <AdminSyncToolbar
+        title="ניהול שאלות"
+        subtitle="עריכה, אימות, שיוך לפרקים, פרימיום ופולי תרגול מסונכרנים מול Supabase."
+        counters={[
+          { label: 'סה״כ שאלות', value: questions.length, tone: 'primary' },
+          { label: 'מאומתות', value: audit.validated, tone: 'success' },
+          { label: 'פרימיום', value: audit.premium, tone: 'warning' },
+          { label: 'בעיות איכות', value: audit.qualityIssues, tone: audit.qualityIssues ? 'danger' : 'success' },
+        ]}
+      />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

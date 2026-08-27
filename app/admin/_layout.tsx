@@ -38,7 +38,7 @@ const PAGE_NAMES: Record<string, string> = {
 };
 
 export default function AdminLayout() {
-  const { isAdmin, setIsAdmin, loadAdminData, logActivity } = useAdminStore();
+  const { isAdmin, setIsAdmin, loadAdminData, logActivity, startRealtimeSync, stopRealtimeSync } = useAdminStore();
   const pathname = usePathname();
   const rootNavigationState = useRootNavigationState();
   const lastLoggedPath = useRef<string | null>(null);
@@ -51,7 +51,10 @@ export default function AdminLayout() {
       const email = data.session?.user?.email?.toLowerCase() ?? '';
       const allowed = email === ADMIN_EMAIL;
       setIsAdmin(allowed);
-      if (allowed) loadAdminData();
+      if (allowed) {
+        loadAdminData(true);
+        startRealtimeSync();
+      }
       setCheckedAdminSession(true);
     }).catch(() => {
       if (!alive) return;
@@ -59,7 +62,14 @@ export default function AdminLayout() {
       setCheckedAdminSession(true);
     });
     return () => { alive = false; };
-  }, [setIsAdmin, loadAdminData]);
+  }, [setIsAdmin, loadAdminData, startRealtimeSync]);
+
+  useEffect(() => {
+    if (isAdmin) startRealtimeSync();
+    return () => {
+      stopRealtimeSync();
+    };
+  }, [isAdmin, startRealtimeSync, stopRealtimeSync]);
 
   useEffect(() => {
     if (!rootNavigationState?.key || !checkedAdminSession) return;

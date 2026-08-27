@@ -8,6 +8,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { analyzeQuestionBank, getQuestionVisibilityLabel, QuestionQaFinding } from '../../utils/questionQaAgent';
 import { textAlign as ta, detectDir } from '../../utils/textDirection';
+import AdminSyncToolbar from '../../components/AdminSyncToolbar';
 
 type FindingFilter = 'all' | 'critical' | 'warning' | 'performance' | 'hidden';
 
@@ -177,6 +178,16 @@ export default function AdminQaAgent() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <AdminSyncToolbar
+        title="סוכן QA לשאלות"
+        subtitle="סריקה חכמה של שאלות, הסברים, מסיחים, סטטוס הצגה וביצועים בפועל."
+        counters={[
+          { label: 'נקיות', value: cleanCount, tone: 'success' },
+          { label: 'קריטיות', value: criticalCount, tone: criticalCount ? 'danger' : 'success' },
+          { label: 'דורשות שיפור', value: warningCount, tone: warningCount ? 'warning' : 'success' },
+          { label: 'עם מדידה', value: attemptedCount, tone: 'primary' },
+        ]}
+      />
       <View style={styles.header}>
         <Text style={styles.title}>סוכן QA לשאלות</Text>
         <Text style={styles.subtitle}>

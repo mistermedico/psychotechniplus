@@ -193,21 +193,21 @@ function spatialExplanation(question: Question): string {
   const mode = visualMode(question);
   const correct = correctOptionId(question).toUpperCase();
   if (mode === 'analogy') {
-    return `התשובה הנכונה היא ${correct}. בזוג הראשון מזהים שינוי קבוע: הצורה הראשית, הכיוון והסימן הפנימי משתנים יחד. מחילים את אותו שינוי בדיוק על הצורה השלישית, ורק אפשרות ${correct} שומרת על אותה התאמה. שאר האפשרויות משנות פרט אחד לפחות ולכן אינן משלימות את האנלוגיה.`;
+    return `התשובה הנכונה היא אפשרות ${correct}. בזוג הראשון מזהים שינוי קבוע: הצורה הראשית, כיוון הסיבוב, גודל היחס והסימן הפנימי משתנים יחד. מחילים את אותו שינוי בדיוק על הצורה השלישית, ורק אפשרות ${correct} שומרת על כל ארבעת הפרטים. שאר האפשרויות דומות, אך משנות פרט אחד לפחות ולכן אינן משלימות את האנלוגיה.`;
   }
   if (mode === 'rotation') {
-    return `התשובה הנכונה היא ${correct}. משווים את הצורה לפני הסיבוב ולאחר סיבוב של 180 מעלות: הכיוון מתהפך, אך היחס בין הצורה החיצונית לסימן הפנימי נשמר. רק אפשרות ${correct} מציגה את תוצאת הסיבוב המדויקת.`;
+    return `התשובה הנכונה היא אפשרות ${correct}. משווים את הצורה המקורית לצורה שאמורה להתקבל אחרי סיבוב של 180 מעלות: הכיוון מתהפך, אך היחס בין הצורה החיצונית, הצבע והסימן הפנימי נשמר. רק אפשרות ${correct} מציגה את תוצאת הסיבוב המדויקת; המסיחים טועים בזווית או במיקום הסימן.`;
   }
   if (mode === 'matrix') {
-    return `התשובה הנכונה היא ${correct}. במטריצה בודקים מה משתנה בכל עמודה ובכל שורה: סוג הצורה, הסיבוב, הגודל והמיקום הפנימי. התא החסר צריך להמשיך את שני החוקים יחד, ורק אפשרות ${correct} עושה זאת ללא חריגה.`;
+    return `התשובה הנכונה היא אפשרות ${correct}. במטריצה בודקים בנפרד את חוק השורות ואת חוק העמודות: סוג הצורה משתנה לפי השורה, הסיבוב לפי העמודה, והסימן הפנימי מתקדם בהתאם למיקום התא. התא החסר צריך לקיים את שני החוקים יחד, ורק אפשרות ${correct} עושה זאת ללא חריגה.`;
   }
   if (mode === 'mirror') {
-    return `התשובה הנכונה היא ${correct}. קו המראה הופך ימין ושמאל, ולכן גם הסימן הפנימי עובר לצד המקביל לאחר השיקוף. האפשרות הנכונה שומרת על הצורה והצבעים, אך מציבה אותם בצד המשוקף.`;
+    return `התשובה הנכונה היא אפשרות ${correct}. קו המראה הופך ימין ושמאל, ולכן גם הסימן הפנימי עובר לצד המקביל לאחר השיקוף. האפשרות הנכונה שומרת על סוג הצורה, הצבעים והיחס הפנימי, אך מציבה אותם בצד המשוקף. כל מסיח מפר לפחות אחד מהפרטים האלה.`;
   }
   if (mode === 'cube') {
-    return `התשובה הנכונה היא ${correct}. בשאלת קובייה משווים פרט-פרט: כיוון הפאות, סיבוב הגוף והסימן הפנימי שעל הפאה. אפשרות ${correct} היא היחידה שממשיכה את אותו חוק מרחבי; המסיחים דומים אך משנים פרט אחד כמו כיוון, פאה או מיקום פנימי.`;
+    return `התשובה הנכונה היא אפשרות ${correct}. בשאלת קובייה משווים פרט-פרט: כיוון הפאות, סיבוב הגוף והסימן הפנימי שעל הפאה. אפשרות ${correct} היא היחידה שממשיכה את אותו חוק מרחבי בדיוק; המסיחים דומים, אך משנים כיוון, פאה גלויה או מיקום פנימי.`;
   }
-  return `התשובה הנכונה היא ${correct}. בסדרת הצורות בודקים את החוק המדויק: שינוי צורה, סיבוב, גודל ומיקום פנימי. רק אפשרות ${correct} ממשיכה את אותו רצף חזותי; המסיחים דומים אך טועים בפרט אחד.`;
+  return `התשובה הנכונה היא אפשרות ${correct}. בסדרת הצורות בודקים את החוק המדויק: שינוי צורה, סיבוב, גודל ומיקום פנימי. רק אפשרות ${correct} ממשיכה את אותו רצף חזותי; המסיחים דומים אך טועים בפרט אחד כמו זווית, מיקום פנימי או סוג צורה.`;
 }
 
 function renderSignature(signature: ShapeSignature, x: number, y: number, size: number, primary: string, accent: string): string {
@@ -431,23 +431,22 @@ export function ensureSpatialVisualAssets(question: Question): Question {
   if (!isSpatialQuestion(question)) return question;
 
   const correctId = correctOptionId(question);
-  const generatedQuestionImage = question.mediaUrl ? undefined : questionSvg(question);
-  const generatedExplanationImage = question.explanationImageUrl ? undefined : explanationSvg(question);
   const options = question.options.map((option, index) => ({
     ...option,
+    text: `אפשרות ${option.id.toUpperCase()}`,
     isCorrect: option.id === correctId,
-    imageUrl: option.imageUrl ?? optionSvg(question, option, index),
+    imageUrl: optionSvg(question, option, index),
   }));
 
   return {
     ...question,
     correctAnswer: correctId,
     questionType: 'shapes',
-    questionText: question.questionText || modePrompt(visualMode(question)),
-    mediaUrl: question.mediaUrl ?? generatedQuestionImage,
-    mediaType: question.mediaType ?? 'image',
-    explanation: question.explanation || spatialExplanation(question),
-    explanationImageUrl: question.explanationImageUrl ?? generatedExplanationImage,
+    questionText: modePrompt(visualMode(question)),
+    mediaUrl: questionSvg(question),
+    mediaType: 'image',
+    explanation: spatialExplanation(question),
+    explanationImageUrl: explanationSvg(question),
     options,
   };
 }

@@ -15,6 +15,7 @@ let lastAdminDataLoadStartedAt = 0;
 let adminCollectionsSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let adminRealtimeMutedUntil = 0;
 const ADMIN_RELOAD_MIN_INTERVAL_MS = 1500;
+const ADMIN_REALTIME_RELOAD_DEBOUNCE_MS = 900;
 const ADMIN_COLLECTION_SAVE_DEBOUNCE_MS = 700;
 const ADMIN_REALTIME_SELF_WRITE_MUTE_MS = 1800;
 
@@ -82,6 +83,24 @@ function syncQuestionsToSupabase(
     logger.success(context, `${questions.length} שאלות סונכרנו ל-Supabase`);
   }).catch((e: any) => {
     const message = e?.message ?? 'שגיאת סנכרון שאלות';
+    set({ isSyncing: false, syncError: message });
+    logger.error(context, message);
+  });
+}
+
+function trackAdminPersistence(
+  set: (partial: Partial<AdminState>) => void,
+  promise: Promise<unknown>,
+  context: string,
+  successMessage: string
+) {
+  set({ isSyncing: true, syncError: null });
+  adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
+  promise.then(() => {
+    set({ isSyncing: false, lastSyncedAt: new Date().toISOString(), syncError: null });
+    logger.success(context, successMessage);
+  }).catch((e: any) => {
+    const message = e?.message ?? 'שגיאת סנכרון ניהול';
     set({ isSyncing: false, syncError: message });
     logger.error(context, message);
   });
@@ -901,7 +920,7 @@ interface AdminState {
   // Supabase sync
   loadQuestionsFromSupabase: () => Promise<void>;
   seedToSupabase: () => Promise<{ ok: boolean; message: string }>;
-  loadAdminData: () => Promise<void>;
+  loadAdminData: (force?: boolean) => Promise<void>;
   syncAll: () => Promise<{ ok: boolean; message: string }>;
   startRealtimeSync: () => void;
   stopRealtimeSync: () => void;
@@ -1675,7 +1694,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   addTopic: (t) => {
     const newT: Topic = { ...t, id: `topic_admin_${Date.now()}` };
     set(s => ({ topics: [...s.topics, newT] }));
-    dbUpsertTopic(newT);
+    trackAdminPersistence(set, dbUpsertTopic(newT), 'adminStore:addTopic', `נושא נשמר ב-Supabase: ${newT.name}`);
     get().logActivity(`הוסיף נושא: ${newT.name}`, 'system');
     return newT;
   },
@@ -1684,14 +1703,14 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => {
       const updated = s.topics.map(t => (t.id === id ? { ...t, ...updates } : t));
       const t = updated.find(x => x.id === id);
-      if (t) dbUpsertTopic(t);
+      if (t) trackAdminPersistence(set, dbUpsertTopic(t), 'adminStore:updateTopic', `נושא עודכן ב-Supabase: ${t.name}`);
       return { topics: updated };
     });
   },
 
   deleteTopic: (id) => {
     set(s => ({ topics: s.topics.filter(t => t.id !== id) }));
-    deleteTopicFromDB(id);
+    trackAdminPersistence(set, deleteTopicFromDB(id), 'adminStore:deleteTopic', `נושא נמחק מ-Supabase: ${id}`);
     get().logActivity(`מחק נושא ${id}`, 'system');
   },
 
@@ -1699,7 +1718,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => {
       const targets = s.targets.map(t => (t.id === id ? { ...t, ...updates } : t));
       const target = targets.find(t => t.id === id);
-      if (target) dbUpsertTarget(target);
+      if (target) trackAdminPersistence(set, dbUpsertTarget(target), 'adminStore:updateTarget', `מסלול עודכן ב-Supabase: ${target.name}`);
       return { targets };
     });
   },
@@ -1712,7 +1731,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     });
     set(s => {
       const next = [...s.templates, newT];
-      saveTemplates(next);
+      trackAdminPersistence(set, saveTemplates(next), 'adminStore:addTemplate', `תבנית נשמרה: ${newT.name}`);
       return { templates: next };
     });
     get().logActivity(`יצר תבנית סימולציה: ${newT.name}`, 'system');
@@ -1722,7 +1741,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   updateTemplate: (id, updates) => {
     set(s => {
       const next = s.templates.map(t => (t.id === id ? normalizeTemplateRules({ ...t, ...updates }) : t));
-      saveTemplates(next);
+      trackAdminPersistence(set, saveTemplates(next), 'adminStore:updateTemplate', `תבנית עודכנה: ${id}`);
       return { templates: next };
     });
   },
@@ -1730,7 +1749,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   deleteTemplate: (id) => {
     set(s => {
       const next = s.templates.filter(t => t.id !== id);
-      saveTemplates(next);
+      trackAdminPersistence(set, saveTemplates(next), 'adminStore:deleteTemplate', `תבנית נמחקה: ${id}`);
       return { templates: next };
     });
     get().logActivity(`מחק תבנית סימולציה ${id}`, 'system');
@@ -1743,7 +1762,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           ? normalizeTemplateRules({ ...t, rules: [...t.rules.filter(r => r.id !== rule.id), rule] })
           : t
       );
-      saveTemplates(templates);
+      trackAdminPersistence(set, saveTemplates(templates), 'adminStore:addTopicRuleToTemplate', `כלל תבנית נשמר: ${templateId}`);
       return { templates };
     });
   },
@@ -1755,7 +1774,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           ? normalizeTemplateRules({ ...t, rules: t.rules.filter(r => r.id !== ruleId) })
           : t
       );
-      saveTemplates(templates);
+      trackAdminPersistence(set, saveTemplates(templates), 'adminStore:removeTopicRuleFromTemplate', `כלל תבנית הוסר: ${templateId}`);
       return { templates };
     });
   },
@@ -1767,7 +1786,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           ? { ...t, pinnedQuestionIds: [...new Set([...(t.pinnedQuestionIds ?? []), questionId])] }
           : t
       );
-      saveTemplates(templates);
+      trackAdminPersistence(set, saveTemplates(templates), 'adminStore:pinQuestionToTemplate', `שאלה הוצמדה לתבנית: ${questionId}`);
       return { templates };
     });
   },
@@ -1779,7 +1798,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           ? { ...t, pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(id => id !== questionId) }
           : t
       );
-      saveTemplates(templates);
+      trackAdminPersistence(set, saveTemplates(templates), 'adminStore:unpinQuestionFromTemplate', `שאלה הוסרה מתבנית: ${questionId}`);
       return { templates };
     });
   },
@@ -1954,12 +1973,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   seedToSupabase: () => seedDatabase(),
 
-  loadAdminData: async () => {
+  loadAdminData: async (force = false) => {
     if (adminDataLoadPromise) return adminDataLoadPromise;
 
     const now = Date.now();
     const recentlyLoaded = now - lastAdminDataLoadStartedAt < ADMIN_RELOAD_MIN_INTERVAL_MS;
-    if (recentlyLoaded && get().lastSyncedAt) return;
+    if (!force && recentlyLoaded && get().lastSyncedAt) return;
 
     lastAdminDataLoadStartedAt = now;
     adminDataLoadPromise = (async () => {
@@ -2066,7 +2085,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   syncAll: async () => {
     try {
-      await get().loadAdminData();
+      await get().loadAdminData(true);
       get().logActivity('סנכרון מלא הופעל מפאנל הניהול', 'system');
       return { ok: true, message: 'כל נתוני הניהול סונכרנו בהצלחה.' };
     } catch (e: any) {
@@ -2087,7 +2106,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           const message = e?.message ?? 'Realtime sync failed';
           set({ syncError: message, isSyncing: false });
         });
-      }, 350);
+      }, ADMIN_REALTIME_RELOAD_DEBOUNCE_MS);
     };
 
     adminRealtimeChannel = supabase
