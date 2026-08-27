@@ -14,6 +14,7 @@ import { useUserStore } from '../../store/userStore';
 import { useAdminStore, SmartExamTemplate, PremiumConfig } from '../../store/adminStore';
 import { canAccessMode, canAccessPremiumFeature, canAccessTopic } from '../../lib/accessControl';
 import { getRewardedAdUnitId, showRewardedAdForBonus } from '../../lib/ads';
+import { AdBanner } from '../../components/AdBanner';
 import { Target, Topic } from '../../data/types';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
 
@@ -449,6 +450,8 @@ function FreePracticePane({
             </LinearGradient>
           </Pressable>
         )}
+
+        <AdBanner isPremium={isPremium} isAdmin={isAdmin} placement="practice" />
 
         {/* Mode label */}
         <Text style={styles.sectionLabel}>מצב תרגול</Text>

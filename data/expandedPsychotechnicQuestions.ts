@@ -1,4 +1,4 @@
-import { Question, QuestionType, ValidationStatus } from './types';
+import { type AccessLevel, type Question, type QuestionType, type ValidationStatus } from './types';
 
 type GeneratedQuestionSeed = {
   topicId: string;
@@ -11,6 +11,7 @@ type GeneratedQuestionSeed = {
   difficulty: number;
   targetIds: string[];
   mediaUrl?: string;
+  accessLevel?: AccessLevel;
   validationStatus?: ValidationStatus;
 };
 
@@ -86,7 +87,7 @@ function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
       discrimination: Number((0.72 + (seed.difficulty % 5) * 0.035).toFixed(2)),
       guessProbability: 0.25,
     },
-    accessLevel: seed.difficulty >= 8 ? 'premium' : 'free',
+    accessLevel: seed.accessLevel ?? (seed.difficulty >= 8 ? 'premium' : 'free'),
     validationStatus,
     smartPracticeEligible: validationStatus === 'validated',
     generalPracticeEligible: validationStatus === 'validated',
@@ -1253,6 +1254,218 @@ function expandedSpatialReasoningVarietyQuestions(): GeneratedQuestionSeed[] {
   return seeds;
 }
 
+function premiumLogicReasoningQuestions(): GeneratedQuestionSeed[] {
+  const seeds: GeneratedQuestionSeed[] = [];
+  const inferenceSets = [
+    {
+      rule: 'כל מי שמסיים סימולציה מקבל דוח ביצועים. נועם סיים סימולציה.',
+      answer: 'נועם יקבל דוח ביצועים',
+      wrong: ['נועם בהכרח קיבל ציון גבוה', 'רק מי שקיבל דוח סיים סימולציה', 'נועם לא תרגל שאלות מילוליות'],
+      reason: 'הכלל חל על כל מסיימי הסימולציה, ולכן מהמקרה של נועם נובע רק שהוא יקבל דוח ביצועים.',
+    },
+    {
+      rule: 'אם שאלה מסומנת כמאומתת, היא זמינה לתרגול. שאלה 18 אינה זמינה לתרגול.',
+      answer: 'שאלה 18 אינה מסומנת כמאומתת',
+      wrong: ['שאלה 18 קשה במיוחד', 'כל שאלה לא זמינה היא שאלה מרחבית', 'שאלה 18 זמינה רק למנהל'],
+      reason: 'זהו שימוש בשלילת התוצאה: אם אימות גורר זמינות, אי-זמינות שוללת את האימות.',
+    },
+    {
+      rule: 'כל מבחן מלא כולל פרק כמותי. מבחן שאינו כולל פרק כמותי אינו מבחן מלא.',
+      answer: 'הטענה השנייה נובעת מהראשונה',
+      wrong: ['הטענה השנייה סותרת את הראשונה', 'שתי הטענות אינן קשורות', 'הטענה הראשונה נובעת מהשנייה בלבד'],
+      reason: 'הטענה השנייה היא הניסוח השקול בדרך השלילה של הכלל הראשון.',
+    },
+    {
+      rule: 'רק משתמשי פרימיום יכולים לפתוח סימולציה מלאה. דנה פתחה סימולציה מלאה.',
+      answer: 'דנה היא משתמשת פרימיום',
+      wrong: ['דנה בהכרח מנהלת', 'דנה פתחה רק תרגול חופשי', 'כל משתמשי הפרימיום פתחו סימולציה'],
+      reason: 'המילה "רק" יוצרת תנאי הכרחי: מי שפתח סימולציה מלאה חייב להיות פרימיום.',
+    },
+    {
+      rule: 'אין שאלה לוגית שמכילה תמונת צורה. שאלה מסוימת מכילה תמונת צורה.',
+      answer: 'השאלה אינה לוגית',
+      wrong: ['השאלה בוודאות מילולית', 'כל שאלה עם תמונה היא קשה', 'השאלה אינה יכולה להופיע במבחן'],
+      reason: 'אם שאלה לוגית אינה מכילה תמונת צורה, שאלה שכן מכילה תמונת צורה אינה יכולה להיות לוגית.',
+    },
+  ];
+
+  for (let i = 0; i < 90; i++) {
+    const set = inferenceSets[i % inferenceSets.length];
+    seeds.push({
+      topicId: 'topic_logic',
+      prefix: 'premium_logic_inference',
+      questionType: 'logic',
+      questionText: `הסקה לוגית ${i + 1}: ${set.rule} איזו מסקנה מתחייבת?`,
+      options: [set.answer, ...set.wrong] as [string, string, string, string],
+      correctIndex: 0,
+      explanation: `${set.reason} לכן התשובה הנכונה היא "${set.answer}", ואין להסיק אף אחת מהאפשרויות האחרות כי הן מוסיפות מידע שלא נאמר.`,
+      difficulty: 3 + (i % 8),
+      targetIds: TOPIC_TARGETS.topic_logic,
+      accessLevel: 'premium',
+      validationStatus: 'validated',
+    });
+  }
+
+  const orderContexts = [
+    ['אורי', 'בר', 'גל', 'דנה', 'אורי לפני בר; גל אחרי בר; דנה לפני אורי', 'דנה, אורי, בר, גל', 'דנה חייבת להיות לפני אורי, אורי לפני בר, וגל אחרי בר.'],
+    ['מבחן א', 'מבחן ב', 'מבחן ג', 'מבחן ד', 'מבחן ב אחרי מבחן א; מבחן ד לפני מבחן א; מבחן ג אחרי מבחן ב', 'מבחן ד, מבחן א, מבחן ב, מבחן ג', 'מבחן ד קודם לא, א קודם לב, וג אחרי ב.'],
+    ['חדר 1', 'חדר 2', 'חדר 3', 'חדר 4', 'חדר 3 מימין לחדר 2; חדר 1 משמאל לחדר 2; חדר 4 מימין לחדר 3', 'חדר 1, חדר 2, חדר 3, חדר 4', 'היחסים יוצרים רצף יחיד משמאל לימין.'],
+    ['קל', 'בינוני', 'קשה', 'קשה מאוד', 'בינוני מעל קל; קשה מעל בינוני; קשה מאוד מעל קשה', 'קל, בינוני, קשה, קשה מאוד', 'כל תנאי מציב רמה אחת מעל הקודמת.'],
+  ];
+  for (let i = 0; i < 70; i++) {
+    const c = orderContexts[i % orderContexts.length];
+    seeds.push({
+      topicId: 'topic_logic',
+      prefix: 'premium_logic_ordering',
+      questionType: 'logic',
+      questionText: `סידור נתונים ${i + 1}: נתונים ארבעה פריטים: ${c.slice(0, 4).join(', ')}. התנאים: ${c[4]}. מהו הסדר היחיד שמתאים?`,
+      options: [c[5], `${c[1]}, ${c[0]}, ${c[2]}, ${c[3]}`, `${c[3]}, ${c[2]}, ${c[1]}, ${c[0]}`, `${c[0]}, ${c[2]}, ${c[1]}, ${c[3]}`] as [string, string, string, string],
+      correctIndex: 0,
+      explanation: `${c[6]} לכן התשובה הנכונה היא "${c[5]}"; שאר האפשרויות מפרות לפחות אחד מתנאי הקדימות או המיקום.`,
+      difficulty: 2 + (i % 9),
+      targetIds: TOPIC_TARGETS.topic_logic,
+      accessLevel: 'premium',
+      validationStatus: 'validated',
+    });
+  }
+
+  const patternRules = [
+    { nums: [3, 6, 12, 24], answer: '48', wrong: ['36', '42', '54'], rule: 'כל איבר מוכפל פי 2.' },
+    { nums: [2, 5, 10, 17], answer: '26', wrong: ['24', '28', '30'], rule: 'ההפרשים הם 3, 5, 7, ולכן ההפרש הבא הוא 9.' },
+    { nums: [64, 32, 16, 8], answer: '4', wrong: ['2', '6', '12'], rule: 'כל איבר מחולק ב-2.' },
+    { nums: [1, 4, 9, 16], answer: '25', wrong: ['20', '24', '30'], rule: 'אלו ריבועים עוקבים: 1², 2², 3², 4², ולכן הבא 5².' },
+    { nums: [7, 11, 19, 35], answer: '67', wrong: ['59', '63', '71'], rule: 'ההפרשים מוכפלים: 4, 8, 16, ולכן הבא 32.' },
+  ];
+  for (let i = 0; i < 70; i++) {
+    const p = patternRules[i % patternRules.length];
+    seeds.push({
+      topicId: 'topic_logic',
+      prefix: 'premium_logic_series',
+      questionType: 'logic',
+      questionText: `סדרה לוגית ${i + 1}: מה האיבר הבא בסדרה ${p.nums.join(', ')}, ___ ?`,
+      options: [p.answer, ...p.wrong] as [string, string, string, string],
+      correctIndex: 0,
+      explanation: `${p.rule} לכן התשובה הנכונה היא "${p.answer}", והמסיחים אינם שומרים על אותו כלל מעבר.`,
+      difficulty: 2 + (i % 9),
+      targetIds: TOPIC_TARGETS.topic_logic,
+      accessLevel: 'premium',
+      validationStatus: 'validated',
+    });
+  }
+
+  return seeds;
+}
+
+function premiumVerbalReasoningQuestions(): GeneratedQuestionSeed[] {
+  const seeds: GeneratedQuestionSeed[] = [];
+  const analogies = [
+    ['מפתח', 'דלת', 'סיסמה', 'חשבון', 'כמו שמפתח מאפשר לפתוח דלת, סיסמה מאפשרת לפתוח חשבון.'],
+    ['רופא', 'אבחנה', 'חוקר', 'מסקנה', 'רופא מגיע לאבחנה מתוך סימנים, וחוקר מגיע למסקנה מתוך ראיות.'],
+    ['מפה', 'ניווט', 'מילון', 'הבנה', 'מפה מסייעת בניווט, ומילון מסייע בהבנה של מילים.'],
+    ['שורש', 'עץ', 'יסוד', 'בניין', 'שורש תומך בעץ כפי שיסוד תומך בבניין.'],
+    ['תרגול', 'מיומנות', 'קריאה', 'ידע', 'תרגול מפתח מיומנות וקריאה מרחיבה ידע.'],
+  ];
+  for (let i = 0; i < 85; i++) {
+    const a = analogies[i % analogies.length];
+    const answer = `${a[2]} : ${a[3]}`;
+    seeds.push({
+      topicId: 'topic_verbal',
+      prefix: 'premium_verbal_analogy',
+      questionType: 'verbal',
+      questionText: `אנלוגיה ${i + 1}: ${a[0]} : ${a[1]} = ?`,
+      options: [answer, `${a[3]} : ${a[2]}`, 'שאלה : תשובה', 'זמן : שעון'] as [string, string, string, string],
+      correctIndex: 0,
+      explanation: `${a[4]} לכן התשובה הנכונה היא "${answer}", משום שהיא שומרת על אותו יחס תפקודי בין שני המושגים.`,
+      difficulty: 2 + (i % 8),
+      targetIds: TOPIC_TARGETS.topic_verbal,
+      accessLevel: 'premium',
+      validationStatus: 'validated',
+    });
+  }
+
+  const completionSets = [
+    {
+      sentence: 'אף על פי שההוראות היו ארוכות, המועמד הצליח לענות במהירות משום שהן היו ___ וברורות.',
+      answer: 'מסודרות',
+      wrong: ['סתירות', 'אקראיות', 'מעורפלות'],
+      reason: 'המילה "משום" מציגה סיבה חיובית להצלחה, ולכן נדרשת מילה שמחזקת בהירות.',
+    },
+    {
+      sentence: 'הטענה נראתה משכנעת, אך לאחר בדיקה התברר שהיא נשענת על הנחה ___.',
+      answer: 'שגויה',
+      wrong: ['מבוססת', 'מוכחת', 'זהירה'],
+      reason: 'המילה "אך" יוצרת ניגוד בין רושם ראשוני חיובי לבין בעיה שהתגלתה.',
+    },
+    {
+      sentence: 'כדי לפתור שאלה מילולית מורכבת, כדאי לזהות תחילה את ___ בין חלקי המשפט.',
+      answer: 'הקשר הלוגי',
+      wrong: ['מספר האותיות', 'צבע הכותרת', 'אורך השורה'],
+      reason: 'בשאלה מילולית מורכבת הדבר החשוב הוא היחס הלוגי בין רעיונות.',
+    },
+    {
+      sentence: 'כאשר מסיח נראה נכון אך אינו עונה בדיוק על השאלה, יש להעדיף תשובה ___ יותר.',
+      answer: 'מדויקת',
+      wrong: ['ארוכה', 'קיצונית', 'מעורפלת'],
+      reason: 'מבחן פסיכוטכני בוחן דיוק, ולכן יש לבחור בתשובה שמותאמת בדיוק לניסוח.',
+    },
+  ];
+  for (let i = 0; i < 80; i++) {
+    const c = completionSets[i % completionSets.length];
+    seeds.push({
+      topicId: 'topic_verbal',
+      prefix: 'premium_verbal_completion',
+      questionType: 'verbal',
+      questionText: `השלמת משפט ${i + 1}: ${c.sentence}`,
+      options: [c.answer, ...c.wrong] as [string, string, string, string],
+      correctIndex: 0,
+      explanation: `${c.reason} לכן התשובה הנכונה היא "${c.answer}", ושאר האפשרויות יוצרות משמעות לא טבעית או לא הגיונית.`,
+      difficulty: 2 + (i % 9),
+      targetIds: TOPIC_TARGETS.topic_verbal,
+      accessLevel: 'premium',
+      validationStatus: 'validated',
+    });
+  }
+
+  const passages = [
+    {
+      text: 'במחקר קטן נמצא שתלמידים שפתרו שאלות עם הסבר לאחר הטעות השתפרו יותר מתלמידים שקיבלו רק סימון נכון או לא נכון.',
+      answer: 'הסבר לאחר טעות עשוי לשפר למידה יותר מסימון בלבד',
+      wrong: ['כל תלמיד חייב לפתור רק שאלות קשות', 'אין צורך בסימון תשובות כלל', 'המחקר מוכיח שכל הסבר תמיד נכון'],
+      reason: 'הקטע משווה בין שתי צורות משוב ומציג יתרון להסבר לאחר טעות.',
+    },
+    {
+      text: 'מנהל המאגר החליט ששאלה תופיע בסימולציה רק לאחר אימות, כדי לצמצם סיכוי לתשובה כפולה או הסבר לא מתאים.',
+      answer: 'האימות נועד לשפר את איכות השאלות לפני הופעתן בסימולציה',
+      wrong: ['אימות נועד להסתיר את כל השאלות', 'כל שאלה לא מאומתת שגויה בהכרח', 'סימולציות אינן כוללות שאלות'],
+      reason: 'הקטע מסביר שהאימות הוא מנגנון בקרת איכות לפני שימוש במבחן.',
+    },
+    {
+      text: 'בתרגול חופשי המשתמש מקבל משוב מיידי, ואילו בסימולציה מלאה ההסברים מוצגים רק בסיום כדי לשמור על תנאי מבחן.',
+      answer: 'קיים הבדל מכוון בין תרגול לבין סימולציה מלאה',
+      wrong: ['בסימולציה אין תשובות', 'בתרגול חופשי אין משוב', 'כל המשתמשים חייבים להירשם מראש'],
+      reason: 'הקטע מציג שתי חוויות שונות ומבהיר את המטרה של כל אחת.',
+    },
+  ];
+  for (let i = 0; i < 75; i++) {
+    const p = passages[i % passages.length];
+    seeds.push({
+      topicId: 'topic_verbal',
+      prefix: 'premium_verbal_passage',
+      questionType: 'verbal',
+      questionText: `הבנת הנקרא ${i + 1}: ${p.text} מה המסקנה המדויקת ביותר?`,
+      options: [p.answer, ...p.wrong] as [string, string, string, string],
+      correctIndex: 0,
+      explanation: `${p.reason} לכן התשובה הנכונה היא "${p.answer}", כי היא מסכמת רק את מה שנאמר ואינה מוסיפה טענה קיצונית.`,
+      difficulty: 3 + (i % 8),
+      targetIds: TOPIC_TARGETS.topic_verbal,
+      accessLevel: 'premium',
+      validationStatus: 'validated',
+    });
+  }
+
+  return seeds;
+}
+
 const RAW_EXPANDED_QUESTIONS: GeneratedQuestionSeed[] = [
   ...seriesQuestions(),
   ...quantitativeQuestions(),
@@ -1268,6 +1481,8 @@ const RAW_EXPANDED_QUESTIONS: GeneratedQuestionSeed[] = [
   ...massiveSpatialQuestions(),
   ...pendingAdminValidationQuestions(),
   ...expandedSpatialReasoningVarietyQuestions(),
+  ...premiumLogicReasoningQuestions(),
+  ...premiumVerbalReasoningQuestions(),
 ];
 
 export const EXPANDED_PSYCHOTECHNIC_QUESTIONS: Question[] = RAW_EXPANDED_QUESTIONS.map(createQuestion);

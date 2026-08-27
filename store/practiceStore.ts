@@ -28,6 +28,7 @@ interface PracticeState {
     questions: Question[];
     initialLevel?: PerformanceLevel;
   }) => void;
+  refreshSessionQuestions: (questions: Question[]) => void;
 
   submitAnswer: (selectedAnswerId: string) => {
     isCorrect: boolean;
@@ -66,6 +67,40 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
         startedAt: now,
         questionStartedAt: now,
         adaptiveLevel: initialLevel,
+      },
+    });
+  },
+
+  refreshSessionQuestions: (questions) => {
+    const { session } = get();
+    if (!session || questions.length === 0) return;
+
+    const normalizedQuestions = questions.map(question =>
+      isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question
+    );
+    const incomingById = new Map(normalizedQuestions.map(question => [question.id, question]));
+    const answeredIds = new Set(session.answers.map(answer => answer.questionId));
+    const oldCurrentId = session.questions[session.currentIndex]?.id;
+
+    const mergedExisting = session.questions
+      .map(question => incomingById.get(question.id) ?? (answeredIds.has(question.id) ? question : null))
+      .filter((question): question is Question => Boolean(question));
+
+    const existingIds = new Set(mergedExisting.map(question => question.id));
+    const additions = normalizedQuestions.filter(question => !existingIds.has(question.id));
+    const nextQuestions = [...mergedExisting, ...additions];
+    if (nextQuestions.length === 0) return;
+
+    let nextIndex = nextQuestions.findIndex(question => question.id === oldCurrentId);
+    if (nextIndex === -1) nextIndex = Math.min(session.currentIndex, nextQuestions.length - 1);
+    const nextCurrentId = nextQuestions[nextIndex]?.id;
+
+    set({
+      session: {
+        ...session,
+        questions: nextQuestions,
+        currentIndex: nextIndex,
+        questionStartedAt: nextCurrentId !== oldCurrentId ? new Date() : session.questionStartedAt,
       },
     });
   },
