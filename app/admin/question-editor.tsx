@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   TextInput, KeyboardAvoidingView, Platform, Alert, Switch, ActivityIndicator,
@@ -14,6 +14,8 @@ import { detectDir, textAlign as ta } from '../../utils/textDirection';
 import { AdminImagePicker } from '../../components/AdminImagePicker';
 import { VisualImage } from '../../components/VisualImage';
 import { loadQuestionUsageStats, QuestionUsageStats } from '../../lib/db';
+import { auditPsychotechnicQuestion } from '../../utils/questionQuality';
+import AdminErrorToast, { AdminToastError, showAdminErrorToast } from '../../components/AdminErrorToast';
 
 const QUESTION_TYPES: QuestionType[] = [
   'multiple_choice', 'true_false', 'logic', 'verbal', 'quantitative', 'shapes',
@@ -78,6 +80,7 @@ export default function QuestionEditor() {
     existing?.mediaType === 'image' ? 'image' : undefined
   );
   const [imageOnlyMode, setImageOnlyMode] = useState(false);
+  const [toastError, setToastError] = useState<AdminToastError | null>(null);
 
   const markDirty = () => { if (!isDirty) setIsDirty(true); };
 
@@ -175,31 +178,62 @@ export default function QuestionEditor() {
     markDirty();
   };
 
-  const handleSave = () => {
+  const currentDraftForAudit = useMemo<Omit<Question, 'id'>>(() => {
+    const correctOpt = options.find(o => o.isCorrect);
+    const rawElo = parseInt(eloOverride);
+    const elo = isNaN(rawElo) ? difficultyToElo(difficulty) : Math.max(800, Math.min(2000, rawElo));
+    return {
+      targetIds,
+      topicId,
+      questionType,
+      questionText,
+      readingPassage: readingPassage.trim() || undefined,
+      mediaUrl: mediaUrl || undefined,
+      mediaType: mediaUrl ? 'image' : undefined,
+      options,
+      correctAnswer: correctOpt?.id ?? '',
+      explanation,
+      explanationImageUrl: explanationImageUrl || undefined,
+      difficulty,
+      psychometricStats: { elo, discrimination: 0.75, guessProbability: 0.25 },
+      accessLevel,
+      validationStatus,
+      smartPracticeEligible: validationStatus === 'validated',
+      generalPracticeEligible: validationStatus === 'validated',
+    };
+  }, [accessLevel, difficulty, eloOverride, explanation, explanationImageUrl, mediaUrl, options, questionText, questionType, readingPassage, targetIds, topicId, validationStatus]);
+
+  const qualityIssues = useMemo(() => auditPsychotechnicQuestion(currentDraftForAudit), [currentDraftForAudit]);
+  const selectedTopic = topics.find(t => t.id === topicId);
+  const selectedTargets = targetIds.map(id => targets.find(t => t.id === id)?.name ?? id);
+  const correctOption = options.find(o => o.isCorrect);
+  const imageCount = (mediaUrl ? 1 : 0) + (explanationImageUrl ? 1 : 0) + options.filter(o => o.imageUrl).length;
+
+  const handleSave = (nextAction: 'back' | 'stay' | 'preview' = 'back') => {
     if (!questionText.trim()) {
-      Alert.alert('שגיאה', 'נא להזין את טקסט השאלה');
+      showAdminErrorToast(setToastError, 'חסר טקסט שאלה', 'נא להזין את טקסט השאלה לפני שמירה.', { questionId, mode, currentDraftForAudit }, 'admin:question-editor');
       return;
     }
     if (questionText.trim().length < 10) {
-      Alert.alert('שגיאה', 'טקסט השאלה קצר מדי (מינימום 10 תווים)');
+      showAdminErrorToast(setToastError, 'טקסט קצר מדי', 'טקסט השאלה חייב להיות לפחות 10 תווים.', { questionId, length: questionText.trim().length }, 'admin:question-editor');
       return;
     }
     const optionsNeedText = !imageOnlyMode && !options.every(o => !!o.imageUrl);
     if (optionsNeedText && options.some(o => !o.text.trim())) {
-      Alert.alert('שגיאה', 'נא למלא את כל האפשרויות');
+      showAdminErrorToast(setToastError, 'אפשרויות חסרות', 'נא למלא טקסט או תמונה לכל אפשרות תשובה.', { questionId, options }, 'admin:question-editor');
       return;
     }
     const correctOpt = options.find(o => o.isCorrect);
     if (!correctOpt) {
-      Alert.alert('שגיאה', 'נא לסמן תשובה נכונה');
+      showAdminErrorToast(setToastError, 'חסרה תשובה נכונה', 'נא לסמן תשובה נכונה אחת לפני שמירה.', { questionId, options }, 'admin:question-editor');
       return;
     }
     if (!explanation.trim()) {
-      Alert.alert('שגיאה', 'נא להוסיף הסבר לשאלה');
+      showAdminErrorToast(setToastError, 'חסר הסבר', 'נא להוסיף הסבר לשאלה לפני שמירה.', { questionId }, 'admin:question-editor');
       return;
     }
     if (targetIds.length === 0) {
-      Alert.alert('שגיאה', 'יש לבחור לפחות מסלול אחד');
+      showAdminErrorToast(setToastError, 'חסר שיוך', 'יש לבחור לפחות מסלול/קורס אחד לפני שמירה.', { questionId, topicId }, 'admin:question-editor');
       return;
     }
 
@@ -231,17 +265,39 @@ export default function QuestionEditor() {
       generalPracticeEligible: validationStatus === 'validated',
     };
 
+    const openPreview = (savedId: string) => {
+      router.push({ pathname: '/practice-session', params: { questionId: savedId, adminPreview: '1' } });
+    };
+
     if (isEdit && questionId) {
       updateQuestion(questionId, q);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsDirty(false);
+      if (nextAction === 'stay') {
+        Alert.alert('נשמר', 'השאלה עודכנה ונשמרה ל-Supabase.');
+        return;
+      }
+      if (nextAction === 'preview') {
+        openPreview(questionId);
+        return;
+      }
       Alert.alert(
         '✅ שאלה עודכנה',
         `נשמרה ל-Supabase עם סטטוס "${validationStatus}"\nעדכונים יופיעו מיד.`,
         [{ text: 'אוקי', onPress: () => router.back() }]
       );
     } else {
-      addQuestion(q);
+      const saved = addQuestion(q);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsDirty(false);
+      if (nextAction === 'stay') {
+        Alert.alert('נשמר', 'השאלה נוצרה ונשמרה ל-Supabase.');
+        return;
+      }
+      if (nextAction === 'preview') {
+        openPreview(saved.id);
+        return;
+      }
       Alert.alert(
         '✅ שאלה נוצרה',
         `נשמרה ל-Supabase עם סטטוס "${validationStatus}"\nתופיע בתור ולידציה.`,
@@ -265,6 +321,7 @@ export default function QuestionEditor() {
   const diffColor = difficulty <= 3 ? Colors.success : difficulty <= 6 ? Colors.warning : Colors.danger;
 
   return (
+    <>
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -284,6 +341,31 @@ export default function QuestionEditor() {
           <View style={styles.pageHeader}>
             <Text style={styles.pageTitle}>{isEdit ? '✏️ עריכת שאלה' : '➕ שאלה חדשה'}</Text>
             {isDirty && <Text style={styles.dirtyBadge}>לא נשמר</Text>}
+          </View>
+
+          <View style={styles.workflowBar}>
+            <View style={styles.workflowInfo}>
+              <Text style={styles.workflowTitle}>{selectedTopic?.icon} {selectedTopic?.name ?? 'ללא נושא'}</Text>
+              <Text style={styles.workflowSub} numberOfLines={2}>
+                {selectedTargets.join(', ') || 'לא משויך למסלול'} · {TYPE_LABELS[questionType]} · {accessLevel === 'premium' ? 'פרימיום' : 'חינמי'}
+              </Text>
+            </View>
+            <View style={styles.workflowStats}>
+              <WorkflowPill label="תמונות" value={imageCount} tone={imageCount ? Colors.success : Colors.textTertiary} />
+              <WorkflowPill label="תשובה" value={correctOption?.id.toUpperCase() ?? '-'} tone={correctOption ? Colors.success : Colors.danger} />
+              <WorkflowPill label="בדיקות" value={qualityIssues.length ? qualityIssues.length : 'OK'} tone={qualityIssues.length ? Colors.warning : Colors.success} />
+            </View>
+            <View style={styles.workflowActions}>
+              <Pressable onPress={() => router.push('/admin/question-assignment')} style={styles.workflowAction}>
+                <Text style={styles.workflowActionText}>שיוך</Text>
+              </Pressable>
+              <Pressable onPress={() => handleSave('stay')} style={styles.workflowActionPrimary}>
+                <Text style={styles.workflowActionPrimaryText}>שמור והשאר</Text>
+              </Pressable>
+              <Pressable onPress={() => handleSave('preview')} style={styles.workflowAction}>
+                <Text style={styles.workflowActionText}>שמור ותצוגה</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Section: question text */}
@@ -546,6 +628,10 @@ export default function QuestionEditor() {
             />
           </Section>
 
+          <Section title="🧪 בדיקת איכות לפני פרסום">
+            <QualityChecklist issues={qualityIssues} imageCount={imageCount} optionCount={options.length} />
+          </Section>
+
           {isEdit && (
             <Section title="📊 סטטיסטיקה והיסטוריית מענה">
               <QuestionUsagePanel stats={usageStats} loading={usageLoading} />
@@ -592,7 +678,7 @@ export default function QuestionEditor() {
 
           {/* Save */}
           <Pressable
-            onPress={handleSave}
+            onPress={() => handleSave('back')}
             style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.9 }]}
           >
             <Text style={styles.saveBtnText}>{isEdit ? '💾 שמור שינויים' : '➕ הוסף שאלה'}</Text>
@@ -609,6 +695,42 @@ export default function QuestionEditor() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    <AdminErrorToast error={toastError} onDismiss={() => setToastError(null)} />
+    </>
+  );
+}
+
+function WorkflowPill({ label, value, tone }: { label: string; value: string | number; tone: string }) {
+  return (
+    <View style={[styles.workflowPill, { borderColor: tone + '55', backgroundColor: tone + '12' }]}>
+      <Text style={[styles.workflowPillValue, { color: tone }]}>{value}</Text>
+      <Text style={styles.workflowPillLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function QualityChecklist({ issues, imageCount, optionCount }: { issues: string[]; imageCount: number; optionCount: number }) {
+  const rows = [
+    { label: 'תשובה נכונה אחת בלבד', ok: !issues.some(issue => issue.includes('תשובה נכונה')) },
+    { label: 'הסבר מספיק ברור', ok: !issues.some(issue => issue.includes('הסבר')) },
+    { label: 'לפחות שתי אפשרויות', ok: optionCount >= 2 },
+    { label: 'מדיה ותמונות נשמרות', ok: imageCount > 0 },
+    { label: 'מוכנה לפרסום במאגר', ok: issues.length === 0 },
+  ];
+  return (
+    <View style={styles.qualityWrap}>
+      {rows.map(row => (
+        <View key={row.label} style={styles.qualityRow}>
+          <Text style={[styles.qualityStatus, { color: row.ok ? Colors.success : Colors.warning }]}>{row.ok ? 'תקין' : 'לבדיקה'}</Text>
+          <Text style={styles.qualityLabel}>{row.label}</Text>
+        </View>
+      ))}
+      {issues.length > 0 && (
+        <View style={styles.qualityIssuesBox}>
+          {issues.map(issue => <Text key={issue} style={styles.qualityIssueText}>• {issue}</Text>)}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -760,6 +882,46 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: Radius.full,
   },
+  workflowBar: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.primary + '44',
+    padding: 12,
+    marginBottom: 12,
+    gap: 12,
+    ...Shadow.sm,
+  },
+  workflowInfo: { alignItems: 'flex-end', gap: 3 },
+  workflowTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
+  workflowSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', writingDirection: 'rtl' },
+  workflowStats: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  workflowPill: { flexGrow: 1, minWidth: 86, borderRadius: Radius.lg, borderWidth: 1, padding: 8, alignItems: 'flex-end' },
+  workflowPillValue: { fontFamily: FontFamily.heading, fontSize: FontSize.base, textAlign: 'right' },
+  workflowPillLabel: { fontFamily: FontFamily.medium, fontSize: 10, color: Colors.textTertiary, textAlign: 'right', marginTop: 2 },
+  workflowActions: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  workflowAction: {
+    flexGrow: 1,
+    minHeight: 40,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  workflowActionPrimary: {
+    flexGrow: 1,
+    minHeight: 40,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  workflowActionText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.text, textAlign: 'center' },
+  workflowActionPrimaryText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff', textAlign: 'center' },
 
   fieldLabel: {
     fontFamily: FontFamily.medium,
@@ -862,6 +1024,27 @@ const styles = StyleSheet.create({
   usageEventResult: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'right' },
   usageEventText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', writingDirection: 'rtl' },
   usageEventDate: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textTertiary, textAlign: 'right' },
+  qualityWrap: { gap: 8 },
+  qualityRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  qualityStatus: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, minWidth: 62, textAlign: 'left' },
+  qualityLabel: { flex: 1, fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  qualityIssuesBox: {
+    backgroundColor: Colors.warningLight,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.warning + '44',
+    padding: 10,
+    marginTop: 4,
+  },
+  qualityIssueText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.warning, textAlign: 'right', lineHeight: 19 },
 
   // Difficulty
   diffHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },

@@ -193,6 +193,21 @@ export default function SimulationBuilder() {
     return { shortages, adaptiveRules, avgSeconds, strictRules };
   };
 
+  const rulePlanningRows = useMemo(() => rules.map(rule => {
+    const topic = topics.find(t => t.id === rule.topicId);
+    const topicQuestions = questions.filter(q => q.validationStatus === 'validated' && q.topicId === rule.topicId);
+    const inRange = topicQuestions.filter(q => q.difficulty >= rule.minDifficulty && q.difficulty <= rule.maxDifficulty).length;
+    const shortage = Math.max(0, rule.count - inRange);
+    return {
+      rule,
+      topicName: `${topic?.icon ?? ''} ${topic?.name ?? rule.topicId}`.trim(),
+      available: topicQuestions.length,
+      inRange,
+      shortage,
+      ready: shortage === 0,
+    };
+  }), [questions, rules, topics]);
+
   const contentAudit = useMemo(() => {
     const rows = templates.map(template => ({ template, audit: getTemplateAudit(template) }));
     const shortageCount = rows.filter(row => row.audit.shortages.length > 0).length;
@@ -407,7 +422,34 @@ export default function SimulationBuilder() {
               <Pressable onPress={applyBalancedTiming} style={[styles.formToolBtn, { borderColor: Colors.success + '66' }]}>
                 <Text style={[styles.formToolText, { color: Colors.success }]}>זמן מומלץ</Text>
               </Pressable>
+              <Pressable onPress={() => router.push('/admin/question-assignment')} style={[styles.formToolBtn, { borderColor: Colors.accent + '66' }]}>
+                <Text style={[styles.formToolText, { color: Colors.accent }]}>שיוך שאלות</Text>
+              </Pressable>
             </View>
+
+            {rulePlanningRows.length > 0 && (
+              <View style={styles.planPanel}>
+                <View style={styles.planHeader}>
+                  <Text style={styles.planTitle}>תכנון מבחן לפני שמירה</Text>
+                  <Text style={styles.planSub}>{rulePlanningRows.filter(row => row.ready).length}/{rulePlanningRows.length} פרקים מוכנים</Text>
+                </View>
+                {rulePlanningRows.map(row => (
+                  <View key={row.rule.id} style={[styles.planRow, !row.ready && styles.planRowWarn]}>
+                    <View style={styles.planStatus}>
+                      <Text style={[styles.planStatusText, { color: row.ready ? Colors.success : Colors.warning }]}>
+                        {row.ready ? 'תקין' : `חסר ${row.shortage}`}
+                      </Text>
+                    </View>
+                    <View style={styles.planInfo}>
+                      <Text style={styles.planTopic}>{row.topicName}</Text>
+                      <Text style={styles.planMeta}>
+                        נדרש {row.rule.count} · מתאים לטווח {row.inRange} · מאושרות בנושא {row.available} · קושי {row.rule.minDifficulty}-{row.rule.maxDifficulty}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {rules.map(rule => {
               const topic = topics.find(t => t.id === rule.topicId);
@@ -731,6 +773,15 @@ export default function SimulationBuilder() {
                 <HealthPill label="קשיחות חריגה" value={audit.strictRules} color={audit.strictRules ? Colors.warning : Colors.success} />
               </View>
 
+              <View style={styles.templateWorkflowRow}>
+                <Pressable onPress={() => router.push('/admin/question-assignment')} style={styles.templateWorkflowBtn}>
+                  <Text style={styles.templateWorkflowText}>נהל שיוכי שאלות</Text>
+                </Pressable>
+                <Pressable onPress={() => router.push('/admin/questions')} style={styles.templateWorkflowBtn}>
+                  <Text style={styles.templateWorkflowText}>פתח מאגר שאלות</Text>
+                </Pressable>
+              </View>
+
               {/* Rules summary */}
               <View style={styles.rulesSummary}>
                 {t.rules.map(r => {
@@ -906,6 +957,19 @@ const styles = StyleSheet.create({
   templateDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', marginBottom: 10, lineHeight: 18 },
   templateStats: { flexDirection: 'row-reverse', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
   templateHealthRow: { flexDirection: 'row-reverse', gap: 6, flexWrap: 'wrap', marginBottom: 10 },
+  templateWorkflowRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  templateWorkflowBtn: {
+    flexGrow: 1,
+    minHeight: 38,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  templateWorkflowText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'center' },
   healthPill: { minWidth: 86, flexGrow: 1, borderRadius: Radius.lg, borderWidth: 1, backgroundColor: Colors.surfaceSecondary, paddingHorizontal: 8, paddingVertical: 7, alignItems: 'flex-end' },
   healthPillValue: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, textAlign: 'right' },
   healthPillLabel: { fontFamily: FontFamily.regular, fontSize: 9, color: Colors.textTertiary, textAlign: 'right', marginTop: 1 },
@@ -944,6 +1008,34 @@ const styles = StyleSheet.create({
   formTools: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   formToolBtn: { flexGrow: 1, borderRadius: Radius.lg, borderWidth: 1, backgroundColor: Colors.surfaceSecondary, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center' },
   formToolText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'center' },
+  planPanel: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.primary + '33',
+    padding: 12,
+    marginBottom: 14,
+    gap: 8,
+  },
+  planHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
+  planTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  planSub: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'left' },
+  planRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    padding: 10,
+  },
+  planRowWarn: { borderColor: Colors.warning + '55', backgroundColor: Colors.warningLight },
+  planStatus: { minWidth: 70, alignItems: 'flex-start' },
+  planStatusText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, textAlign: 'left' },
+  planInfo: { flex: 1, alignItems: 'flex-end' },
+  planTopic: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  planMeta: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textSecondary, textAlign: 'right', marginTop: 3, lineHeight: 16 },
 
   ruleCard: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.lg, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: Colors.border },
   ruleHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 8 },
