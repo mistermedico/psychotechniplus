@@ -10,7 +10,9 @@ import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
-import { AccessLevel, ValidationStatus } from '../../data/types';
+import { AccessLevel, Question, QuestionType, ValidationStatus } from '../../data/types';
+import { VisualImage } from '../../components/VisualImage';
+import AdminErrorToast, { AdminToastError, showAdminErrorToast } from '../../components/AdminErrorToast';
 
 type Tab = 'topic' | 'target' | 'exam' | 'pool';
 
@@ -23,9 +25,20 @@ const STATUS_COLORS: Record<ValidationStatus, string> = {
 const STATUS_LABELS: Record<ValidationStatus, string> = {
   validated: 'מאושר', pending: 'ממתין', rejected: 'נדחה', draft: 'טיוטה',
 };
+const TYPE_LABELS: Record<QuestionType, string> = {
+  multiple_choice: 'בחירה מרובה',
+  true_false: 'נכון/לא נכון',
+  logic: 'לוגיקה',
+  verbal: 'מילולי',
+  quantitative: 'כמותי',
+  shapes: 'צורות/מרחב',
+  reading_comprehension: 'הבנת הנקרא',
+  fill_in_the_blank: 'השלמת חסר',
+};
 
 export default function QuestionAssignmentScreen() {
   const [tab, setTab] = useState<Tab>('topic');
+  const [toastError, setToastError] = useState<AdminToastError | null>(null);
 
   const TABS: [Tab, string, string][] = [
     ['topic',  '📚', 'נושא'],
@@ -42,6 +55,14 @@ export default function QuestionAssignmentScreen() {
         </Pressable>
         <Text style={styles.headerTitle}>🔗 שיוך שאלות</Text>
         <Text style={styles.headerSub}>נושא · מסלול · מבחן · פול אדפטיבי</Text>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => router.push('/admin/question-editor')} style={styles.headerActionBtn}>
+            <Text style={styles.headerActionText}>+ שאלה ידנית</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/admin/json-import')} style={styles.headerActionBtnSecondary}>
+            <Text style={styles.headerActionText}>ייבוא JSON</Text>
+          </Pressable>
+        </View>
       </LinearGradient>
 
       <View style={styles.tabBar}>
@@ -57,10 +78,11 @@ export default function QuestionAssignmentScreen() {
         ))}
       </View>
 
-      {tab === 'topic'  && <TopicAssignmentTab />}
-      {tab === 'target' && <TargetAssignmentTab />}
-      {tab === 'exam'   && <ExamAssignmentTab />}
-      {tab === 'pool'   && <AdaptivePoolTab />}
+      {tab === 'topic'  && <TopicAssignmentTab onError={setToastError} />}
+      {tab === 'target' && <TargetAssignmentTab onError={setToastError} />}
+      {tab === 'exam'   && <ExamAssignmentTab onError={setToastError} />}
+      {tab === 'pool'   && <AdaptivePoolTab onError={setToastError} />}
+      <AdminErrorToast error={toastError} onDismiss={() => setToastError(null)} />
     </SafeAreaView>
   );
 }
@@ -120,14 +142,23 @@ function SelectionBar({
 function QuestionRow({
   q, topicName, isSelected, onPress, badge,
 }: {
-  q: any; topicName: string; isSelected: boolean; onPress: () => void; badge?: React.ReactNode;
+  q: Question; topicName: string; isSelected: boolean; onPress: () => void; badge?: React.ReactNode;
 }) {
   const statusColor = STATUS_COLORS[q.validationStatus as ValidationStatus] ?? Colors.textTertiary;
   const statusLabel = STATUS_LABELS[q.validationStatus as ValidationStatus] ?? q.validationStatus;
+  const { targets, templates } = useAdminStore();
+  const targetNames = q.targetIds.map(tid => targets.find(t => t.id === tid)?.name ?? tid);
+  const examNames = templates
+    .filter(t => (t.pinnedQuestionIds ?? []).includes(q.id) || t.rules.some(r => r.topicId === q.topicId))
+    .map(t => t.name);
+  const imageCount = (q.mediaUrl ? 1 : 0) + (q.explanationImageUrl ? 1 : 0) + q.options.filter(o => o.imageUrl).length;
   return (
     <Pressable onPress={onPress} style={[styles.qRow, isSelected && styles.qRowSelected]}>
       <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
         {isSelected && <Text style={styles.checkmark}>✓</Text>}
+      </View>
+      <View style={styles.qThumbWrap}>
+        <VisualImage uri={q.mediaUrl ?? q.options.find(o => o.imageUrl)?.imageUrl ?? q.explanationImageUrl} style={styles.qThumb} fallbackLabel="אין תמונה" />
       </View>
       <View style={styles.qInfo}>
         <Text style={styles.qText} numberOfLines={2}>{q.questionText}</Text>
@@ -137,7 +168,27 @@ function QuestionRow({
           </View>
           <Text style={styles.qMetaText}>📚 {topicName}</Text>
           <Text style={styles.qMetaText}>⚖️ {q.difficulty}</Text>
+          <Text style={styles.qMetaText}>{TYPE_LABELS[q.questionType] ?? q.questionType}</Text>
+          <Text style={styles.qMetaText}>{q.accessLevel === 'premium' ? 'פרימיום' : 'חינמי'}</Text>
+          <Text style={styles.qMetaText}>תמונות: {imageCount}</Text>
           {badge}
+        </View>
+        <Text style={styles.qMetaLine} numberOfLines={1}>מסלולים/קורסים: {targetNames.join(', ') || 'לא משויך'}</Text>
+        <Text style={styles.qMetaLine} numberOfLines={1}>מבחנים: {examNames.slice(0, 3).join(', ') || 'לא מוצמד; יכול להיכנס לפי כלל נושא'}{examNames.length > 3 ? ` +${examNames.length - 3}` : ''}</Text>
+        <Text style={styles.qMetaLine} numberOfLines={2}>הסבר: {q.explanation || 'חסר הסבר'}</Text>
+        <View style={styles.qQuickActions}>
+          <Pressable
+            onPress={() => router.push({ pathname: '/admin/question-editor', params: { questionId: q.id, mode: 'edit' } })}
+            style={styles.qQuickBtn}
+          >
+            <Text style={styles.qQuickText}>ערוך מלא</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push({ pathname: '/practice-session', params: { questionId: q.id, adminPreview: '1' } })}
+            style={styles.qQuickBtnSecondary}
+          >
+            <Text style={styles.qQuickText}>תצוגה</Text>
+          </Pressable>
         </View>
       </View>
     </Pressable>
@@ -146,7 +197,7 @@ function QuestionRow({
 
 // ── Tab 1: Topic assignment ───────────────────────────────────────────────────
 
-function TopicAssignmentTab() {
+function TopicAssignmentTab({ onError }: { onError: (error: AdminToastError | null) => void }) {
   const insets = useSafeAreaInsets();
   const { questions, topics, assignQuestionsToTopic } = useAdminStore();
   const [sourceTopicId, setSourceTopicId] = useState('');
@@ -176,6 +227,10 @@ function TopicAssignmentTab() {
 
   const handleAssign = async (targetTopicId: string) => {
     const ids = [...selected];
+    if (ids.length === 0) {
+      showAdminErrorToast(onError, 'אין שאלות שנבחרו', 'בחר לפחות שאלה אחת לפני שיוך לנושא.', { tab: 'topic', targetTopicId }, 'admin:question-assignment');
+      return;
+    }
     const target = topics.find(t => t.id === targetTopicId);
     Alert.alert(
       'שיוך לנושא',
@@ -289,7 +344,7 @@ function TopicAssignmentTab() {
 
 // ── Tab 2: Target (track) assignment ─────────────────────────────────────────
 
-function TargetAssignmentTab() {
+function TargetAssignmentTab({ onError }: { onError: (error: AdminToastError | null) => void }) {
   const { questions, topics, targets, assignQuestionsToTargets } = useAdminStore();
   const [statusFilter, setStatusFilter] = useState<ValidationStatus | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -323,7 +378,14 @@ function TargetAssignmentTab() {
   const handleAssign = () => {
     const ids = [...selected];
     const tIds = [...selectedTargets];
-    if (tIds.length === 0) { Alert.alert('שגיאה', 'בחר לפחות מסלול אחד'); return; }
+    if (ids.length === 0) {
+      showAdminErrorToast(onError, 'אין שאלות שנבחרו', 'בחר לפחות שאלה אחת לפני שיוך למסלול/קורס.', { tab: 'target', selectedTargets: tIds }, 'admin:question-assignment');
+      return;
+    }
+    if (tIds.length === 0) {
+      showAdminErrorToast(onError, 'חסר מסלול יעד', 'בחר לפחות מסלול/קורס אחד לפני שמירת השיוך.', { tab: 'target', selectedQuestionIds: ids }, 'admin:question-assignment');
+      return;
+    }
     const names = tIds.map(id => targets.find(t => t.id === id)?.name ?? id).join(', ');
     Alert.alert(
       'שיוך למסלולים',
@@ -449,7 +511,7 @@ function TargetAssignmentTab() {
 
 // ── Tab 3: Exam template assignment ──────────────────────────────────────────
 
-function ExamAssignmentTab() {
+function ExamAssignmentTab({ onError }: { onError: (error: AdminToastError | null) => void }) {
   const insets = useSafeAreaInsets();
   const {
     questions, topics, templates,
@@ -480,12 +542,21 @@ function ExamAssignmentTab() {
   }, [questions, pinned, qSearch, qStatusFilter]);
 
   const addTopicRule = () => {
-    if (!template || !ruleTopicId) { Alert.alert('שגיאה', 'בחר נושא'); return; }
+    if (!template || !ruleTopicId) {
+      showAdminErrorToast(onError, 'חסר נושא במבחן', 'בחר נושא לפני הוספת כלל למבחן.', { selectedTemplateId, ruleTopicId }, 'admin:question-assignment');
+      return;
+    }
     const count = parseInt(ruleCount, 10);
     const min = parseInt(ruleMinDiff, 10);
     const max = parseInt(ruleMaxDiff, 10);
-    if (isNaN(count) || count < 1) { Alert.alert('שגיאה', 'כמות שאלות חייבת להיות מספר חיובי'); return; }
-    if (min > max) { Alert.alert('שגיאה', 'קושי מינימלי גדול ממקסימלי'); return; }
+    if (isNaN(count) || count < 1) {
+      showAdminErrorToast(onError, 'כמות שאלות לא תקינה', 'כמות שאלות חייבת להיות מספר חיובי.', { ruleCount, templateId: template.id }, 'admin:question-assignment');
+      return;
+    }
+    if (min > max) {
+      showAdminErrorToast(onError, 'טווח קושי לא תקין', 'קושי מינימלי לא יכול להיות גדול מהקושי המקסימלי.', { ruleMinDiff, ruleMaxDiff, templateId: template.id }, 'admin:question-assignment');
+      return;
+    }
     addTopicRuleToTemplate(template.id, {
       id: `r_${Date.now()}`,
       topicId: ruleTopicId,
@@ -690,7 +761,7 @@ function ExamAssignmentTab() {
 
 // ── Tab 4: Adaptive pool eligibility + access control ─────────────────────────
 
-function AdaptivePoolTab() {
+function AdaptivePoolTab({ onError }: { onError: (error: AdminToastError | null) => void }) {
   const { questions, topics, setQuestionsAccessLevel, setQuestionsAdaptiveEligibility, updateTopic } = useAdminStore();
   const [filterTopic, setFilterTopic] = useState('');
   const [statusFilter, setStatusFilter] = useState<ValidationStatus | 'all'>('all');
@@ -712,6 +783,10 @@ function AdaptivePoolTab() {
 
   const bulkAction = async (label: string, fn: () => void) => {
     const ids = [...selected];
+    if (ids.length === 0) {
+      showAdminErrorToast(onError, 'אין שאלות שנבחרו', `בחר לפחות שאלה אחת לפני פעולה: ${label}.`, { tab: 'pool', action: label }, 'admin:question-assignment');
+      return;
+    }
     Alert.alert(label, `לעדכן ${ids.length} שאלות?`, [
       { text: 'ביטול', style: 'cancel' },
       {
@@ -877,6 +952,10 @@ const styles = StyleSheet.create({
   backText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#94A3B8' },
   headerTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff', textAlign: 'right' },
   headerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8', textAlign: 'right', marginTop: 2 },
+  headerActions: { flexDirection: 'row-reverse', gap: 8, marginTop: 12, flexWrap: 'wrap' },
+  headerActionBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 8 },
+  headerActionBtnSecondary: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
+  headerActionText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff', textAlign: 'center' },
 
   tabBar: { flexDirection: 'row-reverse', backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
@@ -926,6 +1005,13 @@ const styles = StyleSheet.create({
   qText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', lineHeight: 20 },
   qMeta: { flexDirection: 'row-reverse', gap: 6, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' },
   qMetaText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
+  qMetaLine: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textSecondary, textAlign: 'right', marginTop: 3, lineHeight: 16 },
+  qThumbWrap: { width: 74, height: 58, borderRadius: Radius.md, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background, flexShrink: 0 },
+  qThumb: { width: '100%', height: '100%' },
+  qQuickActions: { flexDirection: 'row-reverse', gap: 8, marginTop: 8, flexWrap: 'wrap' },
+  qQuickBtn: { backgroundColor: Colors.primaryLighter, borderRadius: Radius.md, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: Colors.primary + '33' },
+  qQuickBtnSecondary: { backgroundColor: Colors.surfaceSecondary, borderRadius: Radius.md, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: Colors.border },
+  qQuickText: { fontFamily: FontFamily.bold, fontSize: 11, color: Colors.primary, textAlign: 'center' },
 
   statusPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
   statusPillText: { fontFamily: FontFamily.bold, fontSize: 10 },

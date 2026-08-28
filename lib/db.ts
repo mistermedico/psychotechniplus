@@ -153,14 +153,24 @@ export async function upsertQuestions(qs: Question[]): Promise<{ error?: string 
 }
 
 export async function deleteQuestion(id: string): Promise<{ error?: string }> {
-  const { data, error } = await supabase.from('questions').delete().eq('id', id).select('id');
+  const { error } = await supabase.from('questions').delete().eq('id', id);
   if (error) {
     logger.error('db:deleteQuestion', `שגיאה במחיקת שאלה ${id}`, error.message);
     return { error: error.message };
   }
-  if (!data || data.length === 0) {
-    const message = 'השאלה לא נמחקה ב-Supabase. ייתכן שהיא כבר נמחקה או שהשרת לא החזיר הרשאת SELECT למחיקה.';
-    logger.warn('db:deleteQuestion', message, { id });
+
+  const { data: stillExists, error: verifyError } = await supabase
+    .from('questions')
+    .select('id')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (verifyError && verifyError.code !== 'PGRST116') {
+    logger.warn('db:deleteQuestion', 'המחיקה נשלחה, אך אימות המחיקה נכשל בגלל הרשאות/רשת.', { id, error: verifyError.message });
+  }
+  if (stillExists?.id) {
+    const message = 'השאלה עדיין קיימת ב-Supabase לאחר ניסיון המחיקה.';
+    logger.error('db:deleteQuestion', message, { id });
     return { error: message };
   }
   logger.info('db:deleteQuestion', `שאלה נמחקה: ${id}`);

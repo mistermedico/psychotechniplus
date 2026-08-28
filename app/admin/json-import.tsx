@@ -9,6 +9,8 @@ import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
+import { VisualImage } from '../../components/VisualImage';
+import AdminErrorToast, { AdminToastError, showAdminErrorToast } from '../../components/AdminErrorToast';
 
 const EXAMPLE_JSON = `[
   {
@@ -16,13 +18,16 @@ const EXAMPLE_JSON = `[
     "topicId": "topic_quantitative",
     "targetIds": ["target_psychometric"],
     "options": [
-      { "id": "a", "text": "25", "isCorrect": false },
-      { "id": "b", "text": "30", "isCorrect": true },
-      { "id": "c", "text": "35", "isCorrect": false },
-      { "id": "d", "text": "20", "isCorrect": false }
+      { "id": "a", "text": "25", "isCorrect": false, "imageUrl": "" },
+      { "id": "b", "text": "30", "isCorrect": true, "imageUrl": "" },
+      { "id": "c", "text": "35", "isCorrect": false, "imageUrl": "" },
+      { "id": "d", "text": "20", "isCorrect": false, "imageUrl": "" }
     ],
     "correctAnswer": "b",
     "explanation": "15% × 200 = 0.15 × 200 = 30",
+    "mediaUrl": "",
+    "mediaType": "image",
+    "explanationImageUrl": "",
     "difficulty": 2,
     "accessLevel": "free"
   }
@@ -32,9 +37,12 @@ interface ImportedQuestion {
   questionText: string;
   topicId: string;
   targetIds?: string[];
-  options: Array<{ id: string; text: string; isCorrect: boolean; analysisTag?: string }>;
+  options: Array<{ id: string; text: string; isCorrect: boolean; analysisTag?: string; imageUrl?: string }>;
   correctAnswer: string;
   explanation?: string;
+  explanationImageUrl?: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio';
   difficulty?: number;
   accessLevel?: 'free' | 'premium';
   questionType?: string;
@@ -61,6 +69,7 @@ export default function JsonImportScreen() {
   const [parseError, setParseError] = useState('');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; failed: number; skipped: number } | null>(null);
+  const [toastError, setToastError] = useState<AdminToastError | null>(null);
 
   const handleParse = () => {
     setParseError('');
@@ -69,12 +78,16 @@ export default function JsonImportScreen() {
     setImportResult(null);
 
     if (!jsonText.trim()) {
-      setParseError('הדבק JSON לפני הניתוח');
+      const message = 'הדבק JSON לפני הניתוח';
+      setParseError(message);
+      showAdminErrorToast(setToastError, 'ייבוא JSON נחסם', message, { length: jsonText.length }, 'admin:json-import');
       return;
     }
 
     if (jsonText.length > 500000) {
-      setParseError('הקובץ גדול מדי — מקסימום 500,000 תווים (~1,000 שאלות)');
+      const message = 'הקובץ גדול מדי — מקסימום 500,000 תווים (~1,000 שאלות)';
+      setParseError(message);
+      showAdminErrorToast(setToastError, 'ייבוא JSON נחסם', message, { length: jsonText.length }, 'admin:json-import');
       return;
     }
 
@@ -82,7 +95,9 @@ export default function JsonImportScreen() {
     try {
       parsed = JSON.parse(jsonText);
     } catch (e: any) {
-      setParseError(`שגיאת JSON: ${e.message}`);
+      const message = `שגיאת JSON: ${e.message}`;
+      setParseError(message);
+      showAdminErrorToast(setToastError, 'JSON לא תקין', message, { rawStart: jsonText.slice(0, 500) }, 'admin:json-import');
       return;
     }
 
@@ -95,7 +110,9 @@ export default function JsonImportScreen() {
     });
 
     if (errors.length > 0) {
-      setParseError(errors.join('\n'));
+      const message = errors.join('\n');
+      setParseError(message);
+      showAdminErrorToast(setToastError, 'שאלות לא תקינות', message, { errors }, 'admin:json-import');
       return;
     }
 
@@ -132,11 +149,14 @@ export default function JsonImportScreen() {
           questionType: (item.questionType as any) ?? 'multiple_choice',
           questionText: item.questionText,
           readingPassage: item.readingPassage,
+          mediaUrl: item.mediaUrl || undefined,
+          mediaType: item.mediaUrl ? (item.mediaType ?? 'image') : undefined,
           options: item.options.map(o => ({
-            id: o.id, text: o.text, isCorrect: o.isCorrect, analysisTag: o.analysisTag,
+            id: o.id, text: o.text, isCorrect: o.isCorrect, analysisTag: o.analysisTag, imageUrl: o.imageUrl || undefined,
           })),
           correctAnswer: item.correctAnswer,
           explanation: item.explanation ?? '',
+          explanationImageUrl: item.explanationImageUrl || undefined,
           difficulty: Math.max(1, Math.min(10, item.difficulty ?? 3)),
           psychometricStats: { elo: 1200, discrimination: 0.7, guessProbability: 0.25 },
           accessLevel: item.accessLevel ?? 'free',
@@ -145,7 +165,8 @@ export default function JsonImportScreen() {
           generalPracticeEligible: false,
         });
         success++;
-      } catch {
+      } catch (error: any) {
+        showAdminErrorToast(setToastError, 'שמירת שאלה נכשלה', error?.message ?? 'שגיאה לא ידועה בזמן ייבוא.', { index: i, item }, 'admin:json-import');
         failed++;
       }
     }
@@ -185,6 +206,7 @@ export default function JsonImportScreen() {
   };
 
   return (
+    <>
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -249,6 +271,19 @@ export default function JsonImportScreen() {
                     {isDup && <Text style={{ fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.warning }}>⚠️ כפולה</Text>}
                   </View>
                   <Text style={styles.previewText} numberOfLines={3}>{q.questionText}</Text>
+                  <View style={styles.previewImageGrid}>
+                    <VisualImage uri={q.mediaUrl} style={styles.previewImage} fallbackLabel="אין תמונת שאלה" />
+                    <VisualImage uri={q.explanationImageUrl} style={styles.previewImage} fallbackLabel="אין תמונת הסבר" />
+                  </View>
+                  <View style={styles.previewOptionsGrid}>
+                    {q.options.map(option => (
+                      <View key={option.id} style={[styles.previewOption, option.isCorrect && styles.previewOptionCorrect]}>
+                        <Text style={styles.previewOptionLabel}>{option.id.toUpperCase()}</Text>
+                        <VisualImage uri={option.imageUrl} style={styles.previewOptionImage} fallbackLabel="אין תמונה" />
+                        <Text style={styles.previewOptionText} numberOfLines={1}>{option.text || 'תמונה בלבד'}</Text>
+                      </View>
+                    ))}
+                  </View>
                   <View style={styles.previewMeta}>
                     <Text style={styles.previewMetaText}>נושא: {q.topicId}</Text>
                     <Text style={styles.previewMetaText}>קושי: {q.difficulty ?? 3}</Text>
@@ -296,6 +331,8 @@ export default function JsonImportScreen() {
 
       </ScrollView>
     </SafeAreaView>
+    <AdminErrorToast error={toastError} onDismiss={() => setToastError(null)} />
+    </>
   );
 }
 
@@ -373,6 +410,14 @@ const styles = StyleSheet.create({
   previewText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right', lineHeight: 20, marginBottom: 8 },
   previewMeta: { flexDirection: 'row-reverse', gap: 12 },
   previewMetaText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
+  previewImageGrid: { flexDirection: 'row-reverse', gap: 8, marginBottom: 8 },
+  previewImage: { flex: 1, minHeight: 86, borderRadius: Radius.lg, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  previewOptionsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  previewOption: { width: '48%', minWidth: 128, borderRadius: Radius.lg, backgroundColor: Colors.surfaceSecondary, borderWidth: 1, borderColor: Colors.border, padding: 8, alignItems: 'center' },
+  previewOptionCorrect: { borderColor: Colors.success, backgroundColor: Colors.successLight },
+  previewOptionLabel: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary, marginBottom: 4 },
+  previewOptionImage: { width: '100%', height: 64, borderRadius: Radius.md, backgroundColor: Colors.background },
+  previewOptionText: { fontFamily: FontFamily.regular, fontSize: 10, color: Colors.textSecondary, textAlign: 'center', marginTop: 4 },
   dupWarning: {
     backgroundColor: Colors.warning + '20', borderRadius: Radius.lg, padding: 10,
     borderWidth: 1, borderColor: Colors.warning + '60', marginBottom: 10,

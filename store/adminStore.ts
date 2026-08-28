@@ -1544,20 +1544,29 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   deleteQuestion: async (id) => {
     const existing = get().questions.find(q => q.id === id);
+    const previousTemplates = get().templates;
     set(s => ({
       questions: s.questions.filter(q => q.id !== id),
       selectedQuestionIds: s.selectedQuestionIds.filter(i => i !== id),
+      templates: s.templates.map(t => ({
+        ...t,
+        pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(qId => qId !== id),
+      })),
     }));
     const result = await dbDelete(id);
     if (result.error) {
       if (existing) {
         set(s => ({
           questions: s.questions.some(q => q.id === id) ? s.questions : [...s.questions, existing],
+          templates: previousTemplates,
         }));
       }
       logger.error('adminStore:deleteQuestion', `שגיאה במחיקת שאלה ${id}`, result.error);
       return { ok: false, error: result.error };
     }
+    await saveTemplates(get().templates).catch(e => {
+      logger.warn('adminStore:deleteQuestion', 'השאלה נמחקה אך ניקוי תבניות המבחן לא נשמר מיד.', e?.message);
+    });
     logger.info('adminStore:deleteQuestion', `שאלה נמחקה: ${id}`);
     get().logActivity(`מחק שאלה ${id}`, 'question');
     await get().loadAdminData(true).catch(() => null);
@@ -1567,9 +1576,14 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   deleteQuestions: async (ids) => {
     const idSet = new Set(ids);
     const existing = get().questions.filter(q => idSet.has(q.id));
+    const previousTemplates = get().templates;
     set(s => ({
       questions: s.questions.filter(q => !idSet.has(q.id)),
       selectedQuestionIds: [],
+      templates: s.templates.map(t => ({
+        ...t,
+        pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(qId => !idSet.has(qId)),
+      })),
     }));
     const results = await Promise.all(ids.map(id => dbDelete(id)));
     const failed = results
@@ -1578,12 +1592,18 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     if (failed.length > 0) {
       set(s => {
         const currentIds = new Set(s.questions.map(q => q.id));
-        return { questions: [...s.questions, ...existing.filter(q => !currentIds.has(q.id))] };
+        return {
+          questions: [...s.questions, ...existing.filter(q => !currentIds.has(q.id))],
+          templates: previousTemplates,
+        };
       });
       const message = failed.map(row => `${row.id}: ${row.result.error}`).join('\n');
       logger.error('adminStore:deleteQuestions', `שגיאה במחיקת ${failed.length} שאלות`, message);
       return { ok: false, error: message };
     }
+    await saveTemplates(get().templates).catch(e => {
+      logger.warn('adminStore:deleteQuestions', 'השאלות נמחקו אך ניקוי תבניות המבחן לא נשמר מיד.', e?.message);
+    });
     logger.info('adminStore:deleteQuestions', `${ids.length} שאלות נמחקו`);
     get().logActivity(`מחק ${ids.length} שאלות`, 'question');
     await get().loadAdminData(true).catch(() => null);

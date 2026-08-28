@@ -15,6 +15,7 @@ import { detectDir, textAlign as ta } from '../../utils/textDirection';
 import { startBulkGeneration, stopBulkGeneration } from '../../utils/backgroundGenerator';
 import { auditPsychotechnicQuestion } from '../../utils/questionQuality';
 import { VisualImage } from '../../components/VisualImage';
+import AdminErrorToast, { AdminToastError, showAdminErrorToast } from '../../components/AdminErrorToast';
 
 // ── Question type options ──────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ interface EditDraft {
   options: QuestionOption[];
   correctAnswer: string;
   explanation: string;
+  explanationImageUrl?: string;
   difficulty: number;
   topicId: string;
   questionType: QuestionType;
@@ -60,6 +62,7 @@ function questionToDraft(q: Question): EditDraft {
     options: q.options.map(o => ({ ...o })),
     correctAnswer: q.correctAnswer,
     explanation: q.explanation,
+    explanationImageUrl: q.explanationImageUrl,
     difficulty: q.difficulty,
     topicId: q.topicId,
     questionType: q.questionType,
@@ -101,6 +104,7 @@ export default function ValidateQueue() {
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
   const [showGenLog, setShowGenLog] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toastError, setToastError] = useState<AdminToastError | null>(null);
 
   const queue = filter === 'pending' ? pending : rejected;
   const safeIdx = Math.min(currentIdx, Math.max(0, queue.length - 1));
@@ -170,20 +174,20 @@ export default function ValidateQueue() {
   const handleSaveEdit = (markValidated = false) => {
     if (!current || !editDraft) return;
     if (!editDraft.questionText.trim()) {
-      Alert.alert('שגיאה', 'חסר טקסט שאלה');
+      showAdminErrorToast(setToastError, 'חסר טקסט שאלה', 'אי אפשר לשמור שאלה בלי נוסח.', { questionId: current.id }, 'admin:validate');
       return;
     }
     if (!editDraft.explanation.trim()) {
-      Alert.alert('שגיאה', 'חסר הסבר לשאלה');
+      showAdminErrorToast(setToastError, 'חסר הסבר לשאלה', 'אי אפשר לשמור שאלה בלי הסבר למשתמש.', { questionId: current.id }, 'admin:validate');
       return;
     }
     if (editDraft.targetIds.length === 0) {
-      Alert.alert('שגיאה', 'יש לבחור לפחות מסלול אחד');
+      showAdminErrorToast(setToastError, 'חסר שיוך למסלול', 'יש לבחור לפחות מסלול/קורס אחד לפני שמירה.', { questionId: current.id }, 'admin:validate');
       return;
     }
     const hasEmptyOptions = editDraft.options.some(o => !o.text.trim() && !o.imageUrl);
     if (editDraft.options.length < 2 || hasEmptyOptions) {
-      Alert.alert('שגיאה', 'יש למלא לפחות שתי אפשרויות תקינות');
+      showAdminErrorToast(setToastError, 'אפשרויות לא תקינות', 'יש למלא לפחות שתי אפשרויות תקינות, עם טקסט או תמונה.', { questionId: current.id, options: editDraft.options }, 'admin:validate');
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -216,7 +220,7 @@ export default function ValidateQueue() {
     const result = await deleteQuestion(q.id);
     setDeletingId(null);
     if (!result.ok) {
-      Alert.alert('מחיקה נכשלה', result.error ?? 'לא ניתן למחוק את השאלה כרגע.');
+      showAdminErrorToast(setToastError, 'מחיקה נכשלה', result.error ?? 'לא ניתן למחוק את השאלה כרגע.', { questionId: q.id }, 'admin:validate');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -283,6 +287,7 @@ export default function ValidateQueue() {
   };
 
   return (
+    <>
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       {/* Header stats */}
       <View style={styles.statsRow}>
@@ -507,6 +512,8 @@ export default function ValidateQueue() {
         </>
       )}
     </SafeAreaView>
+    <AdminErrorToast error={toastError} onDismiss={() => setToastError(null)} />
+    </>
   );
 }
 
@@ -611,6 +618,7 @@ function QuestionEditForm({
         placeholder="כתובת תמונה / וידאו / אודיו"
         placeholderTextColor="rgba(255,255,255,0.25)"
       />
+      <VisualImage uri={draft.mediaUrl} style={editStyles.mediaPreview} fallbackLabel="אין תמונת שאלה" />
       <View style={editStyles.chipsRow}>
         {(['image', 'video', 'audio'] as const).map(type => (
           <Pressable
@@ -654,6 +662,7 @@ function QuestionEditForm({
             placeholder="תמונת תשובה אופציונלית"
             placeholderTextColor="rgba(255,255,255,0.2)"
           />
+          <VisualImage uri={opt.imageUrl} style={editStyles.optionImagePreview} fallbackLabel="אין תמונת תשובה" />
           <TextInput
             style={[editStyles.textInput, editStyles.compactInput]}
             value={opt.analysisTag ?? ''}
@@ -680,6 +689,16 @@ function QuestionEditForm({
         placeholder="הסבר מפורט..."
         placeholderTextColor="rgba(255,255,255,0.25)"
       />
+      <Text style={editStyles.sectionLabel}>תמונת הסבר</Text>
+      <TextInput
+        style={[editStyles.textInput, editStyles.compactInput]}
+        value={draft.explanationImageUrl ?? ''}
+        onChangeText={v => onChange({ ...draft, explanationImageUrl: v || undefined })}
+        textAlign="right"
+        placeholder="כתובת תמונה להסבר"
+        placeholderTextColor="rgba(255,255,255,0.25)"
+      />
+      <VisualImage uri={draft.explanationImageUrl} style={editStyles.mediaPreview} fallbackLabel="אין תמונת הסבר" />
 
       <Text style={editStyles.sectionLabel}>רמת קושי: {draft.difficulty}</Text>
       <View style={editStyles.diffRow}>
@@ -982,6 +1001,8 @@ const editStyles = StyleSheet.create({
   },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
   compactInput: { minHeight: 38, paddingVertical: 8, fontSize: FontSize.xs, marginTop: 6 },
+  mediaPreview: { width: '100%', height: 118, borderRadius: Radius.lg, backgroundColor: Colors.background, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginTop: 8 },
+  optionImagePreview: { width: '100%', height: 72, borderRadius: Radius.md, backgroundColor: Colors.background, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginTop: 6 },
 
   optionCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
