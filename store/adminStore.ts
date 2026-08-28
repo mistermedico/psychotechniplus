@@ -7,10 +7,13 @@ import { ensureSpatialVisualAssets } from '../utils/spatialVisualAssets';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
+const DELETED_QUESTIONS_KEY = '@psychotechniplus/admin/deletedQuestionIds';
 const ADMIN_COLLECTIONS_KEY = 'collections';
 let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let adminDataLoadPromise: Promise<void> | null = null;
+let deletedQuestionsLoadPromise: Promise<void> | null = null;
+const deletedQuestionIds = new Set<string>();
 let lastAdminDataLoadStartedAt = 0;
 let adminCollectionsSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let adminRealtimeMutedUntil = 0;
@@ -18,6 +21,51 @@ const ADMIN_RELOAD_MIN_INTERVAL_MS = 1500;
 const ADMIN_REALTIME_RELOAD_DEBOUNCE_MS = 900;
 const ADMIN_COLLECTION_SAVE_DEBOUNCE_MS = 700;
 const ADMIN_REALTIME_SELF_WRITE_MUTE_MS = 1800;
+
+async function loadDeletedQuestionIds(): Promise<void> {
+  if (deletedQuestionsLoadPromise) return deletedQuestionsLoadPromise;
+  deletedQuestionsLoadPromise = (async () => {
+    try {
+      const raw = await AsyncStorage.getItem(DELETED_QUESTIONS_KEY);
+      if (!raw) return;
+      const ids = JSON.parse(raw);
+      if (Array.isArray(ids)) {
+        deletedQuestionIds.clear();
+        ids.filter(id => typeof id === 'string').forEach(id => deletedQuestionIds.add(id));
+      }
+    } catch (e: any) {
+      logger.warn('adminStore:deletedQuestions', 'לא ניתן לטעון רשימת שאלות שנמחקו', e?.message);
+    }
+  })().finally(() => {
+    deletedQuestionsLoadPromise = null;
+  });
+  return deletedQuestionsLoadPromise;
+}
+
+async function persistDeletedQuestionIds(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(DELETED_QUESTIONS_KEY, JSON.stringify([...deletedQuestionIds]));
+  } catch (e: any) {
+    logger.warn('adminStore:deletedQuestions', 'לא ניתן לשמור רשימת שאלות שנמחקו', e?.message);
+  }
+}
+
+async function markQuestionDeletedLocally(id: string): Promise<void> {
+  await loadDeletedQuestionIds();
+  deletedQuestionIds.add(id);
+  await persistDeletedQuestionIds();
+}
+
+async function unmarkQuestionDeletedLocally(id: string): Promise<void> {
+  await loadDeletedQuestionIds();
+  deletedQuestionIds.delete(id);
+  await persistDeletedQuestionIds();
+}
+
+function filterDeletedQuestions(questions: Question[]): Question[] {
+  if (deletedQuestionIds.size === 0) return questions;
+  return questions.filter(q => !deletedQuestionIds.has(q.id));
+}
 
 function pickAdminCollections(s: any) {
   return {
@@ -71,16 +119,17 @@ function syncQuestionsToSupabase(
   questions: Question[],
   context: string
 ) {
-  if (questions.length === 0) return;
+  const questionsToSync = filterDeletedQuestions(questions);
+  if (questionsToSync.length === 0) return;
   set({ isSyncing: true, syncError: null });
-  dbUpsertMany(questions).then(result => {
+  dbUpsertMany(questionsToSync).then(result => {
     if (result.error) {
       set({ isSyncing: false, syncError: result.error });
-      logger.error(context, `שגיאה בסנכרון ${questions.length} שאלות`, result.error);
+      logger.error(context, `שגיאה בסנכרון ${questionsToSync.length} שאלות`, result.error);
       return;
     }
     set({ isSyncing: false, lastSyncedAt: new Date().toISOString(), syncError: null });
-    logger.success(context, `${questions.length} שאלות סונכרנו ל-Supabase`);
+    logger.success(context, `${questionsToSync.length} שאלות סונכרנו ל-Supabase`);
   }).catch((e: any) => {
     const message = e?.message ?? 'שגיאת סנכרון שאלות';
     set({ isSyncing: false, syncError: message });
@@ -1545,6 +1594,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   deleteQuestion: async (id) => {
     const existing = get().questions.find(q => q.id === id);
     const previousTemplates = get().templates;
+    await markQuestionDeletedLocally(id);
+    adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
     set(s => ({
       questions: s.questions.filter(q => q.id !== id),
       selectedQuestionIds: s.selectedQuestionIds.filter(i => i !== id),
@@ -1555,6 +1606,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }));
     const result = await dbDelete(id);
     if (result.error) {
+      await unmarkQuestionDeletedLocally(id);
       if (existing) {
         set(s => ({
           questions: s.questions.some(q => q.id === id) ? s.questions : [...s.questions, existing],
@@ -1577,6 +1629,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     const idSet = new Set(ids);
     const existing = get().questions.filter(q => idSet.has(q.id));
     const previousTemplates = get().templates;
+    await loadDeletedQuestionIds();
+    ids.forEach(id => deletedQuestionIds.add(id));
+    await persistDeletedQuestionIds();
+    adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
     set(s => ({
       questions: s.questions.filter(q => !idSet.has(q.id)),
       selectedQuestionIds: [],
@@ -1590,6 +1646,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       .map((result, index) => ({ result, id: ids[index] }))
       .filter(row => row.result.error);
     if (failed.length > 0) {
+      failed.forEach(row => deletedQuestionIds.delete(row.id));
+      await persistDeletedQuestionIds();
       set(s => {
         const currentIds = new Set(s.questions.map(q => q.id));
         return {
@@ -1983,7 +2041,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   loadQuestionsFromSupabase: async () => {
     set({ isSyncing: true, syncError: null });
     try {
-      const questions = await fetchAllQuestions();
+      await loadDeletedQuestionIds();
+      const questions = filterDeletedQuestions(await fetchAllQuestions());
       set({ questions });
       set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
     } catch (e: any) {
@@ -2009,7 +2068,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
       // 1. Load all questions from Supabase. In admin, Supabase is the source of truth.
       try {
-        const remote = await fetchAllQuestions();
+        await loadDeletedQuestionIds();
+        const remote = filterDeletedQuestions(await fetchAllQuestions());
         set({ questions: remote });
         logger.success('adminStore:loadAdminData', `Loaded ${remote.length} questions from Supabase`);
       } catch (e: any) {

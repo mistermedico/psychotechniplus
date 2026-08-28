@@ -227,6 +227,7 @@ export default function ValidateQueue() {
     setEditMode(false);
     setEditDraft(null);
     setCurrentIdx(i => Math.max(0, Math.min(i, queue.length - 2)));
+    Alert.alert('נמחק', 'השאלה נמחקה מתור האימות ומהמאגר המסונכרן.');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   };
 
