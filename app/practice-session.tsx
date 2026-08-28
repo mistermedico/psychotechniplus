@@ -20,7 +20,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { calcAllScores } from '../utils/scoring';
-import { SessionMode } from '../data/types';
+import { Question, SessionMode } from '../data/types';
 import { generateSmartExamQuestions, GeneratedExamSection } from '../utils/smartExam';
 import { logger } from '../utils/logger';
 import { canAccessMode, canAccessQuestion, canAccessTopic, getSessionQuestionLimit } from '../lib/accessControl';
@@ -52,7 +52,7 @@ export default function PracticeSession() {
   } = usePracticeStore();
 
   const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium } = useUserStore();
-  const { templates, questions: adminQuestions, topics, targets, practiceSettings, freePracticeLimit, premiumConfig, addSessionRecord, isAdmin } = useAdminStore();
+  const { templates, questions: adminQuestions, topics, targets, practiceSettings, freePracticeLimit, premiumConfig, addSessionRecord, isAdmin, loadAdminData } = useAdminStore();
 
   const {
     showTimerInPractice,
@@ -111,6 +111,46 @@ export default function PracticeSession() {
   const exitToPractice = useCallback(() => {
     router.replace('/(tabs)/practice');
   }, []);
+
+  const startSimulationPreview = useCallback((availableTemplates = templates, availableQuestions: Question[] = adminQuestions) => {
+    if (!templateId) return false;
+    const template = availableTemplates.find(t => t.id === templateId);
+    if (!template) {
+      Alert.alert('שגיאה', 'תבנית המבחן לא נמצאה');
+      exitToPractice();
+      return false;
+    }
+
+    const generated = generateSmartExamQuestions(
+      template,
+      availableQuestions.filter(q =>
+        q.validationStatus === 'validated' &&
+        canAccessQuestion(q, hasPremiumAccess)
+      ),
+      {}
+    );
+
+    if (generated.allQuestions.length === 0) {
+      Alert.alert('שגיאה', 'לא נמצאו שאלות מתאימות למבחן זה. נסה לאמת שאלות קודם.');
+      exitToPractice();
+      return false;
+    }
+
+    setExamSections(generated.sections);
+    const totalSimulationSeconds = generated.sections.reduce(
+      (sum, section) => sum + section.timeLimitSeconds,
+      0
+    ) || Math.max(1, generated.estimatedMinutes) * 60;
+    setSimulationRemaining(totalSimulationSeconds);
+    const firstSection = generated.sections[0];
+    startSession({
+      targetId: targetId ?? template.targetId ?? '',
+      topicId: firstSection?.topicId ?? topicId ?? '',
+      mode: 'simulation',
+      questions: generated.allQuestions,
+    });
+    return true;
+  }, [adminQuestions, exitToPractice, hasPremiumAccess, startSession, targetId, templateId, templates, topicId]);
 
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -182,38 +222,30 @@ export default function PracticeSession() {
         exitToPractice();
         return;
       }
-      const template = templates.find(t => t.id === templateId);
-      if (!template) {
-        Alert.alert('שגיאה', 'תבנית המבחן לא נמצאה');
-        exitToPractice();
-        return;
+      const hasWarmData = templates.some(t => t.id === templateId) && adminQuestions.length > 0;
+      if (hasWarmData) {
+        startSimulationPreview();
+        return () => { cancelled = true; };
       }
-      const generated = generateSmartExamQuestions(
-        template,
-        adminQuestions.filter(q =>
-          q.validationStatus === 'validated' &&
-          canAccessQuestion(q, hasPremiumAccess)
-        ),
-        {}
-      );
-      if (generated.allQuestions.length === 0) {
-        Alert.alert('שגיאה', 'לא נמצאו שאלות מתאימות למבחן זה. נסה לאמת שאלות קודם.');
-        exitToPractice();
-        return;
-      }
-      setExamSections(generated.sections);
-      const totalSimulationSeconds = generated.sections.reduce(
-        (sum, section) => sum + section.timeLimitSeconds,
-        0
-      ) || Math.max(1, generated.estimatedMinutes) * 60;
-      setSimulationRemaining(totalSimulationSeconds);
-      const firstSection = generated.sections[0];
-      startSession({
-        targetId: targetId ?? '',
-        topicId: firstSection?.topicId ?? topicId ?? '',
-        mode: 'simulation',
-        questions: generated.allQuestions,
-      });
+
+      setLoadError(false);
+      const loadTimeout = setTimeout(() => {
+        if (!cancelled) setLoadError(true);
+      }, 10000);
+      loadAdminData(true)
+        .then(() => {
+          clearTimeout(loadTimeout);
+          if (cancelled) return;
+          const state = useAdminStore.getState();
+          startSimulationPreview(state.templates, state.questions);
+        })
+        .catch((error: unknown) => {
+          clearTimeout(loadTimeout);
+          if (cancelled) return;
+          const message = error instanceof Error ? error.message : String(error);
+          logger.error('practiceSession:simulationPreviewLoad', 'טעינת מבחן לתצוגה מקדימה נכשלה', message);
+          setLoadError(true);
+        });
       return () => { cancelled = true; };
     }
 
@@ -299,6 +331,65 @@ export default function PracticeSession() {
       if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
     };
   }, [rootNavigationReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep simulation previews aligned with Supabase edits to questions/templates.
+  useEffect(() => {
+    if (!rootNavigationReady || !session || !isSimulation || !templateId) return;
+
+    let cancelled = false;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+
+    const refreshSimulation = async () => {
+      try {
+        await loadAdminData(true);
+        if (cancelled) return;
+        const state = useAdminStore.getState();
+        const template = state.templates.find(t => t.id === templateId);
+        if (!template) return;
+        const regenerated = generateSmartExamQuestions(
+          template,
+          state.questions.filter(q =>
+            q.validationStatus === 'validated' &&
+            canAccessQuestion(q, hasPremiumAccess)
+          ),
+          {}
+        );
+        if (regenerated.allQuestions.length === 0) return;
+        setExamSections(regenerated.sections);
+        refreshSessionQuestions(regenerated.allQuestions);
+      } catch (error) {
+        logger.warn(
+          'practiceSession:simulationRealtime',
+          `לא ניתן לרענן מבחן בזמן אמת: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    };
+
+    const scheduleRefresh = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(refreshSimulation, 650);
+    };
+
+    const channel = supabase
+      .channel(`simulation-preview-live-${templateId}-${session.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_state', filter: 'key=eq.templates' }, scheduleRefresh)
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      if (debounce) clearTimeout(debounce);
+      supabase.removeChannel(channel);
+    };
+  }, [
+    rootNavigationReady,
+    session?.id,
+    isSimulation,
+    templateId,
+    hasPremiumAccess,
+    loadAdminData,
+    refreshSessionQuestions,
+  ]);
 
   // Keep a live practice session aligned with admin edits in Supabase.
   useEffect(() => {
