@@ -12,7 +12,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
 export default function AppSettingsScreen() {
-  const { questions, seedToSupabase, loadQuestionsFromSupabase, freePracticeLimit, setFreePracticeLimit } = useAdminStore();
+  const { questions, loadQuestionsFromSupabase, freePracticeLimit, setFreePracticeLimit } = useAdminStore();
 
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [freeTrialDays, setFreeTrialDays] = useState('7');
@@ -20,33 +20,7 @@ export default function AppSettingsScreen() {
   const [freeLimitInput, setFreeLimitInput] = useState(String(freePracticeLimit));
   const [aiEnabled, setAiEnabled] = useState(true);
   const [newUserBonusXp, setNewUserBonusXp] = useState('50');
-  const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const handleSeed = async () => {
-    Alert.alert(
-      'זרע מסד נתונים',
-      `האם לטעון ${questions.length} שאלות לSupabase? (יחליף נתונים קיימים)`,
-      [
-        { text: 'ביטול', style: 'cancel' },
-        {
-          text: 'אשר',
-          style: 'destructive',
-          onPress: async () => {
-            if (syncing) return;
-            setSyncing(true);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            try {
-              const result = await seedToSupabase();
-              Alert.alert(result.ok ? '✅ הצלחה' : '❌ שגיאה', result.message);
-            } finally {
-              setSyncing(false);
-            }
-          },
-        },
-      ],
-    );
-  };
 
   const handleLoadFromSupabase = async () => {
     if (loading) return;
@@ -200,23 +174,6 @@ export default function AppSettingsScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.divider} />
-
-          <View style={styles.dbRow}>
-            <View style={styles.dbInfo}>
-              <Text style={styles.dbLabel}>זרע ל-Supabase</Text>
-              <Text style={styles.dbDesc}>{questions.length} שאלות → Supabase (מחליף הכל)</Text>
-            </View>
-            <Pressable
-              onPress={handleSeed}
-              disabled={syncing}
-              style={[styles.dbBtn, { borderColor: Colors.danger }, syncing && { opacity: 0.65 }]}
-            >
-              <Text style={[styles.dbBtnText, { color: Colors.danger }]}>
-                {syncing ? 'מזריע...' : '↑ זרע'}
-              </Text>
-            </Pressable>
-          </View>
         </View>
 
         {/* App info */}

@@ -98,7 +98,7 @@ export default function AdminDashboard() {
   const isCompact = width < 520;
   const {
     isAdmin, login, logout, setIsAdmin, getStats, getPendingQuestions,
-    seedToSupabase, loadAdminData, syncAll,
+    loadAdminData, syncAll,
     isSyncing, lastSyncedAt, syncError,
     revenueSnapshots, activityLog, questions, topics, templates, sessionHistory, pushNotifications,
   } = useAdminStore();
@@ -107,7 +107,6 @@ export default function AdminDashboard() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
-  const [seeding, setSeeding] = useState(false);
   const [syncingAll, setSyncingAll] = useState(false);
   const [dashboardCounts, setDashboardCounts] = useState<DashboardCounts>({ users: 0, sessions: 0, supportTickets: 0 });
 
@@ -467,26 +466,6 @@ export default function AdminDashboard() {
         {/* Supabase actions */}
         <View style={styles.seedRow}>
           <Pressable
-            onPress={async () => {
-              if (seeding) return;
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setSeeding(true);
-              try {
-                const result = await seedToSupabase();
-                Alert.alert(result.ok ? 'הצלחה' : 'שגיאה', result.message);
-                if (result.ok) await syncAll();
-              } finally {
-                setSeeding(false);
-              }
-            }}
-            style={({ pressed }) => [styles.seedBtn, pressed && { opacity: 0.85 }]}
-            disabled={seeding}
-          >
-            <LinearGradient colors={['#0EA5E9', '#0284C7']} style={styles.seedBtnGrad}>
-              {seeding ? <ActivityIndicator color="#fff" /> : <Text style={styles.seedBtnText}>זרע ל-Supabase</Text>}
-            </LinearGradient>
-          </Pressable>
-          <Pressable
             disabled={syncingAll || isSyncing}
             onPress={async () => {
               if (syncingAll || isSyncing) return;
@@ -499,7 +478,7 @@ export default function AdminDashboard() {
                 setSyncingAll(false);
               }
             }}
-            style={({ pressed }) => [styles.refreshBtn, (pressed || syncingAll || isSyncing) && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.refreshBtn, styles.refreshBtnWide, (pressed || syncingAll || isSyncing) && { opacity: 0.85 }]}
           >
             <Text style={styles.refreshBtnText}>טען מחדש</Text>
           </Pressable>
@@ -928,5 +907,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#334155',
     ...Shadow.sm,
   },
+  refreshBtnWide: { flex: 1, alignItems: 'center' },
   refreshBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#E2E8F0' },
 });

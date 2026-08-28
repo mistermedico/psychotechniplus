@@ -161,10 +161,16 @@ export default function QuestionsAdmin() {
         {
           text: 'אישור',
           style: action === 'delete' ? 'destructive' : 'default',
-          onPress: () => {
-            if (action === 'delete') deleteQuestions(selectedQuestionIds);
-            else if (action === 'approve') bulkValidate(selectedQuestionIds, 'validated');
-            else bulkValidate(selectedQuestionIds, 'rejected');
+          onPress: async () => {
+            if (action === 'delete') {
+              const result = await deleteQuestions(selectedQuestionIds);
+              Alert.alert(result.ok ? 'נמחק' : 'שגיאת מחיקה', result.ok ? 'השאלות נמחקו גם מ-Supabase.' : result.error ?? 'המחיקה נכשלה.');
+            } else if (action === 'approve') {
+              bulkValidate(selectedQuestionIds, 'validated');
+            } else {
+              bulkValidate(selectedQuestionIds, 'rejected');
+            }
+            clearSelection();
             setBulkMode(false);
           },
         },
@@ -349,7 +355,14 @@ export default function QuestionsAdmin() {
               onPress={() => {
                 Alert.alert('מחיקה', 'למחוק שאלה זו?', [
                   { text: 'ביטול', style: 'cancel' },
-                  { text: 'מחק', style: 'destructive', onPress: () => deleteQuestion(item.id) },
+                  {
+                    text: 'מחק',
+                    style: 'destructive',
+                    onPress: async () => {
+                      const result = await deleteQuestion(item.id);
+                      Alert.alert(result.ok ? 'נמחק' : 'שגיאת מחיקה', result.ok ? 'השאלה נמחקה גם מ-Supabase.' : result.error ?? 'המחיקה נכשלה.');
+                    },
+                  },
                 ]);
               }}
               style={[styles.qaBtn, { backgroundColor: Colors.dangerLight }]}

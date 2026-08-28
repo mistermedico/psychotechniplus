@@ -153,10 +153,15 @@ export async function upsertQuestions(qs: Question[]): Promise<{ error?: string 
 }
 
 export async function deleteQuestion(id: string): Promise<{ error?: string }> {
-  const { error } = await supabase.from('questions').delete().eq('id', id);
+  const { data, error } = await supabase.from('questions').delete().eq('id', id).select('id');
   if (error) {
     logger.error('db:deleteQuestion', `שגיאה במחיקת שאלה ${id}`, error.message);
     return { error: error.message };
+  }
+  if (!data || data.length === 0) {
+    const message = 'השאלה לא נמחקה ב-Supabase. ייתכן שהיא כבר נמחקה או שהשרת לא החזיר הרשאת SELECT למחיקה.';
+    logger.warn('db:deleteQuestion', message, { id });
+    return { error: message };
   }
   logger.info('db:deleteQuestion', `שאלה נמחקה: ${id}`);
   return {};

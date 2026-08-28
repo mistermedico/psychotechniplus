@@ -1560,6 +1560,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }
     logger.info('adminStore:deleteQuestion', `שאלה נמחקה: ${id}`);
     get().logActivity(`מחק שאלה ${id}`, 'question');
+    await get().loadAdminData(true).catch(() => null);
     return { ok: true };
   },
 
@@ -1585,6 +1586,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }
     logger.info('adminStore:deleteQuestions', `${ids.length} שאלות נמחקו`);
     get().logActivity(`מחק ${ids.length} שאלות`, 'question');
+    await get().loadAdminData(true).catch(() => null);
     return { ok: true };
   },
 
