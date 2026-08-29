@@ -22,6 +22,7 @@ const ADMIN_RELOAD_MIN_INTERVAL_MS = 1500;
 const ADMIN_REALTIME_RELOAD_DEBOUNCE_MS = 900;
 const ADMIN_COLLECTION_SAVE_DEBOUNCE_MS = 700;
 const ADMIN_REALTIME_SELF_WRITE_MUTE_MS = 1800;
+const ADMIN_DELETE_RELOAD_MUTE_MS = 10000;
 
 async function loadDeletedQuestionIds(): Promise<void> {
   if (deletedQuestionsLoadPromise) return deletedQuestionsLoadPromise;
@@ -1598,7 +1599,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   deleteQuestion: async (id) => {
     await markQuestionDeletedLocally(id);
-    adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
+    adminRealtimeMutedUntil = Date.now() + ADMIN_DELETE_RELOAD_MUTE_MS;
     set(s => ({
       questions: s.questions.filter(q => q.id !== id),
       selectedQuestionIds: s.selectedQuestionIds.filter(i => i !== id),
@@ -1613,7 +1614,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       set({ syncError: message, isSyncing: false });
       logger.error('adminStore:deleteQuestion', `מחיקה לוגית נשמרה, מחיקה פיזית נכשלה עבור ${id}`, result.error);
       get().logActivity(`מחק שאלה ${id} (מחיקה לוגית; נדרש אימות Supabase)`, 'question');
-      await get().loadAdminData(true).catch(() => null);
       return { ok: true, error: message };
     }
     await saveTemplates(get().templates).catch(e => {
@@ -1621,7 +1621,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     });
     logger.info('adminStore:deleteQuestion', `שאלה נמחקה: ${id}`);
     get().logActivity(`מחק שאלה ${id}`, 'question');
-    await get().loadAdminData(true).catch(() => null);
     return { ok: true };
   },
 
@@ -1630,7 +1629,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     await loadDeletedQuestionIds();
     ids.forEach(id => deletedQuestionIds.add(id));
     await persistDeletedQuestionIds();
-    adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
+    adminRealtimeMutedUntil = Date.now() + ADMIN_DELETE_RELOAD_MUTE_MS;
     set(s => ({
       questions: s.questions.filter(q => !idSet.has(q.id)),
       selectedQuestionIds: [],
@@ -1648,7 +1647,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       set({ syncError: `חלק מהשאלות הוסרו לוגית, אך המחיקה הפיזית דורשת בדיקה:\n${message}`, isSyncing: false });
       logger.error('adminStore:deleteQuestions', `מחיקה לוגית נשמרה; ${failed.length} מחיקות פיזיות נכשלו`, message);
       get().logActivity(`מחק ${ids.length} שאלות (מחיקה לוגית; ${failed.length} דורשות אימות Supabase)`, 'question');
-      await get().loadAdminData(true).catch(() => null);
       return { ok: true, error: message };
     }
     await saveTemplates(get().templates).catch(e => {
@@ -1656,7 +1654,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     });
     logger.info('adminStore:deleteQuestions', `${ids.length} שאלות נמחקו`);
     get().logActivity(`מחק ${ids.length} שאלות`, 'question');
-    await get().loadAdminData(true).catch(() => null);
     return { ok: true };
   },
 
