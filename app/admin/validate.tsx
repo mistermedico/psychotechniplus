@@ -90,7 +90,7 @@ function confirmDeleteQuestion(message: string): Promise<boolean> {
 
 export default function ValidateQueue() {
   const {
-    getPendingQuestions, validateQuestion, getQuestionsByStatus, bulkValidate,
+    questions, validateQuestion, bulkValidate,
     addQuestion, updateQuestion, deleteQuestion,
     bgGenRunning, bgGenProgress, setBgGenRunning, setBgGenProgress,
   } = useAdminStore();
@@ -106,16 +106,16 @@ export default function ValidateQueue() {
 
   const hiddenDeletedSet = useMemo(() => new Set(hiddenDeletedIds), [hiddenDeletedIds]);
   const pending = useMemo(
-    () => getPendingQuestions().filter(q => !hiddenDeletedSet.has(q.id)),
-    [getPendingQuestions, hiddenDeletedSet]
+    () => questions.filter(q => q.validationStatus === 'pending' && !hiddenDeletedSet.has(q.id)),
+    [questions, hiddenDeletedSet]
   );
   const rejected = useMemo(
-    () => getQuestionsByStatus('rejected').filter(q => !hiddenDeletedSet.has(q.id)),
-    [getQuestionsByStatus, hiddenDeletedSet]
+    () => questions.filter(q => q.validationStatus === 'rejected' && !hiddenDeletedSet.has(q.id)),
+    [questions, hiddenDeletedSet]
   );
   const validatedCount = useMemo(
-    () => getQuestionsByStatus('validated').filter(q => !hiddenDeletedSet.has(q.id)).length,
-    [getQuestionsByStatus, hiddenDeletedSet]
+    () => questions.filter(q => q.validationStatus === 'validated' && !hiddenDeletedSet.has(q.id)).length,
+    [questions, hiddenDeletedSet]
   );
 
   const queue = filter === 'pending' ? pending : rejected;
