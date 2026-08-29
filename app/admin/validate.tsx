@@ -86,6 +86,15 @@ function confirmDeleteQuestion(message: string): Promise<boolean> {
   });
 }
 
+function markDraftDeleted(q: Question): Partial<Question> {
+  return {
+    validationStatus: 'deleted' as ValidationStatus,
+    smartPracticeEligible: false,
+    generalPracticeEligible: false,
+    accessLevel: q.accessLevel,
+  };
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function ValidateQueue() {
@@ -230,6 +239,7 @@ export default function ValidateQueue() {
 
     setHiddenDeletedIds(ids => ids.includes(q.id) ? ids : [...ids, q.id]);
     setCurrentIdx(i => Math.max(0, Math.min(i, queue.length - 2)));
+    updateQuestion(q.id, markDraftDeleted(q));
     setDeletingId(q.id);
     const result = await deleteQuestion(q.id);
     setDeletingId(null);
