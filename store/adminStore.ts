@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
 const DELETED_QUESTIONS_KEY = '@psychotechniplus/admin/deletedQuestionIds';
+const DELETED_QUESTIONS_REMOTE_KEY = 'deleted_question_ids';
 const ADMIN_COLLECTIONS_KEY = 'collections';
 let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -27,11 +28,17 @@ async function loadDeletedQuestionIds(): Promise<void> {
   deletedQuestionsLoadPromise = (async () => {
     try {
       const raw = await AsyncStorage.getItem(DELETED_QUESTIONS_KEY);
-      if (!raw) return;
-      const ids = JSON.parse(raw);
-      if (Array.isArray(ids)) {
-        deletedQuestionIds.clear();
-        ids.filter(id => typeof id === 'string').forEach(id => deletedQuestionIds.add(id));
+      if (raw) {
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids)) {
+          deletedQuestionIds.clear();
+          ids.filter(id => typeof id === 'string').forEach(id => deletedQuestionIds.add(id));
+        }
+      }
+      const remote = await loadAdminState<string[]>(DELETED_QUESTIONS_REMOTE_KEY).catch(() => null);
+      if (Array.isArray(remote)) {
+        remote.filter(id => typeof id === 'string').forEach(id => deletedQuestionIds.add(id));
+        await AsyncStorage.setItem(DELETED_QUESTIONS_KEY, JSON.stringify([...deletedQuestionIds]));
       }
     } catch (e: any) {
       logger.warn('adminStore:deletedQuestions', 'לא ניתן לטעון רשימת שאלות שנמחקו', e?.message);
@@ -44,7 +51,11 @@ async function loadDeletedQuestionIds(): Promise<void> {
 
 async function persistDeletedQuestionIds(): Promise<void> {
   try {
-    await AsyncStorage.setItem(DELETED_QUESTIONS_KEY, JSON.stringify([...deletedQuestionIds]));
+    const ids = [...deletedQuestionIds];
+    await AsyncStorage.setItem(DELETED_QUESTIONS_KEY, JSON.stringify(ids));
+    await saveAdminState(DELETED_QUESTIONS_REMOTE_KEY, ids).catch((e: any) => {
+      logger.warn('adminStore:deletedQuestions', 'לא ניתן לשמור רשימת מחיקות ב-Supabase', e?.message);
+    });
   } catch (e: any) {
     logger.warn('adminStore:deletedQuestions', 'לא ניתן לשמור רשימת שאלות שנמחקו', e?.message);
   }
@@ -53,12 +64,6 @@ async function persistDeletedQuestionIds(): Promise<void> {
 async function markQuestionDeletedLocally(id: string): Promise<void> {
   await loadDeletedQuestionIds();
   deletedQuestionIds.add(id);
-  await persistDeletedQuestionIds();
-}
-
-async function unmarkQuestionDeletedLocally(id: string): Promise<void> {
-  await loadDeletedQuestionIds();
-  deletedQuestionIds.delete(id);
   await persistDeletedQuestionIds();
 }
 
@@ -1592,8 +1597,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   deleteQuestion: async (id) => {
-    const existing = get().questions.find(q => q.id === id);
-    const previousTemplates = get().templates;
     await markQuestionDeletedLocally(id);
     adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
     set(s => ({
@@ -1606,15 +1609,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }));
     const result = await dbDelete(id);
     if (result.error) {
-      await unmarkQuestionDeletedLocally(id);
-      if (existing) {
-        set(s => ({
-          questions: s.questions.some(q => q.id === id) ? s.questions : [...s.questions, existing],
-          templates: previousTemplates,
-        }));
-      }
-      logger.error('adminStore:deleteQuestion', `שגיאה במחיקת שאלה ${id}`, result.error);
-      return { ok: false, error: result.error };
+      const message = `השאלה הוסרה מהניהול ונשמרה ברשימת מחיקות, אבל המחיקה הפיזית ב-Supabase דורשת בדיקה: ${result.error}`;
+      set({ syncError: message, isSyncing: false });
+      logger.error('adminStore:deleteQuestion', `מחיקה לוגית נשמרה, מחיקה פיזית נכשלה עבור ${id}`, result.error);
+      get().logActivity(`מחק שאלה ${id} (מחיקה לוגית; נדרש אימות Supabase)`, 'question');
+      await get().loadAdminData(true).catch(() => null);
+      return { ok: true, error: message };
     }
     await saveTemplates(get().templates).catch(e => {
       logger.warn('adminStore:deleteQuestion', 'השאלה נמחקה אך ניקוי תבניות המבחן לא נשמר מיד.', e?.message);
@@ -1627,8 +1627,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   deleteQuestions: async (ids) => {
     const idSet = new Set(ids);
-    const existing = get().questions.filter(q => idSet.has(q.id));
-    const previousTemplates = get().templates;
     await loadDeletedQuestionIds();
     ids.forEach(id => deletedQuestionIds.add(id));
     await persistDeletedQuestionIds();
@@ -1646,18 +1644,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       .map((result, index) => ({ result, id: ids[index] }))
       .filter(row => row.result.error);
     if (failed.length > 0) {
-      failed.forEach(row => deletedQuestionIds.delete(row.id));
-      await persistDeletedQuestionIds();
-      set(s => {
-        const currentIds = new Set(s.questions.map(q => q.id));
-        return {
-          questions: [...s.questions, ...existing.filter(q => !currentIds.has(q.id))],
-          templates: previousTemplates,
-        };
-      });
       const message = failed.map(row => `${row.id}: ${row.result.error}`).join('\n');
-      logger.error('adminStore:deleteQuestions', `שגיאה במחיקת ${failed.length} שאלות`, message);
-      return { ok: false, error: message };
+      set({ syncError: `חלק מהשאלות הוסרו לוגית, אך המחיקה הפיזית דורשת בדיקה:\n${message}`, isSyncing: false });
+      logger.error('adminStore:deleteQuestions', `מחיקה לוגית נשמרה; ${failed.length} מחיקות פיזיות נכשלו`, message);
+      get().logActivity(`מחק ${ids.length} שאלות (מחיקה לוגית; ${failed.length} דורשות אימות Supabase)`, 'question');
+      await get().loadAdminData(true).catch(() => null);
+      return { ok: true, error: message };
     }
     await saveTemplates(get().templates).catch(e => {
       logger.warn('adminStore:deleteQuestions', 'השאלות נמחקו אך ניקוי תבניות המבחן לא נשמר מיד.', e?.message);
