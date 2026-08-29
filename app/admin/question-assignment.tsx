@@ -21,9 +21,10 @@ const STATUS_COLORS: Record<ValidationStatus, string> = {
   pending: Colors.warning,
   rejected: Colors.danger,
   draft: Colors.textTertiary,
+  deleted: Colors.textTertiary,
 };
 const STATUS_LABELS: Record<ValidationStatus, string> = {
-  validated: 'מאושר', pending: 'ממתין', rejected: 'נדחה', draft: 'טיוטה',
+  validated: 'מאושר', pending: 'ממתין', rejected: 'נדחה', draft: 'טיוטה', deleted: 'נמחק',
 };
 const TYPE_LABELS: Record<QuestionType, string> = {
   multiple_choice: 'בחירה מרובה',

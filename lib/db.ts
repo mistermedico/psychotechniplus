@@ -102,7 +102,7 @@ export async function fetchQuestions(opts?: {
   let query = supabase.from('questions').select('*');
   if (opts?.topicId) query = query.eq('topic_id', opts.topicId);
   if (opts?.status)  query = query.eq('validation_status', opts.status);
-  else query = query.neq('validation_status', DELETED_QUESTION_STATUS);
+  else query = query.or(`validation_status.is.null,validation_status.neq.${DELETED_QUESTION_STATUS}`);
   if (opts?.targetId) query = query.contains('target_ids', [opts.targetId]);
   const { data, error } = await query;
   if (error) {
@@ -126,7 +126,7 @@ export async function fetchAllQuestions(): Promise<Question[]> {
     const { data, error } = await supabase
       .from('questions')
       .select('*')
-      .neq('validation_status', DELETED_QUESTION_STATUS)
+      .or(`validation_status.is.null,validation_status.neq.${DELETED_QUESTION_STATUS}`)
       .order('created_at', { ascending: false });
     if (error) { logger.error('db:fetchAllQuestions', 'שגיאה בטעינת שאלות', error.message); return []; }
     logger.info('db:fetchAllQuestions', `נטענו ${data?.length ?? 0} שאלות מסופאבייס`);
@@ -159,19 +159,28 @@ export async function upsertQuestions(qs: Question[]): Promise<{ error?: string 
 }
 
 export async function deleteQuestion(id: string): Promise<{ error?: string }> {
-  const { error: softDeleteError } = await supabase
+  const deletedAt = new Date().toISOString();
+  const { data: softDeletedRow, error: softDeleteError } = await supabase
     .from('questions')
     .update({
       validation_status: DELETED_QUESTION_STATUS,
       smart_practice_eligible: false,
       general_practice_eligible: false,
-      updated_at: new Date().toISOString(),
+      updated_at: deletedAt,
     })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id,validation_status')
+    .maybeSingle();
 
   if (softDeleteError) {
     logger.error('db:deleteQuestion', `שגיאה בסימון שאלה כמחוקה ${id}`, softDeleteError.message);
     return { error: softDeleteError.message };
+  }
+
+  if (!softDeletedRow?.id || softDeletedRow.validation_status !== DELETED_QUESTION_STATUS) {
+    const message = `Supabase לא סימן אף שורה כמחוקה עבור ${id}. ייתכן שהרשאות RLS או מזהה השאלה חסמו את המחיקה.`;
+    logger.error('db:deleteQuestion', message, { id, softDeletedRow });
+    return { error: message };
   }
 
   const { error } = await supabase.from('questions').delete().eq('id', id);

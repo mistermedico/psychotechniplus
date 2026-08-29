@@ -11,7 +11,7 @@ export type QuestionType =
   | 'fill_in_the_blank';
 
 export type AccessLevel = 'free' | 'premium';
-export type ValidationStatus = 'pending' | 'validated' | 'rejected' | 'draft';
+export type ValidationStatus = 'pending' | 'validated' | 'rejected' | 'draft' | 'deleted';
 export type PerformanceLevel = 'low' | 'medium' | 'high' | 'very_high';
 export type SessionMode = 'practice' | 'speed' | 'simulation' | 'review' | 'adaptive';
 export type SessionStatus = 'in_progress' | 'completed' | 'abandoned';

@@ -20,6 +20,7 @@ const STATUS_COLORS: Record<ValidationStatus, string> = {
   pending: Colors.warning,
   draft: Colors.textTertiary,
   rejected: Colors.danger,
+  deleted: Colors.textTertiary,
 };
 
 const STATUS_LABELS: Record<ValidationStatus, string> = {
@@ -27,6 +28,7 @@ const STATUS_LABELS: Record<ValidationStatus, string> = {
   pending: 'ממתין',
   draft: 'טיוטה',
   rejected: 'נדחה',
+  deleted: 'נמחק',
 };
 
 const SORT_OPTIONS = ['חדש → ישן', 'ישן → חדש', 'קושי ↑', 'קושי ↓', 'גישה חופשית', 'גישה פרמיום'];
@@ -85,7 +87,7 @@ export default function QuestionsAdmin() {
   }, [loadSessionHistory]);
 
   const filtered = useMemo(() => {
-    let q = [...questions];
+    let q = questions.filter(x => x.validationStatus !== 'deleted');
     if (search.trim()) {
       const s = search.toLowerCase();
       q = q.filter(x => x.questionText.toLowerCase().includes(s) ||
@@ -113,23 +115,24 @@ export default function QuestionsAdmin() {
   }, [questions, search, filterStatus, filterTopicId, filterAccess, filterType, filterPool, qualityFilter, sortIdx]);
 
   const audit = useMemo(() => {
-    const validated = questions.filter(q => q.validationStatus === 'validated').length;
-    const premium = questions.filter(q => q.accessLevel === 'premium').length;
-    const smart = questions.filter(q => q.smartPracticeEligible).length;
-    const missingPool = questions.filter(q => !q.smartPracticeEligible && !q.generalPracticeEligible).length;
-    const qualityIssues = questions.filter(q =>
+    const visibleQuestions = questions.filter(q => q.validationStatus !== 'deleted');
+    const validated = visibleQuestions.filter(q => q.validationStatus === 'validated').length;
+    const premium = visibleQuestions.filter(q => q.accessLevel === 'premium').length;
+    const smart = visibleQuestions.filter(q => q.smartPracticeEligible).length;
+    const missingPool = visibleQuestions.filter(q => !q.smartPracticeEligible && !q.generalPracticeEligible).length;
+    const qualityIssues = visibleQuestions.filter(q =>
       hasQualityIssue(q, 'missingExplanation') ||
       hasQualityIssue(q, 'weakOptions') ||
       hasQualityIssue(q, 'invalidAnswer') ||
       hasQualityIssue(q, 'difficulty')
     ).length;
-    const avgDifficulty = questions.length ? (questions.reduce((sum, q) => sum + q.difficulty, 0) / questions.length).toFixed(1) : '0.0';
+    const avgDifficulty = visibleQuestions.length ? (visibleQuestions.reduce((sum, q) => sum + q.difficulty, 0) / visibleQuestions.length).toFixed(1) : '0.0';
     return { validated, premium, smart, missingPool, qualityIssues, avgDifficulty };
   }, [questions]);
 
   const topicAudit = useMemo(() => {
     return topics.map(topic => {
-      const topicQuestions = questions.filter(q => q.topicId === topic.id);
+      const topicQuestions = questions.filter(q => q.validationStatus !== 'deleted' && q.topicId === topic.id);
       const validated = topicQuestions.filter(q => q.validationStatus === 'validated').length;
       const pending = topicQuestions.filter(q => q.validationStatus === 'pending').length;
       const premium = topicQuestions.filter(q => q.accessLevel === 'premium').length;
@@ -375,7 +378,8 @@ export default function QuestionsAdmin() {
     );
   };
 
-  const pendingCount = questions.filter(q => q.validationStatus === 'pending').length;
+  const visibleQuestions = questions.filter(q => q.validationStatus !== 'deleted');
+  const pendingCount = visibleQuestions.filter(q => q.validationStatus === 'pending').length;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -383,7 +387,7 @@ export default function QuestionsAdmin() {
         title="ניהול שאלות"
         subtitle="עריכה, אימות, שיוך לפרקים, פרימיום ופולי תרגול מסונכרנים מול Supabase."
         counters={[
-          { label: 'סה״כ שאלות', value: questions.length, tone: 'primary' },
+          { label: 'סה״כ שאלות', value: visibleQuestions.length, tone: 'primary' },
           { label: 'מאומתות', value: audit.validated, tone: 'success' },
           { label: 'פרימיום', value: audit.premium, tone: 'warning' },
           { label: 'בעיות איכות', value: audit.qualityIssues, tone: audit.qualityIssues ? 'danger' : 'success' },
@@ -395,7 +399,7 @@ export default function QuestionsAdmin() {
         style={styles.auditScroll}
         contentContainerStyle={styles.auditGrid}
       >
-        <AuditPill label="מאושרות" value={`${audit.validated}/${questions.length}`} color={Colors.success} />
+        <AuditPill label="מאושרות" value={`${audit.validated}/${visibleQuestions.length}`} color={Colors.success} />
         <AuditPill label="פרימיום" value={audit.premium} color={Colors.warning} />
         <AuditPill label="פול חכם" value={audit.smart} color={Colors.primary} />
         <AuditPill label="ללא פול" value={audit.missingPool} color={audit.missingPool ? Colors.danger : Colors.success} />

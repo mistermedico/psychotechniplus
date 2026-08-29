@@ -69,8 +69,11 @@ async function markQuestionDeletedLocally(id: string): Promise<void> {
 }
 
 function filterDeletedQuestions(questions: Question[]): Question[] {
-  if (deletedQuestionIds.size === 0) return questions;
-  return questions.filter(q => !deletedQuestionIds.has(q.id));
+  return questions.filter(q => q.validationStatus !== 'deleted' && !deletedQuestionIds.has(q.id));
+}
+
+function isVisibleAdminQuestion(q: Question): boolean {
+  return q.validationStatus !== 'deleted' && !deletedQuestionIds.has(q.id);
 }
 
 function pickAdminCollections(s: any) {
@@ -1997,7 +2000,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   getStats: () => {
-    const { questions, topics, targets } = get();
+    const { topics, targets } = get();
+    const questions = get().questions.filter(isVisibleAdminQuestion);
     const questionsPerTopic: Record<string, number> = {};
     const questionsPerDifficulty: Record<number, number> = {};
     const questionsPerType: Record<string, number> = {};
@@ -2218,7 +2222,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }
   },
 
-  getPendingQuestions: () => get().questions.filter(q => q.validationStatus === 'pending'),
-  getQuestionsByStatus: (status) => get().questions.filter(q => q.validationStatus === status),
+  getPendingQuestions: () => get().questions.filter(q => q.validationStatus === 'pending' && isVisibleAdminQuestion(q)),
+  getQuestionsByStatus: (status) => get().questions.filter(q => q.validationStatus === status && isVisibleAdminQuestion(q)),
 }));
 

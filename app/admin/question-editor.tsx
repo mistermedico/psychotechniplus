@@ -849,6 +849,7 @@ const STATUS_BG: Record<ValidationStatus, string> = {
   pending: Colors.warning,
   validated: Colors.success,
   rejected: Colors.danger,
+  deleted: Colors.textTertiary,
 };
 
 const sectionStyles = StyleSheet.create({
