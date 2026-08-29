@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Animated, Alert, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, Switch,
@@ -95,16 +95,28 @@ export default function ValidateQueue() {
     bgGenRunning, bgGenProgress, setBgGenRunning, setBgGenProgress,
   } = useAdminStore();
 
-  const pending = getPendingQuestions();
-  const rejected = getQuestionsByStatus('rejected');
-
   const [currentIdx, setCurrentIdx] = useState(0);
   const [filter, setFilter] = useState<'pending' | 'rejected'>('pending');
   const [editMode, setEditMode] = useState(false);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
   const [showGenLog, setShowGenLog] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [hiddenDeletedIds, setHiddenDeletedIds] = useState<string[]>([]);
   const [toastError, setToastError] = useState<AdminToastError | null>(null);
+
+  const hiddenDeletedSet = useMemo(() => new Set(hiddenDeletedIds), [hiddenDeletedIds]);
+  const pending = useMemo(
+    () => getPendingQuestions().filter(q => !hiddenDeletedSet.has(q.id)),
+    [getPendingQuestions, hiddenDeletedSet]
+  );
+  const rejected = useMemo(
+    () => getQuestionsByStatus('rejected').filter(q => !hiddenDeletedSet.has(q.id)),
+    [getQuestionsByStatus, hiddenDeletedSet]
+  );
+  const validatedCount = useMemo(
+    () => getQuestionsByStatus('validated').filter(q => !hiddenDeletedSet.has(q.id)).length,
+    [getQuestionsByStatus, hiddenDeletedSet]
+  );
 
   const queue = filter === 'pending' ? pending : rejected;
   const safeIdx = Math.min(currentIdx, Math.max(0, queue.length - 1));
@@ -216,17 +228,19 @@ export default function ValidateQueue() {
     const okToDelete = await confirmDeleteQuestion('למחוק את השאלה מהמערכת ומהמאגר? פעולה זו תמחק גם מ-Supabase.');
     if (!okToDelete) return;
 
+    setHiddenDeletedIds(ids => ids.includes(q.id) ? ids : [...ids, q.id]);
+    setCurrentIdx(i => Math.max(0, Math.min(i, queue.length - 2)));
     setDeletingId(q.id);
     const result = await deleteQuestion(q.id);
     setDeletingId(null);
     if (!result.ok) {
+      setHiddenDeletedIds(ids => ids.filter(id => id !== q.id));
       showAdminErrorToast(setToastError, 'מחיקה נכשלה', result.error ?? 'לא ניתן למחוק את השאלה כרגע.', { questionId: q.id }, 'admin:validate');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
     setEditMode(false);
     setEditDraft(null);
-    setCurrentIdx(i => Math.max(0, Math.min(i, queue.length - 2)));
     Alert.alert('נמחק', 'השאלה נמחקה מתור האימות ומהמאגר המסונכרן.');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   };
@@ -298,7 +312,7 @@ export default function ValidateQueue() {
         <Pressable onPress={() => { setFilter('rejected'); setCurrentIdx(0); setEditMode(false); }}>
           <StatPill label="נדחו" value={rejected.length} color={Colors.danger} active={filter === 'rejected'} />
         </Pressable>
-        <StatPill label="אושרו" value={getQuestionsByStatus('validated').length} color={Colors.success} active={false} />
+        <StatPill label="אושרו" value={validatedCount} color={Colors.success} active={false} />
 
         {/* Generator button */}
         {!bgGenRunning ? (
