@@ -10,6 +10,7 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { VisualImage } from '../components/VisualImage';
 import { AdBanner } from '../components/AdBanner';
+import { SponsoredOfferCard } from '../components/SponsoredOfferCard';
 import { getPerformanceLevel, formatTime } from '../utils/scoring';
 import { StatCard } from '../components/StatCard';
 import { usePracticeStore } from '../store/practiceStore';
@@ -47,6 +48,7 @@ export default function Results() {
   const topic = useAdminStore(s => s.topics.find(t => t.id === (params.topicId ?? '')));
   const isAdmin = useAdminStore(s => s.isAdmin);
   const isPremium = useUserStore(s => s.isPremium);
+  const completedSessions = useUserStore(s => s.totalSessions);
   const completedSession = usePracticeStore(s => s.completedSession);
   const reviewSession = completedSession?.id === params.sessionId ? completedSession : null;
   const isSimulationReview = reviewSession?.mode === 'simulation';
@@ -228,6 +230,11 @@ export default function Results() {
           </View>
 
           <AdBanner isPremium={isPremium} isAdmin={isAdmin} placement="session" />
+          <SponsoredOfferCard
+            isPremium={isPremium}
+            isAdmin={isAdmin}
+            completedSessions={completedSessions}
+          />
         </Animated.View>
       </ScrollView>
 
