@@ -10,6 +10,7 @@ import { logger } from '../utils/logger';
 import { ADMIN_EMAIL, useAdminStore } from './adminStore';
 import { logOutPurchases } from '../lib/purchases';
 import { PerformanceLevel, computeAdaptiveLevel, LEVEL_LABELS } from '../utils/adaptive';
+import { localDateKey, previousLocalDateKey, normalizeStoredDateKey } from '../utils/date';
 
 const PREMIUM_REVIEW_EMAILS = new Set([
   'apple-review@psychotechniplus.app',
@@ -347,10 +348,11 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   updateStreak: () => {
     set(state => {
-      const today = new Date().toDateString();
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
-      if (state.lastPracticedDate === today) return {};
-      const newStreak = state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
+      const today = localDateKey();
+      const yesterday = previousLocalDateKey();
+      const lastPracticedDate = normalizeStoredDateKey(state.lastPracticedDate);
+      if (lastPracticedDate === today) return {};
+      const newStreak = lastPracticedDate === yesterday ? state.streak + 1 : 1;
       const updates = {
         streak: newStreak,
         longestStreak: Math.max(newStreak, state.longestStreak),
@@ -394,11 +396,12 @@ export const useUserStore = create<UserState>((set, get) => ({
       let newLevel = state.level;
       while (newXp >= xpForLevel(newLevel)) { newXp -= xpForLevel(newLevel); newLevel++; }
 
-      const today = new Date().toDateString();
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
-      const newStreak = state.lastPracticedDate === today
+      const today = localDateKey();
+      const yesterday = previousLocalDateKey();
+      const lastPracticedDate = normalizeStoredDateKey(state.lastPracticedDate);
+      const newStreak = lastPracticedDate === today
         ? state.streak
-        : state.lastPracticedDate === yesterday ? state.streak + 1 : 1;
+        : lastPracticedDate === yesterday ? state.streak + 1 : 1;
       const longestStreak = Math.max(newStreak, state.longestStreak);
 
       if (state.userId && !state.isGuest) {
