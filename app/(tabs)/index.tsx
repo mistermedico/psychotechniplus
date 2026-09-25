@@ -43,7 +43,9 @@ export default function Dashboard() {
 
   const { dailyChallenges, targets, topics } = useAdminStore();
 
-  const selectedTarget = targets.find(t => t.id === selectedTargetId) ?? targets[0];
+  const selectedTarget =
+    targets.find(t => t.id === 'target_psychometric' && t.isActive !== false && !t.comingSoon) ??
+    targets.find(t => t.id === 'target_psychometric');
   const targetTopics = selectedTarget ? visiblePracticeTopics(topics.filter(t => t.targetId === selectedTarget.id)) : [];
 
   const today = localDateKey();
