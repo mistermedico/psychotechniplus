@@ -199,7 +199,11 @@ export default function AuthScreen() {
               onPress={async () => {
                 setResending(true);
                 try {
-                  await supabase.auth.resend({ type: 'signup', email });
+                  const { error: resendError } = await supabase.auth.resend({
+                    type: 'signup',
+                    email: email.trim().toLowerCase(),
+                  });
+                  if (resendError) throw resendError;
                   Alert.alert('נשלח!', 'בדוק את תיבת הדואר שלך שוב.');
                 } catch {
                   // fall back: let user change email
