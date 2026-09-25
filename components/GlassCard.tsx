@@ -2,7 +2,8 @@ import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Platform } from 'react-native';
-import { Radius } from '../constants/theme';
+import { Radius, Shadow } from '../constants/theme';
+import { Colors } from '../constants/colors';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -21,8 +22,8 @@ export function GlassCard({
   borderColor,
   radius = Radius.xl,
 }: GlassCardProps) {
-  const bg = strong ? 'rgba(255,255,255,0.13)' : 'rgba(255,255,255,0.07)';
-  const border = borderColor ?? (strong ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.13)');
+  const bg = strong ? Colors.surfaceElevated : Colors.surfaceCard;
+  const border = borderColor ?? (strong ? Colors.borderStrong : Colors.border);
 
   if (Platform.OS === 'ios') {
     return (
@@ -35,6 +36,7 @@ export function GlassCard({
           style as ViewStyle,
         ]}
       >
+        <View pointerEvents="none" style={styles.highlight} />
         {children}
       </BlurView>
     );
@@ -49,6 +51,7 @@ export function GlassCard({
         style as ViewStyle,
       ]}
     >
+      <View pointerEvents="none" style={styles.highlight} />
       {children}
     </View>
   );
@@ -58,5 +61,15 @@ const styles = StyleSheet.create({
   base: {
     borderWidth: 1,
     overflow: 'hidden',
+    ...Shadow.md,
+  },
+  highlight: {
+    position: 'absolute',
+    top: 0,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.24)',
+    opacity: 0.75,
   },
 });
