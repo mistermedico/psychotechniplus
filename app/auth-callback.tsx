@@ -29,7 +29,7 @@ export default function AuthCallbackScreen() {
         const user = data.session?.user;
         if (!user?.id) throw new Error('לא נמצא משתמש מחובר');
         await initialize(user.id);
-        if (user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
+        setIsAdmin(user.email?.toLowerCase() === ADMIN_EMAIL);
         const { hasCompletedOnboarding } = useUserStore.getState();
         router.replace(hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
       } catch (err: any) {
