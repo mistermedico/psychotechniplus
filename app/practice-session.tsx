@@ -483,7 +483,7 @@ export default function PracticeSession() {
 
   // Full simulation timer. In simulations, answers/explanations are revealed only on the results screen.
   useEffect(() => {
-    if (!isSimulation || !session || simulationRemaining <= 0) return;
+    if (!isSimulation || !session || showRestScreen || simulationRemaining <= 0) return;
     if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
     simulationTimerRef.current = setInterval(() => {
       setSimulationRemaining(prev => {
@@ -498,11 +498,11 @@ export default function PracticeSession() {
     return () => {
       if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
     };
-  }, [isSimulation, session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isSimulation, session?.id, showRestScreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Speed mode timer (only in speed mode — showTimerInPractice shows timer but doesn't auto-skip)
   useEffect(() => {
-    if (!isSpeedMode || revealed) return;
+    if (!isSpeedMode || !session || revealed) return;
     setTimer(practiceSettings.speedModeSecondsPerQuestion);
     timerRef.current = setInterval(() => {
       setTimer(prev => {
@@ -514,18 +514,18 @@ export default function PracticeSession() {
       });
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [session?.currentIndex, revealed, handleTimeUp]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.currentIndex, revealed, handleTimeUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Non-speed timer display (counts up to SPEED_LIMIT for display only)
   const [practiceTimer, setPracticeTimer] = useState(0);
   useEffect(() => {
-    if (isSpeedMode || revealed) return;
+    if (!session || isSpeedMode || revealed) return;
     setPracticeTimer(0);
     const id = setInterval(() => {
       setPracticeTimer(prev => prev + 1);
     }, 1000);
     return () => clearInterval(id);
-  }, [session?.currentIndex, revealed, isSpeedMode]);
+  }, [session?.id, session?.currentIndex, revealed, isSpeedMode]);
 
   // Auto-advance after answer is revealed — also drives the live countdown banner
   useEffect(() => {
