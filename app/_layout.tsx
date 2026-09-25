@@ -33,10 +33,8 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.setAttribute('dir', 'rtl');
   document.documentElement.style.direction = 'rtl';
   document.documentElement.style.backgroundColor = '#080A12';
-  document.documentElement.style.textAlign = 'right';
   document.body.setAttribute('dir', 'rtl');
   document.body.style.direction = 'rtl';
-  document.body.style.textAlign = 'right';
   document.body.style.backgroundColor = '#080A12';
   document.body.style.color = '#F0F4FF';
 
@@ -46,44 +44,23 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     style.id = styleId;
     style.textContent = `
       html, body, #root {
-        direction: rtl !important;
-        text-align: right !important;
-        unicode-bidi: plaintext !important;
+        direction: rtl;
+        min-height: 100%;
       }
 
-      #root, #root * {
-        direction: rtl !important;
-        unicode-bidi: plaintext !important;
+      body {
+        margin: 0;
       }
 
-      input, textarea, [contenteditable="true"] {
-        direction: rtl !important;
-        text-align: right !important;
+      input:not([dir="ltr"]),
+      textarea:not([dir="ltr"]),
+      [contenteditable="true"]:not([dir="ltr"]) {
+        direction: rtl;
       }
 
-      [dir="ltr"], [style*="direction: ltr"], [style*="text-align: left"] {
-        direction: rtl !important;
-        text-align: right !important;
-      }
-
-      button, a, [data-testid], [role="button"], [role="link"] {
-        direction: rtl !important;
-        text-align: right !important;
-      }
-
-      button *, a *, [role="button"] *, [role="link"] * {
-        direction: rtl !important;
-        text-align: right !important;
-      }
-
-      [class*="css-text"], [class*="r-"], div, span, p, h1, h2, h3, h4, h5, h6 {
-        text-align: right !important;
-        direction: rtl !important;
-      }
-
-      svg text {
-        direction: rtl !important;
-        unicode-bidi: bidi-override !important;
+      [dir="ltr"] {
+        direction: ltr !important;
+        unicode-bidi: isolate;
       }
     `;
     document.head.appendChild(style);
