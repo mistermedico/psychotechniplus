@@ -56,8 +56,10 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question
     );
     set({
+      completedSession: null,
+      lastCompletedSessionId: null,
       session: {
-        id: `session_${Date.now()}`,
+        id: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         targetId,
         topicId,
         mode,
