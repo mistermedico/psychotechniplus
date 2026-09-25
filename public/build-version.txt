@@ -1,0 +1,4 @@
+psychotechniplus-release-2026-09-26-a
+Database cleanup: question labels, duplicate eligibility, live wording fixes
+App fixes: auth isolation, RTL, web storage, local date/streak handling
+Design refresh: contrast, glass cards, navigation, tab bar
