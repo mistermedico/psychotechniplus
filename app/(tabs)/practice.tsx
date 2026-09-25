@@ -17,6 +17,7 @@ import { getRewardedAdUnitId, showRewardedAdForBonus } from '../../lib/ads';
 import { AdBanner } from '../../components/AdBanner';
 import { Target, Topic } from '../../data/types';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
+import { localDateKey } from '../../utils/date';
 
 type PracticeTab = 'free' | 'simulations';
 
@@ -50,6 +51,7 @@ const FREE_MODES = [
 const PRACTICE_USAGE_KEY = '@psychotechniplus/practiceUsage';
 const TAB_BAR_OVERLAY_HEIGHT = 88;
 const START_BAR_HEIGHT = 112;
+const PRIMARY_TARGET_ID = 'target_psychometric';
 
 interface PracticeUsage {
   date: string;
@@ -58,7 +60,7 @@ interface PracticeUsage {
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }
 
 function emptyUsage(): PracticeUsage {
@@ -79,7 +81,10 @@ export default function PracticeTab() {
   const [usage, setUsage] = useState<PracticeUsage>(emptyUsage);
   const [rewardedLoading, setRewardedLoading] = useState(false);
 
-  const target = targets.find(t => t.id === selectedTargetId) ?? targets[0];
+  const target =
+    targets.find(t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon) ??
+    targets.find(t => t.id === PRIMARY_TARGET_ID) ??
+    targets.find(t => t.isActive !== false && !t.comingSoon);
   const topics = target ? visiblePracticeTopics(allTopics.filter(t => t.targetId === target.id)) : [];
   const hasRewardedBonusAd = useMemo(() => !isPremium && !isAdmin && !!getRewardedAdUnitId(), [isAdmin, isPremium]);
 
