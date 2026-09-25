@@ -110,7 +110,10 @@ export default function ProfileTab() {
   }, [email, isAdmin, setIsAdmin]);
 
   const showAdmin = isAdmin || email.toLowerCase() === ADMIN_EMAIL;
-  const target = targets.find(item => item.id === selectedTargetId) ?? targets[0] ?? null;
+  const target =
+    targets.find(item => item.id === 'target_psychometric' && item.isActive !== false && !item.comingSoon) ??
+    targets.find(item => item.id === 'target_psychometric') ??
+    null;
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const mainLevelLabel = getTopicLevelLabel('topic_quantitative');
   const earnedBadgeTypes = new Set(badges.map(badge => badge.badgeType));
