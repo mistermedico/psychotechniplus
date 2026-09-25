@@ -18,6 +18,7 @@ import { canAccessTopic } from '../../lib/accessControl';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
 
 const BOTTOM_TAB_CLEARANCE = 112;
+const PRIMARY_TARGET_ID = 'target_psychometric';
 
 // Animated topics container that springs in when a target is expanded
 function AnimatedTopicsContainer({
@@ -83,7 +84,9 @@ export default function TargetsTab() {
   const { getTopicAccuracy, getTopicLevel, totalSessions, isPremium } = useUserStore();
   const { premiumConfig, targets, topics: allTopics } = useAdminStore();
 
-  const visibleTargets = targets.filter(t => t.isActive !== false);
+  const visibleTargets = targets.filter(
+    t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon
+  );
   const selected = visibleTargets.find(t => t.id === selectedId);
   const selectedTopics = selected ? visiblePracticeTopics(allTopics.filter(t => t.targetId === selected.id)) : [];
 
@@ -111,7 +114,7 @@ export default function TargetsTab() {
         style={styles.hero}
       >
         <Text style={styles.heroTitle}>הכנה לפסיכוטכני</Text>
-        <Text style={styles.heroSubtitle}>בחר מסלול ותרגל לפי רמה אישית</Text>
+        <Text style={styles.heroSubtitle}>תרגול פסיכוטכני כללי לפי רמה אישית</Text>
         <View style={styles.heroBadge}>
           <Text style={styles.heroBadgeText}>🏆 {totalSessions} סשנים</Text>
         </View>
