@@ -250,7 +250,8 @@ export default function PracticeSession() {
     }
 
     // FREE / ADAPTIVE PRACTICE MODE
-    const limit = questionLimit ? parseInt(questionLimit) : 10;
+    const parsedLimit = questionLimit ? Number.parseInt(questionLimit, 10) : 10;
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10;
     const userLevel = getTopicLevel(topicId ?? '');
     if (topic && !canAccessTopic(topic, hasPremiumAccess, premiumConfig)) {
       Alert.alert('פרימיום בלבד', 'הנושא הזה נעול לפי הגדרות המנהל.');
@@ -321,6 +322,15 @@ export default function PracticeSession() {
         questions: [...questionPool].sort(() => Math.random() - 0.5).slice(0, effectiveLimit),
         initialLevel: userLevel,
       });
+    }).catch((error: unknown) => {
+      clearTimeout(loadTimeout);
+      if (cancelled) return;
+      logger.error(
+        'practiceSession:loadQuestions',
+        'טעינת שאלות נכשלה',
+        error instanceof Error ? error.message : String(error),
+      );
+      setLoadError(true);
     });
     return () => {
       cancelled = true;
@@ -397,7 +407,10 @@ export default function PracticeSession() {
 
     let cancelled = false;
     let debounce: ReturnType<typeof setTimeout> | null = null;
-    const limit = questionLimit ? parseInt(questionLimit) : session.questions.length;
+    const parsedLiveLimit = questionLimit ? Number.parseInt(questionLimit, 10) : session.questions.length;
+    const limit = Number.isFinite(parsedLiveLimit) && parsedLiveLimit > 0
+      ? parsedLiveLimit
+      : session.questions.length;
 
     const applyCurrentFilters = (questions: typeof session.questions) => {
       let filtered = questions.filter(q => canAccessQuestion(q, hasPremiumAccess));
@@ -603,7 +616,7 @@ export default function PracticeSession() {
   const handleNext = () => {
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     resetQuestionState();
-    if (mode === 'adaptive') {
+    if (effectiveMode === 'adaptive') {
       const s = usePracticeStore.getState().session;
       if (!s || s.answers.length >= s.questions.length) {
         finishSession();
