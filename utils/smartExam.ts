@@ -137,20 +137,15 @@ export function generateSmartExamQuestions(
       !excludedIds.has(q.id)
     );
 
-    // If pool is too small, keep the no-duplicate rule and use the available pool.
+    // Keep exclusions and the no-duplicate guarantee even when a rule cannot
+    // supply its requested amount. A later anyTopic fallback may fill the gap,
+    // but excluded/already-used questions must never silently re-enter the exam.
     if (pool.length < requestedCount) {
       pool = allQuestions.filter(q =>
         q.topicId === topicId &&
         isUsableQuestion(q) &&
         !usedIds.has(q.id) &&
         !excludedIds.has(q.id)
-      );
-    }
-    // Still empty: use only quality-checked validated questions for this topic.
-    if (pool.length === 0) {
-      pool = allQuestions.filter(q =>
-        q.topicId === topicId &&
-        isUsableQuestion(q)
       );
     }
 
