@@ -178,7 +178,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (profile) {
       set({
         name: profile.name,
-        selectedTargetId: profile.selected_target_id,
+        selectedTargetId: DEFAULT_TARGET_ID,
         hasCompletedOnboarding: profile.has_completed_onboarding,
         isPremium: shouldForcePremium || !!profile.is_premium,
         streak: profile.streak,
@@ -283,7 +283,8 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  completeOnboarding: (name, targetId) => {
+  completeOnboarding: (name, _targetId) => {
+    const targetId = DEFAULT_TARGET_ID;
     set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true });
     const { userId, isGuest } = get();
     if (userId && !isGuest) saveUserProfile(userId, {
