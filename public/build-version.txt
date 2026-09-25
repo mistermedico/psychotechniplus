@@ -1,4 +1,5 @@
-psychotechniplus-release-2026-09-26-b
-Code: adaptive flow, session identity, timer lifecycle, simulation exclusion rules, results guards
-Database: 20 new validated logic questions, Hebrew typo cleanup, zero duplicate new questions
-QA: TypeScript required in Vercel build; Supabase question structure checks passed
+psychotechniplus-release-2026-09-26-c
+Routes: only target_psychometric (פסיכוטכני כללי) is user-facing and persisted
+Simulations: immutable active snapshots; no mid-exam regeneration from live admin edits
+QA: simulation rule totals match declared totals; question inventory exceeds every rule requirement
+Practice: local-date daily quota; stale legacy target IDs are ignored
