@@ -1,4 +1,4 @@
-psychotechniplus-release-2026-09-26-a
-Database cleanup: question labels, duplicate eligibility, live wording fixes
-App fixes: auth isolation, RTL, web storage, local date/streak handling
-Design refresh: contrast, glass cards, navigation, tab bar
+psychotechniplus-release-2026-09-26-b
+Code: adaptive flow, session identity, timer lifecycle, simulation exclusion rules, results guards
+Database: 20 new validated logic questions, Hebrew typo cleanup, zero duplicate new questions
+QA: TypeScript required in Vercel build; Supabase question structure checks passed
