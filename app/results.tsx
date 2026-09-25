@@ -36,14 +36,20 @@ export default function Results() {
     sessionId?: string;
   }>();
 
-  const score = parseInt(params.score ?? '0');
-  const correct = parseInt(params.correct ?? '0');
-  const total = parseInt(params.total ?? '0');
-  const timeSpent = parseInt(params.timeSpent ?? '0');
-  const percentile = parseInt(params.percentile ?? '50');
-  const difficultyScore = parseInt(params.difficultyScore ?? '0');
-  const speedScore = parseInt(params.speedScore ?? '0');
-  const stability = parseInt(params.stability ?? '100');
+  const safeInt = (value: string | undefined, fallback: number, min = 0, max = Number.MAX_SAFE_INTEGER) => {
+    const parsed = Number.parseInt(value ?? '', 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  };
+
+  const score = safeInt(params.score, 0, 0, 100);
+  const correct = safeInt(params.correct, 0);
+  const total = safeInt(params.total, 0);
+  const timeSpent = safeInt(params.timeSpent, 0);
+  const percentile = safeInt(params.percentile, 50, 0, 100);
+  const difficultyScore = safeInt(params.difficultyScore, 0, 0, 100);
+  const speedScore = safeInt(params.speedScore, 0, 0, 100);
+  const stability = safeInt(params.stability, 100, 0, 100);
 
   const topic = useAdminStore(s => s.topics.find(t => t.id === (params.topicId ?? '')));
   const isAdmin = useAdminStore(s => s.isAdmin);
