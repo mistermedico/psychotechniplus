@@ -13,6 +13,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
+import { localDateKey } from '../../utils/date';
 
 const TOPIC_META: Record<string, { icon: string; gradient: [string, string]; glow: string }> = {
   topic_quantitative: { icon: '⚡', gradient: ['#5A52D5', '#7C6FF7'], glow: '#7C6FF7' },
@@ -45,7 +46,7 @@ export default function Dashboard() {
   const selectedTarget = targets.find(t => t.id === selectedTargetId) ?? targets[0];
   const targetTopics = selectedTarget ? visiblePracticeTopics(topics.filter(t => t.targetId === selectedTarget.id)) : [];
 
-  const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  const today = localDateKey();
   const todayChallenge = dailyChallenges.find(c => c.date === today);
   const mainTopic = targetTopics[0] ?? null;
   const title = mainTopic ? LEVEL_LABELS[getTopicLevel(mainTopic.id)] : LEVEL_LABELS['beginner'];
