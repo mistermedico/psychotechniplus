@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "build:web": "expo export --platform web --output-dir dist",
+    "build:web": "npm run typecheck && expo export --platform web --output-dir dist",
     "export:web": "expo export --platform web --output-dir dist-check",
     "eas:whoami": "npx eas-cli@20.2.0 whoami",
     "eas:env:list": "npx eas-cli@20.2.0 env:list --environment production",
