@@ -21,9 +21,8 @@ export default function Onboarding() {
   const [name, setName] = useState('');
   const { targets } = useAdminStore();
   const psychometricTarget =
-    targets.find(t => t.id === DEFAULT_TARGET_ID) ??
-    targets.find(t => t.isActive !== false && !t.comingSoon) ??
-    targets[0];
+    targets.find(t => t.id === DEFAULT_TARGET_ID && t.isActive !== false && !t.comingSoon) ??
+    targets.find(t => t.id === DEFAULT_TARGET_ID);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const completeOnboarding = useUserStore(s => s.completeOnboarding);
