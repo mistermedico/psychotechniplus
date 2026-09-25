@@ -122,7 +122,7 @@ export default function AuthScreen() {
       }
 
       await initialize(data.user.id);
-      if (data.user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
+      setIsAdmin(data.user.email?.toLowerCase() === ADMIN_EMAIL);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const { hasCompletedOnboarding } = useUserStore.getState();
       await completeAuthNavigation(data.user.id, hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
@@ -157,7 +157,7 @@ export default function AuthScreen() {
 
       await initialize(data.user.id);
       notifySignup(data.user.id, data.user.email ?? email.trim().toLowerCase(), displayName.trim() || data.user.user_metadata?.display_name);
-      if (data.user.email?.toLowerCase() === ADMIN_EMAIL) setIsAdmin(true);
+      setIsAdmin(data.user.email?.toLowerCase() === ADMIN_EMAIL);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await completeAuthNavigation(data.user.id, '/onboarding');
     }
