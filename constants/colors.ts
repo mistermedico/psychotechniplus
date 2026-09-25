@@ -36,23 +36,23 @@ export const Colors = {
   background3: '#14102A',
 
   // Surfaces
-  surface: 'rgba(255,255,255,0.06)',
-  surfaceSecondary: 'rgba(255,255,255,0.03)',
+  surface: 'rgba(255,255,255,0.075)',
+  surfaceSecondary: 'rgba(255,255,255,0.045)',
   surfaceTertiary: 'rgba(255,255,255,0.02)',
-  surfaceStrong: 'rgba(255,255,255,0.10)',
-  surfaceCard: 'rgba(255,255,255,0.07)',
-  surfaceElevated: 'rgba(255,255,255,0.09)',
+  surfaceStrong: 'rgba(255,255,255,0.125)',
+  surfaceCard: 'rgba(255,255,255,0.085)',
+  surfaceElevated: 'rgba(255,255,255,0.115)',
 
   // Borders
-  border: 'rgba(255,255,255,0.09)',
-  borderStrong: 'rgba(255,255,255,0.20)',
+  border: 'rgba(255,255,255,0.13)',
+  borderStrong: 'rgba(255,255,255,0.24)',
   borderFocus: 'rgba(124,111,247,0.70)',
   borderGlow: 'rgba(124,111,247,0.40)',
 
   // Text
   text: '#F0F4FF',
-  textSecondary: 'rgba(240,244,255,0.60)',
-  textTertiary: 'rgba(240,244,255,0.32)',
+  textSecondary: 'rgba(240,244,255,0.72)',
+  textTertiary: 'rgba(240,244,255,0.48)',
   textInverse: '#0F172A',
 
   glass: 'rgba(255,255,255,0.85)',
