@@ -342,64 +342,9 @@ export default function PracticeSession() {
     };
   }, [rootNavigationReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep simulation previews aligned with Supabase edits to questions/templates.
-  useEffect(() => {
-    if (!rootNavigationReady || !session || !isSimulation || !templateId) return;
-
-    let cancelled = false;
-    let debounce: ReturnType<typeof setTimeout> | null = null;
-
-    const refreshSimulation = async () => {
-      try {
-        await loadAdminData(true);
-        if (cancelled) return;
-        const state = useAdminStore.getState();
-        const template = state.templates.find(t => t.id === templateId);
-        if (!template) return;
-        const regenerated = generateSmartExamQuestions(
-          template,
-          state.questions.filter(q =>
-            q.validationStatus === 'validated' &&
-            canAccessQuestion(q, hasPremiumAccess)
-          ),
-          {}
-        );
-        if (regenerated.allQuestions.length === 0) return;
-        setExamSections(regenerated.sections);
-        refreshSessionQuestions(regenerated.allQuestions);
-      } catch (error) {
-        logger.warn(
-          'practiceSession:simulationRealtime',
-          `לא ניתן לרענן מבחן בזמן אמת: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    };
-
-    const scheduleRefresh = () => {
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(refreshSimulation, 650);
-    };
-
-    const channel = supabase
-      .channel(`simulation-preview-live-${templateId}-${session.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_state', filter: 'key=eq.templates' }, scheduleRefresh)
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      if (debounce) clearTimeout(debounce);
-      supabase.removeChannel(channel);
-    };
-  }, [
-    rootNavigationReady,
-    session?.id,
-    isSimulation,
-    templateId,
-    hasPremiumAccess,
-    loadAdminData,
-    refreshSessionQuestions,
-  ]);
+  // Active simulations are intentionally immutable snapshots.
+  // Supabase/template edits apply to the next simulation only, preventing
+  // mid-exam question replacement, section-boundary drift and timer mismatch.
 
   // Keep a live practice session aligned with admin edits in Supabase.
   useEffect(() => {
