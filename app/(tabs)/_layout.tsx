@@ -130,7 +130,8 @@ export default function TabLayout() {
           borderTopWidth: 0,
           height: BAR_HEIGHT,
           paddingBottom: Math.max(insets.bottom, 12),
-          paddingTop: 8,
+          paddingTop: 7,
+          paddingHorizontal: 8,
           backgroundColor: 'transparent',
           elevation: 40,
           zIndex: 40,
@@ -200,7 +201,7 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   blurBase: {},
   androidBackground: {
-    backgroundColor: 'rgba(9,13,26,0.98)',
+    backgroundColor: 'rgba(9,13,26,0.96)',
   },
   topBorder: {
     position: 'absolute',
@@ -221,8 +222,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   tabItemFocused: {
-    backgroundColor: 'rgba(124,111,247,0.20)',
-    borderColor: 'rgba(158,153,250,0.55)',
+    backgroundColor: 'rgba(124,111,247,0.24)',
+    borderColor: 'rgba(158,153,250,0.68)',
   },
   activeGlow: {
     ...StyleSheet.absoluteFillObject,
@@ -238,7 +239,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -5,
     width: 22,
-    height: 3,
+    height: 4,
     borderRadius: 99,
     backgroundColor: '#9E99FA',
   },
