@@ -2,7 +2,8 @@ import React from 'react';
 import { Pressable, Text, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
-import { FontFamily } from '../constants/theme';
+import { FontFamily, Radius, Shadow } from '../constants/theme';
+import { Colors } from '../constants/colors';
 
 interface BackButtonProps {
   onPress?: () => void;
@@ -32,7 +33,7 @@ export function BackButton({ onPress, toHome = false, label, style, color = '#ff
       accessibilityRole="button"
       accessibilityLabel={label ?? (toHome ? 'חזור לדף הבית' : 'חזור')}
     >
-      <View style={[styles.inner, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+      <View style={[styles.inner, { borderColor: Colors.borderStrong }]}>
         <Text style={[styles.arrow, { color }]}>{toHome ? '🏠' : '→'}</Text>
         {label ? <Text style={[styles.label, { color }]}>{label}</Text> : null}
       </View>
@@ -52,7 +53,7 @@ export function HomeButton({ style }: { style?: object }) {
       accessibilityRole="button"
       accessibilityLabel="חזור לדף הבית"
     >
-      <View style={[styles.inner, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+      <View style={[styles.inner, { borderColor: Colors.borderStrong }]}>
         <Text style={styles.arrow}>🏠</Text>
       </View>
     </Pressable>
@@ -65,11 +66,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Colors.surfaceStrong,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    borderRadius: Radius.lg,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    ...Shadow.sm,
     minHeight: 44,
     minWidth: 44,
   },
