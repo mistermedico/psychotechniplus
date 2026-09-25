@@ -155,7 +155,18 @@ export const useUserStore = create<UserState>((set, get) => ({
     const isReviewPremium = PREMIUM_REVIEW_EMAILS.has(sessionEmail.toLowerCase());
     const shouldForcePremium = isAdminPremium || isReviewPremium;
 
-    set({ userId, isAuthenticated: true, isGuest: false, email: sessionEmail, isPremium: shouldForcePremium });
+    // Always clear user-scoped state before hydrating a newly authenticated account.
+    // This prevents guest/admin/profile/progress data from leaking between accounts.
+    set({
+      ...INITIAL_STATE,
+      userId,
+      email: sessionEmail,
+      isAuthenticated: true,
+      isGuest: false,
+      isLoaded: false,
+      isSyncing: true,
+      isPremium: shouldForcePremium,
+    });
 
     const [profile, badges, savedTopicPerformance] = await Promise.all([
       loadUserProfile(userId),
@@ -235,7 +246,10 @@ export const useUserStore = create<UserState>((set, get) => ({
     logger.info('userStore:signOut', 'משתמש התנתק');
     await logOutPurchases().catch(() => null);
     await supabase.auth.signOut().catch(() => null);
-    useAdminStore.getState().logActivity('משתמש התנתק', 'user');
+    const adminStore = useAdminStore.getState();
+    adminStore.logActivity('משתמש התנתק', 'user');
+    adminStore.setIsAdmin(false);
+    adminStore.stopRealtimeSync();
     set({ ...INITIAL_STATE, isLoaded: true });
   },
 
@@ -256,7 +270,11 @@ export const useUserStore = create<UserState>((set, get) => ({
       ]);
       logger.success('userStore:deleteAccount', 'נתוני משתמש נמחקו');
       await supabase.functions.invoke('delete-user', { body: { userId } }).catch(() => null);
+      await logOutPurchases().catch(() => null);
       await supabase.auth.signOut();
+      const adminStore = useAdminStore.getState();
+      adminStore.setIsAdmin(false);
+      adminStore.stopRealtimeSync();
       set({ ...INITIAL_STATE, isLoaded: true });
       return { success: true };
     } catch (e: any) {
