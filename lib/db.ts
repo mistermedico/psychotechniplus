@@ -9,19 +9,34 @@ import { ensureSpatialVisualAssets } from '../utils/spatialVisualAssets';
 
 // ── Local storage helpers ──────────────────────────────────────────────────
 
+function getWebStorage(): Storage | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  try {
+    const storage = window.localStorage;
+    const probe = '@psychotechniplus/storage-probe';
+    storage.setItem(probe, '1');
+    storage.removeItem(probe);
+    return storage;
+  } catch {
+    return null;
+  }
+}
+
 function localGet(key: string): string | null {
-  if (Platform.OS === 'web') return localStorage.getItem(key);
-  return null; // async path below
+  return getWebStorage()?.getItem(key) ?? null;
 }
 function localSet(key: string, val: string): void {
-  if (Platform.OS === 'web') localStorage.setItem(key, val);
+  try { getWebStorage()?.setItem(key, val); } catch {}
 }
 async function asyncGet(key: string): Promise<string | null> {
-  if (Platform.OS === 'web') return localStorage.getItem(key);
+  if (Platform.OS === 'web') return localGet(key);
   return AsyncStorage.getItem(key);
 }
 async function asyncSet(key: string, val: string): Promise<void> {
-  if (Platform.OS === 'web') { localStorage.setItem(key, val); return; }
+  if (Platform.OS === 'web') {
+    localSet(key, val);
+    return;
+  }
   return AsyncStorage.setItem(key, val);
 }
 
@@ -32,8 +47,11 @@ const DELETED_QUESTION_STATUS = 'deleted';
 
 export async function getOrCreateUserId(): Promise<string> {
   if (Platform.OS === 'web') {
-    let id = localStorage.getItem(USER_ID_KEY);
-    if (!id) { id = `user_${Date.now()}_${Math.random().toString(36).slice(2)}`; localStorage.setItem(USER_ID_KEY, id); }
+    let id = localGet(USER_ID_KEY);
+    if (!id) {
+      id = `user_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      localSet(USER_ID_KEY, id);
+    }
     return id;
   }
   let id = await AsyncStorage.getItem(USER_ID_KEY);
