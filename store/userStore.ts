@@ -263,22 +263,37 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (!userId) return { success: false, error: 'No user session' };
     try {
       logger.info('userStore:deleteAccount', `מוחק חשבון: ${userId}`);
-      await Promise.all([
-        supabase.from('user_profiles').delete().eq('id', userId),
+
+      // Delete FK children first, then the profile. Supabase query errors are
+      // returned in-band rather than thrown, so every step must be checked.
+      for (const operation of [
+        supabase.from('practice_sessions').delete().eq('user_id', userId),
         supabase.from('user_elos').delete().eq('user_id', userId),
         supabase.from('user_badges').delete().eq('user_id', userId),
-        supabase.from('practice_sessions').delete().eq('user_id', userId),
-      ]);
-      logger.success('userStore:deleteAccount', 'נתוני משתמש נמחקו');
-      await supabase.functions.invoke('delete-user', { body: { userId } }).catch(() => null);
+      ]) {
+        const { error } = await operation;
+        if (error) throw error;
+      }
+
+      const { error: profileDeleteError } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', userId);
+      if (profileDeleteError) throw profileDeleteError;
+
+      const { error: authDeleteError } = await supabase.functions.invoke('delete-user', { body: { userId } });
+      if (authDeleteError) throw authDeleteError;
+
+      logger.success('userStore:deleteAccount', 'נתוני המשתמש וחשבון האימות נמחקו');
       await logOutPurchases().catch(() => null);
-      await supabase.auth.signOut();
+      await supabase.auth.signOut().catch(() => null);
       const adminStore = useAdminStore.getState();
       adminStore.setIsAdmin(false);
       adminStore.stopRealtimeSync();
       set({ ...INITIAL_STATE, isLoaded: true });
       return { success: true };
     } catch (e: any) {
+      logger.error('userStore:deleteAccount', 'מחיקת החשבון נכשלה', e?.message);
       return { success: false, error: e.message ?? 'Unknown error' };
     }
   },
