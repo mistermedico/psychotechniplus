@@ -81,8 +81,7 @@ function StepWelcome({
         </View>
         <Text style={styles.h1}>ברוך הבא ל-PsychoTechniPlus</Text>
         <Text style={styles.subtitle}>
-          פלטפורמת ההכנה החכמה למבחן הפסיכוטכני.{'
-'}
+          פלטפורמת ההכנה החכמה למבחן הפסיכוטכני.{'\n'}
           נתאים את התרגול אישית עבורך.
         </Text>
 
