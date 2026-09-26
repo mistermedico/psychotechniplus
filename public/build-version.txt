@@ -1,5 +1,8 @@
-psychotechniplus-release-2026-09-26-c
-Routes: only target_psychometric (פסיכוטכני כללי) is user-facing and persisted
-Simulations: immutable active snapshots; no mid-exam regeneration from live admin edits
-QA: simulation rule totals match declared totals; question inventory exceeds every rule requirement
-Practice: local-date daily quota; stale legacy target IDs are ignored
+psychotechniplus-release-2026-09-26-d
+Core: atomic public-data bootstrap and reduced normal-user Supabase load
+Exams: fresh Supabase source before start, immutable snapshots, full-count guard, configured global timer, adaptive skip consistency
+Daily challenge: direct Supabase question lookup and correct topic attribution
+Routes: only פסיכוטכני כללי is user-facing; legacy targets and templates disabled
+Account: FK-safe checked account deletion
+Design: streamlined single-route UX, auto-selected practice topic, clearer results and estimated percentile wording
+QA: 1074 active questions clean; 12 active general templates validated for totals and inventory
