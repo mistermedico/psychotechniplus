@@ -285,7 +285,7 @@ export default function ProfileTab() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 170 }]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.profileHero}>
