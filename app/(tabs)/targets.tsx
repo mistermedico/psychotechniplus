@@ -79,7 +79,7 @@ function AnimatedTopicsContainer({
 
 export default function TargetsTab() {
   const insets = useSafeAreaInsets();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(PRIMARY_TARGET_ID);
   const [refreshing, setRefreshing] = useState(false);
   const { getTopicAccuracy, getTopicLevel, totalSessions, isPremium } = useUserStore();
   const { premiumConfig, targets, topics: allTopics } = useAdminStore();
@@ -96,7 +96,7 @@ export default function TargetsTab() {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedId(prev => (prev === id ? null : id));
+    setSelectedId(id);
   };
 
   const handleRefresh = () => {
@@ -113,8 +113,8 @@ export default function TargetsTab() {
         end={{ x: 1, y: 1 }}
         style={styles.hero}
       >
-        <Text style={styles.heroTitle}>הכנה לפסיכוטכני</Text>
-        <Text style={styles.heroSubtitle}>תרגול פסיכוטכני כללי לפי רמה אישית</Text>
+        <Text style={styles.heroTitle}>פסיכוטכני כללי</Text>
+        <Text style={styles.heroSubtitle}>כל תחומי התרגול, ההתקדמות והמבחנים במסלול אחד</Text>
         <View style={styles.heroBadge}>
           <Text style={styles.heroBadgeText}>🏆 {totalSessions} סשנים</Text>
         </View>
@@ -171,7 +171,7 @@ export default function TargetsTab() {
               {/* Expanded topics section — animates in with spring */}
               <AnimatedTopicsContainer visible={isExpanded && !target.comingSoon}>
                 <View style={styles.topicsContainer}>
-                  <Text style={styles.topicsTitle}>נושאים במסלול</Text>
+                  <Text style={styles.topicsTitle}>הנושאים שלך</Text>
 
                   {selectedTopics.length === 0 ? (
                     <Text style={styles.emptyTopics}>אין נושאים זמינים</Text>
