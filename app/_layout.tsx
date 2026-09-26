@@ -72,6 +72,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
+  const loadPublicData = useAdminStore(s => s.loadPublicData);
   const loadAdminData = useAdminStore(s => s.loadAdminData);
   const startRealtimeSync = useAdminStore(s => s.startRealtimeSync);
   const stopRealtimeSync = useAdminStore(s => s.stopRealtimeSync);
@@ -93,16 +94,17 @@ export default function RootLayout() {
         const { email, userId, isGuest } = useUserStore.getState();
         notifyFirstOpenOnce(userId, isGuest ? null : email).catch(() => null);
         // Ensure targets+topics exist in Supabase for all users (FK prerequisite)
-        ensureDbSeeded().then(() => {
+        ensureDbSeeded().then(async () => {
+          await loadPublicData(true);
           if (email.toLowerCase() === ADMIN_EMAIL) {
             setIsAdmin(true);
-            loadAdminData();
+            await loadAdminData();
             startRealtimeSync();
           } else {
             setIsAdmin(false);
             stopRealtimeSync();
           }
-        });
+        }).catch(() => null);
         // Guests receive an anonymous RevenueCat ID so StoreKit prices and purchase restoration work before sign-in.
         initializePurchases(userId && !isGuest ? userId : undefined).catch(() => null);
         initializeAds().catch(() => null);
