@@ -102,7 +102,7 @@ export default function Dashboard() {
 
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 170 }]}
           showsVerticalScrollIndicator={false}
         >
           {/* ── Header ── */}
