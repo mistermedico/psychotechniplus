@@ -7,31 +7,6 @@ const corsHeaders = {
 };
 
 type EventType = 'first_open' | 'signup' | 'purchase';
-
-type Payload = {
-  eventType?: EventType;
-  title?: string;
-  userId?: string | null;
-  email?: string | null;
-  name?: string | null;
-  platform?: string | null;
-  appVersion?: string | null;
-  details?: Record<string, unknown>;
-};
-
-type AdminEvent = {
-  id: string;
-  eventType: EventType;
-  title: string;
-  userId: string | null;
-  email: string | null;
-  name: string | null;
-  platform: string | null;
-  appVersion: string | null;
-  details: Record<string, unknown>;
-  occurredAt: string;
-};
-
 const ADMIN_EVENTS_KEY = 'admin_events';
 const MAX_EVENTS = 2000;
 
@@ -41,59 +16,113 @@ function json(body: unknown, status = 200) {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
-
+function clean(value: unknown, max = 240) {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
 function titleFor(type: EventType) {
   if (type === 'first_open') return 'פתיחה ראשונה / התקנה';
   if (type === 'signup') return 'הרשמה חדשה';
   return 'רכישה חדשה';
 }
+function safeDetails(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized.length > 12000) return { note: 'details omitted: payload too large' };
+    return JSON.parse(serialized);
+  } catch {
+    return {};
+  }
+}
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !serviceRoleKey) {
-    return json({ ok: false, error: 'Supabase service role is not configured' }, 500);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    return json({ ok: false, error: 'Server configuration error' }, 500);
   }
 
-  const payload = await req.json().catch(() => null) as Payload | null;
-  if (!payload?.eventType || !['first_open', 'signup', 'purchase'].includes(payload.eventType)) {
+  const payload = await req.json().catch(() => null) as any;
+  const eventType = clean(payload?.eventType, 30) as EventType;
+  if (!['first_open', 'signup', 'purchase'].includes(eventType)) {
     return json({ ok: false, error: 'Missing or invalid eventType' }, 400);
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: currentRow, error: loadError } = await supabase
-    .from('admin_state')
-    .select('value')
-    .eq('key', ADMIN_EVENTS_KEY)
-    .maybeSingle();
+  let caller: any = null;
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader) {
+    try {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data } = await userClient.auth.getUser();
+      caller = data.user ?? null;
+    } catch {
+      caller = null;
+    }
+  }
 
+  let userId: string | null = null;
+  let email: string | null = null;
+  let name: string | null = null;
+
+  if (eventType === 'purchase') {
+    if (!caller) return json({ ok: false, error: 'Authenticated user required for purchase events' }, 401);
+    userId = caller.id;
+    email = caller.email ?? null;
+    name = clean(payload?.name, 120) || clean(caller.user_metadata?.display_name ?? caller.user_metadata?.full_name, 120) || null;
+  } else if (eventType === 'signup') {
+    const claimedId = clean(payload?.userId, 80);
+    if (!claimedId) return json({ ok: false, error: 'Verified signup userId required' }, 400);
+    const { data, error } = await admin.auth.admin.getUserById(claimedId);
+    if (error || !data.user) return json({ ok: false, error: 'Signup user could not be verified' }, 400);
+    userId = data.user.id;
+    email = data.user.email ?? null;
+    name = clean(payload?.name, 120) || clean(data.user.user_metadata?.display_name ?? data.user.user_metadata?.full_name, 120) || null;
+  } else {
+    if (caller) {
+      userId = caller.id;
+      email = caller.email ?? null;
+      name = clean(payload?.name, 120) || clean(caller.user_metadata?.display_name ?? caller.user_metadata?.full_name, 120) || null;
+    } else {
+      const claimedId = clean(payload?.userId, 120);
+      userId = claimedId.startsWith('guest_') ? claimedId : null;
+      email = null;
+      name = null;
+    }
+  }
+
+  const { data: currentRow, error: loadError } = await admin
+    .from('admin_state').select('value').eq('key', ADMIN_EVENTS_KEY).maybeSingle();
   if (loadError) return json({ ok: false, error: loadError.message }, 500);
 
-  const currentEvents = Array.isArray(currentRow?.value) ? currentRow.value as AdminEvent[] : [];
-  const event: AdminEvent = {
+  const currentEvents = Array.isArray(currentRow?.value) ? currentRow.value : [];
+  const event = {
     id: crypto.randomUUID(),
-    eventType: payload.eventType,
-    title: payload.title?.trim() || titleFor(payload.eventType),
-    userId: payload.userId ?? null,
-    email: payload.email ?? null,
-    name: payload.name ?? null,
-    platform: payload.platform ?? null,
-    appVersion: payload.appVersion ?? null,
-    details: payload.details ?? {},
+    eventType,
+    title: clean(payload?.title, 180) || titleFor(eventType),
+    userId,
+    email,
+    name,
+    platform: clean(payload?.platform, 40) || null,
+    appVersion: clean(payload?.appVersion, 80) || null,
+    details: safeDetails(payload?.details),
     occurredAt: new Date().toISOString(),
   };
 
   const nextEvents = [event, ...currentEvents].slice(0, MAX_EVENTS);
-  const { error: saveError } = await supabase
+  const { error: saveError } = await admin
     .from('admin_state')
     .upsert({ key: ADMIN_EVENTS_KEY, value: nextEvents, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-
   if (saveError) return json({ ok: false, error: saveError.message }, 500);
   return json({ ok: true, event });
 });
