@@ -54,9 +54,9 @@ const FEATURES = [
 ];
 
 const STATS = [
-  { value: '1,200+', label: 'שאלות תרגול' },
+  { value: '1,000+', label: 'שאלות תרגול פעילות' },
   { value: '4', label: 'תחומי תרגול' },
-  { value: '18', label: 'סימולציות' },
+  { value: '12', label: 'סימולציות פעילות' },
 ];
 
 const HOW_STEPS = [
@@ -414,7 +414,7 @@ export default function LandingScreen() {
                   <Text style={styles.pricingPrice}>ללא עלות</Text>
                 </View>
                 <View style={styles.pricingFeatures}>
-                  {['תרגול בסיסי', '3 נושאים', 'ללא סימולציות'].map(f => (
+                  {['תרגול בסיסי', '4 תחומי תרגול', 'ללא סימולציות'].map(f => (
                     <View key={f} style={styles.pricingFeatureRow}>
                       <Text style={styles.pricingFeatureDot}>·</Text>
                       <Text style={styles.pricingFeatureText}>{f}</Text>
@@ -806,7 +806,7 @@ const styles = StyleSheet.create({
   featureCard: {
     flexBasis: '48%',
     flexGrow: 1,
-    minWidth: 260,
+    minWidth: 0,
     backgroundColor: 'rgba(15,23,42,0.66)',
     borderRadius: Radius.xl, padding: 16,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)',
@@ -831,7 +831,7 @@ const styles = StyleSheet.create({
   testimonialsSection: { marginBottom: 36, direction: 'rtl', writingDirection: 'rtl' },
   testimonialsRow: { paddingHorizontal: 20, gap: 12, flexDirection: 'row-reverse' },
   testimonialCard: {
-    width: 360,
+    width: 300,
     maxWidth: 360,
     borderRadius: Radius.xl,
     overflow: 'hidden',
