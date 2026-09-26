@@ -1,8 +1,6 @@
-psychotechniplus-release-2026-09-26-d
-Core: atomic public-data bootstrap and reduced normal-user Supabase load
-Exams: fresh Supabase source before start, immutable snapshots, full-count guard, configured global timer, adaptive skip consistency
-Daily challenge: direct Supabase question lookup and correct topic attribution
-Routes: only פסיכוטכני כללי is user-facing; legacy targets and templates disabled
-Account: FK-safe checked account deletion
-Design: streamlined single-route UX, auto-selected practice topic, clearer results and estimated percentile wording
-QA: 1074 active questions clean; 12 active general templates validated for totals and inventory
+psychotechniplus-release-2026-09-26-e
+Mobile: keyboard-safe onboarding, compact auth/paywall, responsive question/image grids, compact practice header, safer results actions, compact bottom navigation
+Tabs: extra bottom clearance for ad + tab overlays across dashboard/profile/progress/target screens
+Content: landing/paywall counts aligned with current active inventory; free plan reflects 4 practice domains
+Logic: progress forced to general psychotechnic target; previous exam/session stability fixes retained
+QA: 1074 active questions clean; 12 active general templates; 0 active legacy targets/templates
