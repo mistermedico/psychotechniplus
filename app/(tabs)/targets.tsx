@@ -17,7 +17,7 @@ import { LEVEL_LABELS } from '../../utils/adaptive';
 import { canAccessTopic } from '../../lib/accessControl';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
 
-const BOTTOM_TAB_CLEARANCE = 112;
+const BOTTOM_TAB_CLEARANCE = 170;
 const PRIMARY_TARGET_ID = 'target_psychometric';
 
 // Animated topics container that springs in when a target is expanded
