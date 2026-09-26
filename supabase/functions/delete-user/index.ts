@@ -1,79 +1,59 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.105.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-const ADMIN_EMAIL = 'mrmedico111@gmail.com';
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   try {
-    // Verify the caller is authenticated
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (!authHeader) return json({ error: 'Unauthorized' }, 401);
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) return json({ error: 'Server configuration error' }, 500);
 
-    // Verify caller's JWT to get their user ID
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (authError || !user) return json({ error: 'Unauthorized' }, 401);
 
-    const body = await req.json().catch(() => ({}));
-    const requestedUserId = typeof body?.userId === 'string' && body.userId.trim()
-      ? body.userId.trim()
-      : user.id;
-    const isSelfDelete = requestedUserId === user.id;
-    const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL;
-
-    if (!isSelfDelete && !isAdmin) {
-      return new Response(JSON.stringify({ error: 'Admin privileges required' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Delete all user data
-    await Promise.all([
-      supabaseAdmin.from('user_profiles').delete().eq('id', requestedUserId),
-      supabaseAdmin.from('user_elos').delete().eq('user_id', requestedUserId),
-      supabaseAdmin.from('user_badges').delete().eq('user_id', requestedUserId),
-      supabaseAdmin.from('practice_sessions').delete().eq('user_id', requestedUserId),
-    ]);
-
-    // Delete the auth user
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(requestedUserId);
-    if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message ?? 'Unknown error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+
+    for (const [table, column] of [
+      ['practice_sessions', 'user_id'],
+      ['user_elos', 'user_id'],
+      ['user_badges', 'user_id'],
+    ] as const) {
+      const { error } = await admin.from(table).delete().eq(column, user.id);
+      if (error) return json({ error: `Failed deleting ${table}: ${error.message}` }, 500);
+    }
+
+    const { error: profileError } = await admin.from('user_profiles').delete().eq('id', user.id);
+    if (profileError) return json({ error: `Failed deleting profile: ${profileError.message}` }, 500);
+
+    const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+    if (deleteError) return json({ error: deleteError.message }, 500);
+
+    return json({ success: true });
+  } catch (error: any) {
+    return json({ error: error?.message ?? 'Unknown error' }, 500);
   }
 });
