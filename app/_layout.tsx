@@ -111,7 +111,14 @@ export default function RootLayout() {
         }
 
         notifyFirstOpenOnce(userId, isGuest ? null : email).catch(() => null);
-        initializePurchases(userId && !isGuest ? userId : undefined).catch(() => null);
+
+        // Premium entitlement affects routing/gating, so authenticated native
+        // users must finish RevenueCat identification before the UI is released.
+        if (userId && !isGuest) {
+          await initializePurchases(userId).catch(() => null);
+        } else {
+          initializePurchases(undefined).catch(() => null);
+        }
         initializeAds().catch(() => null);
       } finally {
         if (!cancelled) {
