@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, Animated,
+  View, Text, StyleSheet, Pressable, ScrollView, Animated, useWindowDimensions,
 } from 'react-native';
 import { Question } from '../data/types';
 import { Colors } from '../constants/colors';
@@ -33,6 +33,8 @@ const fontSizeMap: Record<FontSizeOption, number> = {
 };
 
 export function QuestionCard({ question, selectedId, revealed, onSelect }: Props) {
+  const { width } = useWindowDimensions();
+  const compact = width < 360;
   const displayQuestion = isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question;
   const isSpatial = isSpatialQuestion(displayQuestion);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -165,7 +167,12 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
         {displayQuestion.mediaUrl && displayQuestion.mediaType === 'image' && (
           <VisualImage
             uri={displayQuestion.mediaUrl}
-            style={[styles.questionImage, isSpatial && styles.spatialQuestionImage]}
+            style={[
+              styles.questionImage,
+              compact && styles.questionImageCompact,
+              isSpatial && styles.spatialQuestionImage,
+              isSpatial && compact && styles.spatialQuestionImageCompact,
+            ]}
             resizeMode="contain"
           />
         )}
@@ -187,6 +194,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                     disabled={revealed}
                     style={({ pressed }) => [
                       styles.optionGridCell,
+                      compact && styles.optionGridCellCompact,
                       getOptionStyle(opt.id),
                       pressed && !revealed && { opacity: 0.85 },
                     ]}
@@ -270,6 +278,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 6,
   },
   passageLabel: {
@@ -300,7 +310,7 @@ const styles = StyleSheet.create({
   questionBox: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
-    padding: 20,
+    padding: 16,
     marginBottom: 16,
     ...Shadow.md,
   },
@@ -346,10 +356,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 8,
   },
+  questionImageCompact: { height: 170 },
   spatialQuestionImage: {
-    height: 280,
+    height: 260,
     marginTop: 0,
   },
+  spatialQuestionImageCompact: { height: 210 },
 
   optionsContainer: { gap: 10 },
 
@@ -366,6 +378,9 @@ const styles = StyleSheet.create({
     padding: 8,
     alignItems: 'center',
     minHeight: 44,
+  },
+  optionGridCellCompact: {
+    width: '100%',
   },
   optionGridImage: {
     width: '100%',
