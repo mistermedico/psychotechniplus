@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   Alert,
-  Appearance,
   Linking,
   Platform,
   Pressable,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
@@ -98,7 +98,8 @@ export default function ProfileTab() {
     getTopicLevelLabel, reset, signOut, deleteAccount, isPremium,
   } = useUserStore();
   const email = useUserStore(state => state.email);
-  const { hapticsEnabled, theme, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
+  const { hapticsEnabled, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
+  const appVersion = Constants.expoConfig?.version ?? '1.0.11';
   const { isAdmin, setIsAdmin, targets } = useAdminStore();
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -226,15 +227,6 @@ export default function ProfileTab() {
       return;
     }
     Alert.alert('התראות', 'לניהול התראות פתח את הגדרות הדפדפן שלך.');
-  };
-
-  const handleThemeToggle = (isDark: boolean) => {
-    Haptics.selectionAsync();
-    const next: 'dark' | 'light' = isDark ? 'dark' : 'light';
-    updateSetting('theme', next);
-    if (Platform.OS !== 'web') {
-      try { Appearance.setColorScheme(next); } catch {}
-    }
   };
 
   const handleDifficulty = () => {
@@ -382,7 +374,7 @@ export default function ProfileTab() {
           <SectionTitle tag="SETTINGS" title="הגדרות" />
           <View style={styles.settingsCard}>
             <SettingRow icon="🔔" label="התראות" value="הגדרות מכשיר" onPress={handleNotifications} />
-            <SettingRow icon={theme === 'dark' ? '🌙' : '☀️'} label="מצב תצוגה" value={theme === 'dark' ? 'כהה' : 'בהיר'} toggle toggleValue={theme === 'dark'} onToggle={handleThemeToggle} />
+            <SettingRow icon="🌙" label="מצב תצוגה" value="כהה" disabled />
             <SettingRow icon="📊" label="קושי ברירת מחדל" value={DIFFICULTY_LABELS[defaultDifficulty]} onPress={handleDifficulty} />
             <SettingRow icon="🔡" label="גודל טקסט שאלות" value={FONT_SIZE_LABELS[questionFontSize]} onPress={handleFontSize} />
             <SettingRow icon="🔊" label="רטט והפטיקה" toggle toggleValue={hapticsEnabled} onToggle={value => updateSetting('hapticsEnabled', value)} isLast={!showAdmin} />
@@ -420,7 +412,7 @@ export default function ProfileTab() {
           )}
 
           <Pressable onPress={handleVersionTap} style={styles.versionWrap}>
-            <Text style={styles.version}>PsychoTechniPlus v1.0.3</Text>
+            <Text style={styles.version}>PsychoTechniPlus v{appVersion}</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
