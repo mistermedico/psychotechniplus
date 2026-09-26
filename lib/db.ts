@@ -736,11 +736,15 @@ export interface SessionRecord {
 export async function saveSessionRecord(record: SessionRecord): Promise<void> {
   if (!record.userId) { logger.error('db:saveSessionRecord', 'userId חסר — סשן לא נשמר'); return; }
   try {
-    await supabase.from('user_profiles').upsert({
+    const { error: profileError } = await supabase.from('user_profiles').upsert({
       id: record.userId,
-      name: record.userName ?? (record.userId.startsWith('guest_') ? 'אורח' : ''),
+      name: record.userName ?? '',
       updated_at: new Date().toISOString(),
     });
+    if (profileError) {
+      logger.error('db:saveSessionRecord', 'פרופיל המשתמש לא זמין לשמירת סשן', profileError.message);
+      return;
+    }
 
     const { error } = await supabase.from('practice_sessions').upsert({
       id: record.id,
