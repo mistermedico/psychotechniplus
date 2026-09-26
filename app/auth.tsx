@@ -448,7 +448,14 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
+  content: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 40,
+  },
 
   // Orbs
   orb: {
@@ -514,7 +521,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(124,111,247,0.22)',
     borderRadius: Radius['3xl'],
-    padding: 22,
+    padding: 18,
     overflow: 'hidden',
     shadowColor: '#7C6FF7',
     shadowOffset: { width: 0, height: 12 },
