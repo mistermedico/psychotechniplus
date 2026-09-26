@@ -65,48 +65,24 @@ let _seeded = false;
 
 export async function ensureDbSeeded(): Promise<void> {
   if (_seeded) return;
-  _seeded = true;
   try {
-    // Always upsert all targets + topics so FK constraints are always satisfied.
-    // Upsert is idempotent — safe to run every session.
-    const T = TARGETS;
-    const TOP = TOPICS;
-    const { error: te } = await supabase.from('targets').upsert(
-      T.map(t => ({
-        id: t.id, name: t.name, slug: t.slug ?? t.id, description: t.description ?? '',
-        icon: t.icon, color: t.color, gradient_colors: t.gradientColors ?? [],
-        order_index: t.order ?? 0, total_questions: t.totalQuestions ?? 0,
-        free_questions_count: t.freeQuestionsCount ?? 0,
-        is_premium_only: t.isPremiumOnly ?? false,
-        is_active: t.isActive ?? true, coming_soon: t.comingSoon ?? false,
-        access_settings: t.accessSettings ?? {},
-      })),
-      { onConflict: 'id', ignoreDuplicates: true }
-    );
-    if (te) {
-      _seeded = false;
-      logger.error('db:seed', 'שגיאה בהזרעת מסלולים', te.message);
+    // Runtime clients must never seed or mutate shared catalogue data.
+    // Only verify that the required catalogue exists; admin-only seedDatabase()
+    // remains the explicit recovery/setup path.
+    const [{ data: target, error: targetError }, { data: topic, error: topicError }] = await Promise.all([
+      supabase.from('targets').select('id').eq('id', 'target_psychometric').maybeSingle(),
+      supabase.from('topics').select('id').eq('target_id', 'target_psychometric').limit(1).maybeSingle(),
+    ]);
+
+    if (targetError || topicError || !target || !topic) {
+      const message = targetError?.message ?? topicError?.message ?? 'קטלוג פסיכוטכני חסר';
+      logger.error('db:bootstrap', 'בדיקת קטלוג נכשלה', message);
+      return;
     }
 
-    const { error: tope } = await supabase.from('topics').upsert(
-      TOP.map(t => ({
-        id: t.id, target_id: t.targetId, name: t.name, slug: t.slug ?? t.id,
-        description: t.description ?? '', icon: t.icon,
-        order_index: t.order ?? 0, is_premium_only: t.isPremiumOnly ?? false, color: t.color ?? '',
-      })),
-      { onConflict: 'id', ignoreDuplicates: true }
-    );
-    if (tope) {
-      _seeded = false;
-      logger.error('db:seed', 'שגיאה בהזרעת נושאים', tope.message);
-    }
-
-    if (!te && !tope) {
-      logger.success('db:seed', `הזרעה הושלמה: ${T.length} מסלולים, ${TOP.length} נושאים`);
-    }
+    _seeded = true;
   } catch (e: any) {
-    _seeded = false;
-    logger.error('db:seed', 'שגיאה בהזרעת DB', e?.message);
+    logger.error('db:bootstrap', 'בדיקת קטלוג נכשלה', e?.message);
   }
 }
 
