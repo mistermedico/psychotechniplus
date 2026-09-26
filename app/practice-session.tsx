@@ -815,7 +815,7 @@ export default function PracticeSession() {
         </Pressable>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTopic}>
+          <Text style={styles.headerTopic} numberOfLines={1} ellipsizeMode="tail">
             {isSimulation && examSections.length > 1
               ? `${examSections[currentSectionIdx] ? topics.find(t => t.id === examSections[currentSectionIdx].topicId)?.name ?? 'תרגול' : 'תרגול'} (חלק ${currentSectionIdx + 1}/${examSections.length})`
               : (topic?.name ?? 'תרגול')}
@@ -1044,8 +1044,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quitText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.textSecondary },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTopic: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text },
+  headerCenter: { flex: 1, minWidth: 0, alignItems: 'center', paddingHorizontal: 6 },
+  headerTopic: {
+    width: '100%',
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    textAlign: 'center',
+  },
   headerProgress: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
   timerBadge: {
     width: 48,
@@ -1155,10 +1161,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
-  actionsRow: { flexDirection: 'row-reverse', gap: 12 },
+  actionsRow: { flexDirection: 'row-reverse', gap: 10, alignItems: 'stretch' },
   skipBtn: {
     paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderRadius: Radius.xl,
     backgroundColor: Colors.surfaceSecondary,
     borderWidth: 1,
