@@ -200,14 +200,16 @@ export function generateSmartExamQuestions(
     const perQuestionSeconds = template.topicTimeSettings?.[topicId]
       ?? Math.round((template.timeLimitMinutes * 60) / (template.totalQuestions || 1));
 
-    sections.push({
-      ruleId: rule.id,
-      ruleName: rule.name || topicId,
-      topicId,
-      questions: shuffle(selected),
-      timeLimitSeconds: perQuestionSeconds * selected.length,
-      useAdaptive: rule.useAdaptiveAlgorithm ?? false,
-    });
+    if (selected.length > 0) {
+      sections.push({
+        ruleId: rule.id,
+        ruleName: rule.name || topicId,
+        topicId,
+        questions: shuffle(selected),
+        timeLimitSeconds: perQuestionSeconds * selected.length,
+        useAdaptive: rule.useAdaptiveAlgorithm ?? false,
+      });
+    }
   }
 
   const allQ = sections.flatMap(s => s.questions);
