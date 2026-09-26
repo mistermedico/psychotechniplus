@@ -58,9 +58,24 @@ function toTicket(row: TicketRow) {
   };
 }
 
+function hasValidPublicApiKey(req: Request) {
+  const key = req.headers.get('apikey') ?? '';
+  if (!key) return false;
+  const legacy = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  if (key === legacy) return true;
+  try {
+    const raw = Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') ?? '{}';
+    const parsed = JSON.parse(raw);
+    return Object.values(parsed).some(value => value === key);
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  if (!hasValidPublicApiKey(req)) return json({ error: 'Invalid API key' }, 401);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
