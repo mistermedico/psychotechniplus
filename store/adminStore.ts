@@ -13,6 +13,7 @@ const ADMIN_COLLECTIONS_KEY = 'collections';
 let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let adminDataLoadPromise: Promise<void> | null = null;
+let publicDataLoadPromise: Promise<void> | null = null;
 let deletedQuestionsLoadPromise: Promise<void> | null = null;
 const deletedQuestionIds = new Set<string>();
 let lastAdminDataLoadStartedAt = 0;
@@ -978,6 +979,7 @@ interface AdminState {
   // Supabase sync
   loadQuestionsFromSupabase: () => Promise<void>;
   seedToSupabase: () => Promise<{ ok: boolean; message: string }>;
+  loadPublicData: (force?: boolean) => Promise<void>;
   loadAdminData: (force?: boolean) => Promise<void>;
   syncAll: () => Promise<{ ok: boolean; message: string }>;
   startRealtimeSync: () => void;
@@ -2046,6 +2048,58 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   seedToSupabase: () => seedDatabase(),
+
+  loadPublicData: async (force = false) => {
+    if (publicDataLoadPromise) return publicDataLoadPromise;
+    if (!force && get().targets.length > 0 && get().topics.length > 0 && get().lastSyncedAt) return;
+
+    publicDataLoadPromise = (async () => {
+      try {
+        const [remoteTargets, remoteTopics, templates, settings, collections] = await Promise.all([
+          fetchTargets(),
+          fetchTopics(),
+          loadTemplates(),
+          loadAdminSettings(),
+          loadAdminState<any>(ADMIN_COLLECTIONS_KEY).catch(() => null),
+        ]);
+
+        const updates: Partial<AdminState> = {
+          targets: remoteTargets,
+          topics: remoteTopics,
+          lastSyncedAt: new Date().toISOString(),
+        };
+
+        if (templates && templates.length > 0) {
+          updates.templates = templates.map(normalizeTemplateRules);
+        }
+
+        if (settings) {
+          if (settings.practiceSettings) updates.practiceSettings = settings.practiceSettings;
+          if (settings.examSettings) updates.examSettings = settings.examSettings;
+          if (settings.premiumConfig) updates.premiumConfig = withDefaultPremiumConfig(settings.premiumConfig);
+          if (settings.freePracticeLimit) updates.freePracticeLimit = settings.freePracticeLimit;
+          if (settings.appConfig) updates.appConfig = withDefaultAppConfig(settings.appConfig);
+        }
+
+        const normalizedCollections = normalizeAdminCollections(collections);
+        if (normalizedCollections?.dailyChallenges) {
+          updates.dailyChallenges = normalizedCollections.dailyChallenges;
+        }
+
+        set(updates);
+        logger.success(
+          'adminStore:loadPublicData',
+          `נטענו נתונים ציבוריים: ${remoteTargets.length} מסלולים, ${remoteTopics.length} נושאים`
+        );
+      } catch (e: any) {
+        logger.error('adminStore:loadPublicData', 'טעינת נתונים ציבוריים נכשלה', e?.message);
+      }
+    })().finally(() => {
+      publicDataLoadPromise = null;
+    });
+
+    return publicDataLoadPromise;
+  },
 
   loadAdminData: async (force = false) => {
     if (adminDataLoadPromise) return adminDataLoadPromise;
