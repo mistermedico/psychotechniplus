@@ -32,7 +32,7 @@ const BADGE_INFO: Record<string, { icon: string; label: string; desc: string }> 
 };
 
 const ALL_BADGES = Object.entries(BADGE_INFO).map(([type, info]) => ({ type, ...info }));
-const BOTTOM_TAB_CLEARANCE = 112;
+const BOTTOM_TAB_CLEARANCE = 170;
 
 // Hebrew day-of-week letters (א = Sunday ... ש = Saturday)
 const DAY_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
@@ -47,7 +47,7 @@ export default function ProgressTab() {
   const { topics: allTopics } = useAdminStore();
 
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
-  const topics = allTopics.filter(t => t.targetId === selectedTargetId);
+  const topics = allTopics.filter(t => t.targetId === 'target_psychometric');
   const earnedBadgeTypes = new Set(badges.map(b => b.badgeType));
   const earnedCount = badges.filter(b => BADGE_INFO[b.badgeType]).length;
   const xpForNext = level * 100;
@@ -554,8 +554,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   streakDay: {
-    width: 40,
-    height: 40,
+    flex: 1,
+    maxWidth: 40,
+    aspectRatio: 1,
     borderRadius: 20,
     backgroundColor: Colors.surfaceSecondary,
     alignItems: 'center',
