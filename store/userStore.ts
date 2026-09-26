@@ -80,7 +80,7 @@ interface UserState {
   getTopicLevel: (topicId: string) => PerformanceLevel;
   getTopicLevelLabel: (topicId: string) => string;
   setPremium: (val: boolean) => void;
-  reset: () => void;
+  reset: () => Promise<void>;
 }
 
 const INITIAL_STATE = {
@@ -180,7 +180,10 @@ export const useUserStore = create<UserState>((set, get) => ({
         name: profile.name,
         selectedTargetId: DEFAULT_TARGET_ID,
         hasCompletedOnboarding: profile.has_completed_onboarding,
-        isPremium: shouldForcePremium || !!profile.is_premium,
+        // Native entitlement is refreshed from RevenueCat during bootstrap.
+        // The profile flag is only a server/admin mirror and must not grant access
+        // on native clients by itself.
+        isPremium: shouldForcePremium,
         streak: profile.streak,
         longestStreak: profile.longest_streak,
         lastPracticedDate: profile.last_practiced_date,
@@ -190,10 +193,6 @@ export const useUserStore = create<UserState>((set, get) => ({
         totalCorrect: profile.total_correct,
         totalAnswered: profile.total_answered,
       });
-    }
-
-    if (shouldForcePremium && userId) {
-      saveUserProfile(userId, { is_premium: true });
     }
 
     if (badges.length > 0) set({ badges });
@@ -447,29 +446,49 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   setPremium: (val) => {
-    const { userId, email, isGuest } = get();
+    const { email } = get();
     const normalizedEmail = email.toLowerCase();
     const next = normalizedEmail === ADMIN_EMAIL || PREMIUM_REVIEW_EMAILS.has(normalizedEmail) ? true : val;
+    // Do not persist an entitlement decision from an untrusted client.
+    // RevenueCat is authoritative on native clients; server/admin tooling may
+    // maintain the DB mirror independently for reporting.
     set({ isPremium: next });
-    if (userId && !isGuest) saveUserProfile(userId, { is_premium: next });
   },
 
-  reset: () => {
+  reset: async () => {
     const { userId, isGuest } = get();
-    if (userId && !isGuest) saveUserProfile(userId, {
-      name: '', selected_target_id: null, has_completed_onboarding: false,
-      streak: 0, longest_streak: 0, last_practiced_date: null,
-      level: 1, xp: 0, total_sessions: 0, total_correct: 0, total_answered: 0,
-    });
+
+    if (userId && !isGuest) {
+      try {
+        for (const operation of [
+          supabase.from('practice_sessions').delete().eq('user_id', userId),
+          supabase.from('user_elos').delete().eq('user_id', userId),
+          supabase.from('user_badges').delete().eq('user_id', userId),
+        ]) {
+          const { error } = await operation;
+          if (error) throw error;
+        }
+
+        await saveUserProfile(userId, {
+          name: '', selected_target_id: DEFAULT_TARGET_ID, has_completed_onboarding: false,
+          streak: 0, longest_streak: 0, last_practiced_date: null,
+          level: 1, xp: 0, total_sessions: 0, total_correct: 0, total_answered: 0,
+        });
+      } catch (e: any) {
+        logger.error('userStore:reset', 'איפוס נתוני משתמש נכשל', e?.message);
+        throw e;
+      }
+    }
+
     set({
       ...INITIAL_STATE,
       userId,
       name: isGuest ? GUEST_NAME : '',
-      selectedTargetId: isGuest ? DEFAULT_TARGET_ID : null,
+      selectedTargetId: DEFAULT_TARGET_ID,
       hasCompletedOnboarding: isGuest,
-      isAuthenticated: isGuest,
+      isAuthenticated: isGuest ? true : Boolean(userId),
       isGuest,
       isLoaded: true,
     });
-  },
+  }
 }));
