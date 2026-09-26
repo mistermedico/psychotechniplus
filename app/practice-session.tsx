@@ -503,6 +503,17 @@ export default function PracticeSession() {
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     resetQuestionState();
     skipQuestion();
+
+    if (effectiveMode === 'adaptive') {
+      const activeSession = usePracticeStore.getState().session;
+      if (!activeSession || activeSession.answers.length >= activeSession.questions.length) {
+        finishSession();
+        return;
+      }
+      getAdaptiveNext();
+      return;
+    }
+
     advanceOrEnd();
   };
 
