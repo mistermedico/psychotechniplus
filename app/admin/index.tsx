@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, ADMIN_EMAIL } from '../../store/adminStore';
+import { useUserStore } from '../../store/userStore';
 import { supabase } from '../../lib/supabase';
 import { loadSupportTickets } from '../../lib/supportTickets';
 import { Colors } from '../../constants/colors';
@@ -179,6 +180,11 @@ export default function AdminDashboard() {
             setLoginError(result.error ?? 'שגיאת התחברות');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           } else {
+            const { data } = await supabase.auth.getSession();
+            const adminUserId = data.session?.user?.id;
+            if (adminUserId) {
+              await useUserStore.getState().initialize(adminUserId);
+            }
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
         }}
@@ -261,7 +267,11 @@ export default function AdminDashboard() {
             </Text>
           </View>
           <Pressable
-            onPress={async () => { await logout(); router.replace('/auth'); }}
+            onPress={async () => {
+              await logout();
+              await useUserStore.getState().signOut().catch(() => null);
+              router.replace('/auth');
+            }}
             style={styles.logoutBtn}
           >
             <Text style={styles.logoutText}>יציאה →</Text>
