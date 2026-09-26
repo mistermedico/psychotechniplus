@@ -43,8 +43,8 @@ export default function Results() {
   };
 
   const score = safeInt(params.score, 0, 0, 100);
-  const correct = safeInt(params.correct, 0);
-  const total = safeInt(params.total, 0);
+  const total = safeInt(params.total, 0, 0, 1000);
+  const correct = Math.min(total, safeInt(params.correct, 0, 0, 1000));
   const timeSpent = safeInt(params.timeSpent, 0);
   const percentile = safeInt(params.percentile, 50, 0, 100);
   const difficultyScore = safeInt(params.difficultyScore, 0, 0, 100);
@@ -167,7 +167,7 @@ export default function Results() {
           <View style={styles.statsGrid}>
             <StatCard icon="✅" label="נכון" value={`${correct}/${total}`} color={Colors.success} />
             <StatCard icon="⏱️" label="זמן ממוצע" value={formatTime(avgTime)} color={Colors.primary} />
-            <StatCard icon="📊" label="אחוזון" value={`${percentile}%`} color={Colors.accent} />
+            <StatCard icon="📊" label="אחוזון משוער" value={`${percentile}%`} color={Colors.accent} />
           </View>
 
           <View style={styles.sectionHeaderRow}>
@@ -182,9 +182,9 @@ export default function Results() {
           </View>
 
           <View style={styles.percentileCard}>
-            <Text style={styles.percentileTitle}>📊 האחוזון שלך</Text>
+            <Text style={styles.percentileTitle}>📊 אחוזון ביצוע משוער</Text>
             <Text style={styles.percentileDesc}>
-              ביצועים שלך טובים יותר מ-{percentile}% מהמשתמשים שהתמודדו עם שאלות דומות.
+              הערכה יחסית המבוססת על הציון והקושי במבחן הזה. היא אינה דירוג ישיר מול כלל המשתמשים.
             </Text>
             <View style={styles.percentileBarTrack}>
               <View style={[styles.percentileBarFill, { width: `${percentile}%` as any, backgroundColor: color }]} />
