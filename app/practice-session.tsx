@@ -49,8 +49,12 @@ export default function PracticeSession() {
     completeUnansweredAsSkipped, nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
   } = usePracticeStore();
 
-  const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium } = useUserStore();
-  const { templates, questions: adminQuestions, topics, targets, practiceSettings, freePracticeLimit, premiumConfig, addSessionRecord, isAdmin, loadAdminData } = useAdminStore();
+  const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium, isGuest } = useUserStore();
+  const {
+    templates, questions: adminQuestions, topics, targets, practiceSettings,
+    freePracticeLimit, premiumConfig, addSessionRecord, isAdmin,
+    loadAdminData, loadPublicData,
+  } = useAdminStore();
 
   const {
     showTimerInPractice,
@@ -257,18 +261,35 @@ export default function PracticeSession() {
       const loadTimeout = setTimeout(() => {
         if (!cancelled) setLoadError(true);
       }, 10000);
-      loadAdminData(true)
-        .then(() => {
+      const loadSimulationSource = async () => {
+        if (isAdminPreview) {
+          await loadAdminData(true);
+          const state = useAdminStore.getState();
+          return { templates: state.templates, questions: state.questions };
+        }
+
+        await loadPublicData(true);
+        const state = useAdminStore.getState();
+        const currentTemplate = state.templates.find(item => item.id === templateId);
+        if (!currentTemplate) throw new Error('תבנית המבחן לא נמצאה');
+        const questions = await fetchQuestions({
+          targetId: currentTemplate.targetId,
+          status: 'validated',
+        });
+        return { templates: state.templates, questions };
+      };
+
+      loadSimulationSource()
+        .then(source => {
           clearTimeout(loadTimeout);
           if (cancelled) return;
-          const state = useAdminStore.getState();
-          startSimulationPreview(state.templates, state.questions);
+          startSimulationPreview(source.templates, source.questions);
         })
         .catch((error: unknown) => {
           clearTimeout(loadTimeout);
           if (cancelled) return;
           const message = error instanceof Error ? error.message : String(error);
-          logger.error('practiceSession:simulationPreviewLoad', 'טעינת מבחן לתצוגה מקדימה נכשלה', message);
+          logger.error('practiceSession:simulationLoad', 'טעינת מבחן נכשלה', message);
           setLoadError(true);
         });
       return () => { cancelled = true; };
@@ -619,7 +640,7 @@ export default function PracticeSession() {
         difficulty: a.questionDifficulty ?? 5,
       })),
     };
-    if (userId && !isAdminPreview) addSessionRecord(sessionRec);
+    if (userId && !isGuest && !isAdminPreview) addSessionRecord(sessionRec);
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
     if (!isAdminPreview) recordSession(correct, finished.answers.length);
 
