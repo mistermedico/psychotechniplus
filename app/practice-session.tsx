@@ -11,7 +11,7 @@ import { usePracticeStore } from '../store/practiceStore';
 import { useUserStore } from '../store/userStore';
 import { useAdminStore } from '../store/adminStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { fetchQuestions } from '../lib/db';
+import { fetchQuestionById, fetchQuestions } from '../lib/db';
 import { AdBanner } from '../components/AdBanner';
 import { QuestionCard } from '../components/QuestionCard';
 import { VisualImage } from '../components/VisualImage';
@@ -185,35 +185,59 @@ export default function PracticeSession() {
 
     const singleQuestionId = challengeQuestionId ?? questionId;
     if (singleQuestionId) {
-      const previewQuestion = adminQuestions.find(q => q.id === singleQuestionId);
-      if (!previewQuestion) {
-        Alert.alert('שגיאה', challengeQuestionId ? 'שאלת האתגר היומי לא נמצאה.' : 'השאלה לתצוגה מקדימה לא נמצאה.');
-        exitToPractice();
-        return;
-      }
-      const previewTopic = topics.find(t => t.id === previewQuestion.topicId);
-      if (previewTopic && isEnglishPracticeTopic(previewTopic)) {
-        Alert.alert('תרגול לא זמין', 'תרגול אנגלית הוסר כרגע מהאפליקציה.');
-        exitToPractice();
-        return;
-      }
-      if (!isAdminPreview && previewQuestion.validationStatus !== 'validated') {
-        Alert.alert('שאלה לא זמינה', 'שאלה זו עדיין ממתינה לאישור מנהל ולכן אינה זמינה לתרגול.');
-        exitToPractice();
-        return;
-      }
-      if (!canAccessQuestion(previewQuestion, hasPremiumAccess)) {
-        Alert.alert('פרימיום בלבד', 'השאלה הזו נעולה למנויי פרימיום.');
-        router.push('/paywall');
-        return;
-      }
-      startSession({
-        targetId: targetId ?? previewQuestion.targetIds[0] ?? '',
-        topicId: topicId ?? previewQuestion.topicId,
-        mode: challengeQuestionId ? 'speed' : 'practice',
-        questions: [previewQuestion],
-      });
-      return () => { cancelled = true; };
+      setLoadError(false);
+      const loadTimeout = setTimeout(() => {
+        if (!cancelled) setLoadError(true);
+      }, 10000);
+
+      Promise.resolve(adminQuestions.find(q => q.id === singleQuestionId) ?? null)
+        .then(localQuestion => localQuestion ?? fetchQuestionById(singleQuestionId))
+        .then(previewQuestion => {
+          clearTimeout(loadTimeout);
+          if (cancelled) return;
+          if (!previewQuestion) {
+            Alert.alert('שגיאה', challengeQuestionId ? 'שאלת האתגר היומי לא נמצאה.' : 'השאלה לתצוגה מקדימה לא נמצאה.');
+            exitToPractice();
+            return;
+          }
+          const previewTopic = topics.find(t => t.id === previewQuestion.topicId);
+          if (previewTopic && isEnglishPracticeTopic(previewTopic)) {
+            Alert.alert('תרגול לא זמין', 'תרגול אנגלית הוסר כרגע מהאפליקציה.');
+            exitToPractice();
+            return;
+          }
+          if (!isAdminPreview && previewQuestion.validationStatus !== 'validated') {
+            Alert.alert('שאלה לא זמינה', 'שאלה זו עדיין ממתינה לאישור מנהל ולכן אינה זמינה לתרגול.');
+            exitToPractice();
+            return;
+          }
+          if (!canAccessQuestion(previewQuestion, hasPremiumAccess)) {
+            Alert.alert('פרימיום בלבד', 'השאלה הזו נעולה למנויי פרימיום.');
+            router.push('/paywall');
+            return;
+          }
+          startSession({
+            targetId: targetId ?? previewQuestion.targetIds[0] ?? 'target_psychometric',
+            topicId: previewQuestion.topicId,
+            mode: challengeQuestionId ? 'speed' : 'practice',
+            questions: [previewQuestion],
+          });
+        })
+        .catch((error: unknown) => {
+          clearTimeout(loadTimeout);
+          if (cancelled) return;
+          logger.error(
+            'practiceSession:singleQuestionLoad',
+            'טעינת שאלה בודדת נכשלה',
+            error instanceof Error ? error.message : String(error),
+          );
+          setLoadError(true);
+        });
+
+      return () => {
+        cancelled = true;
+        clearTimeout(loadTimeout);
+      };
     }
 
     if (isSimulation && templateId) {
