@@ -164,9 +164,16 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       isSkipped: true,
       questionDifficulty: question.difficulty,
     };
+    const updatedAnswers = [...session.answers, answer];
+    const history = updatedAnswers.map(a => ({
+      isCorrect: a.isCorrect,
+      difficulty: a.questionDifficulty,
+    }));
+    const newLevel = computeAdaptiveLevel(history, session.adaptiveLevel);
+
     set(state => ({
       session: state.session
-        ? { ...state.session, answers: [...state.session.answers, answer] }
+        ? { ...state.session, answers: updatedAnswers, adaptiveLevel: newLevel }
         : null,
     }));
   },
