@@ -14,7 +14,7 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
 
 const BENEFITS = [
-  { icon: '♾️', title: 'שאלות ללא הגבלה', desc: 'גישה לכל המאגר — מעל 1,200 שאלות תרגול' },
+  { icon: '♾️', title: 'שאלות ללא הגבלה', desc: 'גישה לכל המאגר — מעל 1,000 שאלות תרגול פעילות' },
   { icon: '🧠', title: 'מעקב רמה חכם', desc: 'ניתוח ביצועים לפי נושאים ורמות קושי לאורך זמן' },
   { icon: '🏆', title: 'כל הסימולציות', desc: 'סימולציות מלאות המדמות תרגול תחת זמן' },
   { icon: '⚡', title: 'אתגרים יומיים', desc: 'בונוס XP ומשימות מיוחדות מדי יום' },
@@ -373,7 +373,13 @@ export default function PaywallScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingBottom: 40 },
+  content: {
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
 
   orbLeft: {
     position: 'absolute', bottom: 80, left: -60,
@@ -586,7 +592,7 @@ const styles = StyleSheet.create({
   planBadgeText: { fontFamily: FontFamily.bold, fontSize: 11, color: '#fff' },
   planCardInner: {
     flexDirection: 'row-reverse', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 16, gap: 12,
+    paddingHorizontal: 14, paddingVertical: 16, gap: 10,
   },
   radio: {
     width: 22, height: 22, borderRadius: 11,
@@ -604,7 +610,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
     color: Colors.textTertiary, marginTop: 2, textAlign: 'right',
   },
-  planPriceWrap: { alignItems: 'flex-start', flexShrink: 0 },
+  planPriceWrap: { alignItems: 'flex-start', flexShrink: 1, maxWidth: 104 },
   planPrice: {
     fontFamily: FontFamily.bold, fontSize: FontSize.lg,
     color: Colors.textSecondary,
