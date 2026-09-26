@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   shareBtn: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: Radius.full, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
   shareBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#fff' },
 
-  statsGrid: { flexDirection: 'row-reverse', padding: 20, gap: 10 },
+  statsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', padding: 16, gap: 10 },
 
   sectionHeaderRow: { paddingHorizontal: 20, marginBottom: 12, marginTop: 4, alignItems: 'flex-end' },
   sectionSub: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'right', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 },
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
-  homeBtn: { paddingVertical: 17, paddingHorizontal: 20, borderRadius: Radius.xl, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)', justifyContent: 'center' },
+  homeBtn: { flexShrink: 1, minWidth: 104, paddingVertical: 17, paddingHorizontal: 14, borderRadius: Radius.xl, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)', justifyContent: 'center' },
   homeBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: 'rgba(255,255,255,0.65)' },
   againBtn: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.primary },
   againBtnGrad: { paddingVertical: 17, alignItems: 'center' },
