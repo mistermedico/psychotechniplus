@@ -18,6 +18,7 @@ import { AdBanner } from '../../components/AdBanner';
 import { Target, Topic } from '../../data/types';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
 import { localDateKey } from '../../utils/date';
+import { useSettingsStore } from '../../store/settingsStore';
 
 type PracticeTab = 'free' | 'simulations';
 
@@ -71,7 +72,10 @@ export default function PracticeTab() {
   const [activeTab, setActiveTab] = useState<PracticeTab>('free');
   const [selectedMode, setSelectedMode] = useState('practice');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyFilter>('all');
+  const defaultDifficulty = useSettingsStore(s => s.defaultDifficulty);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyFilter>(
+    defaultDifficulty === 'auto' ? 'all' : defaultDifficulty
+  );
   const paywallAutoShownRef = useRef(false);
 
   const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, isGuest, userId, addXp } = useUserStore();
@@ -102,6 +106,10 @@ export default function PracticeTab() {
       setSelectedTopicId(topics[0].id);
     }
   }, [topics, selectedTopicId]);
+
+  useEffect(() => {
+    setSelectedDifficulty(defaultDifficulty === 'auto' ? 'all' : defaultDifficulty);
+  }, [defaultDifficulty]);
 
   const enabledModes = useMemo(
     () => FREE_MODES.filter(mode =>
