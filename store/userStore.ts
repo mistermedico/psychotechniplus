@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { UserBadge, BadgeType } from '../data/types';
 import { supabase } from '../lib/supabase';
 import {
@@ -183,7 +184,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         // Native entitlement is refreshed from RevenueCat during bootstrap.
         // The profile flag is only a server/admin mirror and must not grant access
         // on native clients by itself.
-        isPremium: shouldForcePremium,
+        isPremium: shouldForcePremium || (Platform.OS === 'web' && !!profile.is_premium),
         streak: profile.streak,
         longestStreak: profile.longest_streak,
         lastPracticedDate: profile.last_practiced_date,
