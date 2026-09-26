@@ -153,8 +153,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="targets"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon icon="🎯" label="מסלולים" focused={focused} />,
-          tabBarAccessibilityLabel: 'מסלולים',
+          tabBarIcon: ({ focused }) => <TabIcon icon="🎯" label="מסלול" focused={focused} />,
+          tabBarAccessibilityLabel: 'מסלול',
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
