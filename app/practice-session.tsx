@@ -171,7 +171,11 @@ export default function PracticeSession() {
     setLastAnswerCorrect(false);
     setShowExplanation(false);
     explanationAnim.setValue(0);
+    const timedOutQuestion = getCurrentQuestion();
     skipQuestion();
+    if (timedOutQuestion && !isAdminPreview) {
+      recordAnswer(timedOutQuestion.topicId, timedOutQuestion.difficulty, false);
+    }
     const hasMore = nextQuestion();
     if (!hasMore) finishSession();
   }, [revealed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -522,8 +526,12 @@ export default function PracticeSession() {
   const handleSkip = () => {
     if (!isSimulation && timerRef.current) clearInterval(timerRef.current);
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    const skippedQuestion = getCurrentQuestion();
     resetQuestionState();
     skipQuestion();
+    if (skippedQuestion && !isAdminPreview) {
+      recordAnswer(skippedQuestion.topicId, skippedQuestion.difficulty, false);
+    }
 
     if (effectiveMode === 'adaptive') {
       const activeSession = usePracticeStore.getState().session;
