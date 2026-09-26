@@ -12,7 +12,6 @@ import { useUserStore } from '../store/userStore';
 import { useAdminStore } from '../store/adminStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { fetchQuestions } from '../lib/db';
-import { supabase } from '../lib/supabase';
 import { AdBanner } from '../components/AdBanner';
 import { QuestionCard } from '../components/QuestionCard';
 import { VisualImage } from '../components/VisualImage';
@@ -48,7 +47,6 @@ export default function PracticeSession() {
   const {
     session, startSession, submitAnswer, skipQuestion,
     completeUnansweredAsSkipped, nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
-    refreshSessionQuestions,
   } = usePracticeStore();
 
   const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium } = useUserStore();
@@ -130,17 +128,24 @@ export default function PracticeSession() {
       {}
     );
 
-    if (generated.allQuestions.length === 0) {
-      Alert.alert('שגיאה', 'לא נמצאו שאלות מתאימות למבחן זה. נסה לאמת שאלות קודם.');
+    const expectedQuestionCount = (template.smartRules?.length ? template.smartRules : template.rules)
+      .reduce((sum, rule) => sum + Math.max(0, Math.floor(Number(rule.count) || 0)), 0);
+
+    if (generated.allQuestions.length === 0 || generated.allQuestions.length < expectedQuestionCount) {
+      Alert.alert(
+        'המבחן אינו זמין כרגע',
+        `לא ניתן לבנות מבחן מלא: נמצאו ${generated.allQuestions.length} מתוך ${expectedQuestionCount} שאלות נדרשות. לא נתחיל מבחן חלקי.`
+      );
       exitToPractice();
       return false;
     }
 
     setExamSections(generated.sections);
-    const totalSimulationSeconds = generated.sections.reduce(
-      (sum, section) => sum + section.timeLimitSeconds,
-      0
-    ) || Math.max(1, generated.estimatedMinutes) * 60;
+    const configuredMinutes = Number(template.timeLimitMinutes);
+    const totalSimulationSeconds = Number.isFinite(configuredMinutes) && configuredMinutes > 0
+      ? Math.round(configuredMinutes * 60)
+      : generated.sections.reduce((sum, section) => sum + section.timeLimitSeconds, 0)
+        || Math.max(1, generated.estimatedMinutes) * 60;
     setSimulationRemaining(totalSimulationSeconds);
     const firstSection = generated.sections[0];
     startSession({
@@ -222,12 +227,8 @@ export default function PracticeSession() {
         exitToPractice();
         return;
       }
-      const hasWarmData = templates.some(t => t.id === templateId) && adminQuestions.length > 0;
-      if (hasWarmData) {
-        startSimulationPreview();
-        return () => { cancelled = true; };
-      }
-
+      // Always refresh from Supabase before building a new simulation.
+      // Seed/in-memory data may be stale even when it contains the same template id.
       setLoadError(false);
       const loadTimeout = setTimeout(() => {
         if (!cancelled) setLoadError(true);
@@ -284,9 +285,9 @@ export default function PracticeSession() {
         exitToPractice();
         return;
       }
-      if (difficulty === 'easy') filtered = questions.filter(q => q.difficulty <= 4);
-      else if (difficulty === 'medium') filtered = questions.filter(q => q.difficulty >= 3 && q.difficulty <= 7);
-      else if (difficulty === 'hard') filtered = questions.filter(q => q.difficulty >= 6);
+      if (difficulty === 'easy') filtered = filtered.filter(q => q.difficulty <= 4);
+      else if (difficulty === 'medium') filtered = filtered.filter(q => q.difficulty >= 3 && q.difficulty <= 7);
+      else if (difficulty === 'hard') filtered = filtered.filter(q => q.difficulty >= 6);
       filtered = filtered.filter(q => canAccessQuestion(q, hasPremiumAccess));
       if (filtered.length === 0) filtered = questions.filter(q => canAccessQuestion(q, hasPremiumAccess)); // fallback to all allowed
       if (filtered.length === 0) {
@@ -346,85 +347,8 @@ export default function PracticeSession() {
   // Supabase/template edits apply to the next simulation only, preventing
   // mid-exam question replacement, section-boundary drift and timer mismatch.
 
-  // Keep a live practice session aligned with admin edits in Supabase.
-  useEffect(() => {
-    if (!rootNavigationReady || !session || isSimulation || !topicId) return;
-
-    let cancelled = false;
-    let debounce: ReturnType<typeof setTimeout> | null = null;
-    const parsedLiveLimit = questionLimit ? Number.parseInt(questionLimit, 10) : session.questions.length;
-    const limit = Number.isFinite(parsedLiveLimit) && parsedLiveLimit > 0
-      ? parsedLiveLimit
-      : session.questions.length;
-
-    const applyCurrentFilters = (questions: typeof session.questions) => {
-      let filtered = questions.filter(q => canAccessQuestion(q, hasPremiumAccess));
-      if (difficulty === 'easy') filtered = filtered.filter(q => q.difficulty <= 4);
-      else if (difficulty === 'medium') filtered = filtered.filter(q => q.difficulty >= 3 && q.difficulty <= 7);
-      else if (difficulty === 'hard') filtered = filtered.filter(q => q.difficulty >= 6);
-
-      if (!hasPremiumAccess) {
-        const capped = filtered.filter(q => q.difficulty <= practiceSettings.freeUserMaxDifficulty);
-        if (capped.length > 0) filtered = capped;
-      }
-
-      const effectiveLimit = getSessionQuestionLimit(
-        limit,
-        hasPremiumAccess,
-        freePracticeLimit,
-        premiumConfig,
-        practiceSettings.premiumUserQuestionLimit,
-      );
-      return filtered.slice(0, Math.max(effectiveLimit, session.questions.length));
-    };
-
-    const refreshLiveQuestions = async () => {
-      try {
-        const latest = await fetchQuestions({ topicId: topicId ?? '', status: 'validated' });
-        if (cancelled || latest.length === 0) return;
-        const filtered = applyCurrentFilters(latest);
-        if (filtered.length > 0) refreshSessionQuestions(filtered);
-      } catch (error) {
-        logger.warn(
-          'practiceSession:realtimeQuestions',
-          `לא ניתן לרענן שאלות בזמן אמת: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    };
-
-    const scheduleRefresh = () => {
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(refreshLiveQuestions, 450);
-    };
-
-    const channel = supabase
-      .channel(`practice-questions-${topicId}-${session.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'questions', filter: `topic_id=eq.${topicId}` },
-        scheduleRefresh
-      )
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      if (debounce) clearTimeout(debounce);
-      supabase.removeChannel(channel);
-    };
-  }, [
-    rootNavigationReady,
-    session?.id,
-    isSimulation,
-    topicId,
-    difficulty,
-    questionLimit,
-    hasPremiumAccess,
-    freePracticeLimit,
-    premiumConfig,
-    practiceSettings.freeUserMaxDifficulty,
-    practiceSettings.premiumUserQuestionLimit,
-    refreshSessionQuestions,
-  ]);
+  // Active practice sessions are immutable snapshots as well.
+  // Content changes apply to the next session, never halfway through an attempt.
 
   // Full simulation timer. In simulations, answers/explanations are revealed only on the results screen.
   useEffect(() => {
