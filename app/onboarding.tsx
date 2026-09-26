@@ -71,42 +71,49 @@ function StepWelcome({
         colors={['rgba(99,102,241,0.15)', 'transparent']}
         style={StyleSheet.absoluteFill}
       />
-      <View style={styles.heroEmoji}>
-        <Text style={styles.heroEmojiText}>🧠</Text>
-      </View>
-      <Text style={styles.h1}>ברוך הבא ל-PsychoTechniPlus</Text>
-      <Text style={styles.subtitle}>
-        פלטפורמת ההכנה החכמה למבחן הפסיכוטכני.{'\n'}
-        נתאים את התרגול אישית עבורך.
-      </Text>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>מה שמך?</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="הכנס/י שם..."
-          placeholderTextColor={Colors.textTertiary}
-          value={name}
-          onChangeText={setName}
-          textAlign="right"
-          autoFocus
-          returnKeyType="go"
-          onSubmitEditing={onFinish}
-          textContentType="name"
-          autoComplete="name"
-        />
-      </View>
-
-      <Pressable
-        style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
-        onPress={onFinish}
+      <ScrollView
+        contentContainerStyle={styles.stepScrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <LinearGradient colors={Colors.gradients.primary} style={styles.primaryBtnGrad}>
-          <Text style={styles.primaryBtnText}>בוא נתחיל ←</Text>
-        </LinearGradient>
-      </Pressable>
+        <View style={styles.heroEmoji}>
+          <Text style={styles.heroEmojiText}>🧠</Text>
+        </View>
+        <Text style={styles.h1}>ברוך הבא ל-PsychoTechniPlus</Text>
+        <Text style={styles.subtitle}>
+          פלטפורמת ההכנה החכמה למבחן הפסיכוטכני.{'
+'}
+          נתאים את התרגול אישית עבורך.
+        </Text>
 
-      <Text style={styles.legalNote}>בלחיצה על המשך אתה מאשר את תנאי השימוש</Text>
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>מה שמך?</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="הכנס/י שם..."
+            placeholderTextColor={Colors.textTertiary}
+            value={name}
+            onChangeText={setName}
+            textAlign="right"
+            autoFocus
+            returnKeyType="go"
+            onSubmitEditing={onFinish}
+            textContentType="name"
+            autoComplete="name"
+          />
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
+          onPress={onFinish}
+        >
+          <LinearGradient colors={Colors.gradients.primary} style={styles.primaryBtnGrad}>
+            <Text style={styles.primaryBtnText}>בוא נתחיל ←</Text>
+          </LinearGradient>
+        </Pressable>
+
+        <Text style={styles.legalNote}>בלחיצה על המשך אתה מאשר את תנאי השימוש</Text>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -204,13 +211,20 @@ const styles = StyleSheet.create({
 
   stepContainer: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
+  },
+  stepScrollContent: {
+    flexGrow: 1,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 28,
     paddingBottom: 24,
+    justifyContent: 'center',
   },
 
-  heroEmoji: { alignItems: 'center', marginBottom: 24 },
-  heroEmojiText: { fontSize: 72 },
+  heroEmoji: { alignItems: 'center', marginBottom: 18 },
+  heroEmojiText: { fontSize: 60 },
 
   h1: {
     fontFamily: FontFamily.heading,
