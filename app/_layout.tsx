@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState, I18nManager, Platform, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -79,6 +79,8 @@ export default function RootLayout() {
   const initializePurchases = usePurchaseStore(s => s.initialize);
   const checkPurchaseStatus = usePurchaseStore(s => s.checkStatus);
 
+  const [bootstrapReady, setBootstrapReady] = useState(false);
+
   const [fontsLoaded, fontError] = useFonts({
     Heebo_400Regular,
     Heebo_500Medium,
@@ -88,28 +90,41 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-      initialize().then(() => {
+    if (!fontsLoaded && !fontError) return;
+
+    let cancelled = false;
+    const bootstrap = async () => {
+      try {
+        await initialize();
         const { email, userId, isGuest } = useUserStore.getState();
+
+        await ensureDbSeeded();
+        await loadPublicData(true);
+
+        if (email.toLowerCase() === ADMIN_EMAIL) {
+          setIsAdmin(true);
+          await loadAdminData();
+          startRealtimeSync();
+        } else {
+          setIsAdmin(false);
+          stopRealtimeSync();
+        }
+
         notifyFirstOpenOnce(userId, isGuest ? null : email).catch(() => null);
-        // Ensure targets+topics exist in Supabase for all users (FK prerequisite)
-        ensureDbSeeded().then(async () => {
-          await loadPublicData(true);
-          if (email.toLowerCase() === ADMIN_EMAIL) {
-            setIsAdmin(true);
-            await loadAdminData();
-            startRealtimeSync();
-          } else {
-            setIsAdmin(false);
-            stopRealtimeSync();
-          }
-        }).catch(() => null);
-        // Guests receive an anonymous RevenueCat ID so StoreKit prices and purchase restoration work before sign-in.
         initializePurchases(userId && !isGuest ? userId : undefined).catch(() => null);
         initializeAds().catch(() => null);
-      });
-    }
+      } finally {
+        if (!cancelled) {
+          setBootstrapReady(true);
+          SplashScreen.hideAsync().catch(() => null);
+        }
+      }
+    };
+
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => {
@@ -128,7 +143,7 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, [checkPurchaseStatus]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded && !fontError) || !bootstrapReady) return null;
 
   return (
     <GestureHandlerRootView style={styles.root}>
