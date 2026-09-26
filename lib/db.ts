@@ -139,6 +139,33 @@ export async function fetchQuestions(opts?: {
   return questions;
 }
 
+export async function fetchQuestionById(id: string): Promise<Question | null> {
+  if (!id) return null;
+  try {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      logger.error('db:fetchQuestionById', `שגיאה בטעינת שאלה ${id}`, error.message);
+      return null;
+    }
+    if (!data) return null;
+
+    const question = rowToQuestion(data);
+    if (question.validationStatus === 'validated' && !isPsychotechnicQuestionReady(question)) {
+      logger.warn('db:fetchQuestionById', `שאלה ${id} נחסמה בבדיקת איכות`);
+      return null;
+    }
+    return question;
+  } catch (e: any) {
+    logger.error('db:fetchQuestionById', `חריגה בטעינת שאלה ${id}`, e?.message);
+    return null;
+  }
+}
+
 export async function fetchAllQuestions(): Promise<Question[]> {
   try {
     const { data, error } = await supabase
