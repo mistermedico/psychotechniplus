@@ -120,7 +120,7 @@ export default function UsersScreen() {
     setSyncError(null);
     try {
       const [{ data: profiles, error: profilesError }, { data: sessionRows, error: sessionsError }] = await Promise.all([
-        supabase.from('user_profiles').select('*').order('updated_at', { ascending: false }),
+        supabase.rpc('admin_list_user_profiles'),
         supabase
           .from('practice_sessions')
           .select('id,user_id,mode,topic_id,total_questions,correct_answers,score,time_spent_seconds,completed_at')
