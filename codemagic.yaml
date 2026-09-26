@@ -1,0 +1,99 @@
+workflows:
+  ios-app-store-release:
+    name: Psychotechni Plus - App Store
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    integrations:
+      app_store_connect: psychotechniplus-app-store
+
+    environment:
+      groups:
+        - psychotechniplus-production
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.psychotechniplus.app
+      vars:
+        APP_STORE_ID: "6776568241"
+        BUNDLE_ID: "com.psychotechniplus.app"
+      node: 20.19.4
+      xcode: latest
+      cocoapods: default
+
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $CM_BUILD_DIR/node_modules
+
+    scripts:
+      - name: Install dependencies
+        script: npm ci --no-audit --no-fund
+
+      - name: Validate production configuration
+        script: |
+          set -euo pipefail
+          required_vars="EXPO_PUBLIC_REVENUECAT_IOS_API_KEY EXPO_PUBLIC_ADMOB_IOS_APP_ID EXPO_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_AD_UNIT_ID EXPO_PUBLIC_ADMOB_IOS_REWARDED_AD_UNIT_ID"
+          for variable_name in $required_vars; do
+            eval "variable_value=\${$variable_name:-}"
+            if [ -z "$variable_value" ]; then
+              echo "Missing required Codemagic variable: $variable_name"
+              exit 1
+            fi
+          done
+
+      - name: Set next App Store build number
+        script: |
+          set -euo pipefail
+          latest_build_number=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_ID")
+          next_build_number=$((latest_build_number + 1))
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('app.json','utf8')); p.expo.ios={...(p.expo.ios||{}),buildNumber:process.argv[1]}; fs.writeFileSync('app.json',JSON.stringify(p,null,2)+'\n');" "$next_build_number"
+          echo "Building App Store version $(node -p \"require('./app.json').expo.version\") ($next_build_number)"
+
+      - name: Generate native iOS project
+        script: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        script: |
+          set -euo pipefail
+          cd ios
+          pod install --repo-update
+
+      - name: Configure App Store signing
+        script: |
+          set -euo pipefail
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Detect Xcode workspace and scheme
+        script: |
+          set -euo pipefail
+          workspace=$(find "$CM_BUILD_DIR/ios" -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          if [ -z "$workspace" ]; then
+            echo "No Xcode workspace was generated"
+            exit 1
+          fi
+          scheme=$(xcodebuild -list -json -workspace "$workspace" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data["workspace"]["schemes"][0])')
+          if [ -z "$scheme" ]; then
+            echo "No shared Xcode scheme was found"
+            exit 1
+          fi
+          echo "XCODE_WORKSPACE=$workspace" >> "$CM_ENV"
+          echo "XCODE_SCHEME=$scheme" >> "$CM_ENV"
+          echo "Using workspace $workspace and scheme $scheme"
+
+      - name: Build signed IPA
+        script: |
+          set -euo pipefail
+          xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_app_store: true
+        cancel_previous_submissions: false
