@@ -43,6 +43,25 @@ interface RealUser {
   total_time_seconds: number;
 }
 
+interface AdminUserProfileRow {
+  id: string;
+  name: string | null;
+  email: string | null;
+  selected_target_id: string | null;
+  has_completed_onboarding: boolean | null;
+  is_premium: boolean | null;
+  streak: number | null;
+  longest_streak: number | null;
+  level: number | null;
+  xp: number | null;
+  total_sessions: number | null;
+  total_correct: number | null;
+  total_answered: number | null;
+  last_practiced_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface SessionRow {
   id: string;
   user_id: string;
@@ -143,7 +162,7 @@ export default function UsersScreen() {
         sessionsByUser.set(session.user_id, list);
       }
 
-      const mapped = (profiles ?? []).map(profile => {
+      const mapped = ((profiles ?? []) as AdminUserProfileRow[]).map(profile => {
         const userSessions = sessionsByUser.get(profile.id) ?? [];
         const answeredFromSessions = userSessions.reduce((sum, session) => sum + (session.total_questions ?? 0), 0);
         const correctFromSessions = userSessions.reduce((sum, session) => sum + (session.correct_answers ?? 0), 0);
