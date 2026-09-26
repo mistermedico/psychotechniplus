@@ -93,6 +93,16 @@ export default function PracticeTab() {
     [templates, target?.id]
   );
 
+  useEffect(() => {
+    if (topics.length === 0) {
+      if (selectedTopicId !== null) setSelectedTopicId(null);
+      return;
+    }
+    if (!selectedTopicId || !topics.some(topic => topic.id === selectedTopicId)) {
+      setSelectedTopicId(topics[0].id);
+    }
+  }, [topics, selectedTopicId]);
+
   const enabledModes = useMemo(
     () => FREE_MODES.filter(mode =>
       (mode.id !== 'speed' || featureFlags.speedMode !== false) &&
