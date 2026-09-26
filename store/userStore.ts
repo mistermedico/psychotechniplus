@@ -421,10 +421,9 @@ export const useUserStore = create<UserState>((set, get) => ({
       const longestStreak = Math.max(newStreak, state.longestStreak);
 
       if (state.userId && !state.isGuest) {
+        // Session totals are maintained transactionally by a DB trigger when
+        // practice_sessions is written. Persist only non-session aggregates here.
         saveUserProfile(state.userId, {
-          total_sessions: totalSessions,
-          total_correct: totalCorrect,
-          total_answered: totalAnswered,
           xp: newXp,
           level: newLevel,
           streak: newStreak,
