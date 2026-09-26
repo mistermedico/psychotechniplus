@@ -460,20 +460,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     if (userId && !isGuest) {
       try {
-        for (const operation of [
-          supabase.from('practice_sessions').delete().eq('user_id', userId),
-          supabase.from('user_elos').delete().eq('user_id', userId),
-          supabase.from('user_badges').delete().eq('user_id', userId),
-        ]) {
-          const { error } = await operation;
-          if (error) throw error;
-        }
-
-        await saveUserProfile(userId, {
-          name: '', selected_target_id: DEFAULT_TARGET_ID, has_completed_onboarding: false,
-          streak: 0, longest_streak: 0, last_practiced_date: null,
-          level: 1, xp: 0, total_sessions: 0, total_correct: 0, total_answered: 0,
-        });
+        const { error } = await supabase.rpc('reset_my_progress');
+        if (error) throw error;
       } catch (e: any) {
         logger.error('userStore:reset', 'איפוס נתוני משתמש נכשל', e?.message);
         throw e;
