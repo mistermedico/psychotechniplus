@@ -186,10 +186,15 @@ export default function ProfileTab() {
   };
 
   const handleReset = () => {
-    const performReset = () => {
+    const performReset = async () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      reset();
-      router.replace('/onboarding');
+      try {
+        await reset();
+        router.replace('/onboarding');
+      } catch (error: any) {
+        const message = error?.message ?? 'לא ניתן היה לאפס את כל הנתונים. נסה שנית.';
+        if (!webAlert(message)) Alert.alert('שגיאה', message);
+      }
     };
     const message = 'האם אתה בטוח? כל ההתקדמות תימחק.';
     if (Platform.OS === 'web') {
