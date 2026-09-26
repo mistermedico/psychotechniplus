@@ -274,11 +274,10 @@ export default function Dashboard() {
                   router.push({
                     pathname: '/practice-session',
                     params: {
-                      topicId: 'topic_quantitative', // fallback topic
-                      targetId: selectedTarget?.id ?? '',
+                      targetId: selectedTarget?.id ?? 'target_psychometric',
                       mode: 'speed',
-                      questionLimit: '10',
-                      challengeQuestionId: todayChallenge.questionId, // admin-set question
+                      questionLimit: '1',
+                      challengeQuestionId: todayChallenge.questionId,
                     },
                   });
                 } else {
