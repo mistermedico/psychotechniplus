@@ -212,11 +212,11 @@ const styles = StyleSheet.create({
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
     paddingVertical: 5,
     borderRadius: 16,
     gap: 2,
-    minWidth: 52,
+    minWidth: 46,
     position: 'relative',
     borderWidth: 1,
     borderColor: 'transparent',
@@ -244,13 +244,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#9E99FA',
   },
   tabIcon: {
-    fontSize: 20,
+    fontSize: 19,
     color: 'rgba(240,244,255,0.88)',
     fontFamily: FontFamily.regular,
   },
   tabIconFocused: {
     color: '#9E99FA',
-    fontSize: 22,
+    fontSize: 21,
   },
   tabLabel: {
     fontFamily: FontFamily.medium,
