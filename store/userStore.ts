@@ -261,28 +261,16 @@ export const useUserStore = create<UserState>((set, get) => ({
       return { success: true };
     }
     if (!userId) return { success: false, error: 'No user session' };
+
     try {
       logger.info('userStore:deleteAccount', `מוחק חשבון: ${userId}`);
 
-      // Delete FK children first, then the profile. Supabase query errors are
-      // returned in-band rather than thrown, so every step must be checked.
-      for (const operation of [
-        supabase.from('practice_sessions').delete().eq('user_id', userId),
-        supabase.from('user_elos').delete().eq('user_id', userId),
-        supabase.from('user_badges').delete().eq('user_id', userId),
-      ]) {
-        const { error } = await operation;
-        if (error) throw error;
-      }
-
-      const { error: profileDeleteError } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('id', userId);
-      if (profileDeleteError) throw profileDeleteError;
-
-      const { error: authDeleteError } = await supabase.functions.invoke('delete-user', { body: { userId } });
-      if (authDeleteError) throw authDeleteError;
+      // The Edge Function is the single authority for deletion. Keeping all
+      // destructive server operations there avoids a partially-deleted account
+      // if a client request fails midway.
+      const { data, error } = await supabase.functions.invoke('delete-user', { body: {} });
+      if (error) throw error;
+      if (data?.success !== true) throw new Error(data?.error ?? 'Account deletion failed');
 
       logger.success('userStore:deleteAccount', 'נתוני המשתמש וחשבון האימות נמחקו');
       await logOutPurchases().catch(() => null);
@@ -297,6 +285,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       return { success: false, error: e.message ?? 'Unknown error' };
     }
   },
+
 
   completeOnboarding: (name, _targetId) => {
     const targetId = DEFAULT_TARGET_ID;
