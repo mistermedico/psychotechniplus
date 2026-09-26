@@ -277,7 +277,10 @@ export default function PracticeTab() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: activeTab === 'free' }}
               >
-                <Text style={[styles.tabBtnText, activeTab === 'free' && styles.tabBtnTextActive]}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.tabBtnText, activeTab === 'free' && styles.tabBtnTextActive]}
+                >
                   📖 תרגול חופשי
                 </Text>
               </Pressable>
@@ -289,7 +292,10 @@ export default function PracticeTab() {
                 accessibilityState={{ selected: activeTab === 'simulations' }}
               >
                 <View style={styles.tabBtnInner}>
-                  <Text style={[styles.tabBtnText, activeTab === 'simulations' && styles.tabBtnTextActive]}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.tabBtnText, activeTab === 'simulations' && styles.tabBtnTextActive]}
+                  >
                     🏗️ מבחנים חכמים
                   </Text>
                   {activeTemplates.length > 0 && (
@@ -813,7 +819,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 980,
     alignSelf: 'center',
-    padding: 20,
+    padding: 16,
     gap: 4,
   },
 
@@ -824,18 +830,18 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 980,
     alignSelf: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
-    gap: 10,
+    gap: 8,
     zIndex: 20,
     elevation: 20,
   },
   homeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.13)',
@@ -871,7 +877,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(99,102,241,0.45)',
   },
   tabBtnInner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  tabBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.45)' },
+  tabBtnText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.55)',
+    textAlign: 'center',
+  },
   tabBtnTextActive: { color: '#F1F5F9', fontFamily: FontFamily.bold },
   tabCount: {
     backgroundColor: Colors.primary,
@@ -889,6 +900,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 16,
     marginTop: 4,
   },
@@ -1180,7 +1193,7 @@ const styles = StyleSheet.create({
   },
   simCardIcon: { fontSize: 28 },
   simCardBody: { padding: 16 },
-  simStats: { flexDirection: 'row-reverse', gap: 8, marginBottom: 14 },
+  simStats: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   simRulesBox: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: Radius.lg,
