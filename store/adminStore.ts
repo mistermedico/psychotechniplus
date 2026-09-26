@@ -10,6 +10,7 @@ const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
 const DELETED_QUESTIONS_KEY = '@psychotechniplus/admin/deletedQuestionIds';
 const DELETED_QUESTIONS_REMOTE_KEY = 'deleted_question_ids';
 const ADMIN_COLLECTIONS_KEY = 'collections';
+const PUBLIC_DAILY_CHALLENGES_KEY = 'public_daily_challenges';
 let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let adminDataLoadPromise: Promise<void> | null = null;
@@ -95,6 +96,7 @@ function saveAdminCollections(s: any) {
   adminCollectionsSaveTimer = setTimeout(() => {
     adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
     saveAdminState(ADMIN_COLLECTIONS_KEY, pickAdminCollections(s));
+    saveAdminState(PUBLIC_DAILY_CHALLENGES_KEY, Array.isArray(s.dailyChallenges) ? s.dailyChallenges : []);
     adminCollectionsSaveTimer = null;
   }, ADMIN_COLLECTION_SAVE_DEBOUNCE_MS);
 }
@@ -1554,29 +1556,30 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   getSessionsByUser: (userId) => get().sessionHistory.filter(r => r.userId === userId),
 
   login: async (email, password) => {
-    // Try sign in first
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (!error && data.user) {
-      // Verify it's the admin email
-      if (data.user.email !== ADMIN_EMAIL) {
-        await supabase.auth.signOut();
-        return { ok: false, error: 'אין הרשאות מנהל' };
-      }
-      set({ isAdmin: true });
-      get().loadAdminData(); // fire-and-forget — restore all persisted data
-      return { ok: true };
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail !== ADMIN_EMAIL) {
+      return { ok: false, error: 'אין הרשאות מנהל' };
     }
-    // If user doesn't exist, create them (first-time setup)
-    if (error?.message?.includes('Invalid login credentials')) {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
-      if (!signUpError && signUpData.user) {
-        set({ isAdmin: true });
-        get().loadAdminData();
-        return { ok: true };
-      }
-      return { ok: false, error: signUpError?.message ?? 'שגיאת הרשמה' };
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error || !data.user) {
+      set({ isAdmin: false });
+      return { ok: false, error: error?.message ?? 'שגיאת התחברות' };
     }
-    return { ok: false, error: error?.message ?? 'שגיאת התחברות' };
+
+    if (data.user.email?.toLowerCase() !== ADMIN_EMAIL) {
+      await supabase.auth.signOut().catch(() => null);
+      set({ isAdmin: false });
+      return { ok: false, error: 'אין הרשאות מנהל' };
+    }
+
+    set({ isAdmin: true });
+    await get().loadAdminData(true);
+    return { ok: true };
   },
 
   logout: async () => {
@@ -2055,12 +2058,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
     publicDataLoadPromise = (async () => {
       try {
-        const [remoteTargets, remoteTopics, templates, settings, collections] = await Promise.all([
+        const [remoteTargets, remoteTopics, templates, settings, publicDailyChallenges] = await Promise.all([
           fetchTargets(),
           fetchTopics(),
           loadTemplates(),
           loadAdminSettings(),
-          loadAdminState<any>(ADMIN_COLLECTIONS_KEY).catch(() => null),
+          loadAdminState<DailyChallenge[]>(PUBLIC_DAILY_CHALLENGES_KEY).catch(() => null),
         ]);
 
         const updates: Partial<AdminState> = {
@@ -2081,9 +2084,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           if (settings.appConfig) updates.appConfig = withDefaultAppConfig(settings.appConfig);
         }
 
-        const normalizedCollections = normalizeAdminCollections(collections);
-        if (normalizedCollections?.dailyChallenges) {
-          updates.dailyChallenges = normalizedCollections.dailyChallenges;
+        if (Array.isArray(publicDailyChallenges)) {
+          updates.dailyChallenges = publicDailyChallenges;
         }
 
         set(updates);
