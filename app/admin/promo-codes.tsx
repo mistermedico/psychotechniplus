@@ -109,12 +109,19 @@ export default function PromoCodesScreen() {
           <Text style={styles.backText}>→</Text>
         </Pressable>
         <Text style={styles.headerTitle}>🎟️ קודי קופון</Text>
-        <Text style={styles.headerSub}>ניהול הנחות וקודי גישה</Text>
+        <Text style={styles.headerSub}>טיוטות קמפיין בלבד — אין כרגע מימוש קופון בצד המשתמש</Text>
       </LinearGradient>
+
+      <View style={styles.integrationWarning}>
+        <Text style={styles.integrationWarningTitle}>ℹ️ קודים אינם ניתנים למימוש כרגע</Text>
+        <Text style={styles.integrationWarningText}>
+          הקודים במסך זה אינם מחוברים ל-RevenueCat, ל-App Store או למסך redemption למשתמש. לכן הם נשמרים לתכנון בלבד ולא מעניקים הנחה או גישת פרימיום.
+        </Text>
+      </View>
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
-        <StatChip label="קודים פעילים" value={activeCodes.length} color={Colors.success} />
+        <StatChip label="טיוטות מסומנות פעילות" value={activeCodes.length} color={Colors.warning} />
         <StatChip label="שימושים מתועדים היום" value={totalUsesToday} color={Colors.primary} />
         <StatChip label="חסכון ₪" value={`₪${Math.round(totalSavings).toLocaleString()}`} color={Colors.warning} />
       </View>
@@ -331,6 +338,29 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
   headerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8', marginTop: 2 },
 
+  integrationWarning: {
+    marginHorizontal: 12,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: Radius.lg,
+    backgroundColor: 'rgba(124,111,247,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.42)',
+  },
+  integrationWarningTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.primaryLight,
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  integrationWarningText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: '#CBD5E1',
+    textAlign: 'right',
+    lineHeight: 19,
+  },
   statsRow: { flexDirection: 'row-reverse', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
 
   list: { paddingHorizontal: 12, paddingTop: 4, gap: 12 },
