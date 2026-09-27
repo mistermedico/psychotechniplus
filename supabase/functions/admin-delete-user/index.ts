@@ -60,6 +60,14 @@ Deno.serve(async (req: Request) => {
     const { error: deleteError } = await admin.auth.admin.deleteUser(targetUserId);
     if (deleteError) return json({ error: deleteError.message }, 500);
 
+    await admin.from('admin_user_audit').insert({
+      user_id: targetUserId,
+      admin_user_id: user.id,
+      admin_email: user.email ?? ADMIN_EMAIL,
+      action: 'delete_user',
+      details: {},
+    }).catch(() => null);
+
     return json({ success: true });
   } catch (error: any) {
     return json({ error: error?.message ?? 'Unknown error' }, 500);
