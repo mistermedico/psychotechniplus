@@ -280,6 +280,7 @@ export default function Dashboard() {
                                     mode: 'speed',
                                     questionLimit: '1',
                                     challengeQuestionId: todayChallenge.questionId,
+                      challengeId: todayChallenge.id,
                                   },
                                 });
                               } else {
