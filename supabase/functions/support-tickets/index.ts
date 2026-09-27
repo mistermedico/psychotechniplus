@@ -58,18 +58,13 @@ function toTicket(row: TicketRow) {
   };
 }
 
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_JU3RJdOQrPfjp41wc5Kw5A_qIJjI7Tn';
+
 function hasValidPublicApiKey(req: Request) {
   const key = req.headers.get('apikey') ?? '';
   if (!key) return false;
   const legacy = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-  if (key === legacy) return true;
-  try {
-    const raw = Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') ?? '{}';
-    const parsed = JSON.parse(raw);
-    return Object.values(parsed).some(value => value === key);
-  } catch {
-    return false;
-  }
+  return key === legacy || key === SUPABASE_PUBLISHABLE_KEY;
 }
 
 Deno.serve(async (req: Request) => {
