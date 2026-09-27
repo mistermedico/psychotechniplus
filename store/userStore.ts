@@ -64,6 +64,8 @@ interface UserState {
   totalCorrect: number;
   totalAnswered: number;
   isPremium: boolean;
+  serverPremium: boolean;
+  purchasePremium: boolean;
 
   isLoaded: boolean;
   isSyncing: boolean;
@@ -108,6 +110,8 @@ const INITIAL_STATE = {
   totalCorrect: 0,
   totalAnswered: 0,
   isPremium: false,
+  serverPremium: false,
+  purchasePremium: false,
   isLoaded: false,
   isSyncing: false,
   isAuthenticated: false,
@@ -175,6 +179,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       isLoaded: false,
       isSyncing: true,
       isPremium: shouldForcePremium,
+      serverPremium: false,
+      purchasePremium: false,
     });
 
     const [profile, badges, savedTopicPerformance] = await Promise.all([
@@ -188,10 +194,11 @@ export const useUserStore = create<UserState>((set, get) => ({
         name: profile.name,
         selectedTargetId: DEFAULT_TARGET_ID,
         hasCompletedOnboarding: profile.has_completed_onboarding,
-        // Native entitlement is refreshed from RevenueCat during bootstrap.
-        // The profile flag is only a server/admin mirror and must not grant access
-        // on native clients by itself.
-        isPremium: shouldForcePremium || (Platform.OS === 'web' && !!profile.is_premium),
+        // Premium is the union of protected server/admin entitlement and
+        // store entitlement. The DB trigger prevents regular clients from
+        // changing is_premium, so an admin grant is safe to honor on every platform.
+        serverPremium: !!profile.is_premium,
+        isPremium: shouldForcePremium || !!profile.is_premium,
         streak: profile.streak,
         longestStreak: profile.longest_streak,
         lastPracticedDate: profile.last_practiced_date,
@@ -272,7 +279,8 @@ export const useUserStore = create<UserState>((set, get) => ({
           name: profile.name,
           selectedTargetId: DEFAULT_TARGET_ID,
           hasCompletedOnboarding: profile.has_completed_onboarding,
-          isPremium: isAdminPremium || isReviewPremium || (Platform.OS === 'web' ? !!profile.is_premium : current.isPremium),
+          serverPremium: !!profile.is_premium,
+          isPremium: isAdminPremium || isReviewPremium || !!profile.is_premium || current.purchasePremium,
           streak: profile.streak,
           longestStreak: profile.longest_streak,
           lastPracticedDate: profile.last_practiced_date,
@@ -585,13 +593,15 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   setPremium: (val) => {
-    const { email } = get();
+    const { email, serverPremium } = get();
     const normalizedEmail = email.toLowerCase();
-    const next = normalizedEmail === ADMIN_EMAIL || PREMIUM_REVIEW_EMAILS.has(normalizedEmail) ? true : val;
-    // Do not persist an entitlement decision from an untrusted client.
-    // RevenueCat is authoritative on native clients; server/admin tooling may
-    // maintain the DB mirror independently for reporting.
-    set({ isPremium: next });
+    const forced = normalizedEmail === ADMIN_EMAIL || PREMIUM_REVIEW_EMAILS.has(normalizedEmail);
+    // RevenueCat controls purchasePremium; the protected DB flag controls
+    // server/admin grants. Neither source is allowed to erase the other.
+    set({
+      purchasePremium: val,
+      isPremium: forced || serverPremium || val,
+    });
   },
 
   reset: async () => {
