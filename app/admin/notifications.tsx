@@ -106,7 +106,7 @@ export default function NotificationsScreen() {
         estimatedReach: estimatedReachMap[segment],
       });
     } else {
-      const notif = addPushNotification({
+      addPushNotification({
         title: title.trim(),
         body: body.trim(),
         targetSegment: segment,
@@ -114,9 +114,12 @@ export default function NotificationsScreen() {
         scheduledAt: null,
         estimatedReach: estimatedReachMap[segment],
       });
-      sendPushNotification(notif.id);
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      'נשמר כטיוטה',
+      'ההודעה נשמרה, אך לא נשלחה. תשתית Push אינה מוגדרת כרגע.'
+    );
     setComposeVisible(false);
     resetForm();
   };
@@ -152,8 +155,15 @@ export default function NotificationsScreen() {
           <Text style={styles.backText}>→</Text>
         </Pressable>
         <Text style={styles.headerTitle}>🔔 הודעות Push</Text>
-        <Text style={styles.headerSub}>ניהול ושליחת התראות למשתמשים</Text>
+        <Text style={styles.headerSub}>טיוטות בלבד — תשתית Push אינה מחוברת כרגע</Text>
       </LinearGradient>
+
+      <View style={styles.infrastructureWarning}>
+        <Text style={styles.infrastructureWarningTitle}>⚠️ שליחת Push אינה פעילה</Text>
+        <Text style={styles.infrastructureWarningText}>
+          אין כרגע רישום device tokens או שירות משלוח ל-APNs/Expo. הודעות כאן נשמרות כטיוטות בלבד ולא נשלחות למשתמשים.
+        </Text>
+      </View>
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
@@ -213,15 +223,9 @@ export default function NotificationsScreen() {
               <Text style={styles.cardSubInfo}>מתוזמן ל-{formatDate(notif.scheduledAt)}</Text>
             )}
             {notif.status === 'draft' && (
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  sendPushNotification(notif.id);
-                }}
-                style={styles.sendNowBtn}
-              >
-                <Text style={styles.sendNowText}>שלח עכשיו</Text>
-              </Pressable>
+              <View style={styles.sendNowBtn}>
+                <Text style={styles.sendNowText}>שליחה לא זמינה — תשתית Push לא מחוברת</Text>
+              </View>
             )}
           </View>
         ))}
@@ -322,7 +326,7 @@ export default function NotificationsScreen() {
                 </Pressable>
                 <Pressable onPress={handleSend} style={styles.sendBtn}>
                   <LinearGradient colors={Colors.gradients.primary} style={styles.sendBtnGrad}>
-                    <Text style={styles.sendBtnText}>{scheduleToggle ? 'תזמן' : 'שלח עכשיו'}</Text>
+                    <Text style={styles.sendBtnText}>{scheduleToggle ? 'שמור תזמון כטיוטה' : 'שמור טיוטה'}</Text>
                   </LinearGradient>
                 </Pressable>
               </View>
@@ -371,6 +375,29 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: '#fff' },
   headerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8', marginTop: 2 },
 
+  infrastructureWarning: {
+    marginHorizontal: 12,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: Radius.lg,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.45)',
+  },
+  infrastructureWarningTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.warning,
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  infrastructureWarningText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: '#CBD5E1',
+    textAlign: 'right',
+    lineHeight: 19,
+  },
   statsRow: { flexDirection: 'row-reverse', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
 
   tabsRow: { paddingHorizontal: 12, paddingBottom: 10, gap: 8, flexDirection: 'row-reverse' },
