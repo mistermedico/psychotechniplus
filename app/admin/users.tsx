@@ -142,6 +142,27 @@ function formatDuration(seconds: number): string {
   return rest > 0 ? `${hours} ש׳ ${rest} דק׳` : `${hours} ש׳`;
 }
 
+function formatAuditAction(action: string): string {
+  const labels: Record<string, string> = {
+    grant_premium: 'הענקת פרימיום',
+    remove_premium: 'הסרת פרימיום',
+    update_profile: 'עדכון פרופיל',
+    reset_progress: 'איפוס התקדמות',
+    revoke_sessions: 'ניתוק מכל המכשירים',
+    suspend_24h: 'השעיה ל־24 שעות',
+    suspend_7d: 'השעיה ל־7 ימים',
+    suspend_30d: 'השעיה ל־30 יום',
+    suspend_custom: 'השעיה מותאמת',
+    suspend_indefinite: 'השעיה ללא הגבלת זמן',
+    unsuspend: 'ביטול השעיה',
+    confirm_email: 'אימות מייל ידני',
+    resend_verification: 'שליחת אימות מחדש',
+    change_email: 'שינוי כתובת מייל',
+    delete_user: 'מחיקת משתמש',
+  };
+  return labels[action] ?? action;
+}
+
 export default function UsersScreen() {
   const insets = useSafeAreaInsets();
   const { targets } = useAdminStore();
@@ -889,7 +910,7 @@ function UserDetailScreen({
             <Text style={[styles.userAvatarText, styles.detailAvatarText]}>{user.name.charAt(0).toUpperCase() || '?'}</Text>
           </View>
           <Text style={styles.detailName}>{user.name}</Text>
-          <Text style={styles.detailSub}>{user.email ?? user.id}</Text>
+          <Text style={styles.detailSub}>{currentEmail || user.id}</Text>
           <Text style={styles.detailSub}>{target ? `${target.icon} ${target.name}` : 'ללא מסלול'}</Text>
           <View style={styles.detailStatusRow}>
             <Text style={[styles.authStatusTag, user.email_confirmed_at ? styles.authStatusGood : styles.authStatusWarn]}>
@@ -1215,7 +1236,7 @@ function UserDetailScreen({
             <Text style={styles.emptyHint}>אין עדיין פעולות מנהל מתועדות למשתמש זה.</Text>
           ) : auditRows.map(row => (
             <View key={row.id} style={styles.sessionRow}>
-              <Text style={styles.sessionMode}>{row.action}</Text>
+              <Text style={styles.sessionMode}>{formatAuditAction(row.action)}</Text>
               <Text style={styles.sessionMeta}>
                 {formatDateTime(row.created_at)} · {row.admin_email ?? 'admin'}
               </Text>
