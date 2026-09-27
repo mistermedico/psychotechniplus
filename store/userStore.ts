@@ -76,6 +76,7 @@ interface UserState {
   addXp: (amount: number) => void;
   updateStreak: () => void;
   earnBadge: (type: BadgeType) => UserBadge;
+  claimDailyChallengeBonus: (challengeId: string, guestBonusXp: number) => Promise<boolean>;
   recordSession: (correct: number, total: number) => void;
   getTopicAccuracy: (topicId: string) => number;
   getTopicLevel: (topicId: string) => PerformanceLevel;
@@ -391,6 +392,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   recordSession: (correct, total) => {
     const wasFirstSession = get().totalSessions === 0;
+    const previousLevel = get().level;
     const xpGain = correct * 10 + 20;
     set(state => {
       const totalSessions = state.totalSessions + 1;
@@ -429,9 +431,46 @@ export const useUserStore = create<UserState>((set, get) => ({
       };
     });
 
-    if (wasFirstSession) get().earnBadge('first_session');
+    const after = get();
+    if (wasFirstSession) after.earnBadge('first_session');
+    if (total > 0 && correct === total) after.earnBadge('perfect_score');
+    if (after.streak >= 7) after.earnBadge('streak_7');
+    if (after.streak >= 30) after.earnBadge('streak_30');
+    if (after.level > previousLevel) after.earnBadge('level_up');
+
     logger.success('userStore:recordSession', `סשן הושלם — נכון: ${correct}/${total}, XP+${xpGain}`);
     useAdminStore.getState().logActivity(`סשן הושלם — ${correct}/${total} נכון, XP+${xpGain}`, 'session');
+  },
+
+  claimDailyChallengeBonus: async (challengeId, guestBonusXp) => {
+    const { userId, isGuest } = get();
+    if (!challengeId) return false;
+
+    if (isGuest) {
+      const key = `@psychotechniplus/dailyChallengeClaim/${localDateKey()}/${challengeId}`;
+      const alreadyClaimed = await AsyncStorage.getItem(key).catch(() => null);
+      if (alreadyClaimed) return false;
+
+      const bonus = Math.max(0, Math.min(1000, Math.round(Number(guestBonusXp) || 0)));
+      await AsyncStorage.setItem(key, '1').catch(() => null);
+      if (bonus > 0) get().addXp(bonus);
+      return true;
+    }
+
+    if (!userId) return false;
+    const { data, error } = await supabase.rpc('claim_daily_challenge_bonus', {
+      p_challenge_id: challengeId,
+    });
+    if (error) {
+      logger.error('userStore:claimDailyChallengeBonus', 'קבלת בונוס אתגר יומי נכשלה', error.message);
+      return false;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row && Number.isFinite(Number(row.xp)) && Number.isFinite(Number(row.level))) {
+      set({ xp: Number(row.xp), level: Number(row.level) });
+    }
+    return Boolean(row?.awarded);
   },
 
   setPremium: (val) => {
