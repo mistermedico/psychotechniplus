@@ -28,7 +28,7 @@ import { isEnglishPracticeTopic } from '../utils/topicVisibility';
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 export default function PracticeSession() {
-  const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, adminPreview } = useLocalSearchParams<{
+  const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, challengeId, adminPreview } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
     mode?: SessionMode;
@@ -37,6 +37,7 @@ export default function PracticeSession() {
     difficulty?: string; // 'easy' | 'medium' | 'hard' | 'all'
     questionId?: string;
     challengeQuestionId?: string;
+    challengeId?: string;
     adminPreview?: string;
   }>();
 
@@ -49,10 +50,13 @@ export default function PracticeSession() {
     completeUnansweredAsSkipped, nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
   } = usePracticeStore();
 
-  const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium, isGuest } = useUserStore();
+  const {
+    recordAnswer, recordSession, getTopicLevel, userId, name: userName,
+    isPremium, isGuest, earnBadge, claimDailyChallengeBonus,
+  } = useUserStore();
   const {
     templates, questions: adminQuestions, topics, targets, practiceSettings,
-    freePracticeLimit, premiumConfig, appConfig, addSessionRecord, isAdmin,
+    freePracticeLimit, premiumConfig, appConfig, dailyChallenges, addSessionRecord, isAdmin,
     loadAdminData, loadPublicData,
   } = useAdminStore();
 
@@ -668,7 +672,34 @@ export default function PracticeSession() {
     };
     if (userId && !isGuest && !isAdminPreview) addSessionRecord(sessionRec);
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
-    if (!isAdminPreview) recordSession(correct, finished.answers.length);
+    if (!isAdminPreview) {
+      recordSession(correct, finished.answers.length);
+
+      const fastCorrect = finished.answers.filter(a => a.isCorrect && a.timeSpent <= 10).length;
+      if (fastCorrect >= 5) earnBadge('speed_master');
+
+      if (isSimulation) {
+        const passingScore = Number(template?.passingScore ?? 65);
+        if (scores.score >= passingScore) earnBadge('simulation_pass');
+      }
+
+      const completedTopicId = finished.topicId ?? topicId ?? '';
+      if (completedTopicId) {
+        const performance = useUserStore.getState().topicPerformance[completedTopicId];
+        if (performance && performance.history.length >= 20) {
+          const recent = performance.history.slice(-20);
+          const recentAccuracy = recent.filter(entry => entry.isCorrect).length / recent.length;
+          if (recentAccuracy >= 0.8) earnBadge('topic_complete');
+        }
+      }
+
+      if (challengeId && challengeQuestionId) {
+        const challenge = dailyChallenges.find(item => item.id === challengeId && item.questionId === challengeQuestionId);
+        if (challenge) {
+          claimDailyChallengeBonus(challenge.id, challenge.bonusXp).catch(() => false);
+        }
+      }
+    }
 
     router.replace({
       pathname: '/results',
