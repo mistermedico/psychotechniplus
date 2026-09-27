@@ -41,7 +41,7 @@ export default function Dashboard() {
     selectedTargetId, getTopicLevel,
   } = useUserStore();
 
-  const { dailyChallenges, targets, topics } = useAdminStore();
+  const { dailyChallenges, targets, topics, appConfig } = useAdminStore();
 
   const selectedTarget =
     targets.find(t => t.id === 'target_psychometric' && t.isActive !== false && !t.comingSoon) ??
@@ -265,47 +265,53 @@ export default function Dashboard() {
             </View>
           </Animated.View>
 
-          {/* ── Daily Challenge ── */}
-          <Animated.View style={[styles.section, { opacity: fadeIn }]}>
-            <Pressable
-              onPress={() => {
-                if (todayChallenge) {
-                  // Navigate to the specific challenge question in speed mode
-                  router.push({
-                    pathname: '/practice-session',
-                    params: {
-                      targetId: selectedTarget?.id ?? 'target_psychometric',
-                      mode: 'speed',
-                      questionLimit: '1',
-                      challengeQuestionId: todayChallenge.questionId,
-                    },
-                  });
-                } else {
-                  go(mainTopic?.id ?? 'topic_quantitative', { mode: 'speed', questionLimit: '10' });
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="אתגר יומי — 10 שאלות"
-              style={({ pressed }) => [styles.challengeBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
-            >
-              <LinearGradient
-                colors={['#92400E', '#D97706', '#FBBF24']}
-                start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0 }}
-                style={styles.challengeGrad}
-              >
-                <View style={styles.challengeShimmer} />
-                <View style={styles.challengeRight}>
-                  <Text style={styles.challengeTitle}>אתגר יומי</Text>
-                  <Text style={styles.challengeSub}>
-                    {todayChallenge
-                      ? `${todayChallenge.title} · ${todayChallenge.bonusXp} XP בונוס`
-                      : '10 שאלות · מיוחד להיום ← '}
-                  </Text>
-                </View>
-                <Text style={styles.challengeEmoji}>⚡</Text>
-              </LinearGradient>
-            </Pressable>
-          </Animated.View>
+          {appConfig.featureFlags.dailyChallenge !== false && (
+            <>
+                        {/* ── Daily Challenge ── */}
+                        <Animated.View style={[styles.section, { opacity: fadeIn }]}>
+                          <Pressable
+                            onPress={() => {
+                              if (todayChallenge) {
+                                // Navigate to the specific challenge question in speed mode
+                                router.push({
+                                  pathname: '/practice-session',
+                                  params: {
+                                    targetId: selectedTarget?.id ?? 'target_psychometric',
+                                    mode: 'speed',
+                                    questionLimit: '1',
+                                    challengeQuestionId: todayChallenge.questionId,
+                                  },
+                                });
+                              } else {
+                                go(mainTopic?.id ?? 'topic_quantitative', { mode: 'speed', questionLimit: '10' });
+                              }
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel="אתגר יומי — 10 שאלות"
+                            style={({ pressed }) => [styles.challengeBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+                          >
+                            <LinearGradient
+                              colors={['#92400E', '#D97706', '#FBBF24']}
+                              start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0 }}
+                              style={styles.challengeGrad}
+                            >
+                              <View style={styles.challengeShimmer} />
+                              <View style={styles.challengeRight}>
+                                <Text style={styles.challengeTitle}>אתגר יומי</Text>
+                                <Text style={styles.challengeSub}>
+                                  {todayChallenge
+                                    ? `${todayChallenge.title} · ${todayChallenge.bonusXp} XP בונוס`
+                                    : '10 שאלות · מיוחד להיום ← '}
+                                </Text>
+                              </View>
+                              <Text style={styles.challengeEmoji}>⚡</Text>
+                            </LinearGradient>
+                          </Pressable>
+                        </Animated.View>
+              
+              
+            </>
+          )}
 
           {/* ── Badges ── */}
           {recentBadges.length > 0 && (
