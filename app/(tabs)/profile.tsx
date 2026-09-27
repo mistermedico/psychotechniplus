@@ -99,7 +99,7 @@ export default function ProfileTab() {
   } = useUserStore();
   const email = useUserStore(state => state.email);
   const { hapticsEnabled, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
-  const appVersion = Constants.expoConfig?.version ?? '1.0.11';
+  const appVersion = Constants.expoConfig?.version ?? '1.0.12';
   const { isAdmin, setIsAdmin, targets } = useAdminStore();
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
