@@ -21,6 +21,9 @@ const PREMIUM_REVIEW_EMAILS = new Set([
 const GUEST_USER_ID_KEY = '@psychotechniplus/guestUserId';
 const GUEST_NAME = 'אורח';
 const DEFAULT_TARGET_ID = 'target_psychometric';
+let userRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let userRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
+const USER_REALTIME_DEBOUNCE_MS = 500;
 
 async function getOrCreateGuestUserId(): Promise<string> {
   const saved = await AsyncStorage.getItem(GUEST_USER_ID_KEY).catch(() => null);
@@ -67,6 +70,9 @@ interface UserState {
   isAuthenticated: boolean;
   isGuest: boolean;
   initialize: (overrideUserId?: string) => Promise<void>;
+  refreshFromServer: () => Promise<void>;
+  startRealtimeSync: () => void;
+  stopRealtimeSync: () => void;
   continueAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
@@ -224,7 +230,106 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoaded: true, isSyncing: false });
   },
 
+  refreshFromServer: async () => {
+    const state = get();
+    if (!state.userId || state.isGuest || !state.isAuthenticated) return;
+
+    try {
+      const [{ data: { session } }, profile, badges, savedTopicPerformance] = await Promise.all([
+        supabase.auth.getSession(),
+        loadUserProfile(state.userId),
+        loadUserBadges(state.userId),
+        loadUserElos(state.userId),
+      ]);
+
+      const sessionEmail = session?.user?.email ?? state.email;
+      const isAdminPremium = sessionEmail.toLowerCase() === ADMIN_EMAIL;
+      const isReviewPremium = PREMIUM_REVIEW_EMAILS.has(sessionEmail.toLowerCase());
+      const topicPerformance = Object.entries(savedTopicPerformance).reduce<Record<string, TopicPerformance>>(
+        (acc, [topicId, value]) => {
+          const rawHistory = Array.isArray(value.history) ? value.history : [];
+          const history = rawHistory
+            .filter((entry: any) => typeof entry.isCorrect === 'boolean')
+            .map((entry: any) => ({
+              isCorrect: !!entry.isCorrect,
+              difficulty: clampDifficulty(entry.difficulty),
+              date: typeof entry.date === 'string' ? entry.date : undefined,
+            }))
+            .slice(-40);
+          if (history.length === 0) return acc;
+          acc[topicId] = {
+            history,
+            currentLevel: computeAdaptiveLevel(history, 'beginner'),
+          };
+          return acc;
+        },
+        {},
+      );
+
+      set(current => ({
+        email: sessionEmail,
+        ...(profile ? {
+          name: profile.name,
+          selectedTargetId: DEFAULT_TARGET_ID,
+          hasCompletedOnboarding: profile.has_completed_onboarding,
+          isPremium: isAdminPremium || isReviewPremium || (Platform.OS === 'web' ? !!profile.is_premium : current.isPremium),
+          streak: profile.streak,
+          longestStreak: profile.longest_streak,
+          lastPracticedDate: profile.last_practiced_date,
+          level: profile.level,
+          xp: profile.xp,
+          totalSessions: profile.total_sessions,
+          totalCorrect: profile.total_correct,
+          totalAnswered: profile.total_answered,
+        } : {}),
+        badges,
+        topicPerformance,
+        isLoaded: true,
+        isSyncing: false,
+      }));
+    } catch (e: any) {
+      logger.warn('userStore:refreshFromServer', 'סנכרון נתוני משתמש מהשרת נכשל', e?.message);
+    }
+  },
+
+  startRealtimeSync: () => {
+    const { userId, isGuest, isAuthenticated } = get();
+    if (!userId || isGuest || !isAuthenticated || userRealtimeChannel) return;
+
+    const scheduleRefresh = () => {
+      if (userRealtimeReloadTimer) clearTimeout(userRealtimeReloadTimer);
+      userRealtimeReloadTimer = setTimeout(() => {
+        get().refreshFromServer().catch(() => null);
+      }, USER_REALTIME_DEBOUNCE_MS);
+    };
+
+    userRealtimeChannel = supabase
+      .channel(`psychotechniplus-user-sync-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_profiles', filter: `id=eq.${userId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_badges', filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_elos', filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'practice_sessions', filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') logger.info('userStore:realtime', 'סנכרון משתמש חי פעיל');
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          logger.warn('userStore:realtime', `Realtime status: ${status}`);
+        }
+      });
+  },
+
+  stopRealtimeSync: () => {
+    if (userRealtimeReloadTimer) {
+      clearTimeout(userRealtimeReloadTimer);
+      userRealtimeReloadTimer = null;
+    }
+    if (userRealtimeChannel) {
+      supabase.removeChannel(userRealtimeChannel);
+      userRealtimeChannel = null;
+    }
+  },
+
   continueAsGuest: async () => {
+    get().stopRealtimeSync();
     await logOutPurchases().catch(() => null);
     await supabase.auth.signOut().catch(() => null);
     useAdminStore.getState().setIsAdmin(false);
@@ -245,6 +350,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   signOut: async () => {
+    get().stopRealtimeSync();
     logger.info('userStore:signOut', 'משתמש התנתק');
     await logOutPurchases().catch(() => null);
     await supabase.auth.signOut().catch(() => null);
@@ -256,6 +362,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   deleteAccount: async () => {
+    get().stopRealtimeSync();
     const { userId, isGuest } = get();
     if (isGuest) {
       set({ ...INITIAL_STATE, isLoaded: true });
