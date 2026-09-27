@@ -636,11 +636,24 @@ export default function PracticeSession() {
     if (finishingRef.current) return;
     finishingRef.current = true;
     if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+    const answeredBeforeFinish = new Set(
+      (usePracticeStore.getState().session?.answers ?? []).map(answer => answer.questionId)
+    );
     completeUnansweredAsSkipped();
     const finished = endSession();
     if (!finished) { finishingRef.current = false; return; }
     const scores = calcAllScores(finished.answers);
     const correct = finished.answers.filter(a => a.isCorrect).length;
+
+    if (!isAdminPreview) {
+      for (const answer of finished.answers) {
+        if (!answer.isSkipped || answeredBeforeFinish.has(answer.questionId)) continue;
+        const skippedQuestion = finished.questions.find(question => question.id === answer.questionId);
+        if (skippedQuestion) {
+          recordAnswer(skippedQuestion.topicId, skippedQuestion.difficulty, false);
+        }
+      }
+    }
 
     // Save session record to Supabase and admin store (only for authenticated users)
     const template = isSimulation ? templates.find(t => t.id === templateId) : undefined;
@@ -679,7 +692,7 @@ export default function PracticeSession() {
     if (!isAdminPreview && sessionPersisted) {
       recordSession(correct, finished.answers.length);
 
-      const fastCorrect = finished.answers.filter(a => a.isCorrect && a.timeSpent <= 10).length;
+      const fastCorrect = finished.answers.filter(a => a.isCorrect && a.timeSpent < 10).length;
       if (fastCorrect >= 5) earnBadge('speed_master');
 
       if (isSimulation) {
@@ -737,10 +750,10 @@ export default function PracticeSession() {
       router.replace(isAdminPreview ? '/admin/simulation-builder' : '/(tabs)');
     };
     if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      if (window.confirm('לצאת מהתרגול? ההתקדמות הנוכחית תיעצר.')) quit();
+      if (window.confirm('לצאת מהתרגול? הסשן הנוכחי לא יישמר.')) quit();
       return;
     }
-    Alert.alert('יציאה מהתרגול', 'האם לצאת ולשמור את ההתקדמות?', [
+    Alert.alert('יציאה מהתרגול', 'האם לצאת? הסשן הנוכחי לא יישמר.', [
       { text: 'ביטול', style: 'cancel' },
       {
         text: 'יציאה',
