@@ -676,7 +676,7 @@ export default function PracticeSession() {
     }
 
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
-    if (!isAdminPreview) {
+    if (!isAdminPreview && sessionPersisted) {
       recordSession(correct, finished.answers.length);
 
       const fastCorrect = finished.answers.filter(a => a.isCorrect && a.timeSpent <= 10).length;
@@ -703,6 +703,11 @@ export default function PracticeSession() {
           await claimDailyChallengeBonus(challenge.id, challenge.bonusXp).catch(() => false);
         }
       }
+    } else if (!isAdminPreview && !sessionPersisted) {
+      Alert.alert(
+        'שמירת ההתקדמות נכשלה',
+        'התוצאות מוצגות כעת, אך לא הצלחנו לשמור את הסשן לחשבון. בדוק את החיבור לפני הסשן הבא.'
+      );
     }
 
     router.replace({
