@@ -234,6 +234,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (Object.keys(topicPerformance).length > 0) set({ topicPerformance });
 
     set({ isLoaded: true, isSyncing: false });
+    get().startRealtimeSync();
   },
 
   refreshFromServer: async () => {
