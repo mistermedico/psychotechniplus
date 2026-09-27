@@ -632,7 +632,7 @@ export default function PracticeSession() {
     }
   };
 
-  const finishSession = () => {
+  const finishSession = async () => {
     if (finishingRef.current) return;
     finishingRef.current = true;
     if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
@@ -670,7 +670,11 @@ export default function PracticeSession() {
         difficulty: a.questionDifficulty ?? 5,
       })),
     };
-    if (userId && !isGuest && !isAdminPreview) addSessionRecord(sessionRec);
+    let sessionPersisted = isGuest || isAdminPreview;
+    if (userId && !isGuest && !isAdminPreview) {
+      sessionPersisted = await addSessionRecord(sessionRec);
+    }
+
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
     if (!isAdminPreview) {
       recordSession(correct, finished.answers.length);
@@ -693,10 +697,10 @@ export default function PracticeSession() {
         }
       }
 
-      if (challengeId && challengeQuestionId) {
+      if (sessionPersisted && challengeId && challengeQuestionId) {
         const challenge = dailyChallenges.find(item => item.id === challengeId && item.questionId === challengeQuestionId);
         if (challenge) {
-          claimDailyChallengeBonus(challenge.id, challenge.bonusXp).catch(() => false);
+          await claimDailyChallengeBonus(challenge.id, challenge.bonusXp).catch(() => false);
         }
       }
     }
