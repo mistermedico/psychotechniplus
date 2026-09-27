@@ -53,6 +53,7 @@ export default function Results() {
 
   const topic = useAdminStore(s => s.topics.find(t => t.id === (params.topicId ?? '')));
   const isAdmin = useAdminStore(s => s.isAdmin);
+  const socialSharingEnabled = useAdminStore(s => s.appConfig.featureFlags.socialSharing);
   const isPremium = useUserStore(s => s.isPremium);
   const completedSessions = useUserStore(s => s.totalSessions);
   const completedSession = usePracticeStore(s => s.completedSession);
@@ -154,12 +155,14 @@ export default function Results() {
             {correct} מתוך {total} שאלות נכונות
           </Text>
 
-          <Pressable
-            onPress={handleShare}
-            style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.75 : 1 }]}
-          >
-            <Text style={styles.shareBtnText}>שתף תוצאות 🔗</Text>
-          </Pressable>
+          {socialSharingEnabled && (
+            <Pressable
+              onPress={handleShare}
+              style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.75 : 1 }]}
+            >
+              <Text style={styles.shareBtnText}>שתף תוצאות 🔗</Text>
+            </Pressable>
+          )}
         </LinearGradient>
 
         {/* ── Main stats ── */}
