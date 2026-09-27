@@ -913,7 +913,7 @@ function UserDetailScreen({
           <Text style={styles.detailSub}>{currentEmail || user.id}</Text>
           <Text style={styles.detailSub}>{target ? `${target.icon} ${target.name}` : 'ללא מסלול'}</Text>
           <View style={styles.detailStatusRow}>
-            <Text style={[styles.authStatusTag, user.email_confirmed_at ? styles.authStatusGood : styles.authStatusWarn]}>
+            <Text style={[styles.authStatusTag, emailConfirmedAt ? styles.authStatusGood : styles.authStatusWarn]}>
               {emailConfirmedAt ? 'אימייל מאומת' : 'אימייל לא מאומת'}
             </Text>
             {suspended && <Text style={styles.suspendedTag}>מושעה עד {formatDateTime(bannedUntil)}</Text>}
@@ -1169,8 +1169,8 @@ function UserDetailScreen({
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Pressable onPress={() => Linking.openURL(`mailto:${user.email ?? ''}`)} disabled={!user.email}>
-              <Text style={[styles.sectionLink, !user.email && { opacity: 0.4 }]}>שלח מייל</Text>
+            <Pressable onPress={() => Linking.openURL(`mailto:${currentEmail}`)} disabled={!currentEmail}>
+              <Text style={[styles.sectionLink, !currentEmail && { opacity: 0.4 }]}>שלח מייל</Text>
             </Pressable>
             <Text style={styles.sectionTitle}>פרטים</Text>
           </View>
