@@ -1,0 +1,64 @@
+name: iOS Production Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/exam-prep-ios-app-DkN5g
+    paths:
+      - '.github/workflows/ios-release.yml'
+      - '.ios-release-trigger'
+
+concurrency:
+  group: psychotechniplus-ios-production
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: Build and submit iOS
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check Expo authentication
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "Missing EXPO_TOKEN repository secret."
+            echo "Create an Expo personal access token and add it to GitHub Actions as EXPO_TOKEN."
+            exit 1
+          fi
+
+      - name: Checkout exact release commit
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 20.2.0
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: iOS JavaScript export
+        run: npm run build:ios-js
+
+      - name: Trigger production build and TestFlight submission
+        run: >
+          eas build
+          --platform ios
+          --profile production
+          --non-interactive
+          --auto-submit
+          --no-wait
+          --message "GitHub release ${GITHUB_SHA}"
