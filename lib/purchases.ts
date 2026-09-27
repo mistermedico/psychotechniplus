@@ -5,6 +5,7 @@ import Purchases, {
   type PurchasesPackage,
 } from 'react-native-purchases';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
+import { supabase } from './supabase';
 
 export const USE_REAL_PURCHASES = true;
 
@@ -69,6 +70,7 @@ export const DEFAULT_PURCHASE_PACKAGES: PurchasePackage[] = [
 
 let configured = false;
 let latestCustomerInfo: RevenueCatCustomerInfo | null = null;
+let currentAppUserId = '';
 
 const isRevenueCatSupported = Platform.OS === 'ios' || Platform.OS === 'android';
 
@@ -156,10 +158,12 @@ function sortPackages(packages: PurchasePackage[]): PurchasePackage[] {
 }
 
 export async function initializePurchases(userId?: string): Promise<void> {
+  if (userId) currentAppUserId = userId;
   ensurePurchasesConfigured(userId);
 }
 
 export async function identifyUser(userId: string): Promise<void> {
+  currentAppUserId = userId;
   if (!ensurePurchasesConfigured()) return;
   const result = await Purchases.logIn(userId);
   latestCustomerInfo = result.customerInfo;
@@ -232,6 +236,16 @@ export async function restorePurchases(): Promise<{ isPremium: boolean; error?: 
 }
 
 export async function checkPremiumStatus(): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    if (!currentAppUserId || !REVENUECAT_API_KEY_IOS.trim()) return false;
+    const { data, error } = await supabase.functions.invoke('revenuecat-entitlement', {
+      body: { apiKey: REVENUECAT_API_KEY_IOS },
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(String(data.error));
+    return Boolean(data?.isPremium);
+  }
+
   const info = await getCustomerInfo();
   return hasPremiumEntitlement(info);
 }
@@ -281,7 +295,11 @@ export async function presentCustomerCenter(): Promise<{ success: boolean; error
 }
 
 export async function logOutPurchases(): Promise<void> {
-  if (!ensurePurchasesConfigured()) return;
+  currentAppUserId = '';
+  if (!ensurePurchasesConfigured()) {
+    latestCustomerInfo = null;
+    return;
+  }
   await Purchases.logOut().catch(() => null);
   latestCustomerInfo = null;
 }
