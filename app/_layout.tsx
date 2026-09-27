@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState, I18nManager, Platform, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
@@ -78,6 +78,9 @@ export default function RootLayout() {
   const stopRealtimeSync = useAdminStore(s => s.stopRealtimeSync);
   const initializePurchases = usePurchaseStore(s => s.initialize);
   const checkPurchaseStatus = usePurchaseStore(s => s.checkStatus);
+  const maintenanceMode = useAdminStore(s => s.appConfig.maintenanceMode);
+  const isAdmin = useAdminStore(s => s.isAdmin);
+  const pathname = usePathname();
 
   const [bootstrapReady, setBootstrapReady] = useState(false);
 
@@ -137,6 +140,28 @@ export default function RootLayout() {
   useEffect(() => () => {
     stopRealtimeSync();
   }, [stopRealtimeSync]);
+
+  useEffect(() => {
+    if (!bootstrapReady) return;
+
+    const allowedDuringMaintenance =
+      pathname === '/maintenance' ||
+      pathname === '/landing' ||
+      pathname === '/auth' ||
+      pathname === '/auth-callback' ||
+      pathname === '/terms' ||
+      pathname === '/privacy' ||
+      pathname.startsWith('/admin');
+
+    if (maintenanceMode && !isAdmin && !allowedDuringMaintenance) {
+      router.replace('/maintenance');
+      return;
+    }
+
+    if (!maintenanceMode && pathname === '/maintenance') {
+      router.replace('/');
+    }
+  }, [bootstrapReady, maintenanceMode, isAdmin, pathname]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
