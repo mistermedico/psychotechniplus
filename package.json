@@ -13,7 +13,9 @@
     "eas:whoami": "npx eas-cli@20.2.0 whoami",
     "eas:env:list": "npx eas-cli@20.2.0 env:list --environment production",
     "build:ios:production": "npx eas-cli@20.2.0 build --platform ios --profile production --non-interactive",
-    "submit:ios:production": "npx eas-cli@20.2.0 submit --platform ios --profile production --latest --non-interactive"
+    "submit:ios:production": "npx eas-cli@20.2.0 submit --platform ios --profile production --latest --non-interactive",
+    "build:ios-js": "expo export --platform ios --output-dir dist-ios-check",
+    "verify:platforms": "npm run typecheck && npm run build:web && npm run build:ios-js"
   },
   "dependencies": {
     "@expo-google-fonts/heebo": "^0.2.3",
