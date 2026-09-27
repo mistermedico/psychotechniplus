@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -41,6 +42,9 @@ interface RealUser {
   sessions_last_7_days: number;
   avg_score: number;
   total_time_seconds: number;
+  last_sign_in_at: string | null;
+  email_confirmed_at: string | null;
+  banned_until: string | null;
 }
 
 interface AdminUserProfileRow {
@@ -60,6 +64,9 @@ interface AdminUserProfileRow {
   last_practiced_date: string | null;
   created_at: string;
   updated_at: string;
+  last_sign_in_at: string | null;
+  email_confirmed_at: string | null;
+  banned_until: string | null;
 }
 
 interface SessionRow {
@@ -75,7 +82,15 @@ interface SessionRow {
 }
 
 type SortKey = 'sessions' | 'level' | 'streak' | 'correct_rate' | 'joined' | 'recent';
-type UserSegment = 'all' | 'free' | 'premium' | 'active7' | 'low_accuracy' | 'incomplete_onboarding';
+type UserSegment =
+  | 'all'
+  | 'free'
+  | 'premium'
+  | 'active7'
+  | 'suspended'
+  | 'never_signed_in'
+  | 'low_accuracy'
+  | 'incomplete_onboarding';
 
 function formatDate(value?: string | null): string {
   if (!value) return '-';
@@ -101,6 +116,12 @@ function getPerformanceLevel(totalCorrect: number, totalAnswered: number): { lab
 
 function getAccuracy(user: RealUser): number {
   return user.total_answered > 0 ? Math.round((user.total_correct / user.total_answered) * 100) : 0;
+}
+
+function isSuspended(user: Pick<RealUser, 'banned_until'>): boolean {
+  if (!user.banned_until) return false;
+  const timestamp = new Date(user.banned_until).getTime();
+  return Number.isFinite(timestamp) && timestamp > Date.now();
 }
 
 function formatDuration(seconds: number): string {
@@ -198,6 +219,9 @@ export default function UsersScreen() {
           sessions_last_7_days: sessionsLast7Days,
           avg_score: avgScore,
           total_time_seconds: userSessions.reduce((sum, session) => sum + (session.time_spent_seconds ?? 0), 0),
+          last_sign_in_at: profile.last_sign_in_at ?? null,
+          email_confirmed_at: profile.email_confirmed_at ?? null,
+          banned_until: profile.banned_until ?? null,
         } satisfies RealUser;
       });
 
@@ -260,6 +284,8 @@ export default function UsersScreen() {
     if (segment === 'free') list = list.filter(user => !user.is_premium);
     if (segment === 'premium') list = list.filter(user => user.is_premium);
     if (segment === 'active7') list = list.filter(user => user.sessions_last_7_days > 0);
+    if (segment === 'suspended') list = list.filter(user => isSuspended(user));
+    if (segment === 'never_signed_in') list = list.filter(user => !user.last_sign_in_at);
     if (segment === 'low_accuracy') list = list.filter(user => user.total_answered >= 10 && getAccuracy(user) < 45);
     if (segment === 'incomplete_onboarding') list = list.filter(user => !user.has_completed_onboarding);
 
@@ -277,6 +303,7 @@ export default function UsersScreen() {
     total: users.length,
     active7: users.filter(user => user.sessions_last_7_days > 0).length,
     premium: users.filter(user => user.is_premium).length,
+    suspended: users.filter(user => isSuspended(user)).length,
     sessions: users.reduce((sum, user) => sum + user.total_sessions, 0),
     avgAccuracy: users.length
       ? Math.round(users.reduce((sum, user) => sum + getAccuracy(user), 0) / users.length)
@@ -292,12 +319,14 @@ export default function UsersScreen() {
   };
 
   const handleExportCSV = () => {
-    const header = 'מזהה,שם,אימייל,פרימיום,אונבורדינג,מסלול,רמה,XP,סשנים,דיוק,פעיל בשבוע האחרון,זמן תרגול בדקות,הצטרף,פעילות אחרונה';
+    const header = 'מזהה,שם,אימייל,פרימיום,מושעה,אימייל מאומת,אונבורדינג,מסלול,רמה,XP,סשנים,דיוק,פעיל בשבוע האחרון,זמן תרגול בדקות,הצטרף,כניסה אחרונה,פעילות אחרונה';
     const rows = filtered.map(user => [
       user.id,
       user.name,
       user.email ?? '',
       user.is_premium ? 'כן' : 'לא',
+      isSuspended(user) ? 'כן' : 'לא',
+      user.email_confirmed_at ? 'כן' : 'לא',
       user.has_completed_onboarding ? 'כן' : 'לא',
       targets.find(targetItem => targetItem.id === user.selected_target_id)?.name ?? '',
       String(user.level),
@@ -307,10 +336,25 @@ export default function UsersScreen() {
       String(user.sessions_last_7_days),
       String(Math.round(user.total_time_seconds / 60)),
       formatDate(user.created_at),
+      formatDateTime(user.last_sign_in_at),
       formatDateTime(user.last_practiced_date),
     ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(','));
-    const preview = [header, ...rows.slice(0, 5)].join('\n');
-    Alert.alert('יצוא CSV', `${filtered.length} משתמשים בתצוגה הנוכחית\n\nתצוגה מקדימה:\n\n${preview}`);
+
+    const csv = '\uFEFF' + [header, ...rows].join('\n');
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `psychotechniplus-users-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    Alert.alert('יצוא CSV', `נוצר CSV עבור ${filtered.length} משתמשים. הורדה ישירה זמינה בגרסת ה-Web של מסך הניהול.`);
   };
 
   if (loading) {
@@ -344,6 +388,7 @@ export default function UsersScreen() {
           { label: 'משתמשים', value: stats.total, tone: 'primary' },
           { label: 'פעילים השבוע', value: stats.active7, tone: 'success' },
           { label: 'פרימיום', value: stats.premium, tone: 'warning' },
+          { label: 'מושעים', value: stats.suspended, tone: stats.suspended > 0 ? 'warning' : 'primary' },
           { label: 'דיוק ממוצע', value: `${stats.avgAccuracy}%`, tone: stats.avgAccuracy >= 60 ? 'success' : 'warning' },
         ]}
       />
@@ -351,6 +396,7 @@ export default function UsersScreen() {
         <StatChip label="משתמשים" value={String(stats.total)} />
         <StatChip label="פעילים 7 ימים" value={String(stats.active7)} />
         <StatChip label="פרימיום" value={String(stats.premium)} />
+        <StatChip label="מושעים" value={String(stats.suspended)} />
         <StatChip label="סשנים" value={String(stats.sessions)} />
         <StatChip label="דיוק ממוצע" value={`${stats.avgAccuracy}%`} />
       </View>
@@ -391,6 +437,8 @@ export default function UsersScreen() {
           ['free', 'חינמיים'],
           ['premium', 'פרימיום'],
           ['active7', 'פעילים השבוע'],
+          ['suspended', 'מושעים'],
+          ['never_signed_in', 'טרם התחברו'],
           ['low_accuracy', 'דיוק נמוך'],
           ['incomplete_onboarding', 'לא השלימו פתיחה'],
         ] as [UserSegment, string][]).map(([key, label]) => (
@@ -437,12 +485,16 @@ export default function UsersScreen() {
                   <View style={styles.userNameRow}>
                     <Text style={styles.userName}>{item.name}</Text>
                     {item.is_premium && <Text style={styles.premiumTag}>פרימיום</Text>}
+                    {isSuspended(item) && <Text style={styles.suspendedTag}>מושעה</Text>}
                   </View>
                   <Text style={styles.userMeta} numberOfLines={1}>
                     {item.email ?? item.id}
                   </Text>
                   <Text style={styles.userMeta} numberOfLines={1}>
                     {target ? `${target.icon} ${target.name}` : 'ללא מסלול'}{!item.has_completed_onboarding ? ' · לא השלים אונבורדינג' : ''}
+                  </Text>
+                  <Text style={styles.userMeta} numberOfLines={1}>
+                    כניסה אחרונה: {formatDateTime(item.last_sign_in_at)} · {item.email_confirmed_at ? 'אימייל מאומת' : 'אימייל לא מאומת'}
                   </Text>
                 </View>
                 <View style={styles.userLevelBadge}>
@@ -494,27 +546,117 @@ function UserDetailScreen({
   onDeleted: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { targets, topics, premiumConfig } = useAdminStore();
+  const { targets, topics, premiumConfig, getUserNote, setUserNote, logActivity } = useAdminStore();
   const [isPremium, setIsPremium] = useState(user.is_premium);
   const [togglingPremium, setTogglingPremium] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [suspensionAction, setSuspensionAction] = useState<string | null>(null);
+  const [bannedUntil, setBannedUntil] = useState(user.banned_until);
+  const [profileName, setProfileName] = useState(user.name);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [adminNote, setAdminNote] = useState(() => getUserNote(user.id));
+  const [savingNote, setSavingNote] = useState(false);
 
   const handleTogglePremium = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setTogglingPremium(true);
     const next = !isPremium;
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ is_premium: next, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
+      const { error } = await supabase.rpc('admin_set_user_premium', {
+        p_user_id: user.id,
+        p_is_premium: next,
+      });
       if (error) throw error;
       setIsPremium(next);
+      logActivity(`${next ? 'העניק' : 'הסיר'} Premium למשתמש ${user.email ?? user.id}`, 'user');
       Alert.alert('עודכן', next ? 'המשתמש עודכן לפרימיום' : 'פרימיום הוסר מהמשתמש');
     } catch (error: any) {
       Alert.alert('שגיאה', error?.message ?? 'לא ניתן לעדכן סטטוס פרימיום');
     } finally {
       setTogglingPremium(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    const normalizedName = profileName.trim();
+    if (!normalizedName) {
+      Alert.alert('שם לא תקין', 'שם המשתמש לא יכול להיות ריק.');
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase.rpc('admin_update_user_profile', {
+        p_user_id: user.id,
+        p_name: normalizedName,
+        p_selected_target_id: user.selected_target_id,
+        p_has_completed_onboarding: user.has_completed_onboarding,
+      });
+      if (error) throw error;
+      logActivity(`עדכן פרטי משתמש ${user.email ?? user.id}`, 'user');
+      Alert.alert('נשמר', 'פרטי המשתמש עודכנו.');
+    } catch (error: any) {
+      Alert.alert('שגיאה', error?.message ?? 'לא ניתן לעדכן את פרטי המשתמש');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleSaveNote = async () => {
+    setSavingNote(true);
+    try {
+      setUserNote(user.id, adminNote.trim());
+      logActivity(`עדכן הערת מנהל למשתמש ${user.email ?? user.id}`, 'user');
+      Alert.alert('נשמר', 'הערת המנהל נשמרה.');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleResetProgress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Alert.alert(
+      'איפוס התקדמות',
+      `לאפס את כל ההתקדמות של ${user.name}? סשנים, ELO, תגים, XP ורצף יימחקו. החשבון עצמו יישאר קיים.`,
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'אפס התקדמות',
+          style: 'destructive',
+          onPress: async () => {
+            setResetting(true);
+            try {
+              const { error } = await supabase.rpc('admin_reset_user_progress', { p_user_id: user.id });
+              if (error) throw error;
+              logActivity(`איפס התקדמות למשתמש ${user.email ?? user.id}`, 'user');
+              Alert.alert('הושלם', 'התקדמות המשתמש אופסה בהצלחה.', [{ text: 'אישור', onPress: onBack }]);
+            } catch (error: any) {
+              Alert.alert('שגיאה', error?.message ?? 'לא ניתן לאפס את התקדמות המשתמש');
+            } finally {
+              setResetting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSuspension = async (action: 'suspend_24h' | 'suspend_7d' | 'suspend_indefinite' | 'unsuspend') => {
+    setSuspensionAction(action);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-manage-user', {
+        body: { userId: user.id, action },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      setBannedUntil(data?.bannedUntil ?? null);
+      const label = action === 'unsuspend' ? 'ביטל השעיה' : 'השעה';
+      logActivity(`${label} משתמש ${user.email ?? user.id}`, 'user');
+      Alert.alert('עודכן', action === 'unsuspend' ? 'ההשעיה בוטלה.' : 'המשתמש הושעה בהצלחה.');
+    } catch (error: any) {
+      Alert.alert('שגיאה', error?.message ?? 'לא ניתן לעדכן את מצב ההשעיה');
+    } finally {
+      setSuspensionAction(null);
     }
   };
 
@@ -545,6 +687,7 @@ function UserDetailScreen({
   };
 
   const target = targets.find(item => item.id === user.selected_target_id);
+  const suspended = isSuspended({ banned_until: bannedUntil });
   const perf = getPerformanceLevel(user.total_correct, user.total_answered);
   const topicSummary = useMemo(() => {
     const byTopic = new Map<string, { topicId: string; sessions: number; correct: number; total: number; time: number }>();
@@ -611,6 +754,12 @@ function UserDetailScreen({
           <Text style={styles.detailName}>{user.name}</Text>
           <Text style={styles.detailSub}>{user.email ?? user.id}</Text>
           <Text style={styles.detailSub}>{target ? `${target.icon} ${target.name}` : 'ללא מסלול'}</Text>
+          <View style={styles.detailStatusRow}>
+            <Text style={[styles.authStatusTag, user.email_confirmed_at ? styles.authStatusGood : styles.authStatusWarn]}>
+              {user.email_confirmed_at ? 'אימייל מאומת' : 'אימייל לא מאומת'}
+            </Text>
+            {suspended && <Text style={styles.suspendedTag}>מושעה עד {formatDateTime(bannedUntil)}</Text>}
+          </View>
           <View style={[styles.perfPill, { backgroundColor: perf.color + '22', borderColor: perf.color + '55', marginTop: 8 }]}>
             <Text style={[styles.perfPillText, { color: perf.color }]}>{perf.label}</Text>
           </View>
@@ -623,6 +772,40 @@ function UserDetailScreen({
           <MiniDetail label="רצף" value={String(user.streak)} />
           <MiniDetail label="XP" value={String(user.xp)} />
           <MiniDetail label="ציון ממוצע" value={user.avg_score ? `${user.avg_score}%` : '-'} />
+          <MiniDetail label="כניסה אחרונה" value={formatDate(user.last_sign_in_at)} />
+          <MiniDetail label="אימות אימייל" value={user.email_confirmed_at ? 'מאומת' : 'לא'} />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>עריכת משתמש</Text>
+          <Text style={styles.fieldLabel}>שם תצוגה</Text>
+          <TextInput
+            value={profileName}
+            onChangeText={setProfileName}
+            style={styles.adminInput}
+            placeholder="שם המשתמש"
+            placeholderTextColor={Colors.textTertiary}
+            textAlign="right"
+          />
+          <Pressable onPress={handleSaveProfile} disabled={savingProfile} style={[styles.actionBtn, styles.actionBtnPrimary]}>
+            {savingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.actionBtnText}>שמור פרטים</Text>}
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>הערת מנהל פנימית</Text>
+          <TextInput
+            value={adminNote}
+            onChangeText={setAdminNote}
+            style={[styles.adminInput, styles.adminNoteInput]}
+            placeholder="למשל: פנה לתמיכה, בקשת החזר, משתמש בדיקה..."
+            placeholderTextColor={Colors.textTertiary}
+            textAlign="right"
+            multiline
+          />
+          <Pressable onPress={handleSaveNote} disabled={savingNote} style={[styles.actionBtn, styles.actionBtnSecondary]}>
+            {savingNote ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.actionBtnText}>שמור הערה</Text>}
+          </Pressable>
         </View>
 
         <View style={styles.section}>
@@ -659,6 +842,48 @@ function UserDetailScreen({
               : <Text style={styles.actionBtnText}>{isPremium ? 'הסר פרימיום' : 'הפוך לפרימיום'}</Text>}
           </Pressable>
 
+          <View style={styles.actionGrid}>
+            {suspended ? (
+              <Pressable
+                onPress={() => handleSuspension('unsuspend')}
+                disabled={!!suspensionAction}
+                style={[styles.actionBtn, styles.actionBtnSuccess, styles.actionGridBtn]}
+              >
+                <Text style={styles.actionBtnText}>{suspensionAction ? 'מעדכן...' : 'בטל השעיה'}</Text>
+              </Pressable>
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => handleSuspension('suspend_24h')}
+                  disabled={!!suspensionAction}
+                  style={[styles.actionBtn, styles.actionBtnWarning, styles.actionGridBtn]}
+                >
+                  <Text style={styles.actionBtnText}>השעיה 24 שעות</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleSuspension('suspend_7d')}
+                  disabled={!!suspensionAction}
+                  style={[styles.actionBtn, styles.actionBtnWarning, styles.actionGridBtn]}
+                >
+                  <Text style={styles.actionBtnText}>השעיה 7 ימים</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleSuspension('suspend_indefinite')}
+                  disabled={!!suspensionAction}
+                  style={[styles.actionBtn, styles.actionBtnDanger, styles.actionGridBtn]}
+                >
+                  <Text style={styles.actionBtnText}>השעיה ללא הגבלת זמן</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+
+          <Pressable onPress={handleResetProgress} disabled={resetting} style={[styles.actionBtn, styles.actionBtnSecondary]}>
+            {resetting
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.actionBtnText}>אפס התקדמות בלבד</Text>}
+          </Pressable>
+
           <Pressable onPress={handleDeleteUser} disabled={deleting} style={[styles.actionBtn, styles.actionBtnDanger]}>
             {deleting
               ? <ActivityIndicator color="#fff" size="small" />
@@ -674,6 +899,9 @@ function UserDetailScreen({
             <Text style={styles.sectionTitle}>פרטים</Text>
           </View>
           <Text style={styles.dateText}>הצטרף: {formatDateTime(user.created_at)}</Text>
+          <Text style={styles.dateText}>כניסה אחרונה לחשבון: {formatDateTime(user.last_sign_in_at)}</Text>
+          <Text style={styles.dateText}>אימות אימייל: {formatDateTime(user.email_confirmed_at)}</Text>
+          <Text style={styles.dateText}>סטטוס Auth: {suspended ? `מושעה עד ${formatDateTime(bannedUntil)}` : 'פעיל'}</Text>
           <Text style={styles.dateText}>פעילות אחרונה: {formatDateTime(user.last_practiced_date)}</Text>
           <Text style={styles.dateText}>עדכון אחרון: {formatDateTime(user.updated_at)}</Text>
           <Text style={styles.dateText}>זמן תרגול כולל: {formatDuration(user.total_time_seconds)}</Text>
@@ -882,6 +1110,16 @@ const styles = StyleSheet.create({
   userMainInfo: { flex: 1, alignItems: 'flex-end', minWidth: 0 },
   userNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   userName: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
+  suspendedTag: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: '#fff',
+    backgroundColor: Colors.danger,
+    borderRadius: Radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
   premiumTag: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.xs,
@@ -928,6 +1166,10 @@ const styles = StyleSheet.create({
   detailAvatarText: { fontSize: 28 },
   detailName: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: Colors.text, textAlign: 'center', marginTop: 8 },
   detailSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginTop: 4 },
+  detailStatusRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 9 },
+  authStatusTag: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, borderRadius: Radius.full, paddingHorizontal: 9, paddingVertical: 4, overflow: 'hidden' },
+  authStatusGood: { color: Colors.success, backgroundColor: Colors.success + '18' },
+  authStatusWarn: { color: Colors.warning, backgroundColor: Colors.warning + '18' },
   detailGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
   detailStatCard: {
     width: '31%',
@@ -993,8 +1235,25 @@ const styles = StyleSheet.create({
   accessRowText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
   actionBtn: { borderRadius: Radius.lg, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
   actionBtnPrimary: { backgroundColor: Colors.primary },
+  actionBtnSecondary: { backgroundColor: Colors.textSecondary },
+  actionBtnSuccess: { backgroundColor: Colors.success },
   actionBtnWarning: { backgroundColor: Colors.warning },
   actionBtnDanger: { backgroundColor: Colors.danger },
+  actionGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  actionGridBtn: { flexGrow: 1, minWidth: 150, paddingHorizontal: 12 },
+  fieldLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right' },
+  adminInput: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    color: Colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontFamily: FontFamily.regular,
+    writingDirection: 'rtl',
+  },
+  adminNoteInput: { minHeight: 92, textAlignVertical: 'top' },
   actionBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
   topicInsightRow: {
     flexDirection: 'row-reverse',
