@@ -1,0 +1,4 @@
+psychotechniplus iOS production release
+version=1.0.12
+source_commit=95bafdf4535402599283f33d3783ce9f4da4d2ae
+purpose=keep App Store/TestFlight binary aligned with the deployed web source
