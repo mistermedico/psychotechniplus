@@ -1966,15 +1966,20 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   sendPushNotification: (id) => {
     const notif = get().pushNotifications.find(n => n.id === id);
+    if (!notif) return;
+
+    // Push delivery is not configured yet (no device-token registration or
+    // APNs/Expo delivery backend). Never report a notification as sent when
+    // no delivery attempt actually occurred.
     set(s => ({
       pushNotifications: s.pushNotifications.map(n =>
         n.id === id
-          ? { ...n, status: 'sent', sentAt: new Date().toISOString(), openRate: null }
+          ? { ...n, status: 'failed', sentAt: null, openRate: null }
           : n
       ),
     }));
     saveAdminCollections(get());
-    if (notif) get().logActivity(`שלח הודעת Push לכלל המשתמשים: ${notif.title}`, 'notification');
+    get().logActivity(`Push לא נשלח — תשתית Push אינה מוגדרת: ${notif.title}`, 'notification');
   },
 
   addGenerationSession: (s) => {
