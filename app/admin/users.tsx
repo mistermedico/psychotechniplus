@@ -554,6 +554,8 @@ function UserDetailScreen({
   const [suspensionAction, setSuspensionAction] = useState<string | null>(null);
   const [bannedUntil, setBannedUntil] = useState(user.banned_until);
   const [profileName, setProfileName] = useState(user.name);
+  const [selectedTargetId, setSelectedTargetId] = useState(user.selected_target_id);
+  const [onboardingComplete, setOnboardingComplete] = useState(user.has_completed_onboarding);
   const [savingProfile, setSavingProfile] = useState(false);
   const [adminNote, setAdminNote] = useState(() => getUserNote(user.id));
   const [savingNote, setSavingNote] = useState(false);
@@ -589,8 +591,8 @@ function UserDetailScreen({
       const { error } = await supabase.rpc('admin_update_user_profile', {
         p_user_id: user.id,
         p_name: normalizedName,
-        p_selected_target_id: user.selected_target_id,
-        p_has_completed_onboarding: user.has_completed_onboarding,
+        p_selected_target_id: selectedTargetId,
+        p_has_completed_onboarding: onboardingComplete,
       });
       if (error) throw error;
       logActivity(`עדכן פרטי משתמש ${user.email ?? user.id}`, 'user');
@@ -787,6 +789,39 @@ function UserDetailScreen({
             placeholderTextColor={Colors.textTertiary}
             textAlign="right"
           />
+
+          <Text style={styles.fieldLabel}>מסלול פעיל</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.targetPicker}>
+            {targets.filter(item => item.isActive !== false).map(item => (
+              <Pressable
+                key={item.id}
+                onPress={() => setSelectedTargetId(item.id)}
+                style={[styles.targetChip, selectedTargetId === item.id && styles.targetChipActive]}
+              >
+                <Text style={[styles.targetChipText, selectedTargetId === item.id && styles.targetChipTextActive]}>
+                  {item.icon} {item.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <View style={styles.inlineControlRow}>
+            <View style={styles.inlineControlTextWrap}>
+              <Text style={styles.inlineControlTitle}>אונבורדינג</Text>
+              <Text style={styles.inlineControlSub}>
+                {onboardingComplete ? 'המשתמש מסומן כמי שהשלים פתיחה' : 'בכניסה הבאה המשתמש יידרש להשלים פתיחה'}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setOnboardingComplete(value => !value)}
+              style={[styles.statusToggle, onboardingComplete && styles.statusToggleActive]}
+            >
+              <Text style={[styles.statusToggleText, onboardingComplete && styles.statusToggleTextActive]}>
+                {onboardingComplete ? 'הושלם' : 'לא הושלם'}
+              </Text>
+            </Pressable>
+          </View>
+
           <Pressable onPress={handleSaveProfile} disabled={savingProfile} style={[styles.actionBtn, styles.actionBtnPrimary]}>
             {savingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.actionBtnText}>שמור פרטים</Text>}
           </Pressable>
@@ -1254,6 +1289,43 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
   },
   adminNoteInput: { minHeight: 92, textAlignVertical: 'top' },
+  targetPicker: { flexDirection: 'row-reverse', gap: 8, paddingVertical: 2 },
+  targetChip: {
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  targetChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  targetChipText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
+  targetChipTextActive: { color: '#fff' },
+  inlineControlRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: 10,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  inlineControlTextWrap: { flex: 1, alignItems: 'flex-end' },
+  inlineControlTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  inlineControlSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginTop: 2 },
+  statusToggle: {
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.warning,
+    backgroundColor: Colors.warning + '16',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  statusToggleActive: { borderColor: Colors.success, backgroundColor: Colors.success + '16' },
+  statusToggleText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.warning },
+  statusToggleTextActive: { color: Colors.success },
   actionBtnText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
   topicInsightRow: {
     flexDirection: 'row-reverse',
