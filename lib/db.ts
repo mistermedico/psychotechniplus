@@ -733,8 +733,11 @@ export interface SessionRecord {
   }>;
 }
 
-export async function saveSessionRecord(record: SessionRecord): Promise<void> {
-  if (!record.userId) { logger.error('db:saveSessionRecord', 'userId חסר — סשן לא נשמר'); return; }
+export async function saveSessionRecord(record: SessionRecord): Promise<boolean> {
+  if (!record.userId) {
+    logger.error('db:saveSessionRecord', 'userId חסר — סשן לא נשמר');
+    return false;
+  }
   try {
     const { error: profileError } = await supabase.from('user_profiles').upsert({
       id: record.userId,
@@ -743,7 +746,7 @@ export async function saveSessionRecord(record: SessionRecord): Promise<void> {
     });
     if (profileError) {
       logger.error('db:saveSessionRecord', 'פרופיל המשתמש לא זמין לשמירת סשן', profileError.message);
-      return;
+      return false;
     }
 
     const { error } = await supabase.from('practice_sessions').upsert({
@@ -764,10 +767,15 @@ export async function saveSessionRecord(record: SessionRecord): Promise<void> {
       completed_at: record.completedAt,
       answers: record.answers,
     });
-    if (error) logger.error('db:saveSessionRecord', 'שגיאה בשמירת סשן', error.message);
-    else logger.success('db:saveSessionRecord', `סשן נשמר: ${record.id}`);
+    if (error) {
+      logger.error('db:saveSessionRecord', 'שגיאה בשמירת סשן', error.message);
+      return false;
+    }
+    logger.success('db:saveSessionRecord', `סשן נשמר: ${record.id}`);
+    return true;
   } catch (e: any) {
     logger.error('db:saveSessionRecord', 'חריגה בשמירת סשן', e?.message);
+    return false;
   }
 }
 
