@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 import { UserBadge, BadgeType } from '../data/types';
 import { supabase } from '../lib/supabase';
 import {
