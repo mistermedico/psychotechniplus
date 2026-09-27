@@ -1,4 +1,4 @@
 psychotechniplus iOS production release
 version=1.0.12
-source_commit=95bafdf4535402599283f33d3783ce9f4da4d2ae
-purpose=keep App Store/TestFlight binary aligned with the deployed web source
+source_commit=1e6b9f79585c35dde36c16db4569ce9485d3ffe2
+purpose=keep App Store/TestFlight binary aligned with the deployed web source and shared RevenueCat entitlement
