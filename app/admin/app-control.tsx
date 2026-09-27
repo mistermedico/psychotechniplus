@@ -250,9 +250,9 @@ export default function AppControlScreen() {
               thumbColor="#fff"
             />
             <View style={styles.switchLabelGroup}>
-              <Text style={styles.switchLabelMain}>הרשמת משתמשים חדשים</Text>
+              <Text style={styles.switchLabelMain}>הרשמה חדשה דרך האפליקציה</Text>
               <Text style={styles.switchLabelSub}>
-                {appConfig.registrationOpen ? 'פתוחה לכולם' : 'חסומה — משתמשים קיימים בלבד'}
+                {appConfig.registrationOpen ? 'טופס ההרשמה באפליקציה פתוח' : 'טופס ההרשמה באפליקציה חסום'}
               </Text>
             </View>
           </View>
@@ -453,7 +453,7 @@ export default function AppControlScreen() {
         <View style={styles.summaryCard}>
           {[
             { label: 'מצב תחזוקה', value: appConfig.maintenanceMode ? 'פעיל 🔴' : 'כבוי 🟢' },
-            { label: 'הרשמות', value: appConfig.registrationOpen ? 'פתוחות ✅' : 'חסומות 🚫' },
+            { label: 'טופס הרשמה באפליקציה', value: appConfig.registrationOpen ? 'פתוח ✅' : 'חסום 🚫' },
             { label: 'הכרזה', value: appConfig.announcementEnabled ? `פעילה — ${appConfig.announcementLevel}` : 'כבויה' },
             { label: 'סשנים/יום (חינמי)', value: String(appConfig.freeSessionsPerDay) },
             { label: 'הפסקה', value: appConfig.sessionCooldownMinutes > 0 ? `${appConfig.sessionCooldownMinutes} דקות` : 'ללא' },
