@@ -71,11 +71,16 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
+  const refreshUserFromServer = useUserStore(s => s.refreshFromServer);
+  const startUserRealtimeSync = useUserStore(s => s.startRealtimeSync);
+  const stopUserRealtimeSync = useUserStore(s => s.stopRealtimeSync);
   const setIsAdmin = useAdminStore(s => s.setIsAdmin);
   const loadPublicData = useAdminStore(s => s.loadPublicData);
   const loadAdminData = useAdminStore(s => s.loadAdminData);
   const startRealtimeSync = useAdminStore(s => s.startRealtimeSync);
   const stopRealtimeSync = useAdminStore(s => s.stopRealtimeSync);
+  const startPublicRealtimeSync = useAdminStore(s => s.startPublicRealtimeSync);
+  const stopPublicRealtimeSync = useAdminStore(s => s.stopPublicRealtimeSync);
   const initializePurchases = usePurchaseStore(s => s.initialize);
   const checkPurchaseStatus = usePurchaseStore(s => s.checkStatus);
   const maintenanceMode = useAdminStore(s => s.appConfig.maintenanceMode);
@@ -103,6 +108,13 @@ export default function RootLayout() {
 
         await ensureDbSeeded();
         await loadPublicData(true);
+        startPublicRealtimeSync();
+
+        if (userId && !isGuest) {
+          startUserRealtimeSync();
+        } else {
+          stopUserRealtimeSync();
+        }
 
         if (email.toLowerCase() === ADMIN_EMAIL) {
           setIsAdmin(true);
@@ -139,7 +151,9 @@ export default function RootLayout() {
 
   useEffect(() => () => {
     stopRealtimeSync();
-  }, [stopRealtimeSync]);
+    stopPublicRealtimeSync();
+    stopUserRealtimeSync();
+  }, [stopRealtimeSync, stopPublicRealtimeSync, stopUserRealtimeSync]);
 
   useEffect(() => {
     if (!bootstrapReady) return;
@@ -166,14 +180,24 @@ export default function RootLayout() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
+        loadPublicData(true).catch(() => null);
         const { isAuthenticated, isGuest } = useUserStore.getState();
         if (isAuthenticated && !isGuest) {
+          refreshUserFromServer().catch(() => null);
           checkPurchaseStatus().catch(() => null);
+          startUserRealtimeSync();
         }
+        startPublicRealtimeSync();
       }
     });
     return () => subscription.remove();
-  }, [checkPurchaseStatus]);
+  }, [
+    checkPurchaseStatus,
+    loadPublicData,
+    refreshUserFromServer,
+    startPublicRealtimeSync,
+    startUserRealtimeSync,
+  ]);
 
   if ((!fontsLoaded && !fontError) || !bootstrapReady) return null;
 
