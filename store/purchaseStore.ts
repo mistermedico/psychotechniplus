@@ -6,7 +6,6 @@ import {
   purchasePackage as rcPurchase,
   restorePurchases,
   checkPremiumStatus,
-  canSyncPremiumWithPurchases,
   getCustomerInfo,
   logOutPurchases,
   presentRevenueCatPaywall,
@@ -43,11 +42,7 @@ function messageFrom(error: unknown): string {
 }
 
 function syncUserPremium(isPremium: boolean) {
-  if (canSyncPremiumWithPurchases()) {
-    useUserStore.getState().setPremium(isPremium);
-  } else if (isPremium) {
-    useUserStore.getState().setPremium(true);
-  }
+  useUserStore.getState().setPremium(isPremium);
 }
 
 export const usePurchaseStore = create<PurchaseState>((set, get) => ({
