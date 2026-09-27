@@ -81,6 +81,16 @@ interface SessionRow {
   completed_at: string | null;
 }
 
+interface AdminUserAuditRow {
+  id: string;
+  user_id: string;
+  admin_user_id: string | null;
+  admin_email: string | null;
+  action: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
+
 type SortKey = 'sessions' | 'level' | 'streak' | 'correct_rate' | 'joined' | 'recent';
 type UserSegment =
   | 'all'
@@ -559,6 +569,128 @@ function UserDetailScreen({
   const [savingProfile, setSavingProfile] = useState(false);
   const [adminNote, setAdminNote] = useState(() => getUserNote(user.id));
   const [savingNote, setSavingNote] = useState(false);
+  const [currentEmail, setCurrentEmail] = useState(user.email ?? '');
+  const [emailConfirmedAt, setEmailConfirmedAt] = useState(user.email_confirmed_at);
+  const [customSuspendHours, setCustomSuspendHours] = useState('72');
+  const [authAction, setAuthAction] = useState<string | null>(null);
+  const [auditRows, setAuditRows] = useState<AdminUserAuditRow[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  const loadAudit = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('admin_user_audit')
+        .select('id,user_id,admin_user_id,admin_email,action,details,created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      setAuditRows((data ?? []) as AdminUserAuditRow[]);
+    } catch (error: any) {
+      logger.warn('admin:users:audit', 'טעינת היסטוריית ניהול נכשלה', error?.message);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [user.id]);
+
+  useEffect(() => {
+    loadAudit();
+  }, [loadAudit]);
+
+  const invokeUserAction = async (action: string, extra: Record<string, unknown> = {}) => {
+    setAuthAction(action);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-manage-user', {
+        body: { userId: user.id, action, ...extra },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      await loadAudit();
+      return data;
+    } finally {
+      setAuthAction(null);
+    }
+  };
+
+  const handleConfirmEmail = async () => {
+    try {
+      const data = await invokeUserAction('confirm_email');
+      setEmailConfirmedAt(data?.emailConfirmedAt ?? new Date().toISOString());
+      logActivity(`אימת ידנית מייל למשתמש ${currentEmail || user.id}`, 'user');
+      Alert.alert('עודכן', data?.alreadyConfirmed ? 'המייל כבר היה מאומת.' : 'כתובת המייל סומנה כמאומתת.');
+    } catch (error: any) {
+      Alert.alert('שגיאה', error?.message ?? 'לא ניתן לאמת את כתובת המייל');
+    }
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      await invokeUserAction('resend_verification');
+      logActivity(`שלח מחדש אימות מייל למשתמש ${currentEmail || user.id}`, 'user');
+      Alert.alert('נשלח', 'מייל האימות נשלח מחדש למשתמש.');
+    } catch (error: any) {
+      Alert.alert('שגיאה', error?.message ?? 'לא ניתן לשלוח מחדש מייל אימות');
+    }
+  };
+
+  const handleChangeEmail = () => {
+    const normalized = currentEmail.trim().toLowerCase();
+    if (!normalized || !normalized.includes('@')) {
+      Alert.alert('מייל לא תקין', 'הזן כתובת מייל תקינה.');
+      return;
+    }
+    Alert.alert(
+      'שינוי כתובת מייל',
+      `לשנות את כתובת הכניסה של המשתמש ל-${normalized}? השינוי יחול ישירות על חשבון ה-Auth.`,
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'שנה מייל',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const data = await invokeUserAction('change_email', { email: normalized });
+              setCurrentEmail(data?.email ?? normalized);
+              setEmailConfirmedAt(data?.emailConfirmedAt ?? new Date().toISOString());
+              logActivity(`שינה מייל משתמש ${user.id} ל-${normalized}`, 'user');
+              Alert.alert('עודכן', 'כתובת המייל עודכנה ואומתה.');
+            } catch (error: any) {
+              Alert.alert('שגיאה', error?.message ?? 'לא ניתן לשנות את כתובת המייל');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRevokeSessions = () => {
+    Alert.alert(
+      'ניתוק מכל המכשירים',
+      'לנתק את המשתמש מכל הסשנים הפעילים? הוא יידרש להתחבר מחדש.',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'נתק',
+          style: 'destructive',
+          onPress: async () => {
+            setAuthAction('revoke_sessions');
+            try {
+              const { data, error } = await supabase.rpc('admin_revoke_user_sessions', { p_user_id: user.id });
+              if (error) throw error;
+              await loadAudit();
+              logActivity(`ניתק את כל הסשנים של משתמש ${currentEmail || user.id}`, 'user');
+              Alert.alert('הושלם', `בוטלו ${Number(data ?? 0)} סשנים פעילים.`);
+            } catch (error: any) {
+              Alert.alert('שגיאה', error?.message ?? 'לא ניתן לנתק את הסשנים');
+            } finally {
+              setAuthAction(null);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleTogglePremium = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -758,7 +890,7 @@ function UserDetailScreen({
           <Text style={styles.detailSub}>{target ? `${target.icon} ${target.name}` : 'ללא מסלול'}</Text>
           <View style={styles.detailStatusRow}>
             <Text style={[styles.authStatusTag, user.email_confirmed_at ? styles.authStatusGood : styles.authStatusWarn]}>
-              {user.email_confirmed_at ? 'אימייל מאומת' : 'אימייל לא מאומת'}
+              {emailConfirmedAt ? 'אימייל מאומת' : 'אימייל לא מאומת'}
             </Text>
             {suspended && <Text style={styles.suspendedTag}>מושעה עד {formatDateTime(bannedUntil)}</Text>}
           </View>
@@ -775,7 +907,7 @@ function UserDetailScreen({
           <MiniDetail label="XP" value={String(user.xp)} />
           <MiniDetail label="ציון ממוצע" value={user.avg_score ? `${user.avg_score}%` : '-'} />
           <MiniDetail label="כניסה אחרונה" value={formatDate(user.last_sign_in_at)} />
-          <MiniDetail label="אימות אימייל" value={user.email_confirmed_at ? 'מאומת' : 'לא'} />
+          <MiniDetail label="אימות אימייל" value={emailConfirmedAt ? 'מאומת' : 'לא'} />
         </View>
 
         <View style={styles.section}>
@@ -844,6 +976,63 @@ function UserDetailScreen({
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ניהול חשבון ו-Auth</Text>
+          <Text style={styles.fieldLabel}>כתובת מייל לחשבון</Text>
+          <TextInput
+            value={currentEmail}
+            onChangeText={setCurrentEmail}
+            style={styles.adminInput}
+            placeholder="user@example.com"
+            placeholderTextColor={Colors.textTertiary}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            textAlign="right"
+          />
+          <Pressable
+            onPress={handleChangeEmail}
+            disabled={!!authAction}
+            style={[styles.actionBtn, styles.actionBtnSecondary]}
+          >
+            <Text style={styles.actionBtnText}>{authAction === 'change_email' ? 'מעדכן...' : 'שנה כתובת מייל'}</Text>
+          </Pressable>
+
+          <View style={styles.actionGrid}>
+            {!emailConfirmedAt ? (
+              <>
+                <Pressable
+                  onPress={handleConfirmEmail}
+                  disabled={!!authAction}
+                  style={[styles.actionBtn, styles.actionBtnSuccess, styles.actionGridBtn]}
+                >
+                  <Text style={styles.actionBtnText}>{authAction === 'confirm_email' ? 'מעדכן...' : 'אמת מייל ידנית'}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleResendVerification}
+                  disabled={!!authAction}
+                  style={[styles.actionBtn, styles.actionBtnSecondary, styles.actionGridBtn]}
+                >
+                  <Text style={styles.actionBtnText}>{authAction === 'resend_verification' ? 'שולח...' : 'שלח אימות מחדש'}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <View style={[styles.accessStatusCard, styles.accessStatusPremium, styles.actionGridBtn]}>
+                <Text style={styles.accessStatusTitle}>המייל מאומת</Text>
+                <Text style={styles.accessStatusText}>{formatDateTime(emailConfirmedAt)}</Text>
+              </View>
+            )}
+          </View>
+
+          <Pressable
+            onPress={handleRevokeSessions}
+            disabled={!!authAction}
+            style={[styles.actionBtn, styles.actionBtnWarning]}
+          >
+            <Text style={styles.actionBtnText}>{authAction === 'revoke_sessions' ? 'מנתק...' : 'נתק את המשתמש מכל המכשירים'}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>בקרת גישה ופרימיום</Text>
           <View style={[styles.accessStatusCard, isPremium ? styles.accessStatusPremium : styles.accessStatusFree]}>
             <Text style={styles.accessStatusTitle}>{isPremium ? 'משתמש פרימיום פעיל' : 'משתמש חינמי'}</Text>
@@ -903,6 +1092,13 @@ function UserDetailScreen({
                   <Text style={styles.actionBtnText}>השעיה 7 ימים</Text>
                 </Pressable>
                 <Pressable
+                  onPress={() => handleSuspension('suspend_30d')}
+                  disabled={!!suspensionAction}
+                  style={[styles.actionBtn, styles.actionBtnWarning, styles.actionGridBtn]}
+                >
+                  <Text style={styles.actionBtnText}>השעיה 30 יום</Text>
+                </Pressable>
+                <Pressable
                   onPress={() => handleSuspension('suspend_indefinite')}
                   disabled={!!suspensionAction}
                   style={[styles.actionBtn, styles.actionBtnDanger, styles.actionGridBtn]}
@@ -912,6 +1108,27 @@ function UserDetailScreen({
               </>
             )}
           </View>
+
+          {!suspended && (
+            <View style={styles.inlineControlRow}>
+              <TextInput
+                value={customSuspendHours}
+                onChangeText={setCustomSuspendHours}
+                style={[styles.adminInput, { flex: 1 }]}
+                placeholder="שעות להשעיה"
+                placeholderTextColor={Colors.textTertiary}
+                keyboardType="number-pad"
+                textAlign="right"
+              />
+              <Pressable
+                onPress={() => handleSuspension('suspend_custom')}
+                disabled={!!suspensionAction}
+                style={[styles.actionBtn, styles.actionBtnWarning, { minWidth: 150 }]}
+              >
+                <Text style={styles.actionBtnText}>השעה לפי שעות</Text>
+              </Pressable>
+            </View>
+          )}
 
           <Pressable onPress={handleResetProgress} disabled={resetting} style={[styles.actionBtn, styles.actionBtnSecondary]}>
             {resetting
@@ -935,7 +1152,7 @@ function UserDetailScreen({
           </View>
           <Text style={styles.dateText}>הצטרף: {formatDateTime(user.created_at)}</Text>
           <Text style={styles.dateText}>כניסה אחרונה לחשבון: {formatDateTime(user.last_sign_in_at)}</Text>
-          <Text style={styles.dateText}>אימות אימייל: {formatDateTime(user.email_confirmed_at)}</Text>
+          <Text style={styles.dateText}>אימות אימייל: {formatDateTime(emailConfirmedAt)}</Text>
           <Text style={styles.dateText}>סטטוס Auth: {suspended ? `מושעה עד ${formatDateTime(bannedUntil)}` : 'פעיל'}</Text>
           <Text style={styles.dateText}>פעילות אחרונה: {formatDateTime(user.last_practiced_date)}</Text>
           <Text style={styles.dateText}>עדכון אחרון: {formatDateTime(user.updated_at)}</Text>
@@ -982,6 +1199,30 @@ function UserDetailScreen({
               ))}
             </View>
           )}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Pressable onPress={loadAudit} disabled={auditLoading}>
+              <Text style={styles.sectionLink}>{auditLoading ? 'טוען...' : 'רענן'}</Text>
+            </Pressable>
+            <Text style={styles.sectionTitle}>היסטוריית פעולות מנהל</Text>
+          </View>
+          {auditRows.length === 0 ? (
+            <Text style={styles.emptyHint}>אין עדיין פעולות מנהל מתועדות למשתמש זה.</Text>
+          ) : auditRows.map(row => (
+            <View key={row.id} style={styles.sessionRow}>
+              <Text style={styles.sessionMode}>{row.action}</Text>
+              <Text style={styles.sessionMeta}>
+                {formatDateTime(row.created_at)} · {row.admin_email ?? 'admin'}
+              </Text>
+              {row.details && Object.keys(row.details).length > 0 ? (
+                <Text style={styles.sessionMeta} numberOfLines={3}>
+                  {JSON.stringify(row.details)}
+                </Text>
+              ) : null}
+            </View>
+          ))}
         </View>
 
         <View style={styles.section}>
