@@ -36,5 +36,8 @@ jobs:
       - name: Web build
         run: npm run build:web
 
+      - name: iOS JS export
+        run: npm run build:ios-js
+
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=critical
