@@ -13,6 +13,8 @@ const ADMIN_COLLECTIONS_KEY = 'collections';
 const PUBLIC_DAILY_CHALLENGES_KEY = 'public_daily_challenges';
 let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
+let publicRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let publicRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let adminDataLoadPromise: Promise<void> | null = null;
 let publicDataLoadPromise: Promise<void> | null = null;
 let deletedQuestionsLoadPromise: Promise<void> | null = null;
@@ -986,6 +988,8 @@ interface AdminState {
   syncAll: () => Promise<{ ok: boolean; message: string }>;
   startRealtimeSync: () => void;
   stopRealtimeSync: () => void;
+  startPublicRealtimeSync: () => void;
+  stopPublicRealtimeSync: () => void;
 
   // Computed
   getStats: () => AdminStats;
@@ -2239,6 +2243,44 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       const message = e?.message ?? 'שגיאה בסנכרון מלא';
       set({ isSyncing: false, syncError: message });
       return { ok: false, message };
+    }
+  },
+
+  startPublicRealtimeSync: () => {
+    if (publicRealtimeChannel) return;
+
+    const scheduleReload = () => {
+      if (publicRealtimeReloadTimer) clearTimeout(publicRealtimeReloadTimer);
+      publicRealtimeReloadTimer = setTimeout(() => {
+        get().loadPublicData(true).catch((e: any) => {
+          logger.warn('adminStore:publicRealtime', 'Public realtime refresh failed', e?.message);
+        });
+      }, ADMIN_REALTIME_RELOAD_DEBOUNCE_MS);
+    };
+
+    publicRealtimeChannel = supabase
+      .channel('psychotechniplus-public-live-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_state' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topics' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'targets' }, scheduleReload)
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') {
+          logger.info('adminStore:publicRealtime', 'Public live Supabase sync is active');
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          logger.warn('adminStore:publicRealtime', `Live sync status: ${status}`);
+        }
+      });
+  },
+
+  stopPublicRealtimeSync: () => {
+    if (publicRealtimeReloadTimer) {
+      clearTimeout(publicRealtimeReloadTimer);
+      publicRealtimeReloadTimer = null;
+    }
+    if (publicRealtimeChannel) {
+      supabase.removeChannel(publicRealtimeChannel);
+      publicRealtimeChannel = null;
     }
   },
 
