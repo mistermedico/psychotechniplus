@@ -97,6 +97,10 @@ export default function AuthScreen() {
     if (!password) { setError('נא להזין סיסמה'); return; }
 
     if (mode === 'register') {
+      if (!registrationOpen) {
+        setError('ההרשמה דרך האפליקציה סגורה כרגע.');
+        return;
+      }
       if (password.length < 6) { setError('הסיסמה חייבת להכיל לפחות 6 תווים'); return; }
       if (password !== confirmPassword) { setError('הסיסמאות אינן תואמות'); return; }
     }
