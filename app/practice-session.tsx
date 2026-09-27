@@ -52,7 +52,7 @@ export default function PracticeSession() {
   const { recordAnswer, recordSession, getTopicLevel, userId, name: userName, isPremium, isGuest } = useUserStore();
   const {
     templates, questions: adminQuestions, topics, targets, practiceSettings,
-    freePracticeLimit, premiumConfig, addSessionRecord, isAdmin,
+    freePracticeLimit, premiumConfig, appConfig, addSessionRecord, isAdmin,
     loadAdminData, loadPublicData,
   } = useAdminStore();
 
@@ -189,6 +189,24 @@ export default function PracticeSession() {
       Alert.alert('תרגול לא זמין', 'תרגול אנגלית הוסר כרגע מהאפליקציה.');
       exitToPractice();
       return;
+    }
+
+    if (!isAdminPreview) {
+      if (isSimulation && appConfig.featureFlags.simulations === false) {
+        Alert.alert('לא זמין כרגע', 'הסימולציות הושבתו זמנית על ידי מנהל המערכת.');
+        exitToPractice();
+        return;
+      }
+      if (effectiveMode === 'speed' && appConfig.featureFlags.speedMode === false) {
+        Alert.alert('לא זמין כרגע', 'מצב המהירות הושבת זמנית על ידי מנהל המערכת.');
+        exitToPractice();
+        return;
+      }
+      if (challengeQuestionId && appConfig.featureFlags.dailyChallenge === false) {
+        Alert.alert('לא זמין כרגע', 'האתגר היומי הושבת זמנית על ידי מנהל המערכת.');
+        exitToPractice();
+        return;
+      }
     }
 
     const singleQuestionId = challengeQuestionId ?? questionId;
