@@ -775,18 +775,21 @@ function UserDetailScreen({
     );
   };
 
-  const handleSuspension = async (action: 'suspend_24h' | 'suspend_7d' | 'suspend_indefinite' | 'unsuspend') => {
+  const handleSuspension = async (
+    action: 'suspend_24h' | 'suspend_7d' | 'suspend_30d' | 'suspend_indefinite' | 'suspend_custom' | 'unsuspend'
+  ) => {
     setSuspensionAction(action);
     try {
-      const { data, error } = await supabase.functions.invoke('admin-manage-user', {
-        body: { userId: user.id, action },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(String(data.error));
+      const hours = action === 'suspend_custom' ? Math.round(Number(customSuspendHours)) : undefined;
+      if (action === 'suspend_custom' && (!Number.isFinite(hours) || !hours || hours < 1)) {
+        Alert.alert('משך לא תקין', 'הזן מספר שעות גדול מאפס.');
+        return;
+      }
+      const data = await invokeUserAction(action, hours ? { hours } : {});
       setBannedUntil(data?.bannedUntil ?? null);
       const label = action === 'unsuspend' ? 'ביטל השעיה' : 'השעה';
-      logActivity(`${label} משתמש ${user.email ?? user.id}`, 'user');
-      Alert.alert('עודכן', action === 'unsuspend' ? 'ההשעיה בוטלה.' : 'המשתמש הושעה בהצלחה.');
+      logActivity(`${label} משתמש ${currentEmail || user.id}`, 'user');
+      Alert.alert('עודכן', action === 'unsuspend' ? 'ההשעה בוטלה.' : 'המשתמש הושעה בהצלחה.');
     } catch (error: any) {
       Alert.alert('שגיאה', error?.message ?? 'לא ניתן לעדכן את מצב ההשעיה');
     } finally {
