@@ -44,7 +44,8 @@ export default function ProgressTab() {
     totalSessions, totalCorrect, totalAnswered,
     badges, selectedTargetId, getTopicAccuracy, getTopicLevel,
   } = useUserStore();
-  const { topics: allTopics } = useAdminStore();
+  const { topics: allTopics, appConfig } = useAdminStore();
+  const streakEnabled = appConfig.featureFlags.streakMode !== false;
 
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const topics = allTopics.filter(t => t.targetId === 'target_psychometric');
@@ -132,9 +133,11 @@ export default function ProgressTab() {
         >
           {/* Top row: streak badge + name/label */}
           <View style={styles.heroTop}>
-            <View style={styles.streakBadge}>
-              <Text style={styles.streakBadgeText}>🔥 {streak} ימים</Text>
-            </View>
+            {streakEnabled && (
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakBadgeText}>🔥 {streak} ימים</Text>
+              </View>
+            )}
             <View style={styles.heroGreeting}>
               <Text style={styles.heroSubLabel}>ההתקדמות שלי</Text>
               <Text style={styles.heroName}>{name || 'מתאמן'}</Text>
@@ -185,61 +188,67 @@ export default function ProgressTab() {
           </View>
         </Animated.View>
 
-        {/* ── 14-day streak calendar ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>רצף יומי</Text>
-          <Text style={styles.sectionTitle}>🔥 הרצף שלי</Text>
-        </View>
-        <View style={styles.streakCard}>
-          <View style={styles.streakAccentStripe} />
-          {/* Row 1: days 1–7 (oldest) */}
-          <View style={styles.streakRow}>
-            {Array.from({ length: 7 }).map((_, i) => {
-              const dayIndex = i; // days 0–6 (14 days ago to 8 days ago)
-              const active = dayIndex >= 7 - Math.min(streak, 7) && streak >= 7;
-              return (
-                <View
-                  key={`r1-${i}`}
-                  style={[
-                    styles.streakDay,
-                    active && { backgroundColor: Colors.warning },
-                  ]}
-                >
-                  <Text style={[styles.streakDayText, active && { color: '#fff' }]}>
-                    {DAY_LETTERS[i % 7]}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-          {/* Row 2: days 8–14 (most recent, last = today) */}
-          <View style={[styles.streakRow, { marginTop: 8 }]}>
-            {Array.from({ length: 7 }).map((_, i) => {
-              const isToday = i === 6;
-              const daysAgo = 6 - i; // 0 = today, 6 = 6 days ago
-              const active = daysAgo < streak;
-              return (
-                <View
-                  key={`r2-${i}`}
-                  style={[
-                    styles.streakDay,
-                    active && { backgroundColor: Colors.warning },
-                    isToday && styles.streakDayToday,
-                  ]}
-                >
-                  <Text style={[styles.streakDayText, active && { color: '#fff' }]}>
-                    {DAY_LETTERS[i % 7]}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-          <Text style={styles.streakSummary}>
-            {streak === 0
-              ? 'התחל לתרגל היום!'
-              : `${streak} ימים ברצף 🔥 — כל הכבוד!`}
-          </Text>
-        </View>
+        {streakEnabled && (
+          <>
+                    {/* ── 14-day streak calendar ── */}
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionLabel}>רצף יומי</Text>
+                      <Text style={styles.sectionTitle}>🔥 הרצף שלי</Text>
+                    </View>
+                    <View style={styles.streakCard}>
+                      <View style={styles.streakAccentStripe} />
+                      {/* Row 1: days 1–7 (oldest) */}
+                      <View style={styles.streakRow}>
+                        {Array.from({ length: 7 }).map((_, i) => {
+                          const dayIndex = i; // days 0–6 (14 days ago to 8 days ago)
+                          const active = dayIndex >= 7 - Math.min(streak, 7) && streak >= 7;
+                          return (
+                            <View
+                              key={`r1-${i}`}
+                              style={[
+                                styles.streakDay,
+                                active && { backgroundColor: Colors.warning },
+                              ]}
+                            >
+                              <Text style={[styles.streakDayText, active && { color: '#fff' }]}>
+                                {DAY_LETTERS[i % 7]}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                      {/* Row 2: days 8–14 (most recent, last = today) */}
+                      <View style={[styles.streakRow, { marginTop: 8 }]}>
+                        {Array.from({ length: 7 }).map((_, i) => {
+                          const isToday = i === 6;
+                          const daysAgo = 6 - i; // 0 = today, 6 = 6 days ago
+                          const active = daysAgo < streak;
+                          return (
+                            <View
+                              key={`r2-${i}`}
+                              style={[
+                                styles.streakDay,
+                                active && { backgroundColor: Colors.warning },
+                                isToday && styles.streakDayToday,
+                              ]}
+                            >
+                              <Text style={[styles.streakDayText, active && { color: '#fff' }]}>
+                                {DAY_LETTERS[i % 7]}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                      <Text style={styles.streakSummary}>
+                        {streak === 0
+                          ? 'התחל לתרגל היום!'
+                          : `${streak} ימים ברצף 🔥 — כל הכבוד!`}
+                      </Text>
+                    </View>
+            
+            
+          </>
+        )}
 
         {/* ── מגמה אחרונה ── */}
         <View style={styles.sectionHeader}>
