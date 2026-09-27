@@ -911,7 +911,7 @@ interface AdminState {
   setPracticeSettings: (updates: Partial<PracticeSessionSettings>) => void;
   setExamSettings: (updates: Partial<ExamSessionSettings>) => void;
   setPremiumConfig: (updates: Partial<PremiumConfig>) => void;
-  addSessionRecord: (record: SessionRecord) => void;
+  addSessionRecord: (record: SessionRecord) => Promise<boolean>;
   loadSessionHistory: (userId?: string) => Promise<void>;
   getSessionsByUser: (userId: string) => SessionRecord[];
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
@@ -1539,9 +1539,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       return { premiumConfig: next };
     });
   },
-  addSessionRecord: (record) => {
-    set(s => ({ sessionHistory: [record, ...s.sessionHistory.slice(0, 499)] }));
-    saveSessionRecord(record); // fire-and-forget to Supabase
+  addSessionRecord: async (record) => {
+    const saved = await saveSessionRecord(record);
+    if (saved) {
+      set(s => ({ sessionHistory: [record, ...s.sessionHistory.filter(item => item.id !== record.id).slice(0, 499)] }));
+    }
+    return saved;
   },
   loadSessionHistory: async (userId) => {
     const records = userId
