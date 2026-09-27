@@ -414,9 +414,9 @@ export const useUserStore = create<UserState>((set, get) => ({
       if (state.userId && !state.isGuest) {
         // Session totals are maintained transactionally by a DB trigger when
         // practice_sessions is written. Persist only non-session aggregates here.
+        // XP/level and session totals are awarded atomically by the
+        // practice_sessions INSERT trigger. Persist only date-based streak state.
         saveUserProfile(state.userId, {
-          xp: newXp,
-          level: newLevel,
           streak: newStreak,
           longest_streak: longestStreak,
           last_practiced_date: today,
@@ -453,7 +453,9 @@ export const useUserStore = create<UserState>((set, get) => ({
 
       const bonus = Math.max(0, Math.min(1000, Math.round(Number(guestBonusXp) || 0)));
       await AsyncStorage.setItem(key, '1').catch(() => null);
+      const levelBefore = get().level;
       if (bonus > 0) get().addXp(bonus);
+      if (get().level > levelBefore) get().earnBadge('level_up');
       return true;
     }
 
@@ -468,7 +470,9 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     const row = Array.isArray(data) ? data[0] : data;
     if (row && Number.isFinite(Number(row.xp)) && Number.isFinite(Number(row.level))) {
+      const levelBefore = get().level;
       set({ xp: Number(row.xp), level: Number(row.level) });
+      if (Number(row.level) > levelBefore) get().earnBadge('level_up');
     }
     return Boolean(row?.awarded);
   },
