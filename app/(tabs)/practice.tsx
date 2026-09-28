@@ -16,6 +16,7 @@ import { AdBanner } from '../../components/AdBanner';
 import { Target, Topic } from '../../data/types';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
 import { useSettingsStore } from '../../store/settingsStore';
+import { supabase } from '../../lib/supabase';
 import {
   emptyFreePracticeUsage,
   getFreePracticeBlock,
@@ -114,6 +115,34 @@ export default function PracticeTab() {
     loadFreePracticeUsage(userId, isGuest)
       .then(setUsage)
       .catch(() => setUsage(emptyFreePracticeUsage()));
+  }, [userId, isGuest]);
+
+  useEffect(() => {
+    if (!userId || isGuest) return;
+
+    const refreshUsage = () => {
+      loadFreePracticeUsage(userId, false)
+        .then(setUsage)
+        .catch(() => null);
+    };
+
+    const channel = supabase
+      .channel(`free-practice-usage-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'free_practice_usage',
+          filter: `user_id=eq.${userId}`,
+        },
+        refreshUsage,
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId, isGuest]);
 
   const usageBlock = isPremium
