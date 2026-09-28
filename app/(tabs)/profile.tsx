@@ -98,7 +98,7 @@ const ACHIEVEMENT_BADGE_DEFS = [
 export default function ProfileTab() {
   const insets = useSafeAreaInsets();
   const {
-    name, level, streak, selectedTargetId,
+    name, level, streak,
     totalSessions, totalCorrect, totalAnswered, badges,
     getTopicLevelLabel, reset, signOut, deleteAccount, isPremium,
   } = useUserStore();
@@ -372,16 +372,17 @@ export default function ProfileTab() {
           </ScrollView>
 
           <SectionTitle tag="TRACK" title="המסלול שלי" />
-          <Pressable style={({ pressed }) => [styles.targetRow, { opacity: pressed ? 0.78 : 1 }]} onPress={() => { Haptics.selectionAsync(); router.push('/(tabs)/targets'); }}>
-            <Text style={styles.settingChevron}>‹</Text>
+          <View style={styles.targetRow} accessibilityRole="summary">
             <View style={styles.targetInfo}>
-              <Text style={styles.targetName}>{target?.name ?? 'לא נבחר מסלול'}</Text>
-              <Text style={styles.targetDesc} numberOfLines={1}>{target?.description ?? 'בחר מסלול כדי להתאים את התרגול'}</Text>
+              <Text style={styles.targetName}>{target?.name ?? 'פסיכוטכני כללי'}</Text>
+              <Text style={styles.targetDesc} numberOfLines={2}>
+                {target?.description ?? 'כל התרגול, הסימולציות וההתקדמות מרוכזים במסלול פסיכוטכני כללי.'}
+              </Text>
             </View>
             <View style={styles.targetIconCircle}>
               <Text style={styles.targetIcon}>{target?.icon ?? '🎯'}</Text>
             </View>
-          </Pressable>
+          </View>
 
           <SectionTitle tag="SETTINGS" title="הגדרות" />
           <View style={styles.settingsCard}>
