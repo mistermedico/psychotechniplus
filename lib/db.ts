@@ -386,6 +386,8 @@ export type UserEloHistoryEntry = {
   difficulty?: number;
 };
 
+const eloSaveQueues = new Map<string, Promise<void>>();
+
 export async function loadUserElos(userId: string): Promise<Record<string, { elo: number; history: UserEloHistoryEntry[] }>> {
   try {
     const { data, error } = await supabase.from('user_elos').select('*').eq('user_id', userId);
@@ -400,16 +402,29 @@ export async function loadUserElos(userId: string): Promise<Record<string, { elo
   }
 }
 
-export async function saveUserElo(userId: string, topicId: string, elo: number, history: UserEloHistoryEntry[]): Promise<void> {
-  try {
-    const { error } = await supabase.from('user_elos').upsert(
-      { user_id: userId, topic_id: topicId, elo, history, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,topic_id' }
-    );
-    if (error) logger.error('db:saveUserElo', `שגיאה בשמירת ELO ${topicId}`, error.message);
-  } catch (e: any) {
-    logger.error('db:saveUserElo', `חריגה בשמירת ELO ${topicId}`, e?.message);
-  }
+export function saveUserElo(userId: string, topicId: string, elo: number, history: UserEloHistoryEntry[]): Promise<void> {
+  const queueKey = `${userId}:${topicId}`;
+  const previous = eloSaveQueues.get(queueKey) ?? Promise.resolve();
+
+  const next = previous
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        const { error } = await supabase.from('user_elos').upsert(
+          { user_id: userId, topic_id: topicId, elo, history, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,topic_id' }
+        );
+        if (error) logger.error('db:saveUserElo', `שגיאה בשמירת ELO ${topicId}`, error.message);
+      } catch (e: any) {
+        logger.error('db:saveUserElo', `חריגה בשמירת ELO ${topicId}`, e?.message);
+      }
+    });
+
+  eloSaveQueues.set(queueKey, next);
+  next.finally(() => {
+    if (eloSaveQueues.get(queueKey) === next) eloSaveQueues.delete(queueKey);
+  }).catch(() => undefined);
+  return next;
 }
 
 // ── User Badges ────────────────────────────────────────────────────────────
@@ -665,7 +680,7 @@ export async function saveTemplates(templates: any[]): Promise<void> {
 export async function loadTemplates(): Promise<any[] | null> {
   try {
     const remote = await loadAdminState<any[]>('templates');
-    if (remote && remote.length > 0) {
+    if (remote !== null) {
       await asyncSet(TEMPLATES_KEY, JSON.stringify(remote)).catch(() => null);
       return remote.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) }));
     }
