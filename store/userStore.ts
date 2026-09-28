@@ -7,15 +7,10 @@ import {
   loadUserBadges, saveUserBadge, loadUserElos, saveUserElo,
 } from '../lib/db';
 import { logger } from '../utils/logger';
-import { ADMIN_EMAIL, useAdminStore } from './adminStore';
+import { useAdminStore } from './adminStore';
 import { logOutPurchases } from '../lib/purchases';
 import { PerformanceLevel, computeAdaptiveLevel, LEVEL_LABELS } from '../utils/adaptive';
 import { localDateKey, previousLocalDateKey, normalizeStoredDateKey } from '../utils/date';
-
-const PREMIUM_REVIEW_EMAILS = new Set([
-  'apple-review@psychotechniplus.app',
-  'apple-review-2026@psychotechniplus.app',
-]);
 
 const GUEST_USER_ID_KEY = '@psychotechniplus/guestUserId';
 const GUEST_STATE_KEY = '@psychotechniplus/guestState';
@@ -141,6 +136,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     let userId = overrideUserId;
     let sessionEmail = '';
+    let sessionIsAnonymous = false;
 
     if (!userId) {
       try {
@@ -148,30 +144,9 @@ export const useUserStore = create<UserState>((set, get) => ({
         if (session?.user?.id) {
           userId = session.user.id;
           sessionEmail = session.user.email ?? '';
-          logger.info('userStore:initialize', `משתמש מחובר: ${sessionEmail}`);
+          sessionIsAnonymous = session.user.is_anonymous === true;
+          logger.info('userStore:initialize', sessionIsAnonymous ? 'משתמש אורח מאומת בשרת' : `משתמש מחובר: ${sessionEmail}`);
         } else {
-          const savedGuestUserId = await AsyncStorage.getItem(GUEST_USER_ID_KEY).catch(() => null);
-          if (savedGuestUserId?.startsWith('guest_')) {
-            const rawGuestState = await AsyncStorage.getItem(GUEST_STATE_KEY).catch(() => null);
-            let guestState: Partial<UserState> = {};
-            try {
-              guestState = rawGuestState ? JSON.parse(rawGuestState) : {};
-            } catch {}
-            set({
-              ...INITIAL_STATE,
-              ...guestState,
-              userId: savedGuestUserId,
-              email: '',
-              name: GUEST_NAME,
-              selectedTargetId: DEFAULT_TARGET_ID,
-              hasCompletedOnboarding: true,
-              isAuthenticated: true,
-              isGuest: true,
-              isLoaded: true,
-              isSyncing: false,
-            });
-            return;
-          }
           set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
           return;
         }
@@ -187,9 +162,30 @@ export const useUserStore = create<UserState>((set, get) => ({
       } catch {}
     }
 
-    const isAdminPremium = sessionEmail.toLowerCase() === ADMIN_EMAIL;
-    const isReviewPremium = PREMIUM_REVIEW_EMAILS.has(sessionEmail.toLowerCase());
-    const shouldForcePremium = isAdminPremium || isReviewPremium;
+    if (sessionIsAnonymous && userId) {
+      const rawGuestState = await AsyncStorage.getItem(GUEST_STATE_KEY).catch(() => null);
+      let guestState: Partial<UserState> = {};
+      try { guestState = rawGuestState ? JSON.parse(rawGuestState) : {}; } catch {}
+      await AsyncStorage.setItem(GUEST_USER_ID_KEY, userId).catch(() => null);
+      set({
+        ...INITIAL_STATE,
+        ...guestState,
+        userId,
+        email: '',
+        name: GUEST_NAME,
+        selectedTargetId: DEFAULT_TARGET_ID,
+        hasCompletedOnboarding: true,
+        isAuthenticated: true,
+        isGuest: true,
+        isLoaded: true,
+        isSyncing: false,
+        isPremium: false,
+        serverPremium: false,
+        purchasePremium: false,
+      });
+      return;
+    }
+
 
     // Always clear user-scoped state before hydrating a newly authenticated account.
     // This prevents guest/admin/profile/progress data from leaking between accounts.
@@ -201,7 +197,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       isGuest: false,
       isLoaded: false,
       isSyncing: true,
-      isPremium: shouldForcePremium,
+      isPremium: false,
       serverPremium: false,
       purchasePremium: false,
     });
@@ -221,7 +217,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         // store entitlement. The DB trigger prevents regular clients from
         // changing is_premium, so an admin grant is safe to honor on every platform.
         serverPremium: !!profile.is_premium,
-        isPremium: shouldForcePremium || !!profile.is_premium,
+        isPremium: !!profile.is_premium,
         streak: profile.streak,
         longestStreak: profile.longest_streak,
         lastPracticedDate: profile.last_practiced_date,
@@ -274,8 +270,6 @@ export const useUserStore = create<UserState>((set, get) => ({
       ]);
 
       const sessionEmail = session?.user?.email ?? state.email;
-      const isAdminPremium = sessionEmail.toLowerCase() === ADMIN_EMAIL;
-      const isReviewPremium = PREMIUM_REVIEW_EMAILS.has(sessionEmail.toLowerCase());
       const topicPerformance = Object.entries(savedTopicPerformance).reduce<Record<string, TopicPerformance>>(
         (acc, [topicId, value]) => {
           const rawHistory = Array.isArray(value.history) ? value.history : [];
@@ -304,7 +298,7 @@ export const useUserStore = create<UserState>((set, get) => ({
           selectedTargetId: DEFAULT_TARGET_ID,
           hasCompletedOnboarding: profile.has_completed_onboarding,
           serverPremium: !!profile.is_premium,
-          isPremium: isAdminPremium || isReviewPremium || !!profile.is_premium || current.purchasePremium,
+          isPremium: !!profile.is_premium || current.purchasePremium,
           streak: profile.streak,
           longestStreak: profile.longest_streak,
           lastPracticedDate: profile.last_practiced_date,
@@ -365,7 +359,14 @@ export const useUserStore = create<UserState>((set, get) => ({
     await logOutPurchases().catch(() => null);
     await supabase.auth.signOut().catch(() => null);
     useAdminStore.getState().setIsAdmin(false);
-    const guestUserId = await getOrCreateGuestUserId();
+
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error || !data.user?.id) {
+      throw new Error(error?.message ?? 'לא ניתן לפתוח מצב אורח מאובטח כרגע.');
+    }
+
+    const guestUserId = data.user.id;
+    await AsyncStorage.setItem(GUEST_USER_ID_KEY, guestUserId).catch(() => null);
     set({
       ...INITIAL_STATE,
       userId: guestUserId,
@@ -385,7 +386,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         set(current => ({ ...current, ...guestState, userId: guestUserId, isAuthenticated: true, isGuest: true, isLoaded: true }));
       } catch {}
     }
-    logger.info('userStore:continueAsGuest', 'משתמש נכנס כאורח ללא הרשמה');
+    logger.info('userStore:continueAsGuest', 'משתמש נכנס כאורח מאומת ב-Supabase');
   },
 
   signOut: async () => {
@@ -581,18 +582,19 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (after.streak >= 30) after.earnBadge('streak_30');
     if (after.level > previousLevel) after.earnBadge('level_up');
 
-    if (after.isGuest) {
+    if (get().isGuest) {
+      const finalState = get();
       const guestSnapshot = {
-        topicPerformance: after.topicPerformance,
-        streak: after.streak,
-        longestStreak: after.longestStreak,
-        lastPracticedDate: after.lastPracticedDate,
-        level: after.level,
-        xp: after.xp,
-        totalSessions: after.totalSessions,
-        totalCorrect: after.totalCorrect,
-        totalAnswered: after.totalAnswered,
-        badges: after.badges,
+        topicPerformance: finalState.topicPerformance,
+        streak: finalState.streak,
+        longestStreak: finalState.longestStreak,
+        lastPracticedDate: finalState.lastPracticedDate,
+        level: finalState.level,
+        xp: finalState.xp,
+        totalSessions: finalState.totalSessions,
+        totalCorrect: finalState.totalCorrect,
+        totalAnswered: finalState.totalAnswered,
+        badges: finalState.badges,
       };
       AsyncStorage.setItem(GUEST_STATE_KEY, JSON.stringify(guestSnapshot)).catch(() => null);
     }
