@@ -19,6 +19,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { calcAllScores } from '../utils/scoring';
+import { calcSmartExamScore } from '../utils/smartExam';
 import { Question, SessionMode } from '../data/types';
 import { generateSmartExamQuestions, GeneratedExamSection } from '../utils/smartExam';
 import { logger } from '../utils/logger';
@@ -54,11 +55,11 @@ export default function PracticeSession() {
   } = usePracticeStore();
 
   const {
-    recordAnswer, recordSession, getTopicLevel, userId, name: userName,
+    recordAnswer, recordSession, getTopicLevel, topicPerformance, userId, name: userName,
     isPremium, isGuest, earnBadge, claimDailyChallengeBonus,
   } = useUserStore();
   const {
-    templates, questions: adminQuestions, topics, targets, practiceSettings,
+    templates, questions: adminQuestions, topics, targets, practiceSettings, examSettings,
     freePracticeLimit, premiumConfig, appConfig, dailyChallenges, addSessionRecord, isAdmin,
     loadAdminData, loadPublicData,
   } = useAdminStore();
@@ -191,13 +192,24 @@ export default function PracticeSession() {
       return false;
     }
 
+    const adaptiveElos = Object.fromEntries(
+      Object.entries(topicPerformance).map(([id, performance]) => [
+        id,
+        performance.currentLevel === 'advanced'
+          ? 1600
+          : performance.currentLevel === 'intermediate'
+            ? 1300
+            : 1000,
+      ])
+    );
+
     const generated = generateSmartExamQuestions(
       template,
       availableQuestions.filter(q =>
         q.validationStatus === 'validated' &&
         canAccessQuestion(q, hasPremiumAccess)
       ),
-      {}
+      adaptiveElos
     );
 
     const expectedQuestionCount = (template.smartRules?.length ? template.smartRules : template.rules)
@@ -227,7 +239,7 @@ export default function PracticeSession() {
       questions: generated.allQuestions,
     });
     return true;
-  }, [adminQuestions, exitToPractice, hasPremiumAccess, startSession, targetId, templateId, templates, topicId]);
+  }, [adminQuestions, exitToPractice, hasPremiumAccess, startSession, targetId, templateId, templates, topicId, topicPerformance]);
 
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -565,11 +577,15 @@ export default function PracticeSession() {
 
     const { isCorrect } = submitAnswer(selectedId);
 
-    Haptics.notificationAsync(
-      isCorrect
-        ? Haptics.NotificationFeedbackType.Success
-        : Haptics.NotificationFeedbackType.Error
-    );
+    if (isSimulation) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } else {
+      Haptics.notificationAsync(
+        isCorrect
+          ? Haptics.NotificationFeedbackType.Success
+          : Haptics.NotificationFeedbackType.Error
+      );
+    }
 
     // Record answer for adaptive tracking exactly once per question.
     recordAnswer(question.topicId, question.difficulty, isCorrect);
@@ -620,6 +636,7 @@ export default function PracticeSession() {
   };
 
   const handleSkip = () => {
+    if (isSimulation && !examSettings.allowSkipInExam) return;
     const skippedQuestion = claimQuestionAction();
     if (!skippedQuestion) return;
     if (!isSimulation && timerRef.current) clearInterval(timerRef.current);
@@ -717,7 +734,35 @@ export default function PracticeSession() {
     completeUnansweredAsSkipped();
     const finished = endSession();
     if (!finished) { finishingRef.current = false; return; }
-    const scores = calcAllScores(finished.answers);
+    const template = isSimulation ? templates.find(t => t.id === templateId) : undefined;
+    const genericScores = calcAllScores(finished.answers);
+    const simulationScores = isSimulation
+      ? calcSmartExamScore(
+          finished.answers.map(answer => ({
+            isCorrect: answer.isCorrect,
+            timeSpent: answer.timeSpent,
+            difficulty: answer.questionDifficulty,
+            isSkipped: answer.isSkipped,
+          })),
+          Number(template?.passingScore ?? examSettings.defaultPassingScore),
+        )
+      : null;
+    const scores = simulationScores
+      ? {
+          ...genericScores,
+          score: Math.max(0, Math.min(100, Math.round(
+            simulationScores.rawScore * 0.42 +
+            simulationScores.difficultyWeightedScore * 0.38 +
+            simulationScores.speedAdjustedScore * 0.12 +
+            simulationScores.stabilityScore * 0.08 -
+            (finished.answers.filter(answer => answer.isSkipped).length / Math.max(1, finished.answers.length)) * 8
+          ))),
+          difficultyWeightedScore: simulationScores.difficultyWeightedScore,
+          speedAdjustedScore: simulationScores.speedAdjustedScore,
+          stabilityScore: simulationScores.stabilityScore,
+          percentileRank: simulationScores.percentileRank,
+        }
+      : genericScores;
     const correct = finished.answers.filter(a => a.isCorrect).length;
 
     if (!isAdminPreview) {
@@ -731,7 +776,6 @@ export default function PracticeSession() {
     }
 
     // Save session record to Supabase and admin store (only for authenticated users)
-    const template = isSimulation ? templates.find(t => t.id === templateId) : undefined;
     const sessionRec = {
       id: finished.id,
       userId: userId,
@@ -812,6 +856,10 @@ export default function PracticeSession() {
         difficultyScore: scores.difficultyWeightedScore,
         speedScore: scores.speedAdjustedScore,
         stability: scores.stabilityScore,
+        mode: finished.mode,
+        templateId: templateId ?? '',
+        passingScore: isSimulation ? String(template?.passingScore ?? examSettings.defaultPassingScore) : '',
+        passed: isSimulation ? String(scores.score >= Number(template?.passingScore ?? examSettings.defaultPassingScore)) : '',
       },
     });
   };
@@ -997,7 +1045,7 @@ export default function PracticeSession() {
           </Text>
           <Text style={styles.headerProgress}>
             {session.currentIndex + 1} / {session.questions.length}
-            {'  '}✅ {correct}
+            {!isSimulation ? `  ✅ ${correct}` : ''}
           </Text>
         </View>
 
@@ -1131,14 +1179,16 @@ export default function PracticeSession() {
       <View style={[styles.actions, { paddingBottom: Math.max(24, insets.bottom + 12) }]}>
         {!revealed ? (
           <View style={styles.actionsRow}>
-            <Pressable
-              onPress={handleSkip}
-              accessibilityRole="button"
-              accessibilityLabel="דילוג על השאלה"
-              style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.skipText}>דלג</Text>
-            </Pressable>
+            {(!isSimulation || examSettings.allowSkipInExam) && (
+              <Pressable
+                onPress={handleSkip}
+                accessibilityRole="button"
+                accessibilityLabel="דילוג על השאלה"
+                style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.skipText}>דלג</Text>
+              </Pressable>
+            )}
 
             <Pressable
               onPress={handleConfirm}
