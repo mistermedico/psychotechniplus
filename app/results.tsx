@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Animated, Share,
+  View, Text, StyleSheet, ScrollView, Pressable, Animated, Share, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -109,10 +109,10 @@ export default function Results() {
 
     Animated.sequence([
       Animated.parallel([
-        Animated.spring(scaleAnim, { toValue: 1, friction: 5, useNativeDriver: true }),
-        Animated.timing(scoreAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 5, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(scoreAnim, { toValue: 1, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
       ]),
-      Animated.spring(cardAnim, { toValue: 1, friction: 8, useNativeDriver: true }),
+      Animated.spring(cardAnim, { toValue: 1, friction: 8, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
 
     return () => clearInterval(interval);
