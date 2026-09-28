@@ -42,7 +42,7 @@ function selectByElo(
   const filtered = pool.filter(
     q => q.difficulty >= minDiff && q.difficulty <= maxDiff
   );
-  if (filtered.length === 0) return pool.slice(0, count);
+  if (filtered.length === 0) return [];
 
   // Sort by ELO closeness to user level, with slight randomization
   const scored = filtered.map(q => ({
@@ -62,8 +62,7 @@ function selectRandom(
   const filtered = pool.filter(
     q => q.difficulty >= minDiff && q.difficulty <= maxDiff
   );
-  const source = filtered.length >= count ? filtered : pool;
-  return shuffle(source).slice(0, count);
+  return shuffle(filtered).slice(0, count);
 }
 
 function safeCount(value: number): number {
@@ -149,11 +148,28 @@ export function generateSmartExamQuestions(
       );
     }
 
-    let selected: Question[] = [];
+    const pinnedForRule = (template.pinnedQuestionIds ?? [])
+      .map(id => allQuestions.find(q => q.id === id))
+      .filter((q): q is Question => Boolean(q))
+      .filter(q =>
+        q.topicId === topicId &&
+        isUsableQuestion(q) &&
+        q.difficulty >= minDifficulty &&
+        q.difficulty <= maxDifficulty &&
+        !usedIds.has(q.id) &&
+        !excludedIds.has(q.id)
+      )
+      .slice(0, requestedCount);
 
-    if (rule.subRules && rule.subRules.length > 0) {
+    let selected: Question[] = [...pinnedForRule];
+    pinnedForRule.forEach(q => usedIds.add(q.id));
+    const remainingAfterPinned = requestedCount - selected.length;
+
+    if (remainingAfterPinned <= 0) {
+      // The rule is fully satisfied by pinned questions.
+    } else if (rule.subRules && rule.subRules.length > 0) {
       // Select per sub-rule (subcategory)
-      let remaining = requestedCount;
+      let remaining = remainingAfterPinned;
       for (const sub of rule.subRules) {
         const subPool = pool.filter(
           q => !usedIds.has(q.id) && ((q as any).subcategory === sub.value || !sub.value)
@@ -176,10 +192,12 @@ export function generateSmartExamQuestions(
         fill.forEach(q => usedIds.add(q.id));
       }
     } else {
-      selected = rule.useAdaptiveAlgorithm
-        ? selectByElo(pool, userElo, requestedCount, minDifficulty, maxDifficulty)
-        : selectRandom(pool, requestedCount, minDifficulty, maxDifficulty);
-      selected.forEach(q => usedIds.add(q.id));
+      const selectablePool = pool.filter(q => !usedIds.has(q.id));
+      const fill = rule.useAdaptiveAlgorithm
+        ? selectByElo(selectablePool, userElo, remainingAfterPinned, minDifficulty, maxDifficulty)
+        : selectRandom(selectablePool, remainingAfterPinned, minDifficulty, maxDifficulty);
+      selected.push(...fill);
+      fill.forEach(q => usedIds.add(q.id));
     }
 
     if (selected.length < requestedCount && rule.fallback?.type === 'anyTopic') {
