@@ -29,7 +29,7 @@ import { claimFreePracticeSession } from '../lib/freePracticeUsage';
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 export default function PracticeSession() {
-  const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, challengeId, adminPreview, usageClaimed } = useLocalSearchParams<{
+  const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, challengeId, adminPreview } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
     mode?: SessionMode;
@@ -40,7 +40,6 @@ export default function PracticeSession() {
     challengeQuestionId?: string;
     challengeId?: string;
     adminPreview?: string;
-    usageClaimed?: string;
   }>();
 
   const rootNavigationState = useRootNavigationState();
@@ -137,7 +136,7 @@ export default function PracticeSession() {
       !isAdminPreview &&
       !questionId;
 
-    if (!needsQuota || usageClaimed === '1') {
+    if (!needsQuota) {
       setQuotaReady(true);
       return;
     }
@@ -181,7 +180,6 @@ export default function PracticeSession() {
     isSimulation,
     isAdminPreview,
     questionId,
-    usageClaimed,
     userId,
     isGuest,
     premiumConfig.freeUserSessionLimit,
