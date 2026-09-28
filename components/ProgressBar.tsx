@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { Colors } from '../constants/colors';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 interface Props {
   progress: number; // 0–1
@@ -18,18 +19,28 @@ export function ProgressBar({
   animated = true,
 }: Props) {
   const anim = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
+  const normalizedProgress = Number.isFinite(progress)
+    ? Math.min(1, Math.max(0, progress))
+    : 0;
+  const shouldAnimate = animated && !reducedMotion;
 
   useEffect(() => {
-    if (animated) {
+    anim.stopAnimation();
+
+    if (shouldAnimate) {
       Animated.spring(anim, {
-        toValue: Math.min(1, Math.max(0, progress)),
+        toValue: normalizedProgress,
         useNativeDriver: false,
         friction: 8,
+        overshootClamping: true,
       }).start();
     } else {
-      anim.setValue(progress);
+      anim.setValue(normalizedProgress);
     }
-  }, [progress]);
+
+    return () => anim.stopAnimation();
+  }, [anim, normalizedProgress, shouldAnimate]);
 
   const width = anim.interpolate({
     inputRange: [0, 1],
@@ -37,7 +48,11 @@ export function ProgressBar({
   });
 
   return (
-    <View style={[styles.track, { height, backgroundColor, borderRadius: height / 2 }]}>
+    <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(normalizedProgress * 100) }}
+      style={[styles.track, { height, backgroundColor, borderRadius: height / 2 }]}
+    >
       <Animated.View
         style={[styles.fill, { width, backgroundColor: color, borderRadius: height / 2 }]}
       />
