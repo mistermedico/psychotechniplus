@@ -463,7 +463,8 @@ export const useUserStore = create<UserState>((set, get) => ({
         newXp -= xpForLevel(newLevel);
         newLevel += 1;
       }
-      if (state.userId && !state.isGuest) saveUserProfile(state.userId, { xp: newXp, level: newLevel });
+      // Authenticated XP/level is server-authoritative (sessions / trusted RPCs).
+      // Guests remain local-only.
       return { xp: newXp, level: newLevel };
     });
   },
@@ -480,13 +481,8 @@ export const useUserStore = create<UserState>((set, get) => ({
         longestStreak: Math.max(newStreak, state.longestStreak),
         lastPracticedDate: today,
       };
-      if (state.userId && !state.isGuest) {
-        saveUserProfile(state.userId, {
-          streak: updates.streak,
-          longest_streak: updates.longestStreak,
-          last_practiced_date: today,
-        });
-      }
+      // Authenticated streaks are awarded transactionally when a session is
+      // persisted. Guests keep this local state only.
       return updates;
     });
   },
@@ -527,18 +523,9 @@ export const useUserStore = create<UserState>((set, get) => ({
         : lastPracticedDate === yesterday ? state.streak + 1 : 1;
       const longestStreak = Math.max(newStreak, state.longestStreak);
 
-      if (state.userId && !state.isGuest) {
-        // Session totals are maintained transactionally by a DB trigger when
-        // practice_sessions is written. Persist only non-session aggregates here.
-        // XP/level and session totals are awarded atomically by the
-        // practice_sessions INSERT trigger. Persist only date-based streak state.
-        saveUserProfile(state.userId, {
-          streak: newStreak,
-          longest_streak: longestStreak,
-          last_practiced_date: today,
-        });
-      }
-
+      // Authenticated totals, XP/level and streak are all persisted by the
+      // canonical session trigger. Do not write progress fields directly from
+      // the client; this keeps server state tamper-resistant.
       return {
         totalSessions, totalCorrect, totalAnswered,
         xp: newXp, level: newLevel,
