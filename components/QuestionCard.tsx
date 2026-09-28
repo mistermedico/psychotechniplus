@@ -9,6 +9,7 @@ import { useSettingsStore, FontSizeOption } from '../store/settingsStore';
 import { detectDir, textAlign } from '../utils/textDirection';
 import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
 import { VisualImage } from './VisualImage';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 interface Props {
   question: Question;
@@ -35,6 +36,7 @@ const fontSizeMap: Record<FontSizeOption, number> = {
 export function QuestionCard({ question, selectedId, revealed, onSelect }: Props) {
   const { width } = useWindowDimensions();
   const compact = width < 360;
+  const reducedMotion = useReducedMotion();
   const displayQuestion = isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question;
   const isSpatial = isSpatialQuestion(displayQuestion);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,13 +70,18 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
   }, [displayQuestion.id, collapseReadingPassage]);
 
   useEffect(() => {
+    if (reducedMotion) {
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      return;
+    }
     fadeAnim.setValue(0);
     slideAnim.setValue(20);
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
       Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: true }),
     ]).start();
-  }, [displayQuestion.id]);
+  }, [displayQuestion.id, reducedMotion]);
 
   const getOptionStyle = (optId: string) => {
     if (!revealed) {
@@ -192,6 +199,9 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                     key={opt.id}
                     onPress={() => !revealed && onSelect(opt.id)}
                     disabled={revealed}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selectedId === opt.id, disabled: revealed }}
+                    accessibilityLabel={opt.text?.trim() || `אפשרות ${opt.id}`}
                     style={({ pressed }) => [
                       styles.optionGridCell,
                       compact && styles.optionGridCellCompact,
