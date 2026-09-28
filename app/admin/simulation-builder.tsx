@@ -318,8 +318,8 @@ export default function SimulationBuilder() {
     if (filteredTemplates.length === 0) return;
     filteredTemplates.forEach(template => {
       const fixedRules = template.rules.map(rule => {
-        const available = questionsPerTopic[rule.topicId] ?? 0;
-        return available > 0 && rule.count > available ? { ...rule, count: available } : rule;
+        const available = getAvailableForRule(rule);
+        return rule.count > available ? { ...rule, count: available } : rule;
       });
       const totalQuestions = fixedRules.reduce((sum, rule) => sum + rule.count, 0);
       updateTemplate(template.id, { rules: fixedRules, totalQuestions });
