@@ -248,7 +248,7 @@ export default function Dashboard() {
                     </LinearGradient>
                   </Pressable>
                 );
-              }))}
+              })}
             </ScrollView>
           </Animated.View>
 
