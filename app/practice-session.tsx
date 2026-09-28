@@ -284,9 +284,6 @@ export default function PracticeSession() {
     setShowExplanation(false);
     explanationAnim.setValue(0);
     skipQuestion();
-    if (timedOutQuestion && !isAdminPreview) {
-      recordAnswer(timedOutQuestion.topicId, timedOutQuestion.difficulty, false);
-    }
     const hasMore = nextQuestion();
     if (!hasMore) finishSession();
   }, [revealed, claimQuestionAction]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -629,9 +626,6 @@ export default function PracticeSession() {
       );
     }
 
-    // Record answer for adaptive tracking exactly once per question.
-    recordAnswer(question.topicId, question.difficulty, isCorrect);
-
     if (isSimulation) {
       resetQuestionState();
       advanceOrEnd();
@@ -685,10 +679,6 @@ export default function PracticeSession() {
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     resetQuestionState();
     skipQuestion();
-    if (skippedQuestion && !isAdminPreview) {
-      recordAnswer(skippedQuestion.topicId, skippedQuestion.difficulty, false);
-    }
-
     if (effectiveMode === 'adaptive') {
       const activeSession = usePracticeStore.getState().session;
       if (!activeSession || activeSession.answers.length >= activeSession.questions.length) {
@@ -770,9 +760,6 @@ export default function PracticeSession() {
     if (finishingRef.current) return;
     finishingRef.current = true;
     if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
-    const answeredBeforeFinish = new Set(
-      (usePracticeStore.getState().session?.answers ?? []).map(answer => answer.questionId)
-    );
     completeUnansweredAsSkipped();
     const finished = endSession();
     if (!finished) { finishingRef.current = false; return; }
@@ -809,16 +796,6 @@ export default function PracticeSession() {
           percentileRank: simulationScores.percentileRank,
         }
       : { ...genericScores, score: rawAccuracyScore };
-    if (!isAdminPreview) {
-      for (const answer of finished.answers) {
-        if (!answer.isSkipped || answeredBeforeFinish.has(answer.questionId)) continue;
-        const skippedQuestion = finished.questions.find(question => question.id === answer.questionId);
-        if (skippedQuestion) {
-          recordAnswer(skippedQuestion.topicId, skippedQuestion.difficulty, false);
-        }
-      }
-    }
-
     // Save session record to Supabase and admin store (only for authenticated users)
     const sessionRec = {
       id: finished.id,
@@ -853,6 +830,14 @@ export default function PracticeSession() {
 
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
     if (!isAdminPreview && sessionPersisted) {
+      // Commit topic performance only after the canonical session was saved.
+      // Abandoned/failed sessions must not alter accuracy, ELO or badges.
+      for (const answer of finished.answers) {
+        const answeredQuestion = finished.questions.find(question => question.id === answer.questionId);
+        if (answeredQuestion) {
+          recordAnswer(answeredQuestion.topicId, answeredQuestion.difficulty, answer.isCorrect);
+        }
+      }
       recordSession(correct, finished.answers.length);
 
       const fastCorrect = finished.answers.filter(a => a.isCorrect && a.timeSpent < 10).length;
