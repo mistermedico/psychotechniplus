@@ -1,18 +1,18 @@
 import React, { useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView,
-  Animated,
+  Animated, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
-import { DEFAULT_PURCHASE_PACKAGES } from '../lib/purchases';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { useUserStore } from '../store/userStore';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 const FEATURES = [
   {
@@ -79,7 +79,8 @@ const TESTIMONIALS = [
 ];
 
 export default function LandingScreen() {
-  const { packages, loadError, fetchOfferings } = usePurchaseStore();
+  const reducedMotion = useReducedMotion();
+  const { packages, fetchOfferings } = usePurchaseStore();
   const continueAsGuest = useUserStore(s => s.continueAsGuest);
 
   // Animation refs
@@ -100,19 +101,31 @@ export default function LandingScreen() {
   const ctaOpacity    = useRef(new Animated.Value(0)).current;
   const ctaSlide      = useRef(new Animated.Value(16)).current;
   const ctaPressScale = useRef(new Animated.Value(1)).current;
-  const visiblePackages = packages.length > 0 ? packages : DEFAULT_PURCHASE_PACKAGES;
+  const visiblePackages = packages;
 
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.dir = 'rtl';
-      document.documentElement.style.direction = 'rtl';
-      document.body.dir = 'rtl';
-      document.body.style.direction = 'rtl';
-      document.body.style.textAlign = 'right';
+    if (Platform.OS !== 'web' && packages.length === 0) {
+      fetchOfferings().catch(() => null);
     }
 
-    if (packages.length === 0) {
-      fetchOfferings().catch(() => null);
+    if (reducedMotion) {
+      navOpacity.setValue(1);
+      heroOpacity.setValue(1);
+      heroSlide.setValue(0);
+      heroScale.setValue(1);
+      statsOpacity.setValue(1);
+      statsSlide.setValue(0);
+      howOpacity.setValue(1);
+      howSlide.setValue(0);
+      featOpacity.setValue(1);
+      featSlide.setValue(0);
+      testOpacity.setValue(1);
+      testSlide.setValue(0);
+      priceOpacity.setValue(1);
+      priceSlide.setValue(0);
+      ctaOpacity.setValue(1);
+      ctaSlide.setValue(0);
+      return;
     }
 
     Animated.sequence([
@@ -147,7 +160,7 @@ export default function LandingScreen() {
         Animated.spring(ctaSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
       ]),
     ]).start();
-  }, []); // eslint-disable-line
+  }, [reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getPlanPeriod = (identifier: string) => {
     if (identifier === 'weekly') return 'לשבוע';
@@ -401,9 +414,9 @@ export default function LandingScreen() {
               </View>
               <Text style={styles.sectionTitle}>בחר את התוכנית שלך</Text>
             </View>
-            {loadError && packages.length === 0 && (
+            {visiblePackages.length === 0 && (
               <Text style={styles.pricingSyncNote}>
-                מוצגים מחירי ברירת המחדל עד שהחנות נטענת.
+                מחירי Premium מאומתים מוצגים בתוך אפליקציית iPhone/Android בהתאם לחנות.
               </Text>
             )}
             <View style={styles.pricingRow}>
@@ -423,7 +436,27 @@ export default function LandingScreen() {
                 </View>
               </View>
 
-              {visiblePackages.map(pkg => (
+              {visiblePackages.length === 0 ? (
+                <View style={[styles.pricingCard, styles.pricingCardPremium]}>
+                  <LinearGradient
+                    colors={Colors.gradients.primary}
+                    style={styles.pricingPremiumHeader}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.pricingPremiumName}>Premium 💎</Text>
+                    <Text style={styles.pricingPremiumPrice}>מחיר מאומת בחנות</Text>
+                    <Text style={styles.pricingBadge}>ללא מחירי placeholder</Text>
+                  </LinearGradient>
+                  <View style={styles.pricingFeatures}>
+                    {['כל הנושאים', 'סימולציות מלאות', 'אנליטיקס מלא', 'ללא מודעות ומגבלות חינמיות'].map(f => (
+                      <View key={f} style={styles.pricingFeatureRow}>
+                        <Text style={[styles.pricingFeatureDot, { color: Colors.primary }]}>✓</Text>
+                        <Text style={[styles.pricingFeatureText, { color: Colors.text }]}>{f}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : visiblePackages.map(pkg => (
                 <View key={pkg.identifier} style={[styles.pricingCard, styles.pricingCardPremium]}>
                   <LinearGradient
                     colors={Colors.gradients.primary}
