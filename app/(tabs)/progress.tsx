@@ -19,6 +19,7 @@ import { StatCard } from '../../components/StatCard';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 const BADGE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
   first_session: { icon: '🌱', label: 'סשן ראשון', desc: 'השלמת את הסשן הראשון שלך' },
@@ -112,7 +113,7 @@ export default function ProgressTab() {
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push('/(tabs)');
+              router.push('/(tabs)/practice');
             }}
           >
             <Text style={styles.emptyStateCtaText}>→ לתרגול</Text>
