@@ -16,6 +16,7 @@ import { useAdminStore } from '../../store/adminStore';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { canAccessTopic } from '../../lib/accessControl';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 const BOTTOM_TAB_CLEARANCE = 170;
 const PRIMARY_TARGET_ID = 'target_psychometric';
@@ -24,15 +25,24 @@ const PRIMARY_TARGET_ID = 'target_psychometric';
 function AnimatedTopicsContainer({
   visible,
   children,
+  reducedMotion,
 }: {
   visible: boolean;
   children: React.ReactNode;
+  reducedMotion: boolean;
 }) {
   const translateY = useRef(new Animated.Value(visible ? 0 : 20)).current;
   const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const [shouldRender, setShouldRender] = useState(visible);
 
   useEffect(() => {
+    if (reducedMotion) {
+      setShouldRender(visible);
+      translateY.setValue(0);
+      opacity.setValue(visible ? 1 : 0);
+      return;
+    }
+
     if (visible) {
       setShouldRender(true);
       Animated.parallel([
@@ -66,7 +76,7 @@ function AnimatedTopicsContainer({
         translateY.setValue(20);
       });
     }
-  }, [visible]);
+  }, [visible, reducedMotion]);
 
   if (!shouldRender) return null;
 
@@ -79,6 +89,7 @@ function AnimatedTopicsContainer({
 
 export default function TargetsTab() {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const [selectedId, setSelectedId] = useState<string | null>(PRIMARY_TARGET_ID);
   const [refreshing, setRefreshing] = useState(false);
   const { getTopicAccuracy, getTopicLevel, totalSessions, isPremium } = useUserStore();
@@ -169,7 +180,7 @@ export default function TargetsTab() {
               </View>
 
               {/* Expanded topics section — animates in with spring */}
-              <AnimatedTopicsContainer visible={isExpanded && !target.comingSoon}>
+              <AnimatedTopicsContainer visible={isExpanded && !target.comingSoon} reducedMotion={reducedMotion}>
                 <View style={styles.topicsContainer}>
                   <Text style={styles.topicsTitle}>הנושאים שלך</Text>
 
