@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView,
-  Animated, Platform,
+  Animated, Platform, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -176,8 +176,15 @@ export default function LandingScreen() {
 
   const handleStart = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await continueAsGuest();
-    router.replace('/(tabs)');
+    try {
+      await continueAsGuest();
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert(
+        'לא ניתן להתחיל כאורח',
+        error?.message ?? 'לא הצלחנו לפתוח סשן אורח מאובטח. נסה שוב.'
+      );
+    }
   };
 
   const handleLogin = () => {
