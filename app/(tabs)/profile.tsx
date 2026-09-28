@@ -446,7 +446,11 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
   scroll: { flex: 1 },
-  content: {},
+  content: {
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
+  },
   orbTop: {
     position: 'absolute',
     top: -60,
@@ -511,7 +515,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   freePillText: { fontFamily: FontFamily.bold, color: Colors.textSecondary, fontSize: FontSize.sm },
-  heroSignOutBtn: { marginTop: 12, paddingHorizontal: 18, paddingVertical: 9, borderRadius: Radius.full, backgroundColor: Colors.surfaceSecondary },
+  heroSignOutBtn: {
+    marginTop: 12,
+    paddingHorizontal: 18,
+    minHeight: 44,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   heroSignOutText: { fontFamily: FontFamily.medium, color: Colors.textSecondary, fontSize: FontSize.sm },
   heroStats: {
     marginTop: 18,
@@ -614,6 +626,6 @@ const styles = StyleSheet.create({
   premiumBannerTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#fff', textAlign: 'right' },
   premiumBannerSub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.84)', textAlign: 'right', marginTop: 3 },
   premiumBannerEmoji: { fontSize: 30 },
-  versionWrap: { alignItems: 'center', paddingVertical: 22 },
+  versionWrap: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingVertical: 12 },
   version: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textTertiary },
 });
