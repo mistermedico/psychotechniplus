@@ -54,7 +54,7 @@ const FEATURES = [
 ];
 
 const STATS = [
-  { value: '1,000+', label: 'שאלות תרגול פעילות' },
+  { value: '1,173', label: 'שאלות תרגול פעילות' },
   { value: '4', label: 'תחומי תרגול' },
   { value: '12', label: 'סימולציות פעילות' },
 ];
@@ -535,12 +535,26 @@ export default function LandingScreen() {
 
           {/* ─── Footer ─── */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              בלחיצה על "התחל" אתה מסכים ל
-              <Text style={styles.footerLink} onPress={() => router.push('/terms')}> תנאי השימוש </Text>
-              ול
-              <Text style={styles.footerLink} onPress={() => router.push('/privacy')}> מדיניות הפרטיות</Text>
-            </Text>
+            <Text style={styles.footerText}>בלחיצה על "התחל" אתה מסכים למסמכים הבאים:</Text>
+            <View style={styles.footerLinksRow}>
+              <Pressable
+                onPress={() => router.push('/terms')}
+                accessibilityRole="link"
+                accessibilityLabel="תנאי השימוש"
+                hitSlop={8}
+              >
+                <Text style={styles.footerLink}>תנאי השימוש</Text>
+              </Pressable>
+              <Text style={styles.footerText}> · </Text>
+              <Pressable
+                onPress={() => router.push('/privacy')}
+                accessibilityRole="link"
+                accessibilityLabel="מדיניות הפרטיות"
+                hitSlop={8}
+              >
+                <Text style={styles.footerLink}>מדיניות הפרטיות</Text>
+              </Pressable>
+            </View>
           </View>
 
         </ScrollView>
@@ -1001,6 +1015,7 @@ const styles = StyleSheet.create({
   },
 
   // Footer
+  footerLinksRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', marginTop: 6 },
   footer: { paddingHorizontal: 32, alignItems: 'flex-start', direction: 'rtl', writingDirection: 'rtl' },
   footerText: {
     fontFamily: FontFamily.regular, fontSize: FontSize.xs,
