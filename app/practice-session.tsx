@@ -286,7 +286,7 @@ export default function PracticeSession() {
 
       Promise.resolve(adminQuestions.find(q => q.id === singleQuestionId) ?? null)
         .then(localQuestion => localQuestion ?? fetchQuestionById(singleQuestionId))
-        .then(previewQuestion => {
+        .then(async previewQuestion => {
           clearTimeout(loadTimeout);
           if (cancelled) return;
           if (!previewQuestion) {
@@ -310,6 +310,7 @@ export default function PracticeSession() {
             router.push('/paywall');
             return;
           }
+          if (!(await claimQuotaIfNeeded())) return;
           startSession({
             targetId: targetId ?? previewQuestion.targetIds[0] ?? 'target_psychometric',
             topicId: previewQuestion.topicId,
@@ -405,7 +406,7 @@ export default function PracticeSession() {
       setLoadError(true);
     }, 10000);
 
-    fetchQuestions({ topicId: topicId ?? '', status: 'validated' }).then(questions => {
+    fetchQuestions({ topicId: topicId ?? '', status: 'validated' }).then(async questions => {
       clearTimeout(loadTimeout);
       if (cancelled) return;
       if (questions.length === 0) {
@@ -451,6 +452,7 @@ export default function PracticeSession() {
           options: [...q.options].sort(() => Math.random() - 0.5),
         }));
       }
+      if (!(await claimQuotaIfNeeded())) return;
       startSession({
         targetId: targetId ?? '',
         topicId: topicId ?? '',
