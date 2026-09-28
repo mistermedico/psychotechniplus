@@ -162,6 +162,7 @@ export function generateSmartExamQuestions(
         q.topicId === topicId &&
         isUsableQuestion(q) &&
         !usedIds.has(q.id) &&
+        !usedContentKeys.has(questionContentKey(q)) &&
         !excludedIds.has(q.id)
       );
     }
@@ -175,6 +176,7 @@ export function generateSmartExamQuestions(
         q.difficulty >= minDifficulty &&
         q.difficulty <= maxDifficulty &&
         !usedIds.has(q.id) &&
+        !usedContentKeys.has(questionContentKey(q)) &&
         !excludedIds.has(q.id)
       )
       .slice(0, requestedCount);
@@ -234,6 +236,7 @@ export function generateSmartExamQuestions(
       const fillPool = allQuestions.filter(q =>
         isUsableQuestion(q) &&
         !usedIds.has(q.id) &&
+        !usedContentKeys.has(questionContentKey(q)) &&
         !excludedIds.has(q.id)
       );
       const fillCount = requestedCount - selected.length;
