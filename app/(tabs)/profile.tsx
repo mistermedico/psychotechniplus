@@ -17,7 +17,7 @@ import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { useUserStore } from '../../store/userStore';
-import { ADMIN_EMAIL, useAdminStore } from '../../store/adminStore';
+import { useAdminStore } from '../../store/adminStore';
 import { DifficultyOption, useSettingsStore } from '../../store/settingsStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
@@ -105,17 +105,13 @@ export default function ProfileTab() {
   const email = useUserStore(state => state.email);
   const { hapticsEnabled, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
   const appVersion = Constants.expoConfig?.version ?? '1.0.12';
-  const { isAdmin, setIsAdmin, targets } = useAdminStore();
+  const { isAdmin, targets } = useAdminStore();
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  React.useEffect(() => {
-    if (email.toLowerCase() === ADMIN_EMAIL && !isAdmin) setIsAdmin(true);
-  }, [email, isAdmin, setIsAdmin]);
-
-  const showAdmin = isAdmin || email.toLowerCase() === ADMIN_EMAIL;
+  const showAdmin = isAdmin;
   const target =
     targets.find(item => item.id === 'target_psychometric' && item.isActive !== false && !item.comingSoon) ??
     null;
