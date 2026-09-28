@@ -130,7 +130,14 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
             {collapseReadingPassage && (
               <Pressable
                 onPress={() => setPassageExpanded(v => !v)}
-                style={styles.passageToggleBtn}
+                accessibilityRole="button"
+                accessibilityLabel={passageExpanded ? 'הסתר קטע קריאה' : 'הצג קטע קריאה'}
+                accessibilityState={{ expanded: passageExpanded }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={({ pressed }) => [
+                  styles.passageToggleBtn,
+                  pressed && { opacity: 0.78 },
+                ]}
               >
                 <Text style={styles.passageToggleText}>
                   {passageExpanded ? 'הסתר קטע' : 'הצג קטע'}
@@ -192,7 +199,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
           // 2×2 grid layout
           return (
             <View style={styles.optionsGrid}>
-              {displayOptions.map(opt => {
+              {displayOptions.map((opt, index) => {
                 const isTextEmpty = isSpatial || !opt.text || !opt.text.trim();
                 return (
                   <Pressable
@@ -201,7 +208,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                     disabled={revealed}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: selectedId === opt.id, disabled: revealed }}
-                    accessibilityLabel={opt.text?.trim() || `אפשרות ${opt.id}`}
+                    accessibilityLabel={opt.text?.trim() || `אפשרות ${index + 1}`}
                     style={({ pressed }) => [
                       styles.optionGridCell,
                       compact && styles.optionGridCellCompact,
@@ -232,7 +239,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
         // Normal list layout (with optional thumbnail)
         return (
           <View style={styles.optionsContainer}>
-            {displayOptions.map(opt => {
+            {displayOptions.map((opt, index) => {
               const optDir = detectDir(opt.text);
               return (
                 <Pressable
@@ -242,7 +249,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selectedId === opt.id, disabled: revealed }}
-                  accessibilityLabel={opt.text}
+                  accessibilityLabel={opt.text?.trim() || `אפשרות ${index + 1}`}
                   style={({ pressed }) => [
                     styles.optionBase,
                     getOptionStyle(opt.id),
