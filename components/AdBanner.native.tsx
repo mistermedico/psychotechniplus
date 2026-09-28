@@ -1,8 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
-import { Colors } from '../constants/colors';
-import { FontFamily, FontSize, Radius } from '../constants/theme';
 import { canShowAdsForUser, getBannerAdUnitId } from '../lib/ads';
 import { logger } from '../utils/logger';
 
@@ -17,13 +15,7 @@ export function AdBanner({ isPremium, isAdmin = false, placement = 'practice' }:
 
   if (!canShowAdsForUser(isPremium, isAdmin)) return null;
 
-  if (!adUnitId) {
-    return (
-      <View style={styles.placeholder}>
-        <Text style={styles.placeholderText}>Ad will load here</Text>
-      </View>
-    );
-  }
+  if (!adUnitId) return null;
 
   return (
     <View
@@ -63,22 +55,5 @@ const styles = StyleSheet.create({
     marginTop: 0,
     minHeight: 50,
     backgroundColor: 'rgba(8,10,18,0.96)',
-  },
-  placeholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 56,
-    marginHorizontal: 16,
-    marginTop: 14,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surfaceSecondary,
-  },
-  placeholderText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    textAlign: 'center',
   },
 });
