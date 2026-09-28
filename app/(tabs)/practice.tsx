@@ -75,8 +75,7 @@ export default function PracticeTab() {
   const [usage, setUsage] = useState<FreePracticeUsage>(emptyFreePracticeUsage);
 
   const target =
-    targets.find(t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon) ??
-    targets.find(t => t.id === PRIMARY_TARGET_ID);
+    targets.find(t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon);
   const topics = target ? visiblePracticeTopics(allTopics.filter(t => t.targetId === target.id)) : [];
 
   const activeTemplates = useMemo(
