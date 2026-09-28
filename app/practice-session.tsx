@@ -89,7 +89,7 @@ export default function PracticeSession() {
   const [restCountdown, setRestCountdown] = useState(0);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const effectiveMode = (challengeQuestionId ? 'speed' : mode) ?? 'practice';
+  const effectiveMode = mode ?? (challengeQuestionId ? 'speed' : 'practice');
   const isSimulation = effectiveMode === 'simulation' && !!templateId;
   const isAdminPreview = adminPreview === '1' && isAdmin;
   const hasPremiumAccess = isPremium || isAdminPreview;
@@ -99,10 +99,23 @@ export default function PracticeSession() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishingRef = useRef(false);
+  const questionActionRef = useRef<string | null>(null);
 
   const topic = topics.find(t => t.id === (topicId ?? ''));
   const target = targets.find(t => t.id === (targetId ?? ''));
   const isSpeedMode = effectiveMode === 'speed';
+  const currentQuestionId = session?.questions[session.currentIndex]?.id ?? '';
+
+  useEffect(() => {
+    questionActionRef.current = null;
+  }, [currentQuestionId]);
+
+  const claimQuestionAction = useCallback((): Question | null => {
+    const current = getCurrentQuestion();
+    if (!current || questionActionRef.current === current.id) return null;
+    questionActionRef.current = current.id;
+    return current;
+  }, [getCurrentQuestion]);
 
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice OR admin forced showTimerAlways)
   const showTimer = isSimulation || isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
@@ -169,20 +182,21 @@ export default function PracticeSession() {
     if (timerRef.current) clearInterval(timerRef.current);
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     if (revealed) return;
+    const timedOutQuestion = claimQuestionAction();
+    if (!timedOutQuestion) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     setSelectedId(null);
     setRevealed(false);
     setLastAnswerCorrect(false);
     setShowExplanation(false);
     explanationAnim.setValue(0);
-    const timedOutQuestion = getCurrentQuestion();
     skipQuestion();
     if (timedOutQuestion && !isAdminPreview) {
       recordAnswer(timedOutQuestion.topicId, timedOutQuestion.difficulty, false);
     }
     const hasMore = nextQuestion();
     if (!hasMore) finishSession();
-  }, [revealed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [revealed, claimQuestionAction]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialize session — simulation mode or free practice
   useEffect(() => {
@@ -492,6 +506,8 @@ export default function PracticeSession() {
 
   const handleConfirm = () => {
     if (!selectedId || revealed || !session) return;
+    const question = claimQuestionAction();
+    if (!question) return;
     if (!isSimulation && timerRef.current) clearInterval(timerRef.current);
 
     const { isCorrect } = submitAnswer(selectedId);
@@ -502,11 +518,8 @@ export default function PracticeSession() {
         : Haptics.NotificationFeedbackType.Error
     );
 
-    // Record answer for adaptive tracking
-    const question = getCurrentQuestion();
-    if (question) {
-      recordAnswer(question.topicId, question.difficulty, isCorrect);
-    }
+    // Record answer for adaptive tracking exactly once per question.
+    recordAnswer(question.topicId, question.difficulty, isCorrect);
 
     if (isSimulation) {
       resetQuestionState();
@@ -546,9 +559,10 @@ export default function PracticeSession() {
   };
 
   const handleSkip = () => {
+    const skippedQuestion = claimQuestionAction();
+    if (!skippedQuestion) return;
     if (!isSimulation && timerRef.current) clearInterval(timerRef.current);
     if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-    const skippedQuestion = getCurrentQuestion();
     resetQuestionState();
     skipQuestion();
     if (skippedQuestion && !isAdminPreview) {
