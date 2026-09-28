@@ -252,7 +252,7 @@ const PENDING_SEED: Question[] = [
       { id: 'a', text: 'מרחיב', isCorrect: true },
       { id: 'b', text: 'מחזיק', isCorrect: false },
       { id: 'c', text: 'מוסיף', isCorrect: false },
-      { id: 'd', text: 'מגדיל', isCorrect: false },
+      { id: 'd', text: 'משמר', isCorrect: false },
     ],
     correctAnswer: 'a',
     explanation: '"מצמצם" = מקטין, מגביל. ההפך הדיוק הוא "מרחיב".',
