@@ -51,6 +51,9 @@ export default function Dashboard() {
   const today = localDateKey();
   const todayChallenge = dailyChallenges.find(c => c.date === today);
   const mainTopic = targetTopics[0] ?? null;
+  const showDailyChallenge =
+    appConfig.featureFlags.dailyChallenge !== false &&
+    (Boolean(todayChallenge) || appConfig.featureFlags.speedMode !== false);
   const title = mainTopic ? LEVEL_LABELS[getTopicLevel(mainTopic.id)] : LEVEL_LABELS['beginner'];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const xpPercent = Math.min(100, Math.round((xp / (level * 100)) * 100));
@@ -83,6 +86,7 @@ export default function Dashboard() {
   }, [streak]); // eslint-disable-line
 
   const go = (topicId: string, opts?: { questionLimit?: string; mode?: string }) => {
+    if (!topicId || !selectedTarget) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
       pathname: '/practice-session',
@@ -172,10 +176,16 @@ export default function Dashboard() {
           {/* ── Practice CTA ── */}
           <Animated.View style={[styles.ctaWrap, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
             <Pressable
-              onPress={() => go(mainTopic?.id ?? 'topic_quantitative')}
+              onPress={() => mainTopic && go(mainTopic.id)}
+              disabled={!mainTopic}
               accessibilityRole="button"
-              accessibilityLabel={`המשך תרגול · ${selectedTarget?.name ?? 'תרגול'}`}
-              style={({ pressed }) => [styles.ctaBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+              accessibilityLabel={mainTopic ? `המשך תרגול · ${selectedTarget?.name ?? 'תרגול'}` : 'אין כרגע נושאים זמינים לתרגול'}
+              accessibilityState={{ disabled: !mainTopic }}
+              style={({ pressed }) => [
+                styles.ctaBtn,
+                !mainTopic && { opacity: 0.5 },
+                { transform: [{ scale: pressed && mainTopic ? 0.97 : 1 }] },
+              ]}
             >
               <LinearGradient
                 colors={['#7C6FF7', '#5A52D5']}
@@ -184,8 +194,10 @@ export default function Dashboard() {
               >
                 <View style={styles.ctaShimmer} />
                 <View style={styles.ctaRight}>
-                  <Text style={styles.ctaTitle}>המשך תרגול</Text>
-                  <Text style={styles.ctaSub}>{selectedTarget?.name ?? 'תרגול'} · {totalSessions} סשנים עד כה</Text>
+                  <Text style={styles.ctaTitle}>{mainTopic ? 'המשך תרגול' : 'אין נושאים זמינים כרגע'}</Text>
+                  <Text style={styles.ctaSub}>
+                    {mainTopic ? `${selectedTarget?.name ?? 'תרגול'} · ${totalSessions} סשנים עד כה` : 'נסה לרענן או לחזור מאוחר יותר'}
+                  </Text>
                 </View>
                 <View style={styles.ctaArrow}>
                   <Text style={styles.ctaArrowText}>←</Text>
@@ -206,7 +218,13 @@ export default function Dashboard() {
               contentContainerStyle={styles.topicsRow}
               decelerationRate="fast"
             >
-              {targetTopics.map(t => {
+              {targetTopics.length === 0 ? (
+                <View style={styles.emptyTopicsCard}>
+                  <Text style={styles.emptyTopicsIcon}>🛠️</Text>
+                  <Text style={styles.emptyTopicsTitle}>אין כרגע נושאים זמינים</Text>
+                  <Text style={styles.emptyTopicsText}>התוכן מתעדכן. נסה לרענן את האפליקציה או לחזור בעוד מעט.</Text>
+                </View>
+              ) : targetTopics.map(t => {
                 const meta = TOPIC_META[t.id] ?? TOPIC_META.topic_quantitative;
                 return (
                   <Pressable
@@ -230,7 +248,7 @@ export default function Dashboard() {
                     </LinearGradient>
                   </Pressable>
                 );
-              })}
+              }))}
             </ScrollView>
           </Animated.View>
 
@@ -265,7 +283,7 @@ export default function Dashboard() {
             </View>
           </Animated.View>
 
-          {appConfig.featureFlags.dailyChallenge !== false && (
+          {showDailyChallenge && (
             <>
                         {/* ── Daily Challenge ── */}
                         <Animated.View style={[styles.section, { opacity: fadeIn }]}>
@@ -277,7 +295,7 @@ export default function Dashboard() {
                                   pathname: '/practice-session',
                                   params: {
                                     targetId: selectedTarget?.id ?? 'target_psychometric',
-                                    mode: 'speed',
+                                    mode: appConfig.featureFlags.speedMode === false ? 'practice' : 'speed',
                                     questionLimit: '1',
                                     challengeQuestionId: todayChallenge.questionId,
                       challengeId: todayChallenge.id,
@@ -288,7 +306,9 @@ export default function Dashboard() {
                               }
                             }}
                             accessibilityRole="button"
-                            accessibilityLabel="אתגר יומי — 10 שאלות"
+                            accessibilityLabel={todayChallenge
+                              ? `אתגר יומי — ${todayChallenge.title} — שאלה אחת`
+                              : 'אתגר יומי — 10 שאלות'}
                             style={({ pressed }) => [styles.challengeBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
                           >
                             <LinearGradient
@@ -373,6 +393,33 @@ const styles = StyleSheet.create({
     maxWidth: 980,
     alignSelf: 'center',
     paddingTop: 4,
+  },
+
+  emptyTopicsCard: {
+    width: 260,
+    minHeight: 150,
+    borderRadius: Radius.xl,
+    padding: 18,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.055)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  emptyTopicsIcon: { fontSize: 26, marginBottom: 8 },
+  emptyTopicsTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: Colors.text,
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  emptyTopicsText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'right',
+    lineHeight: 20,
   },
 
   // Ambient
