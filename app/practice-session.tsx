@@ -24,11 +24,12 @@ import { generateSmartExamQuestions, GeneratedExamSection } from '../utils/smart
 import { logger } from '../utils/logger';
 import { canAccessMode, canAccessQuestion, canAccessTopic, getSessionQuestionLimit } from '../lib/accessControl';
 import { isEnglishPracticeTopic } from '../utils/topicVisibility';
+import { claimFreePracticeSession } from '../lib/freePracticeUsage';
 
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 export default function PracticeSession() {
-  const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, challengeId, adminPreview } = useLocalSearchParams<{
+  const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, challengeId, adminPreview, usageClaimed } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
     mode?: SessionMode;
@@ -39,6 +40,7 @@ export default function PracticeSession() {
     challengeQuestionId?: string;
     challengeId?: string;
     adminPreview?: string;
+    usageClaimed?: string;
   }>();
 
   const rootNavigationState = useRootNavigationState();
@@ -74,6 +76,7 @@ export default function PracticeSession() {
   const [simulationRemaining, setSimulationRemaining] = useState(0);
   const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(0);
   const [loadError, setLoadError] = useState(false);
+  const [quotaReady, setQuotaReady] = useState(false);
 
   // Favorite & note features
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -119,6 +122,68 @@ export default function PracticeSession() {
 
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice OR admin forced showTimerAlways)
   const showTimer = isSimulation || isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
+
+  useEffect(() => {
+    if (!rootNavigationReady || !quotaReady) return;
+    let cancelled = false;
+
+    const needsQuota =
+      !hasPremiumAccess &&
+      !isSimulation &&
+      !isAdminPreview &&
+      !questionId;
+
+    if (!needsQuota || usageClaimed === '1') {
+      setQuotaReady(true);
+      return;
+    }
+
+    setQuotaReady(false);
+    claimFreePracticeSession({
+      userId: userId ?? '',
+      isGuest,
+      dailyLimit: Math.max(1, premiumConfig.freeUserSessionLimit),
+      cooldownMinutes: Math.max(0, appConfig.sessionCooldownMinutes),
+    })
+      .then(claim => {
+        if (cancelled) return;
+        if (!claim.allowed) {
+          Alert.alert(
+            'מגבלת תרגול חינמי',
+            claim.reason ?? 'לא ניתן להתחיל סשן חינמי כרגע.',
+            [
+              { text: 'שדרג', onPress: () => router.replace('/paywall') },
+              { text: 'חזרה', onPress: exitToPractice },
+            ],
+          );
+          return;
+        }
+        setQuotaReady(true);
+      })
+      .catch((error: any) => {
+        if (cancelled) return;
+        logger.error('practiceSession:quota', 'בדיקת מכסת התרגול נכשלה', error?.message);
+        Alert.alert('לא ניתן להתחיל כרגע', 'לא הצלחנו לאמת את מכסת התרגול. בדוק את החיבור ונסה שוב.', [
+          { text: 'חזרה', onPress: exitToPractice },
+        ]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    rootNavigationReady,
+    hasPremiumAccess,
+    isSimulation,
+    isAdminPreview,
+    questionId,
+    usageClaimed,
+    userId,
+    isGuest,
+    premiumConfig.freeUserSessionLimit,
+    appConfig.sessionCooldownMinutes,
+    exitToPractice,
+  ]);
 
   const formatClock = (seconds: number) => {
     const safe = Math.max(0, seconds);
