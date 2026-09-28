@@ -1,0 +1,13 @@
+{
+  "name": "פסיכוטכני פלוס",
+  "short_name": "פסיכוטכני+",
+  "description": "תרגול פסיכוטכני, סימולציות חכמות ומעקב התקדמות.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060912",
+  "theme_color": "#060912"
+}
