@@ -39,6 +39,9 @@ function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggl
   return (
     <Pressable
       onPress={toggle || disabled ? undefined : onPress}
+      accessibilityRole={toggle ? undefined : onPress && !disabled ? 'button' : undefined}
+      accessibilityLabel={`${label}${value ? `, ${value}` : ''}`}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       style={({ pressed }) => [
         styles.settingRow,
         isLast && styles.settingRowLast,
@@ -54,6 +57,8 @@ function SettingRow({ icon, label, value, onPress, danger, isLast, toggle, toggl
           thumbColor="#fff"
           ios_backgroundColor="rgba(255,255,255,0.15)"
         />
+      ) : disabled ? (
+        <Text style={styles.settingDisabledMark}>—</Text>
       ) : (
         <Text style={[styles.settingChevron, danger && { color: Colors.danger }]}>‹</Text>
       )}
@@ -309,7 +314,14 @@ export default function ProfileTab() {
               </View>
             )}
 
-            <Pressable onPress={handleSignOut} disabled={signingOut} style={({ pressed }) => [styles.heroSignOutBtn, pressed && !signingOut && { opacity: 0.78 }, signingOut && { opacity: 0.5 }]}>
+            <Pressable
+              onPress={handleSignOut}
+              disabled={signingOut}
+              accessibilityRole="button"
+              accessibilityLabel="יציאה מהחשבון"
+              accessibilityState={{ disabled: signingOut, busy: signingOut }}
+              style={({ pressed }) => [styles.heroSignOutBtn, pressed && !signingOut && { opacity: 0.78 }, signingOut && { opacity: 0.5 }]}
+            >
               <Text style={styles.heroSignOutText}>{signingOut ? 'יוצא...' : 'יציאה מהחשבון'}</Text>
             </Pressable>
 
@@ -580,6 +592,13 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   settingRowLast: { borderBottomWidth: 0 },
+  settingDisabledMark: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.base,
+    color: Colors.textTertiary,
+    minWidth: 20,
+    textAlign: 'center',
+  },
   settingChevron: { fontSize: 25, color: Colors.textTertiary },
   settingLabelWrap: { flex: 1, alignItems: 'flex-end' },
   settingLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
