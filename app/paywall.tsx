@@ -12,6 +12,7 @@ import { useUserStore } from '../store/userStore';
 import { PurchasePackage } from '../lib/purchases';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 const BENEFITS = [
   { icon: '♾️', title: 'שאלות ללא הגבלה', desc: 'גישה לכל המאגר — מעל 1,000 שאלות תרגול פעילות' },
@@ -37,6 +38,7 @@ const PREMIUM_UNLOCKS = [
 ];
 
 export default function PaywallScreen() {
+  const reducedMotion = useReducedMotion();
   const {
     packages, isPurchasing, isRestoring, loadError,
     fetchOfferings, purchase, restore,
@@ -50,15 +52,20 @@ export default function PaywallScreen() {
   const slideUp = useRef(new Animated.Value(28)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
-    ]).start();
+    if (reducedMotion) {
+      fadeIn.setValue(1);
+      slideUp.setValue(0);
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
+      ]).start();
+    }
 
     if (!isGuest && isNativeStore && packages.length === 0) {
       fetchOfferings().catch(() => null);
     }
-  }, [isGuest, isNativeStore]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isGuest, isNativeStore, reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Already premium — close paywall
   useEffect(() => {
@@ -354,8 +361,8 @@ export default function PaywallScreen() {
                         {/* Legal text */}
                         {selectedPkg?.isSubscription && (
                           <Text style={styles.legal}>
-                            המנוי יחויב דרך חשבון ה-Apple ID שלך. חידוש אוטומטי יתבצע 24 שעות לפני תום התקופה.
-                            ניתן לבטל בכל עת דרך הגדרות ← Apple ID ← מנויים.
+                            המנוי יחויב דרך חשבון {Platform.OS === 'android' ? 'Google Play' : 'Apple ID'} שלך.
+                            החידוש האוטומטי והביטול מנוהלים דרך הגדרות המנויים של {storeName}.
                           </Text>
                         )}
                         {selectedPkg && !selectedPkg.isSubscription && (
@@ -372,11 +379,21 @@ export default function PaywallScreen() {
 
           {/* Legal links */}
           <View style={styles.legalLinks}>
-            <Pressable onPress={() => router.push('/privacy')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Pressable
+              onPress={() => router.push('/privacy')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="link"
+              accessibilityLabel="מדיניות פרטיות"
+            >
               <Text style={styles.legalLink}>מדיניות פרטיות</Text>
             </Pressable>
             <Text style={styles.legalSep}> · </Text>
-            <Pressable onPress={() => router.push('/terms')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Pressable
+              onPress={() => router.push('/terms')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="link"
+              accessibilityLabel="תנאי שימוש"
+            >
               <Text style={styles.legalLink}>תנאי שימוש</Text>
             </Pressable>
           </View>
