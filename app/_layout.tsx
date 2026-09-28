@@ -1,4 +1,5 @@
 import { Stack, router, usePathname, type ErrorBoundaryProps } from 'expo-router';
+import { installWebAlertPolyfill } from '../utils/webAlertPolyfill';
 import { useEffect, useState } from 'react';
 import { AppState, I18nManager, Platform, StyleSheet, View, Text, Pressable } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
@@ -201,6 +202,8 @@ const errorStyles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
+installWebAlertPolyfill();
 
 export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
