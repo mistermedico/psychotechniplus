@@ -43,13 +43,22 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     const style = document.createElement('style');
     style.id = styleId;
     style.textContent = `
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+
       html, body, #root {
         direction: rtl;
         min-height: 100%;
+        width: 100%;
+        max-width: 100%;
       }
 
       body {
         margin: 0;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
       }
 
       input:not([dir="ltr"]),
@@ -61,6 +70,35 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       [dir="ltr"] {
         direction: ltr !important;
         unicode-bidi: isolate;
+      }
+
+      ::selection {
+        background: rgba(124,111,247,0.35);
+        color: #fff;
+      }
+
+      :where(a, input, textarea, select, [role="button"], [role="tab"], [role="radio"]):focus-visible {
+        outline: 3px solid rgba(158,153,250,0.95);
+        outline-offset: 3px;
+      }
+
+      @media (pointer: fine) {
+        :where(a, [role="button"], [role="tab"], [role="radio"]):not([aria-disabled="true"]) {
+          cursor: pointer;
+        }
+
+        [aria-disabled="true"] {
+          cursor: not-allowed;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
       }
     `;
     document.head.appendChild(style);
