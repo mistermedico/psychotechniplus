@@ -280,6 +280,9 @@ export default function TargetsTab() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   hero: {
+    width: '92%',
+    maxWidth: 948,
+    alignSelf: 'center',
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 28,
@@ -312,7 +315,13 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   scroll: { flex: 1 },
-  content: { padding: 16, gap: 12 },
+  content: {
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
+    padding: 16,
+    gap: 12,
+  },
 
   // Wrapper for TargetCard + overlays
   cardWrapper: {
