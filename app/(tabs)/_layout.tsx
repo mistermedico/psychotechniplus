@@ -34,12 +34,12 @@ function TabIcon({ icon, label, focused }: TabIconProps) {
         toValue: focused ? 1.12 : 1,
         friction: 6,
         tension: 120,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(opacity, {
         toValue: 1,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [focused, reducedMotion, scale, opacity]);
