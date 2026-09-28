@@ -608,7 +608,7 @@ export default function PracticeSession() {
         Animated.spring(explanationAnim, {
           toValue: 1,
           friction: 8,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }).start();
       }
     }
@@ -622,7 +622,7 @@ export default function PracticeSession() {
       Animated.spring(explanationAnim, {
         toValue: 1,
         friction: 8,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
   };
