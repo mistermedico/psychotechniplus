@@ -464,6 +464,28 @@ export async function saveUserBadge(badge: UserBadge): Promise<void> {
 
 // ── Database Seed (called once from Admin panel) ───────────────────────────
 
+function dedupeSeedQuestions(questions: Question[]): Question[] {
+  const byText = new Map<string, Question>();
+  for (const question of questions) {
+    const key = question.questionText.trim().toLocaleLowerCase('he-IL');
+    if (!key) continue;
+    const existing = byText.get(key);
+    if (!existing) {
+      byText.set(key, question);
+      continue;
+    }
+
+    // Preserve the union of target assignments while keeping one canonical row.
+    const preferred = existing.accessLevel === 'free' ? existing : question;
+    byText.set(key, {
+      ...preferred,
+      targetIds: [...new Set([...existing.targetIds, ...question.targetIds])],
+    });
+  }
+  return [...byText.values()];
+}
+
+
 export async function seedDatabase(): Promise<{ ok: boolean; message: string }> {
   try {
     // Seed targets
@@ -486,14 +508,15 @@ export async function seedDatabase(): Promise<{ ok: boolean; message: string }> 
     const { error: topE } = await supabase.from('topics').upsert(topicRows);
     if (topE) return { ok: false, message: `topics: ${topE.message}` };
 
-    // Seed questions in batches of 50
-    for (let i = 0; i < QUESTIONS.length; i += 50) {
-      const batch = QUESTIONS.slice(i, i + 50).map(questionToRow);
+    // Seed questions in batches of 50. Never re-introduce exact duplicate texts.
+    const seedQuestions = dedupeSeedQuestions(QUESTIONS);
+    for (let i = 0; i < seedQuestions.length; i += 50) {
+      const batch = seedQuestions.slice(i, i + 50).map(questionToRow);
       const { error: qe } = await supabase.from('questions').upsert(batch);
       if (qe) return { ok: false, message: `questions batch ${i}: ${qe.message}` };
     }
 
-    return { ok: true, message: `נזרעו ${TARGETS.length} מסלולים, ${TOPICS.length} נושאים, ${QUESTIONS.length} שאלות` };
+    return { ok: true, message: `נזרעו ${TARGETS.length} מסלולים, ${TOPICS.length} נושאים, ${seedQuestions.length} שאלות ייחודיות` };
   } catch (e: any) {
     return { ok: false, message: e?.message ?? 'שגיאה לא ידועה' };
   }
