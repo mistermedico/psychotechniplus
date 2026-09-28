@@ -18,6 +18,7 @@ const PREMIUM_REVIEW_EMAILS = new Set([
 ]);
 
 const GUEST_USER_ID_KEY = '@psychotechniplus/guestUserId';
+const GUEST_STATE_KEY = '@psychotechniplus/guestState';
 const GUEST_NAME = 'אורח';
 const DEFAULT_TARGET_ID = 'target_psychometric';
 let userRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -149,6 +150,28 @@ export const useUserStore = create<UserState>((set, get) => ({
           sessionEmail = session.user.email ?? '';
           logger.info('userStore:initialize', `משתמש מחובר: ${sessionEmail}`);
         } else {
+          const savedGuestUserId = await AsyncStorage.getItem(GUEST_USER_ID_KEY).catch(() => null);
+          if (savedGuestUserId?.startsWith('guest_')) {
+            const rawGuestState = await AsyncStorage.getItem(GUEST_STATE_KEY).catch(() => null);
+            let guestState: Partial<UserState> = {};
+            try {
+              guestState = rawGuestState ? JSON.parse(rawGuestState) : {};
+            } catch {}
+            set({
+              ...INITIAL_STATE,
+              ...guestState,
+              userId: savedGuestUserId,
+              email: '',
+              name: GUEST_NAME,
+              selectedTargetId: DEFAULT_TARGET_ID,
+              hasCompletedOnboarding: true,
+              isAuthenticated: true,
+              isGuest: true,
+              isLoaded: true,
+              isSyncing: false,
+            });
+            return;
+          }
           set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
           return;
         }
@@ -355,6 +378,13 @@ export const useUserStore = create<UserState>((set, get) => ({
       isLoaded: true,
       isSyncing: false,
     });
+    const rawGuestState = await AsyncStorage.getItem(GUEST_STATE_KEY).catch(() => null);
+    if (rawGuestState) {
+      try {
+        const guestState = JSON.parse(rawGuestState);
+        set(current => ({ ...current, ...guestState, userId: guestUserId, isAuthenticated: true, isGuest: true, isLoaded: true }));
+      } catch {}
+    }
     logger.info('userStore:continueAsGuest', 'משתמש נכנס כאורח ללא הרשמה');
   },
 
@@ -428,6 +458,16 @@ export const useUserStore = create<UserState>((set, get) => ({
         [topicId]: { history: newHistory, currentLevel: newLevel },
       },
     });
+
+    if (isGuest) {
+      const state = get();
+      AsyncStorage.getItem(GUEST_STATE_KEY).then(raw => {
+        let snapshot: any = {};
+        try { snapshot = raw ? JSON.parse(raw) : {}; } catch {}
+        snapshot.topicPerformance = state.topicPerformance;
+        return AsyncStorage.setItem(GUEST_STATE_KEY, JSON.stringify(snapshot));
+      }).catch(() => null);
+    }
 
     if (userId && !isGuest) {
       saveUserElo(
@@ -540,6 +580,22 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (after.streak >= 7) after.earnBadge('streak_7');
     if (after.streak >= 30) after.earnBadge('streak_30');
     if (after.level > previousLevel) after.earnBadge('level_up');
+
+    if (after.isGuest) {
+      const guestSnapshot = {
+        topicPerformance: after.topicPerformance,
+        streak: after.streak,
+        longestStreak: after.longestStreak,
+        lastPracticedDate: after.lastPracticedDate,
+        level: after.level,
+        xp: after.xp,
+        totalSessions: after.totalSessions,
+        totalCorrect: after.totalCorrect,
+        totalAnswered: after.totalAnswered,
+        badges: after.badges,
+      };
+      AsyncStorage.setItem(GUEST_STATE_KEY, JSON.stringify(guestSnapshot)).catch(() => null);
+    }
 
     logger.success('userStore:recordSession', `סשן הושלם — נכון: ${correct}/${total}, XP+${xpGain}`);
     useAdminStore.getState().logActivity(`סשן הושלם — ${correct}/${total} נכון, XP+${xpGain}`, 'session');
