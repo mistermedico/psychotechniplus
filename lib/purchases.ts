@@ -38,35 +38,11 @@ export interface PurchasePackage {
 
 export type CustomerInfo = RevenueCatCustomerInfo;
 
-export const DEFAULT_PURCHASE_PACKAGES: PurchasePackage[] = [
-  {
-    identifier: 'weekly',
-    productIdentifier: PRODUCT_IDS.weekly,
-    price: 49.90,
-    priceString: '₪49.90',
-    description: 'פרימיום שבועי',
-    offeringIdentifier: DEFAULT_OFFERING_ID,
-    isSubscription: true,
-  },
-  {
-    identifier: 'monthly',
-    productIdentifier: PRODUCT_IDS.monthly,
-    price: 99.90,
-    priceString: '₪99.90',
-    description: 'פרימיום חודשי',
-    offeringIdentifier: DEFAULT_OFFERING_ID,
-    isSubscription: true,
-  },
-  {
-    identifier: 'lifetime',
-    productIdentifier: PRODUCT_IDS.lifetime,
-    price: 199.00,
-    priceString: '₪199',
-    description: 'גישה לצמיתות',
-    offeringIdentifier: DEFAULT_OFFERING_ID,
-    isSubscription: false,
-  },
-];
+const PACKAGE_DESCRIPTIONS: Record<PurchasePackageId, string> = {
+  weekly: 'פרימיום שבועי',
+  monthly: 'פרימיום חודשי',
+  lifetime: 'גישה לצמיתות',
+};
 
 let configured = false;
 let latestCustomerInfo: RevenueCatCustomerInfo | null = null;
@@ -146,7 +122,7 @@ function mapPackage(pkg: PurchasesPackage): PurchasePackage | null {
     productIdentifier: pkg.product.identifier,
     price: pkg.product.price,
     priceString: pkg.product.priceString,
-    description: pkg.product.title || DEFAULT_PURCHASE_PACKAGES.find(item => item.identifier === identifier)?.description || identifier,
+    description: pkg.product.title || PACKAGE_DESCRIPTIONS[identifier],
     offeringIdentifier: pkg.offeringIdentifier,
     isSubscription: identifier !== 'lifetime',
   };
@@ -183,7 +159,7 @@ export async function getOfferings(): Promise<PurchasePackage[]> {
   const availablePackages = offerings.current?.availablePackages ?? offerings.all[DEFAULT_OFFERING_ID]?.availablePackages ?? [];
   const mapped = availablePackages.map(mapPackage).filter((pkg): pkg is PurchasePackage => Boolean(pkg));
   if (mapped.length === 0) {
-    throw new Error('לא נמצאו מוצרי רכישה פעילים ב-App Store. נסה שוב מאוחר יותר.');
+    throw new Error(`לא נמצאו מוצרי רכישה פעילים ב-${Platform.OS === 'android' ? 'Google Play' : 'App Store'}. נסה שוב מאוחר יותר.`);
   }
   return sortPackages(mapped);
 }
