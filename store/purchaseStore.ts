@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import {
   initializePurchases,
-  identifyUser,
   getOfferings,
   purchasePackage as rcPurchase,
   restorePurchases,
@@ -55,7 +54,6 @@ export const usePurchaseStore = create<PurchaseState>((set, get) => ({
   initialize: async (userId) => {
     try {
       await initializePurchases(userId);
-      if (userId) await identifyUser(userId);
       const customerInfo = await getCustomerInfo();
       set({ isInitialized: true, customerInfo, loadError: null });
       logger.info('purchaseStore:initialize', 'RevenueCat initialized');
