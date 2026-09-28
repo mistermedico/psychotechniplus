@@ -754,16 +754,6 @@ export async function saveSessionRecord(record: SessionRecord): Promise<boolean>
     return false;
   }
   try {
-    const { error: profileError } = await supabase.from('user_profiles').upsert({
-      id: record.userId,
-      name: record.userName ?? '',
-      updated_at: new Date().toISOString(),
-    });
-    if (profileError) {
-      logger.error('db:saveSessionRecord', 'פרופיל המשתמש לא זמין לשמירת סשן', profileError.message);
-      return false;
-    }
-
     const { error } = await supabase.from('practice_sessions').upsert({
       id: record.id,
       user_id: record.userId,
