@@ -203,6 +203,7 @@ export default function PracticeTab() {
           mode: selectedMode,
           difficulty: selectedDifficulty,
           questionLimit: isPremium ? '999' : String(freePracticeLimit),
+          usageClaimed: isPremium ? undefined : '1',
         },
       });
     } catch (error: any) {
