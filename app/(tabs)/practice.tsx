@@ -63,7 +63,7 @@ export default function PracticeTab() {
   );
   const paywallAutoShownRef = useRef(false);
 
-  const { selectedTargetId, getTopicAccuracy, getTopicLevelLabel, isPremium, isGuest, userId } = useUserStore();
+  const { getTopicAccuracy, getTopicLevelLabel, isPremium, isGuest, userId } = useUserStore();
   const { freePracticeLimit, templates, appConfig, practiceSettings, premiumConfig, targets, topics: allTopics, isAdmin } = useAdminStore();
   const featureFlags = appConfig.featureFlags;
   const premiumOnlyModes = practiceSettings.premiumOnlyModes;
@@ -71,8 +71,7 @@ export default function PracticeTab() {
 
   const target =
     targets.find(t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon) ??
-    targets.find(t => t.id === PRIMARY_TARGET_ID) ??
-    targets.find(t => t.isActive !== false && !t.comingSoon);
+    targets.find(t => t.id === PRIMARY_TARGET_ID);
   const topics = target ? visiblePracticeTopics(allTopics.filter(t => t.targetId === target.id)) : [];
 
   const activeTemplates = useMemo(
