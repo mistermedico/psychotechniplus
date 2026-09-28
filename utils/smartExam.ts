@@ -79,6 +79,18 @@ function isUsableQuestion(q: Question): boolean {
   return q.validationStatus === 'validated' && isPsychotechnicQuestionReady(q);
 }
 
+function questionContentKey(q: Question): string {
+  const normalize = (value: string | undefined | null) =>
+    (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+  return [
+    normalize(q.questionText),
+    normalize(q.readingPassage),
+    normalize(q.mediaUrl),
+    ...q.options.map(option => `${option.id}:${normalize(option.text)}:${normalize(option.imageUrl)}`),
+  ].join('|');
+}
+
 export function generateSmartExamQuestions(
   template: SmartExamTemplate,
   allQuestions: Question[],
@@ -86,6 +98,11 @@ export function generateSmartExamQuestions(
   answeredQuestionIds: Set<string> = new Set()
 ): GeneratedExam {
   const usedIds = new Set<string>(answeredQuestionIds);
+  const usedContentKeys = new Set<string>(
+    allQuestions
+      .filter(question => answeredQuestionIds.has(question.id))
+      .map(questionContentKey)
+  );
   const sections: GeneratedExamSection[] = [];
 
   const rules: SmartRule[] = template.smartRules && template.smartRules.length > 0
@@ -133,6 +150,7 @@ export function generateSmartExamQuestions(
       q.topicId === topicId &&
       isUsableQuestion(q) &&
       !usedIds.has(q.id) &&
+      !usedContentKeys.has(questionContentKey(q)) &&
       !excludedIds.has(q.id)
     );
 
@@ -162,7 +180,10 @@ export function generateSmartExamQuestions(
       .slice(0, requestedCount);
 
     let selected: Question[] = [...pinnedForRule];
-    pinnedForRule.forEach(q => usedIds.add(q.id));
+    pinnedForRule.forEach(q => {
+      usedIds.add(q.id);
+      usedContentKeys.add(questionContentKey(q));
+    });
     const remainingAfterPinned = requestedCount - selected.length;
 
     if (remainingAfterPinned <= 0) {
@@ -179,7 +200,10 @@ export function generateSmartExamQuestions(
           ? selectByElo(subPool.length > 0 ? subPool : pool.filter(q => !usedIds.has(q.id)), userElo, subCount, minDifficulty, maxDifficulty)
           : selectRandom(subPool.length > 0 ? subPool : pool.filter(q => !usedIds.has(q.id)), subCount, minDifficulty, maxDifficulty);
         selected.push(...subSelected);
-        subSelected.forEach(q => usedIds.add(q.id));
+        subSelected.forEach(q => {
+          usedIds.add(q.id);
+          usedContentKeys.add(questionContentKey(q));
+        });
         remaining -= subSelected.length;
       }
       // Fill remaining if subRules don't add up
@@ -189,7 +213,10 @@ export function generateSmartExamQuestions(
           ? selectByElo(fillPool, userElo, remaining, minDifficulty, maxDifficulty)
           : selectRandom(fillPool, remaining, minDifficulty, maxDifficulty);
         selected.push(...fill);
-        fill.forEach(q => usedIds.add(q.id));
+        fill.forEach(q => {
+          usedIds.add(q.id);
+          usedContentKeys.add(questionContentKey(q));
+        });
       }
     } else {
       const selectablePool = pool.filter(q => !usedIds.has(q.id));
@@ -197,7 +224,10 @@ export function generateSmartExamQuestions(
         ? selectByElo(selectablePool, userElo, remainingAfterPinned, minDifficulty, maxDifficulty)
         : selectRandom(selectablePool, remainingAfterPinned, minDifficulty, maxDifficulty);
       selected.push(...fill);
-      fill.forEach(q => usedIds.add(q.id));
+      fill.forEach(q => {
+        usedIds.add(q.id);
+        usedContentKeys.add(questionContentKey(q));
+      });
     }
 
     if (selected.length < requestedCount && rule.fallback?.type === 'anyTopic') {
@@ -211,7 +241,10 @@ export function generateSmartExamQuestions(
         ? selectByElo(fillPool, userElo, fillCount, minDifficulty, maxDifficulty)
         : selectRandom(fillPool, fillCount, minDifficulty, maxDifficulty);
       selected.push(...fill);
-      fill.forEach(q => usedIds.add(q.id));
+      fill.forEach(q => {
+        usedIds.add(q.id);
+        usedContentKeys.add(questionContentKey(q));
+      });
     }
 
     // Per-topic time: template.topicTimeSettings or fallback to timeLimitMinutes / totalQ
