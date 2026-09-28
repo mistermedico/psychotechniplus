@@ -353,18 +353,11 @@ function optionSvg(question: Question, option: QuestionOption, index: number): s
 }
 
 export function isSpatialQuestion(question: Question): boolean {
-  const text = `${question.topicId} ${question.questionType} ${question.questionText} ${question.subtopicId ?? ''}`.toLowerCase();
-  return question.topicId === 'topic_spatial'
-    || question.questionType === 'shapes'
-    || text.includes('spatial')
-    || text.includes('shape')
-    || text.includes('צור')
-    || text.includes('מרחב')
-    || text.includes('קוב')
-    || text.includes('פריס')
-    || text.includes('סיבוב')
-    || text.includes('מראה')
-    || text.includes('מטריצ');
+  // Spatial rendering is a topic-level behavior. Do not infer it from words such
+  // as "קובייה", "מטריצה" or a stale questionType: those also occur in
+  // quantitative/probability/logic questions and previously caused unrelated
+  // generated shape assets to replace valid textual content.
+  return question.topicId === 'topic_spatial';
 }
 
 function explanationSvg(question: Question): string {
