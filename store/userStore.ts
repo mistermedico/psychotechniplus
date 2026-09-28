@@ -639,14 +639,12 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   setPremium: (val) => {
-    const { email, serverPremium } = get();
-    const normalizedEmail = email.toLowerCase();
-    const forced = normalizedEmail === ADMIN_EMAIL || PREMIUM_REVIEW_EMAILS.has(normalizedEmail);
-    // RevenueCat controls purchasePremium; the protected DB flag controls
-    // server/admin grants. Neither source is allowed to erase the other.
+    const { serverPremium } = get();
+    // Store entitlement may affect purchase UI immediately, but protected
+    // catalogue access is still enforced by server RLS/profile entitlement.
     set({
       purchasePremium: val,
-      isPremium: forced || serverPremium || val,
+      isPremium: serverPremium || val,
     });
   },
 
