@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable,
-  ScrollView, TextInput, Platform, KeyboardAvoidingView, Animated,
+  ScrollView, TextInput, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,33 +24,18 @@ export default function Onboarding() {
     targets.find(t => t.id === DEFAULT_TARGET_ID && t.isActive !== false && !t.comingSoon) ??
     targets.find(t => t.id === DEFAULT_TARGET_ID);
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
   const completeOnboarding = useUserStore(s => s.completeOnboarding);
-
-  const animateTo = (toValue: number) => {
-    Animated.spring(progressAnim, { toValue, useNativeDriver: false, friction: 8 }).start();
-  };
 
   const handleFinish = () => {
     hapticSuccess();
-    animateTo(1);
     const finalName = name.trim() || 'מתאמן';
     completeOnboarding(finalName, psychometricTarget?.id ?? DEFAULT_TARGET_ID);
     router.replace('/(tabs)');
   };
 
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
-
   return (
     <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.progressTrack}>
-        <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
-      </View>
-
       <StepWelcome name={name} setName={setName} onFinish={handleFinish} />
     </SafeAreaView>
     </LinearGradient>
@@ -99,19 +84,42 @@ function StepWelcome({
             onSubmitEditing={onFinish}
             textContentType="name"
             autoComplete="name"
+            maxLength={80}
+            accessibilityLabel="שם לתצוגה"
           />
         </View>
 
         <Pressable
           style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
           onPress={onFinish}
+          accessibilityRole="button"
+          accessibilityLabel="המשך לאפליקציה"
         >
           <LinearGradient colors={Colors.gradients.primary} style={styles.primaryBtnGrad}>
             <Text style={styles.primaryBtnText}>בוא נתחיל ←</Text>
           </LinearGradient>
         </Pressable>
 
-        <Text style={styles.legalNote}>בלחיצה על המשך אתה מאשר את תנאי השימוש</Text>
+        <View style={styles.legalRow}>
+          <Text style={styles.legalNote}>בלחיצה על המשך אתה מאשר את </Text>
+          <Pressable
+            onPress={() => router.push('/terms')}
+            accessibilityRole="link"
+            accessibilityLabel="פתיחת תנאי השימוש"
+            hitSlop={8}
+          >
+            <Text style={styles.legalLink}>תנאי השימוש</Text>
+          </Pressable>
+          <Text style={styles.legalNote}> ואת </Text>
+          <Pressable
+            onPress={() => router.push('/privacy')}
+            accessibilityRole="link"
+            accessibilityLabel="פתיחת מדיניות הפרטיות"
+            hitSlop={8}
+          >
+            <Text style={styles.legalLink}>מדיניות הפרטיות</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -198,16 +206,6 @@ function StepSelectTarget({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
 
-  progressTrack: {
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  progressFill: {
-    height: 4,
-    backgroundColor: Colors.primary,
-    borderRadius: 2,
-  },
-
   stepContainer: {
     flex: 1,
   },
@@ -273,12 +271,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
+  legalRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
   legalNote: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
     color: Colors.textTertiary,
     textAlign: 'center',
-    marginTop: 16,
+  },
+  legalLink: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: Colors.primaryLight,
+    textDecorationLine: 'underline',
   },
 
   targetsScroll: { flex: 1, marginBottom: 16 },
