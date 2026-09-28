@@ -39,6 +39,7 @@ const DAY_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 
 export default function ProgressTab() {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const {
     name, level, xp, streak, longestStreak,
     totalSessions, totalCorrect, totalAnswered,
@@ -61,6 +62,12 @@ export default function ProgressTab() {
   const statsAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (reducedMotion) {
+      xpAnim.setValue(xpPercent);
+      statsAnim.setValue(1);
+      return;
+    }
+
     Animated.timing(xpAnim, {
       toValue: xpPercent,
       duration: 800,
@@ -72,7 +79,7 @@ export default function ProgressTab() {
       friction: 8,
       useNativeDriver: true,
     }).start();
-  }, [xpPercent]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [xpPercent, reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const xpWidth = xpAnim.interpolate({
     inputRange: [0, 100],
@@ -97,6 +104,8 @@ export default function ProgressTab() {
             השלם את הסשן הראשון שלך כדי לעקוב אחר ההתקדמות שלך
           </Text>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="מעבר לתרגול"
             style={({ pressed }) => [
               styles.emptyStateCta,
               pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
