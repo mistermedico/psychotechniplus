@@ -196,25 +196,26 @@ export default function ProfileTab() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       try {
         await reset();
-        router.replace('/onboarding');
+        const successMessage = 'ההתקדמות אופסה בהצלחה. החשבון, המנוי ומגבלות השימוש נשמרו.';
+        if (!webAlert(successMessage)) Alert.alert('התקדמות אופסה', successMessage);
       } catch (error: any) {
-        const message = error?.message ?? 'לא ניתן היה לאפס את כל הנתונים. נסה שנית.';
+        const message = error?.message ?? 'לא ניתן היה לאפס את ההתקדמות. נסה שנית.';
         if (!webAlert(message)) Alert.alert('שגיאה', message);
       }
     };
-    const message = 'האם אתה בטוח? כל ההתקדמות תימחק.';
+    const message = 'האם לאפס את ההתקדמות? סשנים, XP, רמות, רצפים והישגים יימחקו. החשבון, המנוי ומגבלות השימוש יישמרו.';
     if (Platform.OS === 'web') {
       if (webConfirm(message)) performReset();
       return;
     }
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { title: 'איפוס כל הנתונים', message, options: ['ביטול', 'איפוס'], destructiveButtonIndex: 1, cancelButtonIndex: 0 },
+        { title: 'איפוס התקדמות', message, options: ['ביטול', 'איפוס'], destructiveButtonIndex: 1, cancelButtonIndex: 0 },
         index => { if (index === 1) performReset(); }
       );
       return;
     }
-    Alert.alert('איפוס נתונים', message, [
+    Alert.alert('איפוס התקדמות', message, [
       { text: 'ביטול', style: 'cancel' },
       { text: 'איפוס', style: 'destructive', onPress: performReset },
     ]);
@@ -407,7 +408,7 @@ export default function ProfileTab() {
           <SectionTitle tag="DANGER ZONE" title="פעולות חשבון" danger />
           <View style={styles.settingsCard}>
             <SettingRow icon="🚪" label={signingOut ? 'יוצא...' : 'יציאה מהחשבון'} onPress={handleSignOut} danger disabled={signingOut} />
-            <SettingRow icon="🧹" label="איפוס כל הנתונים" onPress={handleReset} danger />
+            <SettingRow icon="🧹" label="איפוס התקדמות" onPress={handleReset} danger />
             <SettingRow icon="⛔" label={deletingAccount ? 'מוחק חשבון...' : 'מחיקת חשבון לצמיתות'} onPress={handleDeleteAccount} danger disabled={deletingAccount} isLast />
           </View>
 
