@@ -426,20 +426,19 @@ export function ensureSpatialVisualAssets(question: Question): Question {
   const correctId = correctOptionId(question);
   const options = question.options.map((option, index) => ({
     ...option,
-    text: option.text?.trim() || `אפשרות ${option.id.toUpperCase()}`,
+    text: option.text?.trim() || `אפשרות ${index + 1}`,
     isCorrect: option.id === correctId,
-    imageUrl: option.imageUrl || optionSvg(question, option, index),
   }));
 
   return {
     ...question,
     correctAnswer: correctId,
     questionType: 'shapes',
-    questionText: question.questionText?.trim() || modePrompt(visualMode(question)),
-    mediaUrl: question.mediaUrl || questionSvg(question),
-    mediaType: 'image',
-    explanation: question.explanation?.trim() || spatialExplanation(question),
-    explanationImageUrl: question.explanationImageUrl || explanationSvg(question),
+    questionText: question.questionText?.trim() || 'שאלת חשיבה מרחבית',
+    mediaUrl: question.mediaUrl || undefined,
+    mediaType: question.mediaUrl ? (question.mediaType || 'image') : undefined,
+    explanation: question.explanation?.trim() || 'פתרון מפורט אינו זמין לשאלה זו.',
+    explanationImageUrl: question.explanationImageUrl || undefined,
     options,
   };
 }
