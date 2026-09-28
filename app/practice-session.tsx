@@ -31,12 +31,23 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 function practiceQuestionFamilyKey(question: Question): string {
-  return question.questionText
+  const text = question.questionText
     .toLowerCase()
-    .replace(/\d+(?:[.,]\d+)?/g, '#')
+    .replace(/^[^:]{0,40}\s\d+\s*:\s*/u, '')
     .replace(/[״"'׳’]/g, '')
-    .replace(/[^\p{L}#]+/gu, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
+
+  // These families are pedagogically the same exercise even when only the
+  // numbers/vehicle names change, so keep at most one of each per session.
+  if (/(רכבת|רכב|מכונית|אוטובוס).*(לקראת|נוסע.*מול|נעים.*זה.*זה)/u.test(text)) {
+    return 'family:relative-speed-toward';
+  }
+  if (/ממוצע משוקלל/u.test(text)) return 'family:weighted-average';
+
+  // For number-series questions the actual numbers define the rule, so preserve
+  // them instead of collapsing every series into one family.
+  return text;
 }
 
 function dedupePracticeQuestions(questions: Question[]): Question[] {
