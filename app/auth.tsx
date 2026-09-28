@@ -15,10 +15,12 @@ import { usePurchaseStore } from '../store/purchaseStore';
 import { notifySignup } from '../lib/adminEmail';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 type AuthMode = 'login' | 'register';
 
 export default function AuthScreen() {
+  const reducedMotion = useReducedMotion();
   const params = useLocalSearchParams<{ redirect?: string; mode?: AuthMode }>();
   const [mode, setMode] = useState<AuthMode>('login');
   const [displayName, setDisplayName] = useState('');
@@ -48,11 +50,20 @@ export default function AuthScreen() {
   const slideUp = useRef(new Animated.Value(32)).current;
 
   useEffect(() => {
+    if (reducedMotion) {
+      fadeIn.setValue(1);
+      slideUp.setValue(0);
+      return;
+    }
     Animated.parallel([
       Animated.timing(fadeIn, { toValue: 1, duration: 600, useNativeDriver: true }),
       Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    if (error) AccessibilityInfo.announceForAccessibility(error);
+  }, [error]);
 
   useEffect(() => {
     if (params.mode === 'login' || params.mode === 'register') {
