@@ -36,6 +36,10 @@ export default function Results() {
     speedScore: string;
     stability: string;
     sessionId?: string;
+    mode?: string;
+    templateId?: string;
+    passingScore?: string;
+    passed?: string;
   }>();
 
   const safeInt = (value: string | undefined, fallback: number, min = 0, max = Number.MAX_SAFE_INTEGER) => {
@@ -55,12 +59,20 @@ export default function Results() {
 
   const topic = useAdminStore(s => s.topics.find(t => t.id === (params.topicId ?? '')));
   const isAdmin = useAdminStore(s => s.isAdmin);
+  const examSettings = useAdminStore(s => s.examSettings);
+  const template = useAdminStore(s => s.templates.find(t => t.id === (params.templateId ?? '')));
   const socialSharingEnabled = useAdminStore(s => s.appConfig.featureFlags.socialSharing);
   const isPremium = useUserStore(s => s.isPremium);
   const completedSessions = useUserStore(s => s.totalSessions);
   const completedSession = usePracticeStore(s => s.completedSession);
   const reviewSession = completedSession?.id === params.sessionId ? completedSession : null;
-  const isSimulationReview = reviewSession?.mode === 'simulation';
+  const isSimulationReview = reviewSession?.mode === 'simulation' || params.mode === 'simulation';
+  const passingScore = isSimulationReview
+    ? safeInt(params.passingScore, template?.passingScore ?? examSettings.defaultPassingScore, 0, 100)
+    : null;
+  const passed = isSimulationReview
+    ? (params.passed === 'true' || (params.passed !== 'false' && score >= (passingScore ?? 0)))
+    : null;
   const { label, color } = getPerformanceLevel(score);
 
   const [displayScore, setDisplayScore] = useState(0);
@@ -147,7 +159,9 @@ export default function Results() {
           style={styles.hero}
         >
           <Text style={styles.heroLabel}>
-            {topic ? `${topic.icon} ${topic.name}` : '📊 תוצאות'}
+            {isSimulationReview
+              ? `🏁 ${template?.name ?? 'תוצאות סימולציה'}`
+              : topic ? `${topic.icon} ${topic.name}` : '📊 תוצאות'}
           </Text>
 
           <Animated.View style={[styles.scoreBadge, { transform: [{ scale: scaleAnim }], opacity: scoreAnim }]}>
@@ -160,6 +174,17 @@ export default function Results() {
           <View style={[styles.performanceBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
             <Text style={styles.performanceText}>{label}</Text>
           </View>
+
+          {isSimulationReview && passingScore !== null && (
+            <View style={[
+              styles.passBadge,
+              { backgroundColor: passed ? 'rgba(52,211,153,0.18)' : 'rgba(248,113,113,0.18)' },
+            ]}>
+              <Text style={[styles.passBadgeText, { color: passed ? Colors.success : Colors.danger }]}>
+                {passed ? 'עבר את הסימולציה' : 'לא עבר את הסימולציה'} · סף {passingScore}%
+              </Text>
+            </View>
+          )}
 
           <Text style={styles.heroSummary}>
             {correct} מתוך {total} שאלות נכונות
@@ -180,34 +205,42 @@ export default function Results() {
           <View style={styles.statsGrid}>
             <StatCard icon="✅" label="נכון" value={`${correct}/${total}`} color={Colors.success} />
             <StatCard icon="⏱️" label="זמן ממוצע" value={formatTime(avgTime)} color={Colors.primary} />
-            <StatCard icon="📊" label="אחוזון משוער" value={`${percentile}%`} color={Colors.accent} />
+            {(!isSimulationReview || examSettings.showPercentileRankInResults) && (
+              <StatCard icon="📊" label="אחוזון משוער" value={`${percentile}%`} color={Colors.accent} />
+            )}
           </View>
 
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionSub}>BREAKDOWN</Text>
-            <Text style={styles.sectionTitle}>ניקוד מפורט</Text>
-          </View>
+          {(!isSimulationReview || examSettings.showDetailedScoreBreakdown) && (
+            <>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionSub}>BREAKDOWN</Text>
+                <Text style={styles.sectionTitle}>ניקוד מפורט</Text>
+              </View>
 
-          <View style={styles.advancedCard}>
-            <ScoreRow icon="⚖️" label="ניקוד משוקלל קושי" value={difficultyScore} desc="מתחשב ברמת קושי כל שאלה" color={Colors.primary} />
-            <ScoreRow icon="⚡" label="ניקוד מהירות" value={speedScore} desc="בונוס על תשובות מהירות לשאלות קשות" color={Colors.warning} />
-            <ScoreRow icon="📈" label="יציבות" value={stability} desc="עד כמה הביצועים שלך עקביים" color={Colors.success} isLast />
-          </View>
+              <View style={styles.advancedCard}>
+                <ScoreRow icon="⚖️" label="ניקוד משוקלל קושי" value={difficultyScore} desc="מתחשב ברמת קושי כל שאלה" color={Colors.primary} />
+                <ScoreRow icon="⚡" label="ניקוד מהירות" value={speedScore} desc="בונוס על תשובות מהירות לשאלות קשות" color={Colors.warning} />
+                <ScoreRow icon="📈" label="יציבות" value={stability} desc="עד כמה הביצועים שלך עקביים" color={Colors.success} isLast />
+              </View>
+            </>
+          )}
 
-          <View style={styles.percentileCard}>
-            <Text style={styles.percentileTitle}>📊 אחוזון ביצוע משוער</Text>
-            <Text style={styles.percentileDesc}>
-              הערכה יחסית המבוססת על הציון והקושי במבחן הזה. היא אינה דירוג ישיר מול כלל המשתמשים.
-            </Text>
-            <View style={styles.percentileBarTrack}>
-              <View style={[styles.percentileBarFill, { width: `${percentile}%` as any, backgroundColor: color }]} />
-              <View style={[styles.percentileMarker, { left: `${percentile}%` as any }]}>
-                <Text style={styles.percentileMarkerText}>אתה</Text>
+          {(!isSimulationReview || examSettings.showPercentileRankInResults) && (
+            <View style={styles.percentileCard}>
+              <Text style={styles.percentileTitle}>📊 אחוזון ביצוע משוער</Text>
+              <Text style={styles.percentileDesc}>
+                הערכה יחסית המבוססת על הציון והקושי במבחן הזה. היא אינה דירוג ישיר מול כלל המשתמשים.
+              </Text>
+              <View style={styles.percentileBarTrack}>
+                <View style={[styles.percentileBarFill, { width: `${percentile}%` as any, backgroundColor: color }]} />
+                <View style={[styles.percentileMarker, { left: `${percentile}%` as any }]}>
+                  <Text style={styles.percentileMarkerText}>אתה</Text>
+                </View>
               </View>
             </View>
-          </View>
+          )}
 
-          {isSimulationReview && (
+          {isSimulationReview && examSettings.showCorrectAnswersAfterExam && reviewSession && (
             <>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionSub}>REVIEW</Text>
@@ -270,12 +303,24 @@ export default function Results() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            if (isSimulationReview && params.templateId) {
+              router.replace({
+                pathname: '/practice-session',
+                params: {
+                  topicId: params.topicId,
+                  targetId: params.targetId,
+                  mode: 'simulation',
+                  templateId: params.templateId,
+                },
+              });
+              return;
+            }
             router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'practice', questionLimit: params.total } });
           }}
           style={({ pressed }) => [styles.againBtn, { opacity: pressed ? 0.75 : 1 }]}
         >
           <LinearGradient colors={Colors.gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.againBtnGrad}>
-            <Text style={styles.againBtnText}>שחק שוב ←</Text>
+            <Text style={styles.againBtnText}>{isSimulationReview ? 'נסה סימולציה חדשה ←' : 'שחק שוב ←'}</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -395,6 +440,8 @@ const styles = StyleSheet.create({
 
   performanceBadge: { borderRadius: Radius.full, paddingHorizontal: 20, paddingVertical: 7, marginTop: 4, marginBottom: 12 },
   performanceText: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: '#fff' },
+  passBadge: { borderRadius: Radius.full, paddingHorizontal: 16, paddingVertical: 7, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  passBadgeText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, textAlign: 'center' },
   heroSummary: { fontFamily: FontFamily.regular, fontSize: FontSize.base, color: 'rgba(255,255,255,0.8)', marginBottom: 20 },
 
   shareBtn: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: Radius.full, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
