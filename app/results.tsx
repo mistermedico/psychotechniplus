@@ -19,9 +19,11 @@ import { useUserStore } from '../store/userStore';
 import { Question } from '../data/types';
 import { detectDir, textAlign as ta } from '../utils/textDirection';
 import { canShowAdsForUser, showInterstitialAfterSession } from '../lib/ads';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 export default function Results() {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const params = useLocalSearchParams<{
     topicId: string;
     targetId: string;
@@ -71,6 +73,14 @@ export default function Results() {
       score >= 80 ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
     );
 
+    if (reducedMotion) {
+      setDisplayScore(score);
+      scaleAnim.setValue(1);
+      scoreAnim.setValue(1);
+      cardAnim.setValue(1);
+      return;
+    }
+
     const duration = 1200;
     const steps = 60;
     const stepDuration = duration / steps;
@@ -94,7 +104,7 @@ export default function Results() {
     ]).start();
 
     return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reducedMotion, score]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!canShowAdsForUser(isPremium, isAdmin)) return;
