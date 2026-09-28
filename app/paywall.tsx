@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  ActivityIndicator, Alert, Animated,
+  ActivityIndicator, Alert, Animated, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,6 +42,8 @@ export default function PaywallScreen() {
     fetchOfferings, purchase, restore,
   } = usePurchaseStore();
   const { isPremium, isGuest } = useUserStore();
+  const isNativeStore = Platform.OS === 'ios' || Platform.OS === 'android';
+  const storeName = Platform.OS === 'android' ? 'Google Play' : 'App Store';
   const [selected, setSelected] = useState<string>('monthly');
 
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -53,10 +55,10 @@ export default function PaywallScreen() {
       Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
     ]).start();
 
-    if (!isGuest && packages.length === 0) {
+    if (!isGuest && isNativeStore && packages.length === 0) {
       fetchOfferings().catch(() => null);
     }
-  }, [isGuest]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isGuest, isNativeStore]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Already premium — close paywall
   useEffect(() => {
@@ -224,24 +226,31 @@ export default function PaywallScreen() {
           <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
             <Text style={styles.plansTitle}>בחר תוכנית</Text>
 
-            {loadError && packages.length === 0 && (
+            {!isNativeStore && (
               <View style={styles.storeNotice}>
-                <Text style={styles.storeNoticeText}>טוען מחירים מאובטחים מה-App Store. אם זה נמשך, אפשר לנסות שוב.</Text>
+                <Text style={styles.storeNoticeText}>
+                  רכישה חדשה מתבצעת באפליקציית iPhone/Android דרך החנות. אם כבר רכשת פרימיום באפליקציה, הגישה תסתנכרן לחשבון הזה אוטומטית.
+                </Text>
+              </View>
+            )}
+            {isNativeStore && loadError && packages.length === 0 && (
+              <View style={styles.storeNotice}>
+                <Text style={styles.storeNoticeText}>לא הצלחנו לטעון כרגע מחירים מאומתים מ-{storeName}. אפשר לנסות שוב.</Text>
                 <Pressable onPress={() => fetchOfferings().catch(() => null)} style={styles.retryBtn}>
                   <Text style={styles.retryBtnText}>נסה שוב</Text>
                 </Pressable>
               </View>
             )}
-            {loadError && packages.length > 0 && (
+            {isNativeStore && loadError && packages.length > 0 && (
               <View style={styles.storeNotice}>
-                <Text style={styles.storeNoticeText}>המחירים יוצגו ויאושרו דרך ה-App Store לפני כל חיוב.</Text>
+                <Text style={styles.storeNoticeText}>המחירים יוצגו ויאושרו דרך {storeName} לפני כל חיוב.</Text>
                 <Pressable onPress={() => fetchOfferings().catch(() => null)} style={styles.retryBtn}>
                   <Text style={styles.retryBtnText}>רענן מחירים</Text>
                 </Pressable>
               </View>
             )}
 
-            {packages.length === 0 && !loadError && (
+            {isNativeStore && packages.length === 0 && !loadError && (
               <ActivityIndicator color={Colors.primaryLight} style={{ marginVertical: 24 }} />
             )}
 
@@ -297,61 +306,67 @@ export default function PaywallScreen() {
             })}
           </Animated.View>
 
-          {/* CTA */}
-          <Pressable
-            onPress={handlePurchase}
-            disabled={isPurchasing || !selectedPkg}
-            accessibilityRole="button"
-            accessibilityLabel={selectedPkg ? `שדרג עכשיו · ${selectedPkg.priceString}` : 'שדרג עכשיו'}
-            accessibilityState={{ disabled: isPurchasing || !selectedPkg }}
-            style={({ pressed }) => [
-              styles.purchaseBtn,
-              { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: !selectedPkg ? 0.6 : 1 },
-            ]}
-          >
-            <LinearGradient
-              colors={[Colors.primary, Colors.primaryDark]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.purchaseBtnGrad}
-            >
-              <View style={styles.purchaseBtnShimmer} />
-              {isPurchasing
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.purchaseBtnText}>
-                    {selectedPkg
-                      ? `שדרג עכשיו · ${selectedPkg.priceString} ${PLAN_META[selectedPkg.identifier]?.period ?? ''}`
-                      : 'טוען...'}
-                  </Text>
-              }
-            </LinearGradient>
-          </Pressable>
-
-          {/* Restore */}
-          <Pressable
-            onPress={handleRestore}
-            disabled={isRestoring}
-            accessibilityRole="button"
-            accessibilityLabel="שחזר רכישה קודמת"
-            accessibilityState={{ disabled: isRestoring }}
-            style={[styles.restoreBtn, { opacity: isRestoring ? 0.6 : 1 }]}
-          >
-            <Text style={styles.restoreBtnText}>
-              {isRestoring ? 'משחזר רכישות...' : 'שחזר רכישה קודמת'}
-            </Text>
-          </Pressable>
-
-          {/* Legal text */}
-          {selectedPkg?.isSubscription && (
-            <Text style={styles.legal}>
-              המנוי יחויב דרך חשבון ה-Apple ID שלך. חידוש אוטומטי יתבצע 24 שעות לפני תום התקופה.
-              ניתן לבטל בכל עת דרך הגדרות ← Apple ID ← מנויים.
-            </Text>
-          )}
-          {selectedPkg && !selectedPkg.isSubscription && (
-            <Text style={styles.legal}>
-              רכישה חד-פעמית · לא מתחדשת · גישה לצמיתות לכל התכנים הנוכחיים.
-            </Text>
-          )}
+          {isNativeStore && (
+            <>
+                        {/* CTA */}
+                        <Pressable
+                          onPress={handlePurchase}
+                          disabled={isPurchasing || !selectedPkg}
+                          accessibilityRole="button"
+                          accessibilityLabel={selectedPkg ? `שדרג עכשיו · ${selectedPkg.priceString}` : 'שדרג עכשיו'}
+                          accessibilityState={{ disabled: isPurchasing || !selectedPkg }}
+                          style={({ pressed }) => [
+                            styles.purchaseBtn,
+                            { transform: [{ scale: pressed ? 0.97 : 1 }], opacity: !selectedPkg ? 0.6 : 1 },
+                          ]}
+                        >
+                          <LinearGradient
+                            colors={[Colors.primary, Colors.primaryDark]}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                            style={styles.purchaseBtnGrad}
+                          >
+                            <View style={styles.purchaseBtnShimmer} />
+                            {isPurchasing
+                              ? <ActivityIndicator color="#fff" />
+                              : <Text style={styles.purchaseBtnText}>
+                                  {selectedPkg
+                                    ? `שדרג עכשיו · ${selectedPkg.priceString} ${PLAN_META[selectedPkg.identifier]?.period ?? ''}`
+                                    : 'טוען...'}
+                                </Text>
+                            }
+                          </LinearGradient>
+                        </Pressable>
+              
+                        {/* Restore */}
+                        <Pressable
+                          onPress={handleRestore}
+                          disabled={isRestoring}
+                          accessibilityRole="button"
+                          accessibilityLabel="שחזר רכישה קודמת"
+                          accessibilityState={{ disabled: isRestoring }}
+                          style={[styles.restoreBtn, { opacity: isRestoring ? 0.6 : 1 }]}
+                        >
+                          <Text style={styles.restoreBtnText}>
+                            {isRestoring ? 'משחזר רכישות...' : 'שחזר רכישה קודמת'}
+                          </Text>
+                        </Pressable>
+              
+                        {/* Legal text */}
+                        {selectedPkg?.isSubscription && (
+                          <Text style={styles.legal}>
+                            המנוי יחויב דרך חשבון ה-Apple ID שלך. חידוש אוטומטי יתבצע 24 שעות לפני תום התקופה.
+                            ניתן לבטל בכל עת דרך הגדרות ← Apple ID ← מנויים.
+                          </Text>
+                        )}
+                        {selectedPkg && !selectedPkg.isSubscription && (
+                          <Text style={styles.legal}>
+                            רכישה חד-פעמית · לא מתחדשת · גישה לצמיתות לכל התכנים הנוכחיים.
+                          </Text>
+                        )}
+                          </>
+                        )}
+              
+              
             </>
           )}
 
