@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View, Text, Animated, Pressable } from 'react-native';
+import { Platform, StyleSheet, View, Text, Animated } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
@@ -79,20 +79,25 @@ function AnnouncementBanner() {
   const icon = announcementLevel === 'critical' ? '🚨 ' : announcementLevel === 'warning' ? '⚠️ ' : 'ℹ️ ';
 
   return (
-    <View style={{
-      backgroundColor: bgColor,
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: borderColor,
-    }}>
+    <View
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={{
+        backgroundColor: bgColor,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: borderColor,
+      }}
+    >
       <Text
-        numberOfLines={1}
+        numberOfLines={3}
         style={{
           fontFamily: FontFamily.medium,
           fontSize: 13,
           color: textColor,
           textAlign: 'right',
+          lineHeight: 18,
         }}
       >
         {icon}{announcementText}
@@ -216,7 +221,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 16,
     gap: 2,
-    minWidth: 46,
+    minWidth: 48,
+    minHeight: 48,
     position: 'relative',
     borderWidth: 1,
     borderColor: 'transparent',
