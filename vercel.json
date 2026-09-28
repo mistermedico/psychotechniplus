@@ -8,5 +8,12 @@
       "source": "/((?!.*\\..*).*)",
       "destination": "/"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/_sitemap",
+      "destination": "/",
+      "permanent": false
+    }
   ]
 }
