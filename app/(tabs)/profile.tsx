@@ -118,7 +118,6 @@ export default function ProfileTab() {
   const showAdmin = isAdmin || email.toLowerCase() === ADMIN_EMAIL;
   const target =
     targets.find(item => item.id === 'target_psychometric' && item.isActive !== false && !item.comingSoon) ??
-    targets.find(item => item.id === 'target_psychometric') ??
     null;
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const mainLevelLabel = getTopicLevelLabel('topic_quantitative');
