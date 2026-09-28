@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, AppConfig, AppControlPreset, APP_CONTROL_PRESETS } from '../../store/adminStore';
-import { DEFAULT_PURCHASE_PACKAGES, USE_REAL_PURCHASES } from '../../lib/purchases';
+import { USE_REAL_PURCHASES } from '../../lib/purchases';
 import { usePurchaseStore } from '../../store/purchaseStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -48,7 +48,7 @@ export default function AppControlScreen() {
   const [showPreview, setShowPreview] = useState(false);
 
   const stats = getStats();
-  const billingPackages = packages.length > 0 ? packages : DEFAULT_PURCHASE_PACKAGES;
+  const billingPackages = packages;
   const activeFeatureCount = Object.values(appConfig.featureFlags).filter(Boolean).length;
   const healthItems = [
     { label: 'שאלות מאושרות', value: `${stats.validatedCount}/${stats.totalQuestions}`, color: stats.validatedCount > 0 ? Colors.success : Colors.warning },
@@ -219,7 +219,14 @@ export default function AppControlScreen() {
             <Text style={styles.billingMode}>{USE_REAL_PURCHASES ? 'RevenueCat פעיל' : 'מצב פיתוח'}</Text>
             <Text style={styles.billingTitle}>מקור המחירים של הנחיתה וה-Paywall</Text>
           </View>
-          {billingPackages.map(pkg => (
+          {billingPackages.length === 0 ? (
+            <View style={styles.billingPlanRow}>
+              <View style={styles.billingPlanInfo}>
+                <Text style={styles.billingPlanName}>אין כרגע מחירים מאומתים להצגה</Text>
+                <Text style={styles.billingProductId}>המחירים נטענים ישירות מ-RevenueCat בחנות נתמכת</Text>
+              </View>
+            </View>
+          ) : billingPackages.map(pkg => (
             <View key={pkg.identifier} style={styles.billingPlanRow}>
               <View style={styles.billingPlanInfo}>
                 <Text style={styles.billingPlanName}>{pkg.description}</Text>
