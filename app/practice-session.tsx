@@ -123,8 +123,12 @@ export default function PracticeSession() {
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice OR admin forced showTimerAlways)
   const showTimer = isSimulation || isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
 
+  const exitToPractice = useCallback(() => {
+    router.replace('/(tabs)/practice');
+  }, []);
+
   useEffect(() => {
-    if (!rootNavigationReady || !quotaReady) return;
+    if (!rootNavigationReady) return;
     let cancelled = false;
 
     const needsQuota =
@@ -191,10 +195,6 @@ export default function PracticeSession() {
     const secs = safe % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const exitToPractice = useCallback(() => {
-    router.replace('/(tabs)/practice');
-  }, []);
 
   const startSimulationPreview = useCallback((availableTemplates = templates, availableQuestions: Question[] = adminQuestions) => {
     if (!templateId) return false;
@@ -265,7 +265,7 @@ export default function PracticeSession() {
 
   // Initialize session — simulation mode or free practice
   useEffect(() => {
-    if (!rootNavigationReady) return;
+    if (!rootNavigationReady || !quotaReady) return;
     let cancelled = false;
 
     if (topic && isEnglishPracticeTopic(topic)) {
