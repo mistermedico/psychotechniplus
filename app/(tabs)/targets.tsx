@@ -93,7 +93,7 @@ export default function TargetsTab() {
   const [selectedId, setSelectedId] = useState<string | null>(PRIMARY_TARGET_ID);
   const [refreshing, setRefreshing] = useState(false);
   const { getTopicAccuracy, getTopicLevel, totalSessions, isPremium } = useUserStore();
-  const { premiumConfig, targets, topics: allTopics } = useAdminStore();
+  const { premiumConfig, targets, topics: allTopics, loadPublicData } = useAdminStore();
 
   const visibleTargets = targets.filter(
     t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon
@@ -110,9 +110,17 @@ export default function TargetsTab() {
     setSelectedId(id);
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    if (refreshing) return;
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      await loadPublicData(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
