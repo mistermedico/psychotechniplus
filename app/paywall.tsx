@@ -57,8 +57,8 @@ export default function PaywallScreen() {
       slideUp.setValue(0);
     } else {
       Animated.parallel([
-        Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
+        Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
     }
 
