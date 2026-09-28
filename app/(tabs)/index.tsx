@@ -46,8 +46,7 @@ export default function Dashboard() {
   const { dailyChallenges, targets, topics, appConfig } = useAdminStore();
 
   const selectedTarget =
-    targets.find(t => t.id === 'target_psychometric' && t.isActive !== false && !t.comingSoon) ??
-    targets.find(t => t.id === 'target_psychometric');
+    targets.find(t => t.id === 'target_psychometric' && t.isActive !== false && !t.comingSoon);
   const targetTopics = selectedTarget ? visiblePracticeTopics(topics.filter(t => t.targetId === selectedTarget.id)) : [];
 
   const today = localDateKey();
@@ -55,7 +54,7 @@ export default function Dashboard() {
   const mainTopic = targetTopics[0] ?? null;
   const showDailyChallenge =
     appConfig.featureFlags.dailyChallenge !== false &&
-    (Boolean(todayChallenge) || appConfig.featureFlags.speedMode !== false);
+    (Boolean(todayChallenge) || (Boolean(mainTopic) && appConfig.featureFlags.speedMode !== false));
   const title = mainTopic ? LEVEL_LABELS[getTopicLevel(mainTopic.id)] : LEVEL_LABELS['beginner'];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const xpPercent = Math.min(100, Math.round((xp / (level * 100)) * 100));
@@ -310,8 +309,8 @@ export default function Dashboard() {
                       challengeId: todayChallenge.id,
                                   },
                                 });
-                              } else {
-                                go(mainTopic?.id ?? 'topic_quantitative', { mode: 'speed', questionLimit: '10' });
+                              } else if (mainTopic) {
+                                go(mainTopic.id, { mode: 'speed', questionLimit: '10' });
                               }
                             }}
                             accessibilityRole="button"
