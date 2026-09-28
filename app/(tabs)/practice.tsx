@@ -214,6 +214,8 @@ export default function PracticeTab() {
         <View style={styles.headerRow}>
           <Pressable
             onPress={() => router.replace('/(tabs)')}
+            accessibilityRole="button"
+            accessibilityLabel="חזרה למסך הבית"
             style={({ pressed }) => [styles.homeBtn, { opacity: pressed ? 0.7 : 1 }]}
           >
             <Text style={styles.homeBtnText}>🏠</Text>
@@ -417,6 +419,9 @@ function FreePracticePane({
                   <Pressable
                     key={opt.id}
                     onPress={() => { Haptics.selectionAsync(); setSelectedDifficulty(opt.id); }}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`רמת קושי ${opt.label}`}
+                    accessibilityState={{ checked: isActive }}
                     style={({ pressed }) => [
                       styles.difficultyChip,
                       isActive && { borderColor: opt.color, backgroundColor: opt.color + '22' },
@@ -445,6 +450,9 @@ function FreePracticePane({
               <Pressable
                 key={topic.id}
                 disabled={isLocked}
+                accessibilityRole="radio"
+                accessibilityLabel={`${topic.name}${isLocked ? ', פרימיום בלבד' : ''}`}
+                accessibilityState={{ checked: isSelected, disabled: isLocked }}
                 onPress={() => {
                   if (isLocked) {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -517,18 +525,21 @@ function FreePracticePane({
       <View style={[styles.stickyBar, { bottom: TAB_BAR_OVERLAY_HEIGHT, paddingBottom: Math.max(insets.bottom + 4, 18) }]}>
         <Pressable
           onPress={onStart}
-          disabled={!canStart || !!usageBlock}
+          disabled={!canStart}
+          accessibilityRole="button"
+          accessibilityLabel={canStart ? 'התחלת תרגול' : 'יש לבחור נושא לפני התחלת התרגול'}
+          accessibilityState={{ disabled: !canStart }}
           style={({ pressed }) => [
             styles.startPressable,
-            { opacity: pressed && canStart && !usageBlock ? 0.75 : 1 },
+            { opacity: pressed && canStart ? 0.75 : 1 },
           ]}
         >
           <LinearGradient
-            colors={canStart && !usageBlock ? Colors.gradients.primary : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.06)']}
+            colors={canStart ? Colors.gradients.primary : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.06)']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={[styles.startBtn, (!canStart || !!usageBlock) && { shadowOpacity: 0 }]}
+            style={[styles.startBtn, !canStart && { shadowOpacity: 0 }]}
           >
-            <Text style={[styles.startBtnText, (!canStart || !!usageBlock) && { color: 'rgba(255,255,255,0.4)' }]}>
+            <Text style={[styles.startBtnText, !canStart && { color: 'rgba(255,255,255,0.4)' }]}>
               {usageBlock
                 ? 'מגבלת שימוש חינמי פעילה'
                 : canStart
@@ -548,6 +559,9 @@ function ModeChip({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={mode.label}
+      accessibilityState={{ checked: isSelected }}
       style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
     >
       {isSelected ? (
