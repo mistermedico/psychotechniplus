@@ -30,6 +30,25 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
+function practiceQuestionFamilyKey(question: Question): string {
+  return question.questionText
+    .toLowerCase()
+    .replace(/\d+(?:[.,]\d+)?/g, '#')
+    .replace(/[״"'׳’]/g, '')
+    .replace(/[^\p{L}#]+/gu, ' ')
+    .trim();
+}
+
+function dedupePracticeQuestions(questions: Question[]): Question[] {
+  const seen = new Set<string>();
+  return questions.filter(question => {
+    const key = practiceQuestionFamilyKey(question);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export default function PracticeSession() {
   const reducedMotion = useReducedMotion();
   const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, challengeId, adminPreview } = useLocalSearchParams<{
@@ -450,6 +469,10 @@ export default function PracticeSession() {
         const capped = questionPool.filter(q => q.difficulty <= practiceSettings.freeUserMaxDifficulty);
         if (capped.length > 0) questionPool = capped;
       }
+      // Avoid showing exact/templated variants of essentially the same question
+      // in one short session (e.g. identical vehicle problems with only numbers changed).
+      questionPool = dedupePracticeQuestions(questionPool);
+
       // Apply free user question limit
       const effectiveLimit = getSessionQuestionLimit(
         limit,
