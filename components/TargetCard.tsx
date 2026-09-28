@@ -21,6 +21,11 @@ export function TargetCard({ target, progress = 0, sessionsCount = 0, onPress, c
     <Pressable
       onPress={onPress}
       disabled={locked}
+      accessibilityRole="button"
+      accessibilityLabel={`${target.name}. ${target.totalQuestions.toLocaleString()} שאלות`}
+      accessibilityHint={locked ? 'המסלול עדיין לא זמין' : 'פתח את המסלול'}
+      accessibilityState={{ disabled: locked }}
+      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       style={({ pressed }) => [
         styles.card,
         Shadow.lg,
