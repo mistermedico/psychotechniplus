@@ -17,7 +17,6 @@ import { Target, Topic } from '../../data/types';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
 import { useSettingsStore } from '../../store/settingsStore';
 import {
-  claimFreePracticeSession,
   emptyFreePracticeUsage,
   getFreePracticeBlock,
   loadFreePracticeUsage,
@@ -68,8 +67,6 @@ export default function PracticeTab() {
   const featureFlags = appConfig.featureFlags;
   const premiumOnlyModes = practiceSettings.premiumOnlyModes;
   const [usage, setUsage] = useState<FreePracticeUsage>(emptyFreePracticeUsage);
-  const [startingSession, setStartingSession] = useState(false);
-  const startFreeRef = useRef(false);
 
   const target =
     targets.find(t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon) ??
@@ -138,25 +135,13 @@ export default function PracticeTab() {
     router.push('/paywall');
   }, [isGuest, isPremium, usageBlock]);
 
-  const claimFreeUsage = async (): Promise<{ allowed: boolean; reason?: string }> => {
-    if (isPremium) return { allowed: true };
-    const claim = await claimFreePracticeSession({
-      userId: userId ?? '',
-      isGuest,
-      dailyLimit: Math.max(1, premiumConfig.freeUserSessionLimit),
-      cooldownMinutes: Math.max(0, appConfig.sessionCooldownMinutes),
-    });
-    setUsage(claim.usage);
-    return { allowed: claim.allowed, reason: claim.reason };
-  };
-
   const switchTab = (tab: PracticeTab) => {
     Haptics.selectionAsync();
     setActiveTab(tab);
   };
 
-  const handleStartFree = async () => {
-    if (!selectedTopicId || startFreeRef.current) return;
+  const handleStartFree = () => {
+    if (!selectedTopicId) return;
     const selectedTopic = topics.find(t => t.id === selectedTopicId);
     if (selectedTopic && !canAccessTopic(selectedTopic, isPremium, premiumConfig)) {
       Alert.alert('פרימיום בלבד', 'הנושא הזה נעול לפי הגדרות המנהל.', [
@@ -182,36 +167,17 @@ export default function PracticeTab() {
       );
       return;
     }
-    startFreeRef.current = true;
-    setStartingSession(true);
-    try {
-      const claim = await claimFreeUsage();
-      if (!claim.allowed) {
-        Alert.alert('מגבלת תרגול חינמי', claim.reason ?? 'לא ניתן להתחיל סשן חינמי כרגע.', [
-          { text: 'שדרג', onPress: () => router.push('/paywall') },
-          { text: 'בסדר', style: 'cancel' },
-        ]);
-        return;
-      }
-
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      router.push({
-        pathname: '/practice-session',
-        params: {
-          topicId: selectedTopicId,
-          targetId: target?.id ?? '',
-          mode: selectedMode,
-          difficulty: selectedDifficulty,
-          questionLimit: isPremium ? '999' : String(freePracticeLimit),
-          usageClaimed: isPremium ? undefined : '1',
-        },
-      });
-    } catch (error: any) {
-      Alert.alert('לא ניתן להתחיל כרגע', error?.message ?? 'בדוק את החיבור ונסה שוב.');
-    } finally {
-      startFreeRef.current = false;
-      setStartingSession(false);
-    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    router.push({
+      pathname: '/practice-session',
+      params: {
+        topicId: selectedTopicId,
+        targetId: target?.id ?? '',
+        mode: selectedMode,
+        difficulty: selectedDifficulty,
+        questionLimit: isPremium ? '999' : String(freePracticeLimit),
+      },
+    });
   };
 
   const handleStartSimulation = (templateId: string) => {
@@ -316,7 +282,6 @@ export default function PracticeTab() {
             usageBlock={usageBlock}
             premiumConfig={premiumConfig}
             isAdmin={isAdmin}
-            startingSession={startingSession}
           />
         ) : featureFlags.simulations !== false ? (
           <SimulationsPane
@@ -352,7 +317,6 @@ function FreePracticePane({
   dailyLimit, dailyUsed, cooldownMinutes, usageBlock,
   premiumConfig,
   isAdmin,
-  startingSession,
 }: {
   topics: Topic[];
   selectedMode: string; setSelectedMode: (m: string) => void;
@@ -369,7 +333,6 @@ function FreePracticePane({
   usageBlock: string | null;
   premiumConfig: PremiumConfig;
   isAdmin: boolean;
-  startingSession: boolean;
 }) {
   const insets = useSafeAreaInsets();
   return (
