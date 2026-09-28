@@ -39,22 +39,35 @@ export function computeAdaptiveLevel(
 export function selectAdaptiveQuestion(
   currentLevel: PerformanceLevel,
   questions: Question[],
-  answeredIds: string[]
+  answeredIds: string[],
+  history: { isCorrect: boolean; difficulty: number }[] = []
 ): Question | null {
   const unanswered = questions.filter(q => !answeredIds.includes(q.id));
   if (unanswered.length === 0) return null;
 
   const [minD, maxD] = levelToDifficultyRange(currentLevel);
-  const optimal = unanswered.filter(q => q.difficulty >= minD && q.difficulty <= maxD);
-  const pool = optimal.length > 0 ? optimal : unanswered;
+  const last = history[history.length - 1];
 
-  const midD = (minD + maxD) / 2;
-  const weights = pool.map(q => Math.max(1, 10 - Math.abs(q.difficulty - midD) * 2));
-  const total = weights.reduce((s, w) => s + w, 0);
-  let rand = Math.random() * total;
-  for (let i = 0; i < pool.length; i++) {
-    rand -= weights[i];
-    if (rand <= 0) return pool[i];
+  let targetDifficulty = Math.round((minD + maxD) / 2);
+  let directionalPool = unanswered;
+
+  if (last) {
+    const lastDifficulty = Math.max(1, Math.min(10, Math.round(last.difficulty)));
+    targetDifficulty = Math.max(1, Math.min(10, lastDifficulty + (last.isCorrect ? 1 : -1)));
+
+    // A wrong answer must not make the next question harder when an equal/easier
+    // question is available; likewise a correct answer should not move backward.
+    const directional = last.isCorrect
+      ? unanswered.filter(q => q.difficulty >= lastDifficulty)
+      : unanswered.filter(q => q.difficulty <= lastDifficulty);
+    if (directional.length > 0) directionalPool = directional;
+  } else {
+    const inBand = unanswered.filter(q => q.difficulty >= minD && q.difficulty <= maxD);
+    if (inBand.length > 0) directionalPool = inBand;
   }
-  return pool[pool.length - 1];
+
+  const minDistance = Math.min(...directionalPool.map(q => Math.abs(q.difficulty - targetDifficulty)));
+  const closest = directionalPool.filter(q => Math.abs(q.difficulty - targetDifficulty) === minDistance);
+
+  return closest[Math.floor(Math.random() * closest.length)] ?? directionalPool[0] ?? null;
 }
