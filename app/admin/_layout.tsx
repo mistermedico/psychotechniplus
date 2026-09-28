@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { FontFamily, FontSize } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
-import { ADMIN_EMAIL, useAdminStore } from '../../store/adminStore';
+import { useAdminStore } from '../../store/adminStore';
 
 const PAGE_NAMES: Record<string, string> = {
   '/admin': 'כניסה למרכז הניהול',
@@ -46,21 +46,30 @@ export default function AdminLayout() {
 
   useEffect(() => {
     let alive = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!alive) return;
-      const email = data.session?.user?.email?.toLowerCase() ?? '';
-      const allowed = email === ADMIN_EMAIL;
-      setIsAdmin(allowed);
-      if (allowed) {
-        loadAdminData(true);
-        startRealtimeSync();
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!alive) return;
+        if (!sessionData.session?.user?.id) {
+          setIsAdmin(false);
+          setCheckedAdminSession(true);
+          return;
+        }
+        const { data, error } = await supabase.rpc('is_app_admin');
+        if (!alive) return;
+        const allowed = !error && data === true;
+        setIsAdmin(allowed);
+        if (allowed) {
+          await loadAdminData(true);
+          startRealtimeSync();
+        }
+        setCheckedAdminSession(true);
+      } catch {
+        if (!alive) return;
+        setIsAdmin(false);
+        setCheckedAdminSession(true);
       }
-      setCheckedAdminSession(true);
-    }).catch(() => {
-      if (!alive) return;
-      setIsAdmin(false);
-      setCheckedAdminSession(true);
-    });
+    })();
     return () => { alive = false; };
   }, [setIsAdmin, loadAdminData, startRealtimeSync]);
 
@@ -73,7 +82,7 @@ export default function AdminLayout() {
 
   useEffect(() => {
     if (!rootNavigationState?.key || !checkedAdminSession) return;
-    if (!isAdmin && pathname !== '/admin') router.replace('/admin');
+    if (!isAdmin) router.replace('/(tabs)');
   }, [checkedAdminSession, isAdmin, pathname, rootNavigationState?.key]);
 
   useEffect(() => {
@@ -83,6 +92,8 @@ export default function AdminLayout() {
     const pageName = PAGE_NAMES[pathname] ?? pathname.replace('/admin/', '');
     logActivity(`ביקור בעמוד: ${pageName}`, 'page');
   }, [isAdmin, pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!checkedAdminSession || !isAdmin) return null;
 
   return (
     <Stack
