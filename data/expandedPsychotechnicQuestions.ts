@@ -57,15 +57,26 @@ function normalizeOptions(options: [string, string, string, string], correctInde
 function strengthenExplanation(explanation: string, correctText: string): string {
   const clean = explanation.trim();
   if (clean.length >= 35 && clean.includes(correctText)) return clean;
-  const answerSummary = ` לכן התשובה הנכונה היא "${correctText}", כי היא היחידה שתואמת את הכלל או החישוב שהוצג בשאלה.`;
+  const answerSummary = ` לכן התשובה הנכונה היא "${correctText}".`;
   return clean.endsWith('.') ? `${clean}${answerSummary}` : `${clean}.${answerSummary}`;
 }
 
 function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
-  const correctId = ['a', 'b', 'c', 'd'][seed.correctIndex];
   const validationStatus = seed.validationStatus ?? 'validated';
   const normalizedOptions = normalizeOptions(seed.options, seed.correctIndex);
-  const explanation = strengthenExplanation(seed.explanation, normalizedOptions[seed.correctIndex]);
+  const correctText = normalizedOptions[seed.correctIndex];
+
+  // Seeds are authored for readability and often put the correct value first.
+  // Rotate the final option order deterministically so generated/re-seeded data
+  // has an approximately even A/B/C/D answer distribution.
+  const rotation = index % 4;
+  const orderedOptions = [
+    ...normalizedOptions.slice(rotation),
+    ...normalizedOptions.slice(0, rotation),
+  ] as [string, string, string, string];
+  const correctIndex = orderedOptions.indexOf(correctText);
+  const correctId = ['a', 'b', 'c', 'd'][correctIndex];
+  const explanation = strengthenExplanation(seed.explanation, correctText);
   return {
     id: `q_exp_${seed.prefix}_${String(index + 1).padStart(3, '0')}`,
     targetIds: seed.targetIds,
@@ -74,10 +85,10 @@ function createQuestion(seed: GeneratedQuestionSeed, index: number): Question {
     questionText: seed.questionText,
     mediaUrl: seed.mediaUrl,
     mediaType: seed.mediaUrl ? 'image' : undefined,
-    options: normalizedOptions.map((text, optionIndex) => ({
+    options: orderedOptions.map((text, optionIndex) => ({
       id: ['a', 'b', 'c', 'd'][optionIndex],
       text,
-      isCorrect: optionIndex === seed.correctIndex,
+      isCorrect: optionIndex === correctIndex,
     })),
     correctAnswer: correctId,
     explanation,
@@ -418,13 +429,13 @@ function advancedLogicQuestions(): GeneratedQuestionSeed[] {
 function advancedQuantitativeQuestions(): GeneratedQuestionSeed[] {
   const seeds: GeneratedQuestionSeed[] = [];
   const mixtures = [
-    [20, 30, 10, 50, 30],
+    [20, 30, 10, 50, 36.67],
     [15, 40, 5, 20, 35],
-    [25, 60, 15, 40, 50],
-    [30, 50, 10, 80, 40],
-    [12, 25, 8, 75, 15],
+    [25, 60, 15, 40, 52.5],
+    [30, 50, 10, 80, 57.5],
+    [12, 25, 8, 75, 45],
     [18, 70, 12, 30, 54],
-    [24, 45, 6, 55, 42],
+    [24, 45, 6, 55, 47],
     [28, 35, 12, 65, 44],
   ];
   mixtures.forEach((m, i) => seeds.push({
