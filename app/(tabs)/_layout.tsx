@@ -9,6 +9,7 @@ import { Colors } from '../../constants/colors';
 import { useAdminStore } from '../../store/adminStore';
 import { useUserStore } from '../../store/userStore';
 import { AdBanner } from '../../components/AdBanner';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 interface TabIconProps {
   icon: string;
@@ -19,8 +20,15 @@ interface TabIconProps {
 function TabIcon({ icon, label, focused }: TabIconProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) {
+      scale.setValue(focused ? 1.06 : 1);
+      opacity.setValue(1);
+      return;
+    }
+
     Animated.parallel([
       Animated.spring(scale, {
         toValue: focused ? 1.12 : 1,
@@ -34,7 +42,7 @@ function TabIcon({ icon, label, focused }: TabIconProps) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [focused]);
+  }, [focused, reducedMotion, scale, opacity]);
 
   return (
     <Animated.View
