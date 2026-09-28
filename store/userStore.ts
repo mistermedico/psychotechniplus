@@ -618,15 +618,20 @@ export const useUserStore = create<UserState>((set, get) => ({
       }
     }
 
-    set({
-      ...INITIAL_STATE,
-      userId,
-      name: isGuest ? GUEST_NAME : '',
-      selectedTargetId: DEFAULT_TARGET_ID,
-      hasCompletedOnboarding: isGuest,
-      isAuthenticated: isGuest ? true : Boolean(userId),
-      isGuest,
+    set(state => ({
+      ...state,
+      topicPerformance: {},
+      streak: 0,
+      longestStreak: 0,
+      lastPracticedDate: null,
+      level: 1,
+      xp: 0,
+      badges: [],
+      totalSessions: 0,
+      totalCorrect: 0,
+      totalAnswered: 0,
+      isSyncing: false,
       isLoaded: true,
-    });
+    }));
   }
 }));
