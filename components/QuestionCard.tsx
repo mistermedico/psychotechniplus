@@ -194,7 +194,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
 
       {/* Options */}
       {(() => {
-        const allOptionsHaveImages = isSpatial || displayOptions.every(o => !!o.imageUrl);
+        const allOptionsHaveImages = isSpatial || displayOptions.every(o => !!o.imageUrl && !o.text?.trim());
         if (allOptionsHaveImages) {
           // 2×2 grid layout
           return (
