@@ -1,8 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { localDateKey } from '../utils/date';
-
-const PRACTICE_USAGE_KEY = '@psychotechniplus/practiceUsage';
 
 export interface FreePracticeUsage {
   date: string;
@@ -48,25 +45,9 @@ export function getFreePracticeBlock(
 
 export async function loadFreePracticeUsage(
   userId: string,
-  isGuest: boolean,
+  _isGuest: boolean,
 ): Promise<FreePracticeUsage> {
   if (!userId) return emptyFreePracticeUsage();
-
-  if (isGuest) {
-    const raw = await AsyncStorage.getItem(`${PRACTICE_USAGE_KEY}:${userId}`).catch(() => null);
-    if (!raw) return emptyFreePracticeUsage();
-    try {
-      const parsed = JSON.parse(raw) as Partial<FreePracticeUsage>;
-      if (parsed.date !== localDateKey()) return emptyFreePracticeUsage();
-      return {
-        date: parsed.date,
-        count: Math.max(0, Number(parsed.count) || 0),
-        lastStartedAt: typeof parsed.lastStartedAt === 'string' ? parsed.lastStartedAt : null,
-      };
-    } catch {
-      return emptyFreePracticeUsage();
-    }
-  }
 
   const { data, error } = await supabase.rpc('get_my_free_practice_usage');
   if (error) throw error;
@@ -84,25 +65,10 @@ export async function claimFreePracticeSession(input: {
   dailyLimit: number;
   cooldownMinutes: number;
 }): Promise<FreePracticeClaim> {
-  const { userId, isGuest } = input;
   const dailyLimit = Math.max(1, input.dailyLimit);
   const cooldownMinutes = Math.max(0, input.cooldownMinutes);
 
-  if (isGuest) {
-    const current = await loadFreePracticeUsage(userId, true);
-    const reason = getFreePracticeBlock(current, dailyLimit, cooldownMinutes);
-    if (reason) return { allowed: false, reason, usage: current };
-
-    const next: FreePracticeUsage = {
-      date: localDateKey(),
-      count: current.count + 1,
-      lastStartedAt: new Date().toISOString(),
-    };
-    await AsyncStorage.setItem(`${PRACTICE_USAGE_KEY}:${userId}`, JSON.stringify(next));
-    return { allowed: true, usage: next };
-  }
-
-  if (!userId) {
+  if (!input.userId) {
     return {
       allowed: false,
       reason: 'לא נמצא חשבון משתמש פעיל.',
