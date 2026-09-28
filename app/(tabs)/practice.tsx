@@ -3,7 +3,6 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Animated, Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -16,9 +15,14 @@ import { canAccessMode, canAccessPremiumFeature, canAccessTopic } from '../../li
 import { AdBanner } from '../../components/AdBanner';
 import { Target, Topic } from '../../data/types';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
-import { localDateKey } from '../../utils/date';
 import { useSettingsStore } from '../../store/settingsStore';
-import { supabase } from '../../lib/supabase';
+import {
+  claimFreePracticeSession,
+  emptyFreePracticeUsage,
+  getFreePracticeBlock,
+  loadFreePracticeUsage,
+  type FreePracticeUsage,
+} from '../../lib/freePracticeUsage';
 
 type PracticeTab = 'free' | 'simulations';
 
@@ -49,25 +53,6 @@ const FREE_MODES = [
   },
 ];
 
-const PRACTICE_USAGE_KEY = '@psychotechniplus/practiceUsage';
-const TAB_BAR_OVERLAY_HEIGHT = 88;
-const START_BAR_HEIGHT = 112;
-const PRIMARY_TARGET_ID = 'target_psychometric';
-
-interface PracticeUsage {
-  date: string;
-  count: number;
-  lastStartedAt: string | null;
-}
-
-function todayKey() {
-  return localDateKey();
-}
-
-function emptyUsage(): PracticeUsage {
-  return { date: todayKey(), count: 0, lastStartedAt: null };
-}
-
 export default function PracticeTab() {
   const [activeTab, setActiveTab] = useState<PracticeTab>('free');
   const [selectedMode, setSelectedMode] = useState('practice');
@@ -82,7 +67,7 @@ export default function PracticeTab() {
   const { freePracticeLimit, templates, appConfig, practiceSettings, premiumConfig, targets, topics: allTopics, isAdmin } = useAdminStore();
   const featureFlags = appConfig.featureFlags;
   const premiumOnlyModes = practiceSettings.premiumOnlyModes;
-  const [usage, setUsage] = useState<PracticeUsage>(emptyUsage);
+  const [usage, setUsage] = useState<FreePracticeUsage>(emptyFreePracticeUsage);
   const [startingSession, setStartingSession] = useState(false);
   const startFreeRef = useRef(false);
 
@@ -126,64 +111,21 @@ export default function PracticeTab() {
 
   useEffect(() => {
     if (!userId) {
-      setUsage(emptyUsage());
+      setUsage(emptyFreePracticeUsage());
       return;
     }
-
-    if (isGuest) {
-      AsyncStorage.getItem(`${PRACTICE_USAGE_KEY}:${userId}`)
-        .then(raw => {
-          if (!raw) {
-            setUsage(emptyUsage());
-            return;
-          }
-          const parsed = JSON.parse(raw) as PracticeUsage;
-          setUsage(parsed.date === todayKey() ? parsed : emptyUsage());
-        })
-        .catch(() => setUsage(emptyUsage()));
-      return;
-    }
-
-    supabase.rpc('get_my_free_practice_usage')
-      .then(({ data, error }) => {
-        if (error) throw error;
-        const row = Array.isArray(data) ? data[0] : data;
-        setUsage({
-          date: row?.usage_date ?? todayKey(),
-          count: Number(row?.session_count ?? 0),
-          lastStartedAt: row?.last_started_at ?? null,
-        });
-      })
-      .catch(() => setUsage(emptyUsage()));
+    loadFreePracticeUsage(userId, isGuest)
+      .then(setUsage)
+      .catch(() => setUsage(emptyFreePracticeUsage()));
   }, [userId, isGuest]);
 
-  const persistGuestUsage = async (next: PracticeUsage) => {
-    setUsage(next);
-    if (userId) {
-      await AsyncStorage.setItem(`${PRACTICE_USAGE_KEY}:${userId}`, JSON.stringify(next)).catch(() => null);
-    }
-  };
-
-  const getFreeUsageBlock = () => {
-    if (isPremium) return null;
-    const dailyLimit = Math.max(1, premiumConfig.freeUserSessionLimit);
-    const currentUsage = usage.date === todayKey() ? usage : emptyUsage();
-    if (currentUsage.count >= dailyLimit) {
-      return `הגעת למגבלת ${dailyLimit} סשנים חינמיים להיום. אפשר לשדרג לפרימיום או לחזור מחר.`;
-    }
-    if (appConfig.sessionCooldownMinutes > 0 && currentUsage.lastStartedAt) {
-      const lastStarted = new Date(currentUsage.lastStartedAt).getTime();
-      const nextAllowed = lastStarted + appConfig.sessionCooldownMinutes * 60 * 1000;
-      const remainingMs = nextAllowed - Date.now();
-      if (remainingMs > 0) {
-        const remainingMinutes = Math.ceil(remainingMs / 60000);
-        return `יש להמתין עוד ${remainingMinutes} דקות לפני סשן חינמי נוסף.`;
-      }
-    }
-    return null;
-  };
-
-  const usageBlock = getFreeUsageBlock();
+  const usageBlock = isPremium
+    ? null
+    : getFreePracticeBlock(
+        usage,
+        Math.max(1, premiumConfig.freeUserSessionLimit),
+        Math.max(0, appConfig.sessionCooldownMinutes),
+      );
 
   useEffect(() => {
     if (!usageBlock) {
@@ -198,36 +140,14 @@ export default function PracticeTab() {
 
   const claimFreeUsage = async (): Promise<{ allowed: boolean; reason?: string }> => {
     if (isPremium) return { allowed: true };
-
-    if (isGuest) {
-      const block = getFreeUsageBlock();
-      if (block) return { allowed: false, reason: block };
-      const currentUsage = usage.date === todayKey() ? usage : emptyUsage();
-      await persistGuestUsage({
-        date: todayKey(),
-        count: currentUsage.count + 1,
-        lastStartedAt: new Date().toISOString(),
-      });
-      return { allowed: true };
-    }
-
-    const { data, error } = await supabase.rpc('claim_free_practice_session', {
-      p_daily_limit: Math.max(1, premiumConfig.freeUserSessionLimit),
-      p_cooldown_minutes: Math.max(0, appConfig.sessionCooldownMinutes),
+    const claim = await claimFreePracticeSession({
+      userId: userId ?? '',
+      isGuest,
+      dailyLimit: Math.max(1, premiumConfig.freeUserSessionLimit),
+      cooldownMinutes: Math.max(0, appConfig.sessionCooldownMinutes),
     });
-    if (error) throw error;
-
-    const row = Array.isArray(data) ? data[0] : data;
-    setUsage({
-      date: row?.usage_date ?? todayKey(),
-      count: Number(row?.session_count ?? 0),
-      lastStartedAt: row?.last_started_at ?? null,
-    });
-
-    return {
-      allowed: Boolean(row?.allowed),
-      reason: row?.reason ?? undefined,
-    };
+    setUsage(claim.usage);
+    return { allowed: claim.allowed, reason: claim.reason };
   };
 
   const switchTab = (tab: PracticeTab) => {
@@ -390,7 +310,7 @@ export default function PracticeTab() {
             onStart={handleStartFree}
             showSpeedMode={featureFlags.speedMode}
             dailyLimit={premiumConfig.freeUserSessionLimit}
-            dailyUsed={usage.date === todayKey() ? usage.count : 0}
+            dailyUsed={usage.date === emptyFreePracticeUsage().date ? usage.count : 0}
             cooldownMinutes={appConfig.sessionCooldownMinutes}
             usageBlock={usageBlock}
             premiumConfig={premiumConfig}
