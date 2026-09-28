@@ -3,6 +3,20 @@ import { Question, UserAnswer, SessionMode } from '../data/types';
 import { selectAdaptiveQuestion, computeAdaptiveLevel, PerformanceLevel } from '../utils/adaptive';
 import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
 
+function shuffleArray<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function normalizeSessionQuestion(question: Question): Question {
+  const normalized = isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question;
+  return { ...normalized, options: shuffleArray(normalized.options) };
+}
+
 interface ActiveSession {
   id: string;
   targetId: string;
@@ -52,9 +66,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
 
   startSession: ({ targetId, topicId, mode, questions, initialLevel = 'beginner' }) => {
     const now = new Date();
-    const normalizedQuestions = questions.map(question =>
-      isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question
-    );
+    const normalizedQuestions = questions.map(normalizeSessionQuestion);
     set({
       completedSession: null,
       lastCompletedSessionId: null,
@@ -77,9 +89,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     const { session } = get();
     if (!session || questions.length === 0) return;
 
-    const normalizedQuestions = questions.map(question =>
-      isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question
-    );
+    const normalizedQuestions = questions.map(normalizeSessionQuestion);
     const incomingById = new Map(normalizedQuestions.map(question => [question.id, question]));
     const answeredIds = new Set(session.answers.map(answer => answer.questionId));
     const oldCurrentId = session.questions[session.currentIndex]?.id;
@@ -222,7 +232,15 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     const { session } = get();
     if (!session) return;
     const answeredIds = session.answers.map(a => a.questionId);
-    const next = selectAdaptiveQuestion(session.adaptiveLevel, session.questions, answeredIds);
+    const next = selectAdaptiveQuestion(
+      session.adaptiveLevel,
+      session.questions,
+      answeredIds,
+      session.answers.map(answer => ({
+        isCorrect: answer.isCorrect,
+        difficulty: answer.questionDifficulty,
+      })),
+    );
     if (!next) return;
     const nextIndex = session.questions.findIndex(q => q.id === next.id);
     if (nextIndex === -1) return;
