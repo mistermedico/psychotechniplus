@@ -1,6 +1,6 @@
-import { Stack, router, usePathname } from 'expo-router';
+import { Stack, router, usePathname, type ErrorBoundaryProps } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AppState, I18nManager, Platform, StyleSheet } from 'react-native';
+import { AppState, I18nManager, Platform, StyleSheet, View, Text, Pressable } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -68,6 +68,100 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 SplashScreen.preventAutoHideAsync();
+
+export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+  return (
+    <View
+      accessibilityRole="alert"
+      style={errorStyles.root}
+    >
+      <View style={errorStyles.card}>
+        <Text style={errorStyles.icon}>⚠️</Text>
+        <Text style={errorStyles.title}>משהו השתבש</Text>
+        <Text style={errorStyles.text}>
+          נתקלנו בשגיאה לא צפויה. אפשר לנסות לטעון את המסך מחדש או לחזור למסך הראשי.
+        </Text>
+        <Pressable
+          onPress={() => retry().catch(() => null)}
+          accessibilityRole="button"
+          accessibilityLabel="נסה לטעון מחדש"
+          style={({ pressed }) => [errorStyles.primaryBtn, pressed && { opacity: 0.82 }]}
+        >
+          <Text style={errorStyles.primaryText}>נסה שוב</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.replace('/')}
+          accessibilityRole="button"
+          accessibilityLabel="חזרה למסך הראשי"
+          style={({ pressed }) => [errorStyles.secondaryBtn, pressed && { opacity: 0.75 }]}
+        >
+          <Text style={errorStyles.secondaryText}>חזרה למסך הראשי</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const errorStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#080A12',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 520,
+    borderRadius: 22,
+    padding: 24,
+    backgroundColor: '#121727',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+  },
+  icon: { fontSize: 36, marginBottom: 10 },
+  title: {
+    color: '#F0F4FF',
+    fontFamily: 'Heebo_700Bold',
+    fontSize: 24,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  text: {
+    color: '#A5B2CC',
+    fontFamily: 'Heebo_400Regular',
+    fontSize: 15,
+    lineHeight: 23,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  primaryBtn: {
+    width: '100%',
+    minHeight: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7C6FF7',
+    marginBottom: 10,
+  },
+  primaryText: {
+    color: '#FFFFFF',
+    fontFamily: 'Heebo_700Bold',
+    fontSize: 16,
+  },
+  secondaryBtn: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryText: {
+    color: '#AFA8FF',
+    fontFamily: 'Heebo_600SemiBold',
+    fontSize: 14,
+  },
+});
 
 export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
