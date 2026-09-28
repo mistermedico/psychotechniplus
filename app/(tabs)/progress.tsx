@@ -372,7 +372,12 @@ export default function ProgressTab() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: { paddingBottom: 20 },
+  content: {
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
+    paddingBottom: 20,
+  },
 
   // ── Empty state (no sessions) ─────────────────────────────────────────────
   emptyStateContainer: {
@@ -401,6 +406,8 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   emptyStateCta: {
+    minHeight: 48,
+    justifyContent: 'center',
     backgroundColor: Colors.primary,
     borderRadius: Radius.xl,
     paddingHorizontal: 32,
