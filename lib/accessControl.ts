@@ -19,7 +19,7 @@ export function canAccessMode(
 ): boolean {
   if (!mode || mode === 'practice' || mode === 'review') return true;
   if (premiumOnlyModes.includes(mode)) return isPremium;
-  if (mode === 'speed') return canAccessPremiumFeature('speedMode', isPremium, premiumConfig);
+  if (mode === 'speed') return premiumOnlyModes.includes('speed') ? isPremium : true;
   if (mode === 'adaptive') return canAccessPremiumFeature('adaptiveAlgorithm', isPremium, premiumConfig);
   if (mode === 'simulation') return canAccessPremiumFeature('simulations', isPremium, premiumConfig);
   return true;
