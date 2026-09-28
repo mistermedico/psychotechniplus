@@ -442,10 +442,10 @@ export const DEFAULT_PRACTICE_SETTINGS: PracticeSessionSettings = {
   speedModeSecondsPerQuestion: 60,
   showExplanationsAuto: false,
   autoAdvanceDelaySeconds: 0,
-  shuffleAnswerOptions: false,
+  shuffleAnswerOptions: true,
   showTimerAlways: false,
   premiumOnlyModes: [],
-  freeUserMaxDifficulty: 10,
+  freeUserMaxDifficulty: 6,
   premiumUserQuestionLimit: 999,
 };
 
@@ -499,7 +499,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   announcementEnabled: false,
   announcementLevel: 'info',
   registrationOpen: true,
-  freeSessionsPerDay: 10,
+  freeSessionsPerDay: 3,
   sessionCooldownMinutes: 0,
   leaderboardVisible: true,
   featureFlags: {
