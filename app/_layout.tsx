@@ -30,6 +30,7 @@ if (!I18nManager.isRTL) {
 }
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  document.documentElement.setAttribute('lang', 'he');
   document.documentElement.setAttribute('dir', 'rtl');
   document.documentElement.style.direction = 'rtl';
   document.documentElement.style.backgroundColor = '#080A12';
@@ -220,6 +221,21 @@ export default function RootLayout() {
   const pathname = usePathname();
 
   const [bootstrapReady, setBootstrapReady] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    let changed = false;
+    for (const key of [...url.searchParams.keys()]) {
+      if (key.startsWith('__EXPO_ROUTER_')) {
+        url.searchParams.delete(key);
+        changed = true;
+      }
+    }
+    if (changed) {
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  }, [pathname]);
 
   const [fontsLoaded, fontError] = useFonts({
     Heebo_400Regular,
