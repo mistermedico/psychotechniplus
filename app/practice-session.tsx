@@ -249,7 +249,7 @@ export default function PracticeSession() {
           startSession({
             targetId: targetId ?? previewQuestion.targetIds[0] ?? 'target_psychometric',
             topicId: previewQuestion.topicId,
-            mode: challengeQuestionId ? 'speed' : 'practice',
+            mode: challengeQuestionId ? effectiveMode : 'practice',
             questions: [previewQuestion],
           });
         })
