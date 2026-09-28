@@ -153,7 +153,7 @@ export default function Dashboard() {
               <View style={styles.xpSection}>
                 <View style={styles.xpHeader}>
                   <Text style={styles.xpPct}>{xpPercent}%</Text>
-                  <Text style={styles.xpHint}>רמה {level + 1}</Text>
+                  <Text style={styles.xpHint}>התקדמות לרמה {level + 1}</Text>
                 </View>
                 <View style={styles.xpTrack}>
                   <LinearGradient
