@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet, View } from 'react-native';
+import { Pressable, Text, StyleSheet, View, StyleProp, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { FontFamily, Radius, Shadow } from '../constants/theme';
@@ -9,7 +9,7 @@ interface BackButtonProps {
   onPress?: () => void;
   toHome?: boolean;
   label?: string;
-  style?: object;
+  style?: StyleProp<ViewStyle>;
   color?: string;
 }
 
@@ -32,6 +32,7 @@ export function BackButton({ onPress, toHome = false, label, style, color = '#ff
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       accessibilityRole="button"
       accessibilityLabel={label ?? (toHome ? 'חזור לדף הבית' : 'חזור')}
+      accessibilityHint={toHome ? 'מעביר למסך הבית' : 'חוזר למסך הקודם'}
     >
       <View style={[styles.inner, { borderColor: Colors.borderStrong }]}>
         <Text style={[styles.arrow, { color }]}>{toHome ? '🏠' : '→'}</Text>
@@ -41,7 +42,7 @@ export function BackButton({ onPress, toHome = false, label, style, color = '#ff
   );
 }
 
-export function HomeButton({ style }: { style?: object }) {
+export function HomeButton({ style }: { style?: StyleProp<ViewStyle> }) {
   return (
     <Pressable
       onPress={() => {
@@ -52,6 +53,7 @@ export function HomeButton({ style }: { style?: object }) {
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       accessibilityRole="button"
       accessibilityLabel="חזור לדף הבית"
+      accessibilityHint="מעביר למסך הבית"
     >
       <View style={[styles.inner, { borderColor: Colors.borderStrong }]}>
         <Text style={styles.arrow}>🏠</Text>
