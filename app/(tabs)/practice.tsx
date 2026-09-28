@@ -53,6 +53,11 @@ const FREE_MODES = [
   },
 ];
 
+const TAB_BAR_OVERLAY_HEIGHT = 88;
+const START_BAR_HEIGHT = 112;
+const PRIMARY_TARGET_ID = 'target_psychometric';
+
+
 export default function PracticeTab() {
   const [activeTab, setActiveTab] = useState<PracticeTab>('free');
   const [selectedMode, setSelectedMode] = useState('practice');
