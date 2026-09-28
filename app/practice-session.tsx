@@ -477,8 +477,16 @@ export default function PracticeSession() {
       // Apply free user difficulty cap
       let questionPool = filtered;
       if (!hasPremiumAccess) {
-        const capped = questionPool.filter(q => q.difficulty <= practiceSettings.freeUserMaxDifficulty);
-        if (capped.length > 0) questionPool = capped;
+        const maxFreeDifficulty = Math.min(
+          Math.max(1, premiumConfig.freeUserMaxDifficulty),
+          Math.max(1, practiceSettings.freeUserMaxDifficulty),
+        );
+        questionPool = questionPool.filter(q => q.difficulty <= maxFreeDifficulty);
+        if (questionPool.length === 0) {
+          Alert.alert('אין שאלות זמינות', `לא נמצאו שאלות עד רמת קושי ${maxFreeDifficulty}.`);
+          exitToPractice();
+          return;
+        }
       }
       // Avoid showing exact/templated variants of essentially the same question
       // in one short session (e.g. identical vehicle problems with only numbers changed).
@@ -770,6 +778,7 @@ export default function PracticeSession() {
     if (!finished) { finishingRef.current = false; return; }
     const template = isSimulation ? templates.find(t => t.id === templateId) : undefined;
     const genericScores = calcAllScores(finished.answers);
+    const correct = finished.answers.filter(a => a.isCorrect).length;
     const simulationScores = isSimulation
       ? calcSmartExamScore(
           finished.answers.map(answer => ({
@@ -781,6 +790,9 @@ export default function PracticeSession() {
           Number(template?.passingScore ?? examSettings.defaultPassingScore),
         )
       : null;
+    const rawAccuracyScore = finished.answers.length > 0
+      ? Math.round((correct / finished.answers.length) * 100)
+      : 0;
     const scores = simulationScores
       ? {
           ...genericScores,
@@ -796,9 +808,7 @@ export default function PracticeSession() {
           stabilityScore: simulationScores.stabilityScore,
           percentileRank: simulationScores.percentileRank,
         }
-      : genericScores;
-    const correct = finished.answers.filter(a => a.isCorrect).length;
-
+      : { ...genericScores, score: rawAccuracyScore };
     if (!isAdminPreview) {
       for (const answer of finished.answers) {
         if (!answer.isSkipped || answeredBeforeFinish.has(answer.questionId)) continue;
@@ -836,8 +846,8 @@ export default function PracticeSession() {
         difficulty: a.questionDifficulty ?? 5,
       })),
     };
-    let sessionPersisted = isGuest || isAdminPreview;
-    if (userId && !isGuest && !isAdminPreview) {
+    let sessionPersisted = isAdminPreview;
+    if (userId && !isAdminPreview) {
       sessionPersisted = await addSessionRecord(sessionRec);
     }
 
