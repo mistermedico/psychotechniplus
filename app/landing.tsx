@@ -186,9 +186,14 @@ export default function LandingScreen() {
   };
 
   const onCtaPressIn = () => {
+    if (reducedMotion) return;
     Animated.spring(ctaPressScale, { toValue: 0.96, friction: 10, tension: 120, useNativeDriver: true }).start();
   };
   const onCtaPressOut = () => {
+    if (reducedMotion) {
+      ctaPressScale.setValue(1);
+      return;
+    }
     Animated.spring(ctaPressScale, { toValue: 1, friction: 10, tension: 120, useNativeDriver: true }).start();
   };
 
@@ -206,7 +211,12 @@ export default function LandingScreen() {
         {/* ─── Nav Bar ─── */}
         <Animated.View style={[styles.navShell, { opacity: navOpacity }]}>
           <BlurView intensity={26} tint="dark" style={styles.navBar}>
-            <Pressable onPress={handleLogin} style={styles.navLogin}>
+            <Pressable
+              onPress={handleLogin}
+              accessibilityRole="button"
+              accessibilityLabel="כניסה או הרשמה"
+              style={styles.navLogin}
+            >
               <Text style={styles.navLoginText}>כניסה</Text>
             </Pressable>
             <View style={styles.navBrand}>
@@ -279,6 +289,8 @@ export default function LandingScreen() {
             <Animated.View style={[styles.ctaPrimaryWrap, { transform: [{ scale: ctaPressScale }] }]}>
               <Pressable
                 onPress={handleStart}
+                accessibilityRole="button"
+                accessibilityLabel="המשך חינמי כאורח"
                 onPressIn={onCtaPressIn}
                 onPressOut={onCtaPressOut}
                 style={styles.ctaPrimary}
@@ -295,7 +307,12 @@ export default function LandingScreen() {
             </Animated.View>
 
             {/* Secondary CTA */}
-            <Pressable onPress={handleLogin} style={styles.ctaSecondary}>
+            <Pressable
+              onPress={handleLogin}
+              accessibilityRole="button"
+              accessibilityLabel="כניסה או הרשמה לסנכרון ופרימיום"
+              style={styles.ctaSecondary}
+            >
               <Text style={styles.ctaSecondaryText}>כניסה או הרשמה לסנכרון ופרימיום</Text>
             </Pressable>
           </Animated.View>
@@ -445,7 +462,7 @@ export default function LandingScreen() {
                   >
                     <Text style={styles.pricingPremiumName}>Premium 💎</Text>
                     <Text style={styles.pricingPremiumPrice}>מחיר מאומת בחנות</Text>
-                    <Text style={styles.pricingBadge}>ללא מחירי placeholder</Text>
+                    <Text style={styles.pricingBadge}>המחיר נקבע בחנות</Text>
                   </LinearGradient>
                   <View style={styles.pricingFeatures}>
                     {['כל הנושאים', 'סימולציות מלאות', 'אנליטיקס מלא', 'ללא מודעות ומגבלות חינמיות'].map(f => (
@@ -498,6 +515,8 @@ export default function LandingScreen() {
               <Animated.View style={{ transform: [{ scale: ctaPressScale }] }}>
                 <Pressable
                   onPress={handleStart}
+                  accessibilityRole="button"
+                  accessibilityLabel="המשך עכשיו כאורח בחינם"
                   onPressIn={onCtaPressIn}
                   onPressOut={onCtaPressOut}
                   style={styles.finalCtaBtn}
