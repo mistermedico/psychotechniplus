@@ -194,13 +194,13 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
 
       {/* Options */}
       {(() => {
-        const allOptionsHaveImages = isSpatial || displayOptions.every(o => !!o.imageUrl && !o.text?.trim());
+        const allOptionsHaveImages = displayOptions.length > 0 && displayOptions.every(o => !!o.imageUrl);
         if (allOptionsHaveImages) {
           // 2×2 grid layout
           return (
             <View style={styles.optionsGrid}>
               {displayOptions.map((opt, index) => {
-                const isTextEmpty = isSpatial || !opt.text || !opt.text.trim();
+                const isTextEmpty = !opt.text || !opt.text.trim();
                 return (
                   <Pressable
                     key={opt.id}
