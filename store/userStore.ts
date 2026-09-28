@@ -135,6 +135,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   initialize: async (overrideUserId?: string) => {
     if (get().isLoaded && !overrideUserId) return;
+    get().stopRealtimeSync();
     set({ isSyncing: true });
 
     let userId = overrideUserId;
