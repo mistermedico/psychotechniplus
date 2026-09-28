@@ -25,10 +25,12 @@ import { logger } from '../utils/logger';
 import { canAccessMode, canAccessQuestion, canAccessTopic, getSessionQuestionLimit } from '../lib/accessControl';
 import { isEnglishPracticeTopic } from '../utils/topicVisibility';
 import { claimFreePracticeSession } from '../lib/freePracticeUsage';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 const SPEED_LIMIT = 60; // seconds per question in speed mode
 
 export default function PracticeSession() {
+  const reducedMotion = useReducedMotion();
   const { topicId, targetId, mode, templateId, questionLimit, difficulty, questionId, challengeQuestionId, challengeId, adminPreview } = useLocalSearchParams<{
     topicId: string;
     targetId: string;
@@ -96,7 +98,6 @@ export default function PracticeSession() {
   const hasPremiumAccess = isPremium || isAdminPreview;
 
   const explanationAnim = useRef(new Animated.Value(0)).current;
-  const resultAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishingRef = useRef(false);
@@ -585,21 +586,29 @@ export default function PracticeSession() {
     // Only auto-show explanation if setting is on
     if (showExplanationAuto) {
       setShowExplanation(true);
+      if (reducedMotion) {
+        explanationAnim.setValue(1);
+      } else {
+        Animated.spring(explanationAnim, {
+          toValue: 1,
+          friction: 8,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+  };
+
+  const handleShowExplanation = () => {
+    setShowExplanation(true);
+    if (reducedMotion) {
+      explanationAnim.setValue(1);
+    } else {
       Animated.spring(explanationAnim, {
         toValue: 1,
         friction: 8,
         useNativeDriver: true,
       }).start();
     }
-  };
-
-  const handleShowExplanation = () => {
-    setShowExplanation(true);
-    Animated.spring(explanationAnim, {
-      toValue: 1,
-      friction: 8,
-      useNativeDriver: true,
-    }).start();
   };
 
   const resetQuestionState = () => {
@@ -1061,6 +1070,8 @@ export default function PracticeSession() {
         {revealed && !showExplanation && !showExplanationAuto && (
           <Pressable
             onPress={handleShowExplanation}
+            accessibilityRole="button"
+            accessibilityLabel="הצגת הסבר לתשובה"
             style={({ pressed }) => [styles.showExplanationBtn, pressed && { opacity: 0.85 }]}
           >
             <Text style={styles.showExplanationText}>הצג הסבר</Text>
@@ -1122,6 +1133,8 @@ export default function PracticeSession() {
           <View style={styles.actionsRow}>
             <Pressable
               onPress={handleSkip}
+              accessibilityRole="button"
+              accessibilityLabel="דילוג על השאלה"
               style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.7 }]}
             >
               <Text style={styles.skipText}>דלג</Text>
@@ -1130,6 +1143,9 @@ export default function PracticeSession() {
             <Pressable
               onPress={handleConfirm}
               disabled={!selectedId}
+              accessibilityRole="button"
+              accessibilityLabel="אישור התשובה שנבחרה"
+              accessibilityState={{ disabled: !selectedId }}
               style={({ pressed }) => [
                 styles.confirmBtn,
                 !selectedId && styles.confirmBtnDisabled,
