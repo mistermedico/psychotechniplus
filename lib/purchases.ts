@@ -176,13 +176,16 @@ export async function getCustomerInfo(): Promise<RevenueCatCustomerInfo | null> 
 }
 
 export async function getOfferings(): Promise<PurchasePackage[]> {
-  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return DEFAULT_PURCHASE_PACKAGES;
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported) return [];
   if (!hasRevenueCatApiKey()) throw new Error('רכישות בתוך האפליקציה לא הוגדרו עבור גרסת ההפצה.');
   ensurePurchasesConfigured();
   const offerings = await Purchases.getOfferings();
   const availablePackages = offerings.current?.availablePackages ?? offerings.all[DEFAULT_OFFERING_ID]?.availablePackages ?? [];
   const mapped = availablePackages.map(mapPackage).filter((pkg): pkg is PurchasePackage => Boolean(pkg));
-  return mapped.length > 0 ? sortPackages(mapped) : DEFAULT_PURCHASE_PACKAGES;
+  if (mapped.length === 0) {
+    throw new Error('לא נמצאו מוצרי רכישה פעילים ב-App Store. נסה שוב מאוחר יותר.');
+  }
+  return sortPackages(mapped);
 }
 
 export async function purchasePackage(
