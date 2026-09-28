@@ -11,7 +11,7 @@ import { FontFamily, FontSize, Radius, Shadow } from '../constants/theme';
 import { VisualImage } from '../components/VisualImage';
 import { AdBanner } from '../components/AdBanner';
 import { SponsoredOfferCard } from '../components/SponsoredOfferCard';
-import { getPerformanceLevel, formatTime } from '../utils/scoring';
+import { calcAllScores, getPerformanceLevel, formatTime } from '../utils/scoring';
 import { StatCard } from '../components/StatCard';
 import { usePracticeStore } from '../store/practiceStore';
 import { useAdminStore } from '../store/adminStore';
@@ -20,6 +20,11 @@ import { Question } from '../data/types';
 import { detectDir, textAlign as ta } from '../utils/textDirection';
 import { canShowAdsForUser, showInterstitialAfterSession } from '../lib/ads';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+
+
+function getTrustedBreakdown(answers: any[]) {
+  return calcAllScores(answers);
+}
 
 export default function Results() {
   const insets = useSafeAreaInsets();
@@ -48,15 +53,6 @@ export default function Results() {
     return Math.min(max, Math.max(min, parsed));
   };
 
-  const score = safeInt(params.score, 0, 0, 100);
-  const total = safeInt(params.total, 0, 0, 1000);
-  const correct = Math.min(total, safeInt(params.correct, 0, 0, 1000));
-  const timeSpent = safeInt(params.timeSpent, 0);
-  const percentile = safeInt(params.percentile, 50, 0, 100);
-  const difficultyScore = safeInt(params.difficultyScore, 0, 0, 100);
-  const speedScore = safeInt(params.speedScore, 0, 0, 100);
-  const stability = safeInt(params.stability, 100, 0, 100);
-
   const topic = useAdminStore(s => s.topics.find(t => t.id === (params.topicId ?? '')));
   const isAdmin = useAdminStore(s => s.isAdmin);
   const examSettings = useAdminStore(s => s.examSettings);
@@ -66,12 +62,21 @@ export default function Results() {
   const completedSessions = useUserStore(s => s.totalSessions);
   const completedSession = usePracticeStore(s => s.completedSession);
   const reviewSession = completedSession?.id === params.sessionId ? completedSession : null;
-  const isSimulationReview = reviewSession?.mode === 'simulation' || params.mode === 'simulation';
+  const total = reviewSession?.answers.length ?? 0;
+  const correct = reviewSession?.answers.filter(answer => answer.isCorrect).length ?? 0;
+  const timeSpent = reviewSession?.answers.reduce((sum, answer) => sum + answer.timeSpent, 0) ?? 0;
+  const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const trustedBreakdown = reviewSession ? getTrustedBreakdown(reviewSession.answers) : null;
+  const percentile = trustedBreakdown?.percentileRank ?? 0;
+  const difficultyScore = trustedBreakdown?.difficultyWeightedScore ?? 0;
+  const speedScore = trustedBreakdown?.speedAdjustedScore ?? 0;
+  const stability = trustedBreakdown?.stabilityScore ?? 0;
+  const isSimulationReview = reviewSession?.mode === 'simulation';
   const passingScore = isSimulationReview
     ? safeInt(params.passingScore, template?.passingScore ?? examSettings.defaultPassingScore, 0, 100)
     : null;
   const passed = isSimulationReview
-    ? (params.passed === 'true' || (params.passed !== 'false' && score >= (passingScore ?? 0)))
+    ? score >= (passingScore ?? 0)
     : null;
   const { label, color } = getPerformanceLevel(score);
 
