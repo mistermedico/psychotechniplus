@@ -185,8 +185,17 @@ export default function SimulationBuilder() {
     return map;
   }, [questions]);
 
+  const getAvailableForRule = (rule: Pick<SimulationRule, 'topicId' | 'minDifficulty' | 'maxDifficulty'>) => (
+    questions.filter(q =>
+      q.validationStatus === 'validated' &&
+      q.topicId === rule.topicId &&
+      q.difficulty >= rule.minDifficulty &&
+      q.difficulty <= rule.maxDifficulty
+    ).length
+  );
+
   const getTemplateAudit = (template: Pick<SmartExamTemplate, 'rules' | 'totalQuestions' | 'timeLimitMinutes'>) => {
-    const shortages = template.rules.filter(rule => rule.count > (questionsPerTopic[rule.topicId] ?? 0));
+    const shortages = template.rules.filter(rule => rule.count > getAvailableForRule(rule));
     const adaptiveRules = template.rules.filter(rule => rule.useAdaptive).length;
     const avgSeconds = template.totalQuestions > 0 ? Math.round((template.timeLimitMinutes * 60) / template.totalQuestions) : 0;
     const strictRules = template.rules.filter(rule => rule.minDifficulty >= 8 || rule.maxDifficulty <= 3).length;
@@ -219,8 +228,8 @@ export default function SimulationBuilder() {
 
   const fixTemplateShortages = (template: SmartExamTemplate) => {
     const fixedRules = template.rules.map(rule => {
-      const available = questionsPerTopic[rule.topicId] ?? 0;
-      return available > 0 && rule.count > available ? { ...rule, count: available } : rule;
+      const available = getAvailableForRule(rule);
+      return rule.count > available ? { ...rule, count: available } : rule;
     });
     const totalQuestions = fixedRules.reduce((sum, rule) => sum + rule.count, 0);
     updateTemplate(template.id, { rules: fixedRules, totalQuestions });
@@ -235,8 +244,8 @@ export default function SimulationBuilder() {
 
   const fixCurrentRuleShortages = () => {
     setRules(prev => prev.map(rule => {
-      const available = questionsPerTopic[rule.topicId] ?? 0;
-      return available > 0 && rule.count > available ? { ...rule, count: available } : rule;
+      const available = getAvailableForRule(rule);
+      return rule.count > available ? { ...rule, count: available } : rule;
     }));
     markDirty();
   };
