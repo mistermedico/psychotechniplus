@@ -14,6 +14,7 @@ import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
 import { localDateKey } from '../../utils/date';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 const TOPIC_META: Record<string, { icon: string; gradient: [string, string]; glow: string }> = {
   topic_quantitative: { icon: '⚡', gradient: ['#5A52D5', '#7C6FF7'], glow: '#7C6FF7' },
@@ -35,6 +36,7 @@ const BADGE_INFO: Record<string, { icon: string; label: string }> = {
 
 export default function Dashboard() {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const {
     name, streak, level, xp, badges,
     totalSessions, totalCorrect, totalAnswered,
@@ -68,6 +70,13 @@ export default function Dashboard() {
   const streakScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    if (reducedMotion) {
+      fadeIn.setValue(1);
+      slideUp.setValue(0);
+      streakScale.setValue(1);
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
@@ -83,7 +92,7 @@ export default function Dashboard() {
       pulse.start();
       return () => pulse.stop();
     }
-  }, [streak]); // eslint-disable-line
+  }, [streak, reducedMotion]); // eslint-disable-line
 
   const go = (topicId: string, opts?: { questionLimit?: string; mode?: string }) => {
     if (!topicId || !selectedTarget) return;
