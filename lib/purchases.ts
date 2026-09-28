@@ -134,8 +134,24 @@ function sortPackages(packages: PurchasePackage[]): PurchasePackage[] {
 }
 
 export async function initializePurchases(userId?: string): Promise<void> {
+  if (!USE_REAL_PURCHASES || !isRevenueCatSupported || !hasRevenueCatApiKey()) {
+    if (userId) currentAppUserId = userId;
+    return;
+  }
+
+  const wasConfigured = configured;
+  const previousUserId = currentAppUserId;
   if (userId) currentAppUserId = userId;
-  ensurePurchasesConfigured(userId);
+
+  if (!wasConfigured) {
+    ensurePurchasesConfigured(userId);
+    return;
+  }
+
+  if (userId && previousUserId !== userId) {
+    const result = await Purchases.logIn(userId);
+    latestCustomerInfo = result.customerInfo;
+  }
 }
 
 export async function identifyUser(userId: string): Promise<void> {
