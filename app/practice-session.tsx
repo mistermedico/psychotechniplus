@@ -75,7 +75,6 @@ export default function PracticeSession() {
   const [simulationRemaining, setSimulationRemaining] = useState(0);
   const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(0);
   const [loadError, setLoadError] = useState(false);
-  const [quotaReady, setQuotaReady] = useState(false);
 
   // Favorite & note features
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -126,56 +125,44 @@ export default function PracticeSession() {
     router.replace('/(tabs)/practice');
   }, []);
 
-  useEffect(() => {
-    if (!rootNavigationReady) return;
-    let cancelled = false;
-
+  const claimQuotaIfNeeded = useCallback(async (): Promise<boolean> => {
     const needsQuota =
       !hasPremiumAccess &&
       !isSimulation &&
       !isAdminPreview &&
       !questionId;
 
-    if (!needsQuota) {
-      setQuotaReady(true);
-      return;
-    }
+    if (!needsQuota) return true;
 
-    setQuotaReady(false);
-    claimFreePracticeSession({
-      userId: userId ?? '',
-      isGuest,
-      dailyLimit: Math.max(1, premiumConfig.freeUserSessionLimit),
-      cooldownMinutes: Math.max(0, appConfig.sessionCooldownMinutes),
-    })
-      .then(claim => {
-        if (cancelled) return;
-        if (!claim.allowed) {
-          Alert.alert(
-            'מגבלת תרגול חינמי',
-            claim.reason ?? 'לא ניתן להתחיל סשן חינמי כרגע.',
-            [
-              { text: 'שדרג', onPress: () => router.replace('/paywall') },
-              { text: 'חזרה', onPress: exitToPractice },
-            ],
-          );
-          return;
-        }
-        setQuotaReady(true);
-      })
-      .catch((error: any) => {
-        if (cancelled) return;
-        logger.error('practiceSession:quota', 'בדיקת מכסת התרגול נכשלה', error?.message);
-        Alert.alert('לא ניתן להתחיל כרגע', 'לא הצלחנו לאמת את מכסת התרגול. בדוק את החיבור ונסה שוב.', [
-          { text: 'חזרה', onPress: exitToPractice },
-        ]);
+    try {
+      const claim = await claimFreePracticeSession({
+        userId: userId ?? '',
+        isGuest,
+        dailyLimit: Math.max(1, premiumConfig.freeUserSessionLimit),
+        cooldownMinutes: Math.max(0, appConfig.sessionCooldownMinutes),
       });
 
-    return () => {
-      cancelled = true;
-    };
+      if (claim.allowed) return true;
+
+      Alert.alert(
+        'מגבלת תרגול חינמי',
+        claim.reason ?? 'לא ניתן להתחיל סשן חינמי כרגע.',
+        [
+          { text: 'שדרג', onPress: () => router.replace('/paywall') },
+          { text: 'חזרה', onPress: exitToPractice },
+        ],
+      );
+      return false;
+    } catch (error: any) {
+      logger.error('practiceSession:quota', 'בדיקת מכסת התרגול נכשלה', error?.message);
+      Alert.alert(
+        'לא ניתן להתחיל כרגע',
+        'לא הצלחנו לאמת את מכסת התרגול. בדוק את החיבור ונסה שוב.',
+        [{ text: 'חזרה', onPress: exitToPractice }],
+      );
+      return false;
+    }
   }, [
-    rootNavigationReady,
     hasPremiumAccess,
     isSimulation,
     isAdminPreview,
@@ -263,7 +250,7 @@ export default function PracticeSession() {
 
   // Initialize session — simulation mode or free practice
   useEffect(() => {
-    if (!rootNavigationReady || !quotaReady) return;
+    if (!rootNavigationReady) return;
     let cancelled = false;
 
     if (topic && isEnglishPracticeTopic(topic)) {
