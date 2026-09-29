@@ -80,48 +80,23 @@ export default function Results() {
     : null;
   const { label, color } = getPerformanceLevel(score);
 
-  const [displayScore, setDisplayScore] = useState(0);
-  const scoreAnim = useRef(new Animated.Value(0)).current;
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.5)).current;
+  const [displayScore, setDisplayScore] = useState(score);
+  const scoreAnim = useRef(new Animated.Value(1)).current;
+  const cardAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Haptics.notificationAsync(
-      score >= 80 ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
-    );
-
-    if (reducedMotion) {
-      setDisplayScore(score);
-      scaleAnim.setValue(1);
-      scoreAnim.setValue(1);
-      cardAnim.setValue(1);
-      return;
+    setDisplayScore(score);
+    scaleAnim.setValue(1);
+    scoreAnim.setValue(1);
+    cardAnim.setValue(1);
+    if (reviewSession) {
+      Haptics.notificationAsync(
+        score >= 80 ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
+      );
     }
+  }, [score, reviewSession, scaleAnim, scoreAnim, cardAnim]);
 
-    const duration = 1200;
-    const steps = 60;
-    const stepDuration = duration / steps;
-    let current = 0;
-    const interval = setInterval(() => {
-      current += score / steps;
-      if (current >= score) {
-        setDisplayScore(score);
-        clearInterval(interval);
-      } else {
-        setDisplayScore(Math.floor(current));
-      }
-    }, stepDuration);
-
-    Animated.sequence([
-      Animated.parallel([
-        Animated.spring(scaleAnim, { toValue: 1, friction: 5, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(scoreAnim, { toValue: 1, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
-      ]),
-      Animated.spring(cardAnim, { toValue: 1, friction: 8, useNativeDriver: Platform.OS !== 'web' }),
-    ]).start();
-
-    return () => clearInterval(interval);
-  }, [reducedMotion, score]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!canShowAdsForUser(isPremium, isAdmin)) return;
@@ -146,6 +121,24 @@ export default function Results() {
       // ignore
     }
   };
+
+  if (!reviewSession) {
+    return (
+      <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
+        <SafeAreaView style={[styles.safe, { justifyContent: 'center', padding: 24 }]} edges={['top', 'bottom']}>
+          <View style={styles.hero}>
+            <Text style={styles.heroLabel}>אין תוצאה שמורה להצגה</Text>
+            <Text style={{ color: Colors.textSecondary, textAlign: 'center', fontFamily: FontFamily.regular, fontSize: FontSize.base, lineHeight: 24, marginTop: 10 }}>
+              תוצאות מוצגות רק לאחר סיום סשן אמיתי במכשיר הזה. נתונים שמוזנים בכתובת אינם משמשים לחישוב התוצאה.
+            </Text>
+            <Pressable onPress={() => router.replace('/(tabs)/practice')} style={{ marginTop: 20, alignSelf: 'center', backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 22, paddingVertical: 12 }}>
+              <Text style={{ color: '#fff', fontFamily: FontFamily.bold }}>חזרה לתרגול</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
