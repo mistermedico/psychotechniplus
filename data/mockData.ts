@@ -2393,7 +2393,7 @@ const BASE_QUESTIONS: Question[] = [
     questionText: 'מה המשמעות של "דיאלקטי"?',
     options: [
       { id: 'a', text: 'שפה אזורית', isCorrect: false },
-      { id: 'b', text: 'תהליך של ויכוח והגעה לאמת דרך ניגוד ניגוד', isCorrect: true },
+      { id: 'b', text: 'תהליך של ויכוח והגעה לאמת דרך ניגוד', isCorrect: true },
       { id: 'c', text: 'שיטת הוראה', isCorrect: false },
       { id: 'd', text: 'סגנון ספרותי מודרני', isCorrect: false },
     ],
@@ -2416,7 +2416,7 @@ const BASE_QUESTIONS: Question[] = [
     options: [
       { id: 'a', text: 'יש להימנע מטלוויזיה', isCorrect: false },
       { id: 'b', text: 'כל צפייה מזיקה לאינטליגנציה', isCorrect: false },
-      { id: 'c', text: 'בחירה מושכלת של תכנים הופכת הצפייה לחיובית', isCorrect: true },
+      { id: 'c', text: 'בחירה מושכלת של תכנים הופכת את הצפייה לחיובית', isCorrect: true },
       { id: 'd', text: 'טלוויזיה הייתה מהפכה תרבותית', isCorrect: false },
     ],
     correctAnswer: 'c',
@@ -2500,7 +2500,7 @@ const BASE_QUESTIONS: Question[] = [
     options: [
       { id: 'a', text: 'להתחבא במקום', isCorrect: false },
       { id: 'b', text: 'להתמחות בתחום', isCorrect: false },
-      { id: 'c', text: 'להימנע מתחייבות בתחכום', isCorrect: true },
+      { id: 'c', text: 'להימנע מהתחייבות בתחכום', isCorrect: true },
       { id: 'd', text: 'לברוח בפחד', isCorrect: false },
     ],
     correctAnswer: 'c',
@@ -4833,7 +4833,7 @@ const BASE_QUESTIONS: Question[] = [
     questionText: 'מה המשמעות של "דיאלקטי"?',
     options: [
       { id: 'a', text: 'שפה אזורית', isCorrect: false },
-      { id: 'b', text: 'תהליך של ויכוח והגעה לאמת דרך ניגוד ניגוד', isCorrect: true },
+      { id: 'b', text: 'תהליך של ויכוח והגעה לאמת דרך ניגוד', isCorrect: true },
       { id: 'c', text: 'שיטת הוראה', isCorrect: false },
       { id: 'd', text: 'סגנון ספרותי מודרני', isCorrect: false },
     ],
@@ -4856,7 +4856,7 @@ const BASE_QUESTIONS: Question[] = [
     options: [
       { id: 'a', text: 'יש להימנע מטלוויזיה', isCorrect: false },
       { id: 'b', text: 'כל צפייה מזיקה לאינטליגנציה', isCorrect: false },
-      { id: 'c', text: 'בחירה מושכלת של תכנים הופכת הצפייה לחיובית', isCorrect: true },
+      { id: 'c', text: 'בחירה מושכלת של תכנים הופכת את הצפייה לחיובית', isCorrect: true },
       { id: 'd', text: 'טלוויזיה הייתה מהפכה תרבותית', isCorrect: false },
     ],
     correctAnswer: 'c',
@@ -4940,7 +4940,7 @@ const BASE_QUESTIONS: Question[] = [
     options: [
       { id: 'a', text: 'להתחבא במקום', isCorrect: false },
       { id: 'b', text: 'להתמחות בתחום', isCorrect: false },
-      { id: 'c', text: 'להימנע מתחייבות בתחכום', isCorrect: true },
+      { id: 'c', text: 'להימנע מהתחייבות בתחכום', isCorrect: true },
       { id: 'd', text: 'לברוח בפחד', isCorrect: false },
     ],
     correctAnswer: 'c',
@@ -6298,7 +6298,113 @@ const BASE_QUESTIONS: Question[] = [
   },
 ];
 
-const BASE_QUESTION_OVERRIDES: Record<string, Partial<Pick<Question, 'options' | 'correctAnswer' | 'explanation'>>> = {
+const BASE_QUESTION_OVERRIDES: Record<string, Partial<Pick<Question, 'questionText' | 'options' | 'correctAnswer' | 'explanation'>>> = {
+  q_logic_008: {
+    options: [
+      { id: 'a', text: 'א', isCorrect: false },
+      { id: 'b', text: 'ב', isCorrect: false },
+      { id: 'c', text: 'ג', isCorrect: true },
+      { id: 'd', text: 'ד', isCorrect: false },
+    ],
+    correctAnswer: 'c',
+    explanation: 'מן הנתונים מתקבל: ג משמאל לב, ב משמאל לא, וג גם משמאל לד. לכן ג הוא היחיד שבהכרח יושב הכי שמאלה.',
+  },
+  q_logic_015: {
+    questionText: 'יש שלוש קופסאות: באחת תפוחים בלבד, באחת תפוזים בלבד ובאחת תערובת. על הקופסאות כתוב "תפוחים", "תפוזים" ו"תפוחים ותפוזים", אך כל שלוש התוויות שגויות. שולפים פרי אחד מהקופסה שעליה כתוב "תפוחים ותפוזים" ומקבלים תפוח. מה יש בקופסה זו?',
+    options: [
+      { id: 'a', text: 'תפוחים בלבד', isCorrect: true },
+      { id: 'b', text: 'תפוזים בלבד', isCorrect: false },
+      { id: 'c', text: 'תערובת תפוחים ותפוזים', isCorrect: false },
+      { id: 'd', text: 'אי אפשר לקבוע', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: 'מאחר שכל התוויות שגויות, הקופסה המסומנת "תפוחים ותפוזים" אינה תערובת. אם הפרי שנשלף ממנה הוא תפוח, היא חייבת להכיל תפוחים בלבד.',
+  },
+  q_logic_019: {
+    questionText: 'בתחרות יש חמישה מתחרים. ד׳ מסיים ראשון. א׳ מסיים לפני ב׳, ב׳ מסיים מיד לפני ג׳, וה׳ מסיים אחרי ג׳. מי מסיים אחרון?',
+    options: [
+      { id: 'a', text: 'א', isCorrect: false },
+      { id: 'b', text: 'ב', isCorrect: false },
+      { id: 'c', text: 'ג', isCorrect: false },
+      { id: 'd', text: 'ה', isCorrect: true },
+    ],
+    correctAnswer: 'd',
+    explanation: 'ד׳ ראשון. א׳ לפני ב׳, ב׳ מיד לפני ג׳, וה׳ אחרי ג׳. לכן הסדר היחיד הוא ד׳, א׳, ב׳, ג׳, ה׳ — וה׳ מסיים אחרון.',
+  },
+  q_logic_023: {
+    options: [
+      { id: 'a', text: 'A', isCorrect: true },
+      { id: 'b', text: 'B', isCorrect: false },
+      { id: 'c', text: 'C', isCorrect: false },
+      { id: 'd', text: 'אי אפשר לקבוע', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: 'C תמיד מגישה. לכן B אינה מגישה. מאחר ש-A זוכה כאשר B אינה מגישה, A זוכה.',
+  },
+  q_logic_030: {
+    questionText: 'שלושה אנשים א׳, ב׳ וג׳ חובשים בדיוק שני כובעים אדומים וכובע כחול אחד. א׳ רואה את כובעי ב׳ וג׳ ואומר שאינו יודע את צבע כובעו. ב׳ רואה שכובעו של ג׳ אדום. מה צבע כובעו של ב׳?',
+    options: [
+      { id: 'a', text: 'כחול', isCorrect: true },
+      { id: 'b', text: 'אדום', isCorrect: false },
+      { id: 'c', text: 'אי אפשר לדעת', isCorrect: false },
+      { id: 'd', text: 'הצבעים יכולים להיות זהים', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: 'אם ב׳ וג׳ היו שניהם אדומים, א׳ היה יודע שכובעו כחול. מאחר שא׳ אינו יודע, ב׳ וג׳ אינם שניהם אדומים. ב׳ רואה שג׳ אדום, ולכן כובעו של ב׳ חייב להיות כחול.',
+  },
+  q_verbal_005: {
+    questionText: 'השלם את המשפט: "הצלחתה של הפגישה הייתה תלויה ___ ברצון הטוב של שני הצדדים."',
+    options: [
+      { id: 'a', text: 'במידה רבה', isCorrect: true },
+      { id: 'b', text: 'בניגוד', isCorrect: false },
+      { id: 'c', text: 'למרות', isCorrect: false },
+      { id: 'd', text: 'מחוץ', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: 'הצירוף התקין הוא "הייתה תלויה במידה רבה ברצון הטוב". שאר האפשרויות אינן יוצרות משפט תקין.',
+  },
+  q_verbal_014: {
+    questionText: 'השלם את הפתגם: "אל תסתכל בקנקן אלא ___"',
+    options: [
+      { id: 'a', text: 'במה שיש בו', isCorrect: true },
+      { id: 'b', text: 'בצבע שלו', isCorrect: false },
+      { id: 'c', text: 'בגודלו', isCorrect: false },
+      { id: 'd', text: 'במי שמחזיק אותו', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: 'הפתגם הוא "אל תסתכל בקנקן אלא במה שיש בו", כלומר אין לשפוט דבר רק לפי מראהו החיצוני.',
+  },
+  q_verbal_016: {
+    options: [
+      { id: 'a', text: 'להיות מוטעה או להאמין לדבר שאינו נכון', isCorrect: true },
+      { id: 'b', text: 'להטעות אדם אחר בכוונה', isCorrect: false },
+      { id: 'c', text: 'ללכת לאיבוד בדרך', isCorrect: false },
+      { id: 'd', text: 'להתחמק מאחריות', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: '"ללכת שולל" פירושו להיות מוטעה או להתפתות להאמין לדבר שאינו נכון. "להוליך שולל" פירושו להטעות אדם אחר.',
+  },
+  q_verbal_029: {
+    questionText: 'השלם את האמרה: "לא הביישן למד ולא ___ מלמד."',
+    options: [
+      { id: 'a', text: 'הקפדן', isCorrect: true },
+      { id: 'b', text: 'הזריז', isCorrect: false },
+      { id: 'c', text: 'הסקרן', isCorrect: false },
+      { id: 'd', text: 'הצעיר', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: 'האמרה מפרקי אבות היא "לא הביישן למד ולא הקפדן מלמד".',
+  },
+  q_quant_029: {
+    options: [
+      { id: 'a', text: '12 ס"מ', isCorrect: false },
+      { id: 'b', text: '10 ס"מ', isCorrect: true },
+      { id: 'c', text: '14 ס"מ', isCorrect: false },
+      { id: 'd', text: '8 ס"מ', isCorrect: false },
+    ],
+    correctAnswer: 'b',
+    explanation: 'לפי משפט פיתגורס: 6²+8²=36+64=100, ולכן היתר הוא √100=10 ס"מ.',
+  },
   q_quant_039: {
     options: [
       { id: 'a', text: '2', isCorrect: true },
