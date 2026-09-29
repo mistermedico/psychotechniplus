@@ -186,11 +186,15 @@ export default function PracticeSession() {
       );
       return false;
     } catch (error: any) {
-      logger.error('practiceSession:quota', 'בדיקת מכסת התרגול נכשלה', error?.message);
+      const rawMessage = String(error?.message ?? '');
+      logger.error('practiceSession:quota', 'בדיקת מכסת התרגול נכשלה', rawMessage);
+      const authorizationProblem = /401|unauthori[sz]ed|jwt|auth/i.test(rawMessage);
       Alert.alert(
         'לא ניתן להתחיל כרגע',
-        'לא הצלחנו לאמת את מכסת התרגול. בדוק את החיבור ונסה שוב.',
-        [{ text: 'חזרה', onPress: exitToPractice }],
+        authorizationProblem
+          ? 'לא הצלחנו לאמת את סשן המשתמש מול השרת. חזור למסך התרגול ונסה להתחיל מחדש.'
+          : 'לא הצלחנו לבדוק את מכסת התרגול מול השרת. נסה שוב בעוד רגע.',
+        [{ text: 'חזרה לתרגול', onPress: exitToPractice }],
       );
       return false;
     }
