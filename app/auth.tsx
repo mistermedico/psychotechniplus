@@ -138,8 +138,12 @@ export default function AuthScreen() {
       }
 
       await initialize(data.user.id);
-      const { data: adminAllowed } = await supabase.rpc('is_app_admin').catch(() => ({ data: false } as any));
-      setIsAdmin(adminAllowed === true);
+      let adminAllowed = false;
+      try {
+        const adminResult = await supabase.rpc('is_app_admin');
+        adminAllowed = !adminResult.error && adminResult.data === true;
+      } catch {}
+      setIsAdmin(adminAllowed);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const { hasCompletedOnboarding } = useUserStore.getState();
       await completeAuthNavigation(data.user.id, hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
@@ -174,8 +178,12 @@ export default function AuthScreen() {
 
       await initialize(data.user.id);
       notifySignup(data.user.id, data.user.email ?? email.trim().toLowerCase(), displayName.trim() || data.user.user_metadata?.display_name);
-      const { data: adminAllowed } = await supabase.rpc('is_app_admin').catch(() => ({ data: false } as any));
-      setIsAdmin(adminAllowed === true);
+      let adminAllowed = false;
+      try {
+        const adminResult = await supabase.rpc('is_app_admin');
+        adminAllowed = !adminResult.error && adminResult.data === true;
+      } catch {}
+      setIsAdmin(adminAllowed);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await completeAuthNavigation(data.user.id, '/onboarding');
     }
