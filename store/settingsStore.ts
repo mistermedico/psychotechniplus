@@ -30,7 +30,7 @@ interface SettingsState extends DisplaySettings {
 const DEFAULT_SETTINGS: DisplaySettings = {
   showDifficultyBadge: true,
   showEloOnQuestion: false,
-  shuffleOptions: false,
+  shuffleOptions: true,
   collapseReadingPassage: false,
   highlightCorrectAfterWrong: true,
   showTimerInPractice: false,
@@ -51,6 +51,11 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'psychotechniplus-settings',
+      version: 2,
+      migrate: (persisted: any, version) => {
+        if (version < 2) return { ...(persisted ?? {}), shuffleOptions: true };
+        return persisted as SettingsState;
+      },
       storage: createJSONStorage(() => AsyncStorage),
     }
   )
