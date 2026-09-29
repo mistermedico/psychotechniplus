@@ -137,6 +137,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     let userId = overrideUserId;
     let sessionEmail = '';
     let sessionIsAnonymous = false;
+    let sessionIsGuest = false;
 
     if (!userId) {
       try {
@@ -145,7 +146,8 @@ export const useUserStore = create<UserState>((set, get) => ({
           userId = session.user.id;
           sessionEmail = session.user.email ?? '';
           sessionIsAnonymous = session.user.is_anonymous === true;
-          logger.info('userStore:initialize', sessionIsAnonymous ? 'משתמש אורח מאומת בשרת' : `משתמש מחובר: ${sessionEmail}`);
+          sessionIsGuest = sessionIsAnonymous || session.user.user_metadata?.guest === true;
+          logger.info('userStore:initialize', sessionIsGuest ? 'משתמש אורח מאומת בשרת' : `משתמש מחובר: ${sessionEmail}`);
         } else {
           set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
           return;
@@ -162,7 +164,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       } catch {}
     }
 
-    if (sessionIsAnonymous && userId) {
+    if (sessionIsGuest && userId) {
       const rawGuestState = await AsyncStorage.getItem(GUEST_STATE_KEY).catch(() => null);
       let guestState: Partial<UserState> = {};
       try { guestState = rawGuestState ? JSON.parse(rawGuestState) : {}; } catch {}
@@ -360,12 +362,26 @@ export const useUserStore = create<UserState>((set, get) => ({
     await supabase.auth.signOut().catch(() => null);
     useAdminStore.getState().setIsAdmin(false);
 
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error || !data.user?.id) {
-      throw new Error(error?.message ?? 'לא ניתן לפתוח מצב אורח מאובטח כרגע.');
+    let guestUserId = '';
+    const anonymousAttempt = await supabase.auth.signInAnonymously().catch(() => ({ data: { user: null }, error: new Error('anonymous unavailable') } as any));
+    if (anonymousAttempt.data?.user?.id) {
+      guestUserId = anonymousAttempt.data.user.id;
+    } else {
+      // Some production projects disable Supabase anonymous sign-ins.
+      // Fall back to a server-created throwaway Auth user so quota/RLS still use auth.uid().
+      const { data: guestData, error: guestError } = await supabase.functions.invoke('guest-session', { body: {} });
+      if (guestError || !guestData?.email || !guestData?.password) {
+        throw new Error('לא ניתן לפתוח כרגע מצב אורח מאובטח. נסה שוב בעוד רגע.');
+      }
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: guestData.email,
+        password: guestData.password,
+      });
+      if (loginError || !loginData.user?.id) {
+        throw new Error('לא ניתן לאמת את סשן האורח.');
+      }
+      guestUserId = loginData.user.id;
     }
-
-    const guestUserId = data.user.id;
     await AsyncStorage.setItem(GUEST_USER_ID_KEY, guestUserId).catch(() => null);
     set({
       ...INITIAL_STATE,
