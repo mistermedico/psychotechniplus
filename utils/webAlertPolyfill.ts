@@ -26,16 +26,22 @@ export function installWebAlertPolyfill(): void {
     const cancel = buttons.find(button => button.style === 'cancel');
     const actionable = buttons.filter(button => button !== cancel);
 
-    if (actionable.length <= 1) {
-      const action = actionable[0];
-      if (!action) {
-        window.alert(body);
-        cancel?.onPress?.();
-        return;
-      }
+    if (actionable.length === 0) {
+      window.alert(body);
+      cancel?.onPress?.();
+      return;
+    }
+
+    if (actionable.length === 1 && !cancel) {
+      window.alert(body);
+      actionable[0]?.onPress?.();
+      return;
+    }
+
+    if (actionable.length === 1 && cancel) {
       const confirmed = window.confirm(body);
-      if (confirmed) action.onPress?.();
-      else cancel?.onPress?.();
+      if (confirmed) actionable[0]?.onPress?.();
+      else cancel.onPress?.();
       return;
     }
 
