@@ -13,7 +13,7 @@ export const TARGETS: Target[] = [
     color: '#8B5CF6',
     gradientColors: ['#8B5CF6', '#6D28D9'],
     order: 1,
-    totalQuestions: 992,
+    totalQuestions: 979,
     freeQuestionsCount: 80,
     isPremiumOnly: false,
     isActive: true,
