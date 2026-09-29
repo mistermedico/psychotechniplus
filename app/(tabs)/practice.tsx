@@ -53,8 +53,9 @@ const FREE_MODES = [
   },
 ];
 
-const TAB_BAR_OVERLAY_HEIGHT = 88;
-const START_BAR_HEIGHT = 112;
+const TAB_BAR_OVERLAY_HEIGHT = 96;
+const START_BAR_HEIGHT = 132;
+const MOBILE_CONTENT_SAFE_GAP = 56;
 const PRIMARY_TARGET_ID = 'target_psychometric';
 
 
@@ -373,7 +374,7 @@ function FreePracticePane({
     <>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + TAB_BAR_OVERLAY_HEIGHT + START_BAR_HEIGHT }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + TAB_BAR_OVERLAY_HEIGHT + START_BAR_HEIGHT + MOBILE_CONTENT_SAFE_GAP }]}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
@@ -554,7 +555,7 @@ function FreePracticePane({
       </ScrollView>
 
       {/* Sticky start button */}
-      <View style={[styles.stickyBar, { bottom: TAB_BAR_OVERLAY_HEIGHT, paddingBottom: Math.max(insets.bottom + 4, 18) }]}>
+      <View style={[styles.stickyBar, { bottom: TAB_BAR_OVERLAY_HEIGHT + Math.max(insets.bottom, 8), paddingBottom: 18 }]}>
         <Pressable
           onPress={onStart}
           disabled={!canStart}
@@ -641,7 +642,7 @@ function SimulationsPane({
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + TAB_BAR_OVERLAY_HEIGHT + 32 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + TAB_BAR_OVERLAY_HEIGHT + MOBILE_CONTENT_SAFE_GAP + 32 }]}
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.simHeader}>
