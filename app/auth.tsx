@@ -10,7 +10,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { supabase } from '../lib/supabase';
 import { useUserStore } from '../store/userStore';
-import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
+import { useAdminStore } from '../store/adminStore';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { notifySignup } from '../lib/adminEmail';
 import { Colors } from '../constants/colors';
@@ -29,6 +29,7 @@ export default function AuthScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [error, setError] = useState('');
   const [emailPending, setEmailPending] = useState(false);
 
@@ -137,7 +138,8 @@ export default function AuthScreen() {
       }
 
       await initialize(data.user.id);
-      setIsAdmin(data.user.email?.toLowerCase() === ADMIN_EMAIL);
+      const { data: adminAllowed } = await supabase.rpc('is_app_admin').catch(() => ({ data: false } as any));
+      setIsAdmin(adminAllowed === true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const { hasCompletedOnboarding } = useUserStore.getState();
       await completeAuthNavigation(data.user.id, hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
@@ -172,7 +174,8 @@ export default function AuthScreen() {
 
       await initialize(data.user.id);
       notifySignup(data.user.id, data.user.email ?? email.trim().toLowerCase(), displayName.trim() || data.user.user_metadata?.display_name);
-      setIsAdmin(data.user.email?.toLowerCase() === ADMIN_EMAIL);
+      const { data: adminAllowed } = await supabase.rpc('is_app_admin').catch(() => ({ data: false } as any));
+      setIsAdmin(adminAllowed === true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await completeAuthNavigation(data.user.id, '/onboarding');
     }
@@ -181,8 +184,33 @@ export default function AuthScreen() {
   const handleGuestAccess = async () => {
     setError('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await continueAsGuest();
-    router.replace('/(tabs)');
+    try {
+      await continueAsGuest();
+      router.replace('/(tabs)');
+    } catch (guestError: any) {
+      setError(guestError?.message ?? 'לא ניתן להתחיל מצב אורח כרגע.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('הזן כתובת מייל ואז לחץ על "שכחתי סיסמה".');
+      emailRef.current?.focus();
+      return;
+    }
+    setError('');
+    setResettingPassword(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+      if (resetError) throw resetError;
+      Alert.alert('קישור לאיפוס סיסמה נשלח', 'בדוק את תיבת המייל שלך ופעל לפי הקישור לאיפוס הסיסמה.');
+    } catch (resetError: any) {
+      setError(translateError(resetError?.message ?? 'לא ניתן לשלוח קישור לאיפוס כרגע.'));
+    } finally {
+      setResettingPassword(false);
+    }
   };
 
   if (emailPending) {
@@ -328,6 +356,20 @@ export default function AuthScreen() {
                 </View>
               ) : (
                 <View style={styles.form}>
+                  {mode === 'login' && (
+                    <Pressable
+                      onPress={handleForgotPassword}
+                      disabled={resettingPassword}
+                      accessibilityRole="button"
+                      accessibilityLabel="שכחתי סיסמה"
+                      style={{ alignSelf: 'flex-end', paddingVertical: 6, marginTop: -4, marginBottom: 6 }}
+                    >
+                      <Text style={{ fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primaryLight }}>
+                        {resettingPassword ? 'שולח קישור...' : 'שכחתי סיסמה'}
+                      </Text>
+                    </Pressable>
+                  )}
+
                   {mode === 'register' && (
                     <TextInput
                       ref={nameRef}
