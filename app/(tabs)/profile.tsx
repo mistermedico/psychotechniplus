@@ -3,6 +3,7 @@ import {
   ActionSheetIOS,
   Alert,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -100,7 +101,7 @@ export default function ProfileTab() {
   const {
     name, level, streak,
     totalSessions, totalCorrect, totalAnswered, badges,
-    getTopicLevelLabel, reset, signOut, deleteAccount, isPremium,
+    getTopicLevelLabel, reset, signOut, deleteAccount, isPremium, isGuest,
   } = useUserStore();
   const email = useUserStore(state => state.email);
   const { hapticsEnabled, defaultDifficulty, questionFontSize, updateSetting } = useSettingsStore();
@@ -108,6 +109,10 @@ export default function ProfileTab() {
   const { isAdmin, targets } = useAdminStore();
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [picker, setPicker] = useState<null | {
+    title: string;
+    options: Array<{ label: string; onPress: () => void }>;
+  }>(null);
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -244,13 +249,15 @@ export default function ProfileTab() {
       );
       return;
     }
-    Alert.alert('רמת קושי', 'בחר רמת קושי ברירת מחדל:', [
-      { text: 'ביטול', style: 'cancel' },
-      { text: 'אוטומטי (ELO)', onPress: () => updateSetting('defaultDifficulty', 'auto') },
-      { text: 'קל', onPress: () => updateSetting('defaultDifficulty', 'easy') },
-      { text: 'בינוני', onPress: () => updateSetting('defaultDifficulty', 'medium') },
-      { text: 'קשה', onPress: () => updateSetting('defaultDifficulty', 'hard') },
-    ]);
+    setPicker({
+      title: 'רמת קושי ברירת מחדל',
+      options: [
+        { label: 'אוטומטי (ELO)', onPress: () => updateSetting('defaultDifficulty', 'auto') },
+        { label: 'קל', onPress: () => updateSetting('defaultDifficulty', 'easy') },
+        { label: 'בינוני', onPress: () => updateSetting('defaultDifficulty', 'medium') },
+        { label: 'קשה', onPress: () => updateSetting('defaultDifficulty', 'hard') },
+      ],
+    });
   };
 
   const handleFontSize = () => {
@@ -267,12 +274,14 @@ export default function ProfileTab() {
       );
       return;
     }
-    Alert.alert('גודל טקסט', 'בחר גודל טקסט:', [
-      { text: 'ביטול', style: 'cancel' },
-      { text: 'קטן', onPress: () => updateSetting('questionFontSize', 'small') },
-      { text: 'בינוני', onPress: () => updateSetting('questionFontSize', 'medium') },
-      { text: 'גדול', onPress: () => updateSetting('questionFontSize', 'large') },
-    ]);
+    setPicker({
+      title: 'גודל טקסט שאלות',
+      options: [
+        { label: 'קטן', onPress: () => updateSetting('questionFontSize', 'small') },
+        { label: 'בינוני', onPress: () => updateSetting('questionFontSize', 'medium') },
+        { label: 'גדול', onPress: () => updateSetting('questionFontSize', 'large') },
+      ],
+    });
   };
 
   return (
@@ -298,7 +307,7 @@ export default function ProfileTab() {
 
             <Text style={styles.profileName}>{name || 'מתאמן'}</Text>
             <Text style={styles.profileEloTitle}>{mainLevelLabel}</Text>
-            <Text style={styles.profileEmail}>{email}</Text>
+            {!isGuest && email ? <Text style={styles.profileEmail}>{email}</Text> : <Text style={styles.profileEmail}>מצב אורח</Text>}
 
             {isPremium ? (
               <LinearGradient colors={['#D97706', '#FBBF24', '#FDE68A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.premiumPill}>
@@ -310,6 +319,11 @@ export default function ProfileTab() {
               </View>
             )}
 
+            {isGuest ? (
+              <Pressable onPress={() => router.push('/auth')} style={styles.heroSignOutBtn}>
+                <Text style={styles.heroSignOutText}>התחברות / הרשמה</Text>
+              </Pressable>
+            ) : (
             <Pressable
               onPress={handleSignOut}
               disabled={signingOut}
@@ -320,6 +334,7 @@ export default function ProfileTab() {
             >
               <Text style={styles.heroSignOutText}>{signingOut ? 'יוצא...' : 'יציאה מהחשבון'}</Text>
             </Pressable>
+            )}
 
             <View style={styles.heroStats}>
               {[
@@ -402,9 +417,9 @@ export default function ProfileTab() {
 
           <SectionTitle tag="DANGER ZONE" title="פעולות חשבון" danger />
           <View style={styles.settingsCard}>
-            <SettingRow icon="🚪" label={signingOut ? 'יוצא...' : 'יציאה מהחשבון'} onPress={handleSignOut} danger disabled={signingOut} />
-            <SettingRow icon="🧹" label="איפוס התקדמות" onPress={handleReset} danger />
-            <SettingRow icon="⛔" label={deletingAccount ? 'מוחק חשבון...' : 'מחיקת חשבון לצמיתות'} onPress={handleDeleteAccount} danger disabled={deletingAccount} isLast />
+            {!isGuest && <SettingRow icon="🚪" label={signingOut ? 'יוצא...' : 'יציאה מהחשבון'} onPress={handleSignOut} danger disabled={signingOut} />}
+            <SettingRow icon="🧹" label="איפוס התקדמות" onPress={handleReset} danger isLast={isGuest} />
+            {!isGuest && <SettingRow icon="⛔" label={deletingAccount ? 'מוחק חשבון...' : 'מחיקת חשבון לצמיתות'} onPress={handleDeleteAccount} danger disabled={deletingAccount} isLast />}
           </View>
 
           {!isPremium && (
@@ -425,6 +440,28 @@ export default function ProfileTab() {
           </Pressable>
         </ScrollView>
       </SafeAreaView>
+      <Modal visible={!!picker} transparent animationType="fade" onRequestClose={() => setPicker(null)}>
+        <Pressable style={styles.pickerBackdrop} onPress={() => setPicker(null)}>
+          <Pressable style={styles.pickerCard} onPress={() => {}}>
+            <Text style={styles.pickerTitle}>{picker?.title}</Text>
+            {picker?.options.map(option => (
+              <Pressable
+                key={option.label}
+                onPress={() => {
+                  option.onPress();
+                  setPicker(null);
+                }}
+                style={({ pressed }) => [styles.pickerOption, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.pickerOptionText}>{option.label}</Text>
+              </Pressable>
+            ))}
+            <Pressable onPress={() => setPicker(null)} style={styles.pickerCancel}>
+              <Text style={styles.pickerCancelText}>ביטול</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -440,6 +477,13 @@ function SectionTitle({ tag, title, danger }: { tag: string; title: string; dang
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  pickerCard: { width: '100%', maxWidth: 420, backgroundColor: '#111827', borderRadius: 20, borderWidth: 1, borderColor: Colors.border, padding: 16 },
+  pickerTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.text, textAlign: 'right', marginBottom: 10 },
+  pickerOption: { paddingVertical: 13, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  pickerOptionText: { fontFamily: FontFamily.medium, fontSize: FontSize.base, color: Colors.text, textAlign: 'right' },
+  pickerCancel: { marginTop: 10, paddingVertical: 12, alignItems: 'center' },
+  pickerCancelText: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textSecondary },
   safe: { flex: 1 },
   scroll: { flex: 1 },
   content: {
