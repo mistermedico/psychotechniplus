@@ -139,7 +139,7 @@ function seriesQuestions(): GeneratedQuestionSeed[] {
 
 function quantitativeQuestions(): GeneratedQuestionSeed[] {
   const seeds: GeneratedQuestionSeed[] = [];
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 8; i++) {
     const base = 120 + i * 10;
     const percent = [15, 20, 25, 30, 35, 40][i % 6];
     const answer = Math.round((base * percent) / 100);
@@ -268,7 +268,7 @@ function spatialQuestions(): GeneratedQuestionSeed[] {
     [5, 4, 2, 40, '5×4×2 = 40 קוביות קטנות.'],
     [5, 3, 3, 45, '5×3×3 = 45 קוביות קטנות.'],
   ];
-  cubes.forEach((c, i) => seeds.push({
+  cubes.slice(0, 6).forEach((c, i) => seeds.push({
     topicId: 'topic_spatial',
     prefix: 'spatial_cubes',
     questionType: 'shapes',
@@ -550,7 +550,7 @@ function massiveQuantitativeQuestions(): GeneratedQuestionSeed[] {
     [4, 5, 108, 48, 'סך יחידות היחס הוא 9. כל יחידה שווה 12, ולכן 4 יחידות הן 48.'],
     [8, 13, 210, 80, 'סך יחידות היחס הוא 21. כל יחידה שווה 10, ולכן 8 יחידות הן 80.'],
   ];
-  ratios.forEach((r, i) => seeds.push({
+  ratios.slice(0, 6).forEach((r, i) => seeds.push({
     topicId: 'topic_quantitative',
     prefix: 'quant_ratio',
     questionType: 'quantitative',
@@ -579,7 +579,7 @@ function massiveQuantitativeQuestions(): GeneratedQuestionSeed[] {
     const d = denominator / divisor;
     return d === 1 ? `${n}` : `${n}/${d}`;
   };
-  work.forEach((w, i) => seeds.push({
+  work.slice(0, 6).forEach((w, i) => seeds.push({
     topicId: 'topic_quantitative',
     prefix: 'quant_work',
     questionType: 'quantitative',
@@ -630,7 +630,7 @@ function massiveQuantitativeQuestions(): GeneratedQuestionSeed[] {
     [315, 45, '315 מתחלק ב-45 כי 45×7=315.'],
     [360, 40, '360 מתחלק ב-40 כי 40×9=360.'],
   ];
-  numberTheory.forEach((n, i) => seeds.push({
+  numberTheory.slice(0, 6).forEach((n, i) => seeds.push({
     topicId: 'topic_quantitative',
     prefix: 'quant_divisibility',
     questionType: 'quantitative',
@@ -675,7 +675,7 @@ function massiveLogicQuestions(): GeneratedQuestionSeed[] {
   }));
 
   const syllogisms = [
-    ['כל המהנדסים מדויקים. חלק מהמדויקים זריזים. מה נובע בהכרח?', 'כל המהנדסים מדויקים', 'רק הטענה הראשונה מובטחת; אין הכרח שחלק מהמהנדסים זריזים.'],
+    ['כל המהנדסים מדויקים. אף אדם מהיר אינו מדויק. מה נובע בהכרח?', 'אף מהנדס אינו מהיר', 'כל מהנדס מדויק, ואין אדם שהוא גם מהיר וגם מדויק; לכן מהנדס אינו יכול להיות מהיר.'],
     ['אין תלמיד שהוא גם נעדר וגם נבחן. רועי נבחן. מה נובע?', 'רועי אינו נעדר', 'אם נבחן לא יכול להיות נעדר לפי הכלל.'],
     ['כל מי שקיבל אישור נכנס. דנה לא נכנסה. מה נובע?', 'דנה לא קיבלה אישור', 'אם הייתה מקבלת אישור הייתה נכנסת; שלילת התוצאה שוללת את התנאי המספיק.'],
     ['רק מי שסיים אימון יכול לגשת למבחן. יעל ניגשה למבחן. מה נובע?', 'יעל סיימה אימון', 'סיום אימון הוא תנאי הכרחי.'],
@@ -862,7 +862,7 @@ function massiveSpatialQuestions(): GeneratedQuestionSeed[] {
     [[7, 4, 1], 12],
     [[10, 8, 6], 24],
   ];
-  layers.forEach((l, i) => seeds.push({
+  layers.slice(0, 6).forEach((l, i) => seeds.push({
     topicId: 'topic_spatial',
     prefix: 'spatial_layers',
     questionType: 'shapes',
@@ -1338,10 +1338,10 @@ function premiumLogicReasoningQuestions(): GeneratedQuestionSeed[] {
       topicId: 'topic_logic',
       prefix: 'premium_logic_inference',
       questionType: 'logic',
-      questionText: `הסקה לוגית ${i + 1}: ${set.rule} איזו מסקנה מתחייבת?`,
+      questionText: `${set.rule} איזו מסקנה מתחייבת?`,
       options: [set.answer, ...set.wrong] as [string, string, string, string],
       correctIndex: 0,
-      explanation: `${set.reason} לכן התשובה הנכונה היא "${set.answer}", ואין להסיק אף אחת מהאפשרויות האחרות כי הן מוסיפות מידע שלא נאמר.`,
+      explanation: set.reason,
       difficulty: 3 + (i % 8),
       targetIds: TOPIC_TARGETS.topic_logic,
       accessLevel: 'premium',
@@ -1361,10 +1361,10 @@ function premiumLogicReasoningQuestions(): GeneratedQuestionSeed[] {
       topicId: 'topic_logic',
       prefix: 'premium_logic_ordering',
       questionType: 'logic',
-      questionText: `סידור נתונים ${i + 1}: נתונים ארבעה פריטים: ${c.slice(0, 4).join(', ')}. התנאים: ${c[4]}. מהו הסדר היחיד שמתאים?`,
+      questionText: `נתונים ארבעה פריטים: ${c.slice(0, 4).join(', ')}. התנאים: ${c[4]}. מהו הסדר היחיד שמתאים?`,
       options: [c[5], `${c[1]}, ${c[0]}, ${c[2]}, ${c[3]}`, `${c[3]}, ${c[2]}, ${c[1]}, ${c[0]}`, `${c[0]}, ${c[2]}, ${c[1]}, ${c[3]}`] as [string, string, string, string],
       correctIndex: 0,
-      explanation: `${c[6]} לכן התשובה הנכונה היא "${c[5]}"; שאר האפשרויות מפרות לפחות אחד מתנאי הקדימות או המיקום.`,
+      explanation: c[6],
       difficulty: 2 + (i % 9),
       targetIds: TOPIC_TARGETS.topic_logic,
       accessLevel: 'premium',
@@ -1385,10 +1385,10 @@ function premiumLogicReasoningQuestions(): GeneratedQuestionSeed[] {
       topicId: 'topic_logic',
       prefix: 'premium_logic_series',
       questionType: 'logic',
-      questionText: `סדרה לוגית ${i + 1}: מה האיבר הבא בסדרה ${p.nums.join(', ')}, ___ ?`,
+      questionText: `מה האיבר הבא בסדרה ${p.nums.join(', ')}, ___ ?`,
       options: [p.answer, ...p.wrong] as [string, string, string, string],
       correctIndex: 0,
-      explanation: `${p.rule} לכן התשובה הנכונה היא "${p.answer}", והמסיחים אינם שומרים על אותו כלל מעבר.`,
+      explanation: p.rule,
       difficulty: 2 + (i % 9),
       targetIds: TOPIC_TARGETS.topic_logic,
       accessLevel: 'premium',
@@ -1415,10 +1415,10 @@ function premiumVerbalReasoningQuestions(): GeneratedQuestionSeed[] {
       topicId: 'topic_verbal',
       prefix: 'premium_verbal_analogy',
       questionType: 'verbal',
-      questionText: `אנלוגיה ${i + 1}: ${a[0]} : ${a[1]} = ?`,
+      questionText: `${a[0]} : ${a[1]} = ?`,
       options: [answer, `${a[3]} : ${a[2]}`, 'שאלה : תשובה', 'זמן : שעון'] as [string, string, string, string],
       correctIndex: 0,
-      explanation: `${a[4]} לכן התשובה הנכונה היא "${answer}", משום שהיא שומרת על אותו יחס תפקודי בין שני המושגים.`,
+      explanation: a[4],
       difficulty: 2 + (i % 8),
       targetIds: TOPIC_TARGETS.topic_verbal,
       accessLevel: 'premium',
@@ -1458,10 +1458,10 @@ function premiumVerbalReasoningQuestions(): GeneratedQuestionSeed[] {
       topicId: 'topic_verbal',
       prefix: 'premium_verbal_completion',
       questionType: 'verbal',
-      questionText: `השלמת משפט ${i + 1}: ${c.sentence}`,
+      questionText: c.sentence,
       options: [c.answer, ...c.wrong] as [string, string, string, string],
       correctIndex: 0,
-      explanation: `${c.reason} לכן התשובה הנכונה היא "${c.answer}", ושאר האפשרויות יוצרות משמעות לא טבעית או לא הגיונית.`,
+      explanation: c.reason,
       difficulty: 2 + (i % 9),
       targetIds: TOPIC_TARGETS.topic_verbal,
       accessLevel: 'premium',
@@ -1495,10 +1495,10 @@ function premiumVerbalReasoningQuestions(): GeneratedQuestionSeed[] {
       topicId: 'topic_verbal',
       prefix: 'premium_verbal_passage',
       questionType: 'verbal',
-      questionText: `הבנת הנקרא ${i + 1}: ${p.text} מה המסקנה המדויקת ביותר?`,
+      questionText: `${p.text} מה המסקנה המדויקת ביותר?`,
       options: [p.answer, ...p.wrong] as [string, string, string, string],
       correctIndex: 0,
-      explanation: `${p.reason} לכן התשובה הנכונה היא "${p.answer}", כי היא מסכמת רק את מה שנאמר ואינה מוסיפה טענה קיצונית.`,
+      explanation: p.reason,
       difficulty: 3 + (i % 8),
       targetIds: TOPIC_TARGETS.topic_verbal,
       accessLevel: 'premium',
