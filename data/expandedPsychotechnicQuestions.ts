@@ -1332,7 +1332,7 @@ function premiumLogicReasoningQuestions(): GeneratedQuestionSeed[] {
     },
   ];
 
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < inferenceSets.length * 2; i++) {
     const set = inferenceSets[i % inferenceSets.length];
     seeds.push({
       topicId: 'topic_logic',
@@ -1355,7 +1355,7 @@ function premiumLogicReasoningQuestions(): GeneratedQuestionSeed[] {
     ['חדר 1', 'חדר 2', 'חדר 3', 'חדר 4', 'חדר 3 מימין לחדר 2; חדר 1 משמאל לחדר 2; חדר 4 מימין לחדר 3', 'חדר 1, חדר 2, חדר 3, חדר 4', 'היחסים יוצרים רצף יחיד משמאל לימין.'],
     ['קל', 'בינוני', 'קשה', 'קשה מאוד', 'בינוני מעל קל; קשה מעל בינוני; קשה מאוד מעל קשה', 'קל, בינוני, קשה, קשה מאוד', 'כל תנאי מציב רמה אחת מעל הקודמת.'],
   ];
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < orderContexts.length * 2; i++) {
     const c = orderContexts[i % orderContexts.length];
     seeds.push({
       topicId: 'topic_logic',
@@ -1379,7 +1379,7 @@ function premiumLogicReasoningQuestions(): GeneratedQuestionSeed[] {
     { nums: [1, 4, 9, 16], answer: '25', wrong: ['20', '24', '30'], rule: 'אלו ריבועים עוקבים: 1², 2², 3², 4², ולכן הבא 5².' },
     { nums: [7, 11, 19, 35], answer: '67', wrong: ['59', '63', '71'], rule: 'ההפרשים מוכפלים: 4, 8, 16, ולכן הבא 32.' },
   ];
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < patternRules.length * 2; i++) {
     const p = patternRules[i % patternRules.length];
     seeds.push({
       topicId: 'topic_logic',
@@ -1408,7 +1408,7 @@ function premiumVerbalReasoningQuestions(): GeneratedQuestionSeed[] {
     ['שורש', 'עץ', 'יסוד', 'בניין', 'שורש תומך בעץ כפי שיסוד תומך בבניין.'],
     ['תרגול', 'מיומנות', 'קריאה', 'ידע', 'תרגול מפתח מיומנות וקריאה מרחיבה ידע.'],
   ];
-  for (let i = 0; i < 85; i++) {
+  for (let i = 0; i < analogies.length * 2; i++) {
     const a = analogies[i % analogies.length];
     const answer = `${a[2]} : ${a[3]}`;
     seeds.push({
@@ -1452,7 +1452,7 @@ function premiumVerbalReasoningQuestions(): GeneratedQuestionSeed[] {
       reason: 'מבחן פסיכוטכני בוחן דיוק, ולכן יש לבחור בתשובה שמותאמת בדיוק לניסוח.',
     },
   ];
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < completionSets.length * 2; i++) {
     const c = completionSets[i % completionSets.length];
     seeds.push({
       topicId: 'topic_verbal',
@@ -1489,7 +1489,7 @@ function premiumVerbalReasoningQuestions(): GeneratedQuestionSeed[] {
       reason: 'הקטע מציג שתי חוויות שונות ומבהיר את המטרה של כל אחת.',
     },
   ];
-  for (let i = 0; i < 75; i++) {
+  for (let i = 0; i < passages.length * 2; i++) {
     const p = passages[i % passages.length];
     seeds.push({
       topicId: 'topic_verbal',
