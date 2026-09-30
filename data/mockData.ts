@@ -6481,12 +6481,11 @@ const BASE_QUESTION_OVERRIDES: Record<string, Partial<Pick<Question, 'questionTe
 function reviewBaseQuestion(question: Question): Question {
   const reviewed = { ...question, ...BASE_QUESTION_OVERRIDES[question.id] };
   const cleanExplanation = reviewed.explanation.trim();
+  if (cleanExplanation.length > 0) {
+    return { ...reviewed, explanation: cleanExplanation };
+  }
   const correctText = reviewed.options.find(option => option.isCorrect)?.text ?? reviewed.correctAnswer;
-  if (cleanExplanation.length >= 35 && cleanExplanation.includes(correctText)) return reviewed;
-  return {
-    ...reviewed,
-    explanation: `${cleanExplanation}${cleanExplanation.endsWith('.') ? '' : '.'} התשובה הנכונה היא "${correctText}".`,
-  };
+  return { ...reviewed, explanation: `הפתרון המתאים הוא "${correctText}".` };
 }
 
 const REVIEWED_BASE_QUESTIONS: Question[] = BASE_QUESTIONS.map(reviewBaseQuestion);
