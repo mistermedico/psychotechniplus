@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Question, UserAnswer, SessionMode } from '../data/types';
 import { selectAdaptiveQuestion, computeAdaptiveLevel, PerformanceLevel } from '../utils/adaptive';
 import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
+import { shuffleOptionsSafely } from '../utils/optionOrder';
 
 function shuffleArray<T>(items: T[]): T[] {
   const copy = [...items];
@@ -14,7 +15,7 @@ function shuffleArray<T>(items: T[]): T[] {
 
 function normalizeSessionQuestion(question: Question): Question {
   const normalized = isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question;
-  return { ...normalized, options: shuffleArray(normalized.options) };
+  return { ...normalized, options: shuffleOptionsSafely(normalized.options, shuffleArray) };
 }
 
 interface ActiveSession {

@@ -243,7 +243,10 @@ function validateBank(rows, opts = {}) {
   const byText = new Map();
   const byImage = new Map();
   for (const q of pool) {
-    const key = normalizeText(q.questionText);
+    // Visual questions legitimately share a generic prompt ("which shape is the mirror image?"),
+    // so for them a duplicate means the same text AND the same image.
+    const textKey = normalizeText(q.questionText);
+    const key = textKey && (q.mediaUrl ? `${textKey}|${hash(q.mediaUrl)}` : textKey);
     if (key) byText.set(key, [...(byText.get(key) ?? []), q.id]);
     if (q.mediaUrl) {
       const h = hash(q.mediaUrl);
