@@ -13,7 +13,7 @@ export const TARGETS: Target[] = [
     color: '#8B5CF6',
     gradientColors: ['#8B5CF6', '#6D28D9'],
     order: 1,
-    totalQuestions: 979,
+    totalQuestions: 778,
     freeQuestionsCount: 80,
     isPremiumOnly: false,
     isActive: true,
@@ -6474,7 +6474,7 @@ function reviewBaseQuestion(question: Question): Question {
   if (cleanExplanation.length >= 35 && cleanExplanation.includes(correctText)) return reviewed;
   return {
     ...reviewed,
-    explanation: `${cleanExplanation}${cleanExplanation.endsWith('.') ? '' : '.'} לכן התשובה הנכונה היא "${correctText}", כי היא היחידה שתואמת את החישוב או הכלל שמופיע בשאלה.`,
+    explanation: `${cleanExplanation}${cleanExplanation.endsWith('.') ? '' : '.'} התשובה הנכונה היא "${correctText}".`,
   };
 }
 
