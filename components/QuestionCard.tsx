@@ -8,6 +8,7 @@ import { FontFamily, FontSize, Radius, Shadow, Spacing } from '../constants/them
 import { useSettingsStore, FontSizeOption } from '../store/settingsStore';
 import { detectDir, textAlign } from '../utils/textDirection';
 import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
+import { imageShowsQuestionText } from '../utils/svgTitle';
 import { VisualImage } from './VisualImage';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
@@ -172,7 +173,10 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
             )}
           </View>
         )}
-        {!isSpatial && (
+        {/* Spatial questions used to hide their text entirely, which hid the instructions of
+            image-only questions (e.g. "rotate 90°, mirror, then rotate 180°"). Show the text
+            unless the image itself already draws exactly the same question. */}
+        {!(isSpatial && imageShowsQuestionText(displayQuestion.questionText, displayQuestion.mediaUrl)) && (
           <Text style={[styles.questionText, { fontSize: questionFontSize_, textAlign: textAlign(displayQuestion.questionText), writingDirection: questionDir }]}>
             {displayQuestion.questionText}
           </Text>

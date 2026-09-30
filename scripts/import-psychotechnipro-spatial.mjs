@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+const { guardQuestionImport } = createRequire(import.meta.url)('./lib/question-import-guard.cjs');
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PLUS_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -139,13 +140,14 @@ async function main() {
   const supabaseSource = await fs.readFile(path.join(PLUS_ROOT, 'lib', 'supabase.ts'), 'utf8');
   const plus = createSupabaseClient(
     readConstant(supabaseSource, 'SUPABASE_URL'),
-    readConstant(supabaseSource, 'SUPABASE_ANON_KEY'),
+    process.env.SUPABASE_SERVICE_ROLE_KEY || readConstant(supabaseSource, 'SUPABASE_ANON_KEY'),
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 
+  const safeRows = await guardQuestionImport(plus, rows);
   let upserted = 0;
-  for (let index = 0; index < rows.length; index += 10) {
-    const batch = rows.slice(index, index + 10);
+  for (let index = 0; index < safeRows.length; index += 10) {
+    const batch = safeRows.slice(index, index + 10);
     const { data, error } = await plus
       .from('questions')
       .upsert(batch, { onConflict: 'id' })

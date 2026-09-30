@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+const { guardQuestionImport } = createRequire(import.meta.url)('./lib/question-import-guard.cjs');
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const plusRoot = path.resolve(scriptDir, '..');
@@ -166,12 +167,13 @@ async function main() {
   if (!apply) return console.log(JSON.stringify({ mode: 'dry-run', ...summary }, null, 2));
 
   const supabaseSource = await fs.readFile(path.join(plusRoot, 'lib', 'supabase.ts'), 'utf8');
-  const plus = createSupabaseClient(readConstant(supabaseSource, 'SUPABASE_URL'), readConstant(supabaseSource, 'SUPABASE_ANON_KEY'), {
+  const plus = createSupabaseClient(readConstant(supabaseSource, 'SUPABASE_URL'), process.env.SUPABASE_SERVICE_ROLE_KEY || readConstant(supabaseSource, 'SUPABASE_ANON_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const safeRows = await guardQuestionImport(plus, rows);
   let upserted = 0;
-  for (let index = 0; index < rows.length; index += 10) {
-    const { data, error } = await plus.from('questions').upsert(rows.slice(index, index + 10), { onConflict: 'id' }).select('id');
+  for (let index = 0; index < safeRows.length; index += 10) {
+    const { data, error } = await plus.from('questions').upsert(safeRows.slice(index, index + 10), { onConflict: 'id' }).select('id');
     if (error) throw new Error(`Destination batch ${index / 10 + 1} failed: ${error.message}`);
     upserted += data?.length ?? 0;
   }
