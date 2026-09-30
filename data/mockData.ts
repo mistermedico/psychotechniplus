@@ -13,7 +13,7 @@ export const TARGETS: Target[] = [
     color: '#8B5CF6',
     gradientColors: ['#8B5CF6', '#6D28D9'],
     order: 1,
-    totalQuestions: 778,
+    totalQuestions: 525,
     freeQuestionsCount: 80,
     isPremiumOnly: false,
     isActive: true,
@@ -6299,6 +6299,17 @@ const BASE_QUESTIONS: Question[] = [
 ];
 
 const BASE_QUESTION_OVERRIDES: Record<string, Partial<Pick<Question, 'questionText' | 'options' | 'correctAnswer' | 'explanation'>>> = {
+  q_logic_062: {
+    questionText: 'כל הטכנאים מדויקים. אף אדם מהיר אינו מדויק. איזו מסקנה מתחייבת?',
+    options: [
+      { id: 'a', text: 'אף טכנאי אינו מהיר', isCorrect: true },
+      { id: 'b', text: 'כל אדם מדויק הוא טכנאי', isCorrect: false },
+      { id: 'c', text: 'כל הטכנאים מהירים', isCorrect: false },
+      { id: 'd', text: 'חלק מהאנשים המהירים הם טכנאים', isCorrect: false },
+    ],
+    correctAnswer: 'a',
+    explanation: 'כל טכנאי מדויק, ואין אדם שהוא גם מהיר וגם מדויק. לכן טכנאי אינו יכול להיות מהיר.',
+  },
   q_logic_008: {
     options: [
       { id: 'a', text: 'א', isCorrect: false },
