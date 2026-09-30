@@ -54,7 +54,7 @@ const FEATURES = [
 ];
 
 const STATS = [
-  { value: '778', label: 'שאלות תרגול פעילות' },
+  { value: '525', label: 'שאלות תרגול פעילות' },
   { value: '4', label: 'תחומי תרגול' },
   { value: '12', label: 'סימולציות פעילות' },
 ];
