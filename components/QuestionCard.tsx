@@ -10,6 +10,7 @@ import { detectDir, textAlign } from '../utils/textDirection';
 import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
 import { imageShowsQuestionText } from '../utils/svgTitle';
 import { VisualImage } from './VisualImage';
+import { shuffleOptionsSafely } from '../utils/optionOrder';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 interface Props {
@@ -58,7 +59,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
   if (lastQuestionIdRef.current !== displayQuestion.id) {
     lastQuestionIdRef.current = displayQuestion.id;
     shuffledOptionsRef.current = shuffleOptions
-      ? shuffleArray(displayQuestion.options)
+      ? shuffleOptionsSafely(displayQuestion.options, shuffleArray)
       : displayQuestion.options;
   }
   const displayOptions = shuffledOptionsRef.current ?? displayQuestion.options;

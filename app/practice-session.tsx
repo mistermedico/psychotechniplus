@@ -12,6 +12,7 @@ import { useUserStore } from '../store/userStore';
 import { useAdminStore } from '../store/adminStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { fetchQuestionById, fetchQuestions } from '../lib/db';
+import { shuffleOptionsSafely } from '../utils/optionOrder';
 import { AdBanner } from '../components/AdBanner';
 import { QuestionCard } from '../components/QuestionCard';
 import { VisualImage } from '../components/VisualImage';
@@ -505,7 +506,7 @@ export default function PracticeSession() {
       if (practiceSettings.shuffleAnswerOptions) {
         questionPool = questionPool.map(q => ({
           ...q,
-          options: [...q.options].sort(() => Math.random() - 0.5),
+          options: shuffleOptionsSafely(q.options, opts => [...opts].sort(() => Math.random() - 0.5)),
         }));
       }
       if (!(await claimQuotaIfNeeded())) return;

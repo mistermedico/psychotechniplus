@@ -17,7 +17,9 @@
     "build:ios-js": "expo export --platform ios --output-dir dist-ios-check",
     "verify:platforms": "npm run typecheck && npm run build:web && npm run build:ios-js",
     "validate:questions": "node scripts/validate-question-bank.cjs",
-    "validate:questions:live": "node scripts/validate-question-bank.cjs --live"
+    "validate:questions:live": "node scripts/validate-question-bank.cjs --live",
+    "generate:spatial": "node scripts/generate-spatial-questions.cjs",
+    "verify:spatial": "node scripts/verify-spatial-questions.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/heebo": "^0.2.3",
