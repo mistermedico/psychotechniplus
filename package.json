@@ -15,7 +15,9 @@
     "build:ios:production": "npx eas-cli@20.2.0 build --platform ios --profile production --non-interactive",
     "submit:ios:production": "npx eas-cli@20.2.0 submit --platform ios --profile production --latest --non-interactive",
     "build:ios-js": "expo export --platform ios --output-dir dist-ios-check",
-    "verify:platforms": "npm run typecheck && npm run build:web && npm run build:ios-js"
+    "verify:platforms": "npm run typecheck && npm run build:web && npm run build:ios-js",
+    "validate:questions": "node scripts/validate-question-bank.cjs",
+    "validate:questions:live": "node scripts/validate-question-bank.cjs --live"
   },
   "dependencies": {
     "@expo-google-fonts/heebo": "^0.2.3",

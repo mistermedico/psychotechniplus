@@ -1,4 +1,5 @@
 import { Question, QuestionType } from '../data/types';
+import { imageTitleMismatch } from './svgTitle';
 
 export function auditPsychotechnicQuestion(
   q: Pick<Question, 'questionText' | 'targetIds' | 'topicId' | 'questionType' | 'options' | 'correctAnswer' | 'explanation' | 'difficulty' | 'mediaUrl'>
@@ -29,6 +30,10 @@ export function auditPsychotechnicQuestion(
   if (correctOptions.length !== 1) issues.push('חייבת להיות תשובה נכונה אחת בלבד.');
   if (correctOptions.length === 1 && q.correctAnswer !== correctOptions[0].id) issues.push('שדה התשובה הנכונה לא תואם לאפשרות המסומנת.');
   if (!q.explanation.trim() || q.explanation.trim().length < 25) issues.push('חסר הסבר מקיף מספיק למשתמש.');
+  const mismatchedTitle = imageTitleMismatch(q.questionText, q.mediaUrl);
+  if (mismatchedTitle) issues.push(`התמונה מציגה שאלה אחרת ("${mismatchedTitle}") מזו שבטקסט.`);
+  const optionImages = cleanOptions.map(o => o.imageUrl).filter(Boolean) as string[];
+  if (new Set(optionImages).size !== optionImages.length) issues.push('יש תמונות תשובה זהות.');
   if (q.questionType === 'shapes') {
     if (!q.mediaUrl) issues.push('שאלת צורות/מרחב חייבת לכלול תמונה מרכזית לשאלה.');
     if (!cleanOptions.every(o => !!o.imageUrl)) issues.push('בשאלת צורות/מרחב לכל תשובה חייבת להיות תמונה.');

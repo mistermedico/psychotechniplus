@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
+import { createRequire } from 'node:module';
+const { guardQuestionImport } = createRequire(import.meta.url)('./lib/question-import-guard.cjs');
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const apply = process.argv.includes('--apply');
@@ -137,13 +139,14 @@ async function main() {
 
   const source = await fs.readFile(path.join(root, 'lib', 'supabase.ts'), 'utf8');
   const read = name => source.match(new RegExp(`const\\s+${name}\\s*=\\s*['\"]([^'\"]+)['\"]`))?.[1];
-  const client = createClient(read('SUPABASE_URL'), read('SUPABASE_ANON_KEY'), { auth: { persistSession: false } });
-  for (let i = 0; i < rows.length; i += 20) {
-    const { error } = await client.from('questions').upsert(rows.slice(i, i + 20), { onConflict: 'id' });
+  const client = createClient(read('SUPABASE_URL'), process.env.SUPABASE_SERVICE_ROLE_KEY || read('SUPABASE_ANON_KEY'), { auth: { persistSession: false } });
+  const safeRows = await guardQuestionImport(client, rows);
+  for (let i = 0; i < safeRows.length; i += 20) {
+    const { error } = await client.from('questions').upsert(safeRows.slice(i, i + 20), { onConflict: 'id' });
     if (error) throw new Error(`Batch ${i / 20 + 1}: ${error.message}`);
   }
   const { count, error } = await client.from('questions').select('id', { head: true, count: 'exact' }).like('id', `${idsPrefix}%`);
-  if (error || count !== rows.length) throw new Error(error?.message || `Expected ${rows.length}, found ${count}`);
+  if (error || count < safeRows.length) throw new Error(error?.message || `Expected ${rows.length}, found ${count}`);
   console.log(JSON.stringify({ mode: 'applied', ...summary, verified: count }, null, 2));
 }
 

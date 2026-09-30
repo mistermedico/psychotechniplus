@@ -2,6 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 const ts = require('typescript');
+const { guardQuestionImport } = require('./lib/question-import-guard.cjs');
 
 const root = path.join(__dirname, '..');
 const buildDir = path.join(root, '.reviewed-seed-build');
@@ -9,7 +10,7 @@ const buildDir = path.join(root, '.reviewed-seed-build');
 function readSupabaseConfig() {
   const src = fs.readFileSync(path.join(root, 'lib', 'supabase.ts'), 'utf8');
   const url = src.match(/SUPABASE_URL = '([^']+)'/)?.[1];
-  const key = src.match(/SUPABASE_ANON_KEY =\s*'([^']+)'/s)?.[1];
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || src.match(/SUPABASE_ANON_KEY =\s*'([^']+)'/s)?.[1];
   if (!url || !key) throw new Error('Could not read Supabase config from lib/supabase.ts');
   return { url, key };
 }
@@ -56,7 +57,7 @@ function questionToRow(q) {
 }
 
 async function upsertQuestions(supabase, questions) {
-  const rows = questions.map(questionToRow);
+  const rows = await guardQuestionImport(supabase, questions.map(questionToRow));
   const batchSize = 50;
   let saved = 0;
   for (let i = 0; i < rows.length; i += batchSize) {
