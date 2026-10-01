@@ -37,6 +37,10 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   fill_in_the_blank: 'השלמת חסר',
 };
 
+function alertOnSaveFailure(result: { ok: boolean; error?: string }) {
+  if (!result.ok) Alert.alert('שגיאת שמירה', result.error ?? 'השינוי לא נשמר ב-Supabase.');
+}
+
 export default function QuestionAssignmentScreen() {
   const [tab, setTab] = useState<Tab>('topic');
   const [toastError, setToastError] = useState<AdminToastError | null>(null);
@@ -243,9 +247,12 @@ function TopicAssignmentTab({ onError }: { onError: (error: AdminToastError | nu
           onPress: async () => {
             setIsSaving(true);
             setShowTargetModal(false);
-            assignQuestionsToTopic(ids, targetTopicId);
-            await new Promise(r => setTimeout(r, 400));
+            const result = await assignQuestionsToTopic(ids, targetTopicId);
             setIsSaving(false);
+            if (!result.ok) {
+              Alert.alert('שגיאת שמירה', result.error ?? 'השיוך לא נשמר ב-Supabase.');
+              return;
+            }
             setSelected(new Set());
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert('✅ שויך בהצלחה', `${ids.length} שאלות → "${target?.name}"\nנשמר ב-Supabase`);
@@ -398,9 +405,12 @@ function TargetAssignmentTab({ onError }: { onError: (error: AdminToastError | n
           onPress: async () => {
             setIsSaving(true);
             setShowTargetPicker(false);
-            assignQuestionsToTargets(ids, tIds);
-            await new Promise(r => setTimeout(r, 400));
+            const result = await assignQuestionsToTargets(ids, tIds);
             setIsSaving(false);
+            if (!result.ok) {
+              Alert.alert('שגיאת שמירה', result.error ?? 'השיוך לא נשמר ב-Supabase.');
+              return;
+            }
             setSelected(new Set());
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert('✅ שויך בהצלחה', `${ids.length} שאלות → ${names}\nנשמר ב-Supabase`);
@@ -542,23 +552,31 @@ function ExamAssignmentTab({ onError }: { onError: (error: AdminToastError | nul
     return q.slice(0, 80);
   }, [questions, pinned, qSearch, qStatusFilter]);
 
-  const addTopicRule = () => {
+  const addTopicRule = async () => {
     if (!template || !ruleTopicId) {
       showAdminErrorToast(onError, 'חסר נושא במבחן', 'בחר נושא לפני הוספת כלל למבחן.', { selectedTemplateId, ruleTopicId }, 'admin:question-assignment');
       return;
     }
-    const count = parseInt(ruleCount, 10);
-    const min = parseInt(ruleMinDiff, 10);
-    const max = parseInt(ruleMaxDiff, 10);
-    if (isNaN(count) || count < 1) {
-      showAdminErrorToast(onError, 'כמות שאלות לא תקינה', 'כמות שאלות חייבת להיות מספר חיובי.', { ruleCount, templateId: template.id }, 'admin:question-assignment');
+    const count = Number(ruleCount.trim());
+    const min = Number(ruleMinDiff.trim());
+    const max = Number(ruleMaxDiff.trim());
+    if (!Number.isInteger(count) || count < 1) {
+      showAdminErrorToast(onError, 'כמות שאלות לא תקינה', 'כמות שאלות חייבת להיות מספר שלם חיובי.', { ruleCount, templateId: template.id }, 'admin:question-assignment');
+      return;
+    }
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || min > 10 || max < 1 || max > 10) {
+      showAdminErrorToast(onError, 'טווח קושי לא תקין', 'קושי מינימלי ומקסימלי חייבים להיות מספרים שלמים בין 1 ל-10.', { ruleMinDiff, ruleMaxDiff, templateId: template.id }, 'admin:question-assignment');
       return;
     }
     if (min > max) {
       showAdminErrorToast(onError, 'טווח קושי לא תקין', 'קושי מינימלי לא יכול להיות גדול מהקושי המקסימלי.', { ruleMinDiff, ruleMaxDiff, templateId: template.id }, 'admin:question-assignment');
       return;
     }
-    addTopicRuleToTemplate(template.id, {
+    if (template.rules.some(r => r.topicId === ruleTopicId)) {
+      showAdminErrorToast(onError, 'כלל כפול', 'כבר קיים כלל לנושא זה במבחן. ערוך את הכלל הקיים במקום להוסיף חדש.', { ruleTopicId, templateId: template.id }, 'admin:question-assignment');
+      return;
+    }
+    const result = await addTopicRuleToTemplate(template.id, {
       id: `r_${Date.now()}`,
       topicId: ruleTopicId,
       count,
@@ -566,6 +584,10 @@ function ExamAssignmentTab({ onError }: { onError: (error: AdminToastError | nul
       maxDifficulty: max,
       useAdaptive: ruleAdaptive,
     });
+    if (!result.ok) {
+      Alert.alert('שגיאת שמירה', result.error ?? 'הכלל לא נשמר ב-Supabase.');
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowTopicRuleModal(false);
     setRuleTopicId('');
@@ -614,7 +636,7 @@ function ExamAssignmentTab({ onError }: { onError: (error: AdminToastError | nul
             <Pressable
               onPress={() => Alert.alert('הסרת נושא', `להסיר "${topic?.name}"?`, [
                 { text: 'ביטול', style: 'cancel' },
-                { text: 'הסר', style: 'destructive', onPress: () => removeTopicRuleFromTemplate(template.id, rule.id) },
+                { text: 'הסר', style: 'destructive', onPress: () => removeTopicRuleFromTemplate(template.id, rule.id).then(alertOnSaveFailure) },
               ])}
               style={styles.ruleRemoveBtn}
             >
@@ -649,7 +671,7 @@ function ExamAssignmentTab({ onError }: { onError: (error: AdminToastError | nul
 
       {pinnedQuestions.map(q => (
         <View key={q.id} style={styles.pinnedCard}>
-          <Pressable onPress={() => unpinQuestionFromTemplate(template.id, q.id)} style={styles.ruleRemoveBtn}>
+          <Pressable onPress={() => unpinQuestionFromTemplate(template.id, q.id).then(alertOnSaveFailure)} style={styles.ruleRemoveBtn}>
             <Text style={styles.ruleRemoveText}>✕</Text>
           </Pressable>
           <View style={styles.qInfo}>
@@ -731,7 +753,7 @@ function ExamAssignmentTab({ onError }: { onError: (error: AdminToastError | nul
               renderItem={({ item: q }) => (
                 <Pressable
                   onPress={() => {
-                    pinQuestionToTemplate(template.id, q.id);
+                    pinQuestionToTemplate(template.id, q.id).then(alertOnSaveFailure);
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   }}
                   style={styles.modalOption}
@@ -782,7 +804,7 @@ function AdaptivePoolTab({ onError }: { onError: (error: AdminToastError | null)
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
 
-  const bulkAction = async (label: string, fn: () => void) => {
+  const bulkAction = async (label: string, fn: () => Promise<{ ok: boolean; error?: string }>) => {
     const ids = [...selected];
     if (ids.length === 0) {
       showAdminErrorToast(onError, 'אין שאלות שנבחרו', `בחר לפחות שאלה אחת לפני פעולה: ${label}.`, { tab: 'pool', action: label }, 'admin:question-assignment');
@@ -794,9 +816,12 @@ function AdaptivePoolTab({ onError }: { onError: (error: AdminToastError | null)
         text: 'עדכן',
         onPress: async () => {
           setIsSaving(true);
-          fn();
-          await new Promise(r => setTimeout(r, 400));
+          const result = await fn();
           setIsSaving(false);
+          if (!result.ok) {
+            Alert.alert('שגיאת שמירה', result.error ?? 'העדכון לא נשמר ב-Supabase.');
+            return;
+          }
           setSelected(new Set());
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           Alert.alert('✅ עודכן', `${ids.length} שאלות עודכנו.\nנשמר ב-Supabase`);

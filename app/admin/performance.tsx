@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { fetchAllAdminRows } from '../../lib/db';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useAdminStore } from '../../store/adminStore';
@@ -69,19 +70,27 @@ export default function PerformanceScreen() {
     const load = async () => {
       try {
         // 1. Load practice sessions
-        const { data: sessions, error: sessErr } = await supabase
-          .from('practice_sessions')
-          .select('score, correct_answers, total_questions, user_id, mode, topic_id, completed_at');
-        if (sessErr) {
-          logger.error('performance:load', 'שגיאה בטעינת סשנים', sessErr.message);
+        let sessions: SessionRow[] | null = null;
+        try {
+          sessions = await fetchAllAdminRows<SessionRow>((from, to) => supabase
+            .from('practice_sessions')
+            .select('id, score, correct_answers, total_questions, user_id, mode, topic_id, completed_at')
+            .order('id', { ascending: true })
+            .range(from, to), 'performance:load');
+        } catch (sessErr: any) {
+          logger.error('performance:load', 'שגיאה בטעינת סשנים', sessErr?.message);
         }
 
         // 2. Load user_profiles for activity stats
-        const { data: profiles, error: profErr } = await supabase
-          .from('user_profiles')
-          .select('id, last_practiced_date');
-        if (profErr) {
-          logger.error('performance:load', 'שגיאה בטעינת פרופילים', profErr.message);
+        let profiles: any[] | null = null;
+        try {
+          profiles = await fetchAllAdminRows<any>((from, to) => supabase
+            .from('user_profiles')
+            .select('id, last_practiced_date')
+            .order('id', { ascending: true })
+            .range(from, to), 'performance:load');
+        } catch (profErr: any) {
+          logger.error('performance:load', 'שגיאה בטעינת פרופילים', profErr?.message);
         }
 
         const sessionList: SessionRow[] = sessions ?? [];

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable,
-  ScrollView, TextInput, Platform, KeyboardAvoidingView,
+  ScrollView, TextInput, Platform, KeyboardAvoidingView, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,18 +25,30 @@ export default function Onboarding() {
     targets.find(t => t.id === DEFAULT_TARGET_ID);
 
   const completeOnboarding = useUserStore(s => s.completeOnboarding);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
-  const handleFinish = () => {
-    hapticSuccess();
+  const handleFinish = async () => {
+    if (saving) return;
+    setSaving(true);
+    setSaveError('');
     const finalName = name.trim() || 'מתאמן';
-    completeOnboarding(finalName, psychometricTarget?.id ?? DEFAULT_TARGET_ID);
-    router.replace('/(tabs)');
+    try {
+      await completeOnboarding(finalName, psychometricTarget?.id ?? DEFAULT_TARGET_ID);
+      hapticSuccess();
+      router.replace('/(tabs)');
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setSaveError('לא הצלחנו לשמור את הפרטים שלך. בדוק את החיבור לאינטרנט ונסה שוב.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <LinearGradient colors={['#060912', '#0D1425', '#1A0F2E']} style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <StepWelcome name={name} setName={setName} onFinish={handleFinish} />
+      <StepWelcome name={name} setName={setName} onFinish={handleFinish} saving={saving} error={saveError} />
     </SafeAreaView>
     </LinearGradient>
   );
@@ -45,8 +57,8 @@ export default function Onboarding() {
 // ── Step 1: Welcome ────────────────────────────────────────────────────────
 
 function StepWelcome({
-  name, setName, onFinish,
-}: { name: string; setName: (v: string) => void; onFinish: () => void }) {
+  name, setName, onFinish, saving = false, error = '',
+}: { name: string; setName: (v: string) => void; onFinish: () => void; saving?: boolean; error?: string }) {
   return (
     <KeyboardAvoidingView
       style={styles.stepContainer}
@@ -89,14 +101,22 @@ function StepWelcome({
           />
         </View>
 
+        {!!error && (
+          <Text accessibilityRole="alert" style={styles.saveError}>⚠️ {error}</Text>
+        )}
+
         <Pressable
-          style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.primaryBtn, (pressed || saving) && { opacity: 0.85 }]}
           onPress={onFinish}
+          disabled={saving}
           accessibilityRole="button"
-          accessibilityLabel="המשך לאפליקציה"
+          accessibilityLabel={error ? 'נסה שוב' : 'המשך לאפליקציה'}
+          accessibilityState={{ disabled: saving }}
         >
           <LinearGradient colors={Colors.gradients.primary} style={styles.primaryBtnGrad}>
-            <Text style={styles.primaryBtnText}>בוא נתחיל ←</Text>
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.primaryBtnText}>{error ? 'נסה שוב ←' : 'בוא נתחיל ←'}</Text>}
           </LinearGradient>
         </Pressable>
 
@@ -205,6 +225,15 @@ function StepSelectTarget({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
+  saveError: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.danger,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
 
   stepContainer: {
     flex: 1,

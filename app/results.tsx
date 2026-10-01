@@ -12,6 +12,7 @@ import { VisualImage } from '../components/VisualImage';
 import { AdBanner } from '../components/AdBanner';
 import { SponsoredOfferCard } from '../components/SponsoredOfferCard';
 import { calcAllScores, getPerformanceLevel, formatTime } from '../utils/scoring';
+import { calcSmartExamScore } from '../utils/smartExam';
 import { StatCard } from '../components/StatCard';
 import { usePracticeStore } from '../store/practiceStore';
 import { useAdminStore } from '../store/adminStore';
@@ -65,19 +66,32 @@ export default function Results() {
   const total = reviewSession?.answers.length ?? 0;
   const correct = reviewSession?.answers.filter(answer => answer.isCorrect).length ?? 0;
   const timeSpent = reviewSession?.answers.reduce((sum, answer) => sum + answer.timeSpent, 0) ?? 0;
-  const score = total > 0 ? Math.round((correct / total) * 100) : 0;
-  const trustedBreakdown = reviewSession ? getTrustedBreakdown(reviewSession.answers) : null;
-  const percentile = trustedBreakdown?.percentileRank ?? 0;
-  const difficultyScore = trustedBreakdown?.difficultyWeightedScore ?? 0;
-  const speedScore = trustedBreakdown?.speedAdjustedScore ?? 0;
-  const stability = trustedBreakdown?.stabilityScore ?? 0;
   const isSimulationReview = reviewSession?.mode === 'simulation';
   const passingScore = isSimulationReview
-    ? safeInt(params.passingScore, template?.passingScore ?? examSettings.defaultPassingScore, 0, 100)
+    ? safeInt(params.passingScore, Number(template?.passingScore ?? examSettings.defaultPassingScore), 0, 100)
     : null;
-  const passed = isSimulationReview
-    ? score >= (passingScore ?? 0)
+  // Simulations use the same weighted exam score that finishSession saved and used for the pass badge.
+  const simulationScores = reviewSession && isSimulationReview
+    ? calcSmartExamScore(
+        reviewSession.answers.map(answer => ({
+          isCorrect: answer.isCorrect,
+          timeSpent: answer.timeSpent,
+          difficulty: answer.questionDifficulty,
+          isSkipped: answer.isSkipped,
+        })),
+        passingScore ?? 0,
+      )
     : null;
+  const trustedBreakdown = reviewSession && !simulationScores ? getTrustedBreakdown(reviewSession.answers) : null;
+  const breakdown = simulationScores ?? trustedBreakdown;
+  const score = simulationScores
+    ? simulationScores.score
+    : total > 0 ? Math.round((correct / total) * 100) : 0;
+  const percentile = breakdown?.percentileRank ?? 0;
+  const difficultyScore = breakdown?.difficultyWeightedScore ?? 0;
+  const speedScore = breakdown?.speedAdjustedScore ?? 0;
+  const stability = breakdown?.stabilityScore ?? 0;
+  const passed = simulationScores ? simulationScores.passed : null;
   const { label, color } = getPerformanceLevel(score);
 
   const [displayScore, setDisplayScore] = useState(score);
@@ -231,7 +245,7 @@ export default function Results() {
               </Text>
               <View style={styles.percentileBarTrack}>
                 <View style={[styles.percentileBarFill, { width: `${percentile}%` as any, backgroundColor: color }]} />
-                <View style={[styles.percentileMarker, { left: `${percentile}%` as any }]}>
+                <View style={[styles.percentileMarker, { right: `${percentile}%` as any }]}>
                   <Text style={styles.percentileMarkerText}>אתה</Text>
                 </View>
               </View>
@@ -457,8 +471,10 @@ const styles = StyleSheet.create({
   percentileTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.base, color: Colors.primary, textAlign: 'right', marginBottom: 6 },
   percentileDesc: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'right', lineHeight: 20, marginBottom: 14 },
   percentileBarTrack: { height: 10, backgroundColor: Colors.border, borderRadius: 5, overflow: 'visible', position: 'relative' },
-  percentileBarFill: { height: 10, borderRadius: 5 },
-  percentileMarker: { position: 'absolute', top: -20, transform: [{ translateX: -16 }] },
+  // Fill and marker are both anchored to the right edge (RTL: higher percentile grows leftwards),
+  // so the "אתה" marker always sits at the end of the fill on web and native alike.
+  percentileBarFill: { position: 'absolute', top: 0, right: 0, height: 10, borderRadius: 5 },
+  percentileMarker: { position: 'absolute', top: -20, width: 32, marginRight: -16, alignItems: 'center' },
   percentileMarkerText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
 
   reviewList: { paddingHorizontal: 20, gap: 12, marginBottom: 16 },

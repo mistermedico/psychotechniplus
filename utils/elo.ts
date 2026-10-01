@@ -22,8 +22,10 @@ export function updateQuestionElo(
   playerElo: number,
   isCorrect: boolean
 ): number {
+  // From the question's point of view it "wins" when the user answers wrong,
+  // so a correct answer lowers the question's rating.
   const expected = expectedScore(currentElo, playerElo);
-  const actual = isCorrect ? 1 : 0;
+  const actual = isCorrect ? 0 : 1;
   return Math.round(currentElo + K_FACTOR * (actual - expected));
 }
 

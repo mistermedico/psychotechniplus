@@ -2,20 +2,11 @@ import { create } from 'zustand';
 import { Question, UserAnswer, SessionMode } from '../data/types';
 import { selectAdaptiveQuestion, computeAdaptiveLevel, PerformanceLevel } from '../utils/adaptive';
 import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
-import { shuffleOptionsSafely } from '../utils/optionOrder';
 
-function shuffleArray<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
+// Option order is decided by the caller (admin shuffle setting in practice-session)
+// and by QuestionCard (user shuffle setting) — never shuffled unconditionally here.
 function normalizeSessionQuestion(question: Question): Question {
-  const normalized = isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question;
-  return { ...normalized, options: shuffleOptionsSafely(normalized.options, shuffleArray) };
+  return isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question;
 }
 
 interface ActiveSession {

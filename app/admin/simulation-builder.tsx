@@ -11,6 +11,36 @@ import { useAdminStore, SmartExamTemplate, SimulationRule } from '../../store/ad
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import AdminSyncToolbar from '../../components/AdminSyncToolbar';
+import { isPsychotechnicQuestionReady } from '../../utils/questionQuality';
+import { Question } from '../../data/types';
+
+type RuleAllocation = { allocated: number; inRange: number; topicTotal: number; free: number };
+
+const ruleFits = (q: Question, r: Pick<SimulationRule, 'topicId' | 'minDifficulty' | 'maxDifficulty'>) =>
+  q.topicId === r.topicId && q.difficulty >= r.minDifficulty && q.difficulty <= r.maxDifficulty;
+
+// Allocates ready questions of the template's target to its rules so a question
+// shared by overlapping rules (same topic) is counted only once. Questions that
+// fit fewer rules are taken first.
+function allocateRules(pool: Question[], rules: SimulationRule[], targetId: string): RuleAllocation[] {
+  const targetPool = pool.filter(q => !targetId || q.targetIds.includes(targetId));
+  const used = new Set<string>();
+  return rules.map(rule => {
+    const inRangeQuestions = targetPool.filter(q => ruleFits(q, rule));
+    const candidates = inRangeQuestions
+      .filter(q => !used.has(q.id))
+      .map(q => ({ q, overlap: rules.filter(r => r !== rule && ruleFits(q, r)).length }))
+      .sort((a, b) => a.overlap - b.overlap);
+    const taken = candidates.slice(0, Math.max(0, rule.count));
+    taken.forEach(c => used.add(c.q.id));
+    return {
+      allocated: taken.length,
+      inRange: inRangeQuestions.length,
+      topicTotal: targetPool.filter(q => q.topicId === rule.topicId).length,
+      free: inRangeQuestions.filter(q => q.accessLevel !== 'premium').length,
+    };
+  });
+}
 
 export default function SimulationBuilder() {
   const {
@@ -72,7 +102,7 @@ export default function SimulationBuilder() {
     }
   };
 
-  const cloneTemplate = (t: SmartExamTemplate) => {
+  const cloneTemplate = async (t: SmartExamTemplate) => {
     const data = {
       name: `${t.name} (עותק)`,
       description: t.description,
@@ -83,7 +113,11 @@ export default function SimulationBuilder() {
       rules: t.rules.map(r => ({ ...r, id: `rule_${Date.now()}_${Math.random().toString(36).slice(2,5)}` })),
       isActive: false,
     };
-    addTemplate(data);
+    const result = await addTemplate(data);
+    if (!result.ok) {
+      Alert.alert('שגיאת שמירה', result.error ?? 'השכפול לא נשמר ב-Supabase.');
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('שוכפל!', `"${t.name} (עותק)" נוצר`);
   };
@@ -177,45 +211,62 @@ export default function SimulationBuilder() {
 
   const totalQ = rules.reduce((s, r) => s + r.count, 0);
 
-  const questionsPerTopic = useMemo(() => {
-    const map: Record<string, number> = {};
-    questions.filter(q => q.validationStatus === 'validated').forEach(q => {
-      if (q.topicId) { map[q.topicId] = (map[q.topicId] ?? 0) + 1; }
-    });
-    return map;
-  }, [questions]);
-
-  const getAvailableForRule = (rule: Pick<SimulationRule, 'topicId' | 'minDifficulty' | 'maxDifficulty'>) => (
-    questions.filter(q =>
-      q.validationStatus === 'validated' &&
-      q.topicId === rule.topicId &&
-      q.difficulty >= rule.minDifficulty &&
-      q.difficulty <= rule.maxDifficulty
-    ).length
+  // Only validated questions that pass the quality gate are served to users.
+  const readyQuestions = useMemo(
+    () => questions.filter(q => q.validationStatus === 'validated' && isPsychotechnicQuestionReady(q)),
+    [questions]
   );
 
-  const getTemplateAudit = (template: Pick<SmartExamTemplate, 'rules' | 'totalQuestions' | 'timeLimitMinutes'>) => {
-    const shortages = template.rules.filter(rule => rule.count > getAvailableForRule(rule));
+  const getTemplateAudit = (template: Pick<SmartExamTemplate, 'rules' | 'totalQuestions' | 'timeLimitMinutes' | 'targetId'>) => {
+    const allocations = allocateRules(readyQuestions, template.rules, template.targetId);
+    const shortages = template.rules.filter((rule, i) => rule.count > allocations[i].allocated);
     const adaptiveRules = template.rules.filter(rule => rule.useAdaptive).length;
     const avgSeconds = template.totalQuestions > 0 ? Math.round((template.timeLimitMinutes * 60) / template.totalQuestions) : 0;
     const strictRules = template.rules.filter(rule => rule.minDifficulty >= 8 || rule.maxDifficulty <= 3).length;
-    return { shortages, adaptiveRules, avgSeconds, strictRules };
+    return { shortages, adaptiveRules, avgSeconds, strictRules, allocations };
   };
 
-  const rulePlanningRows = useMemo(() => rules.map(rule => {
-    const topic = topics.find(t => t.id === rule.topicId);
-    const topicQuestions = questions.filter(q => q.validationStatus === 'validated' && q.topicId === rule.topicId);
-    const inRange = topicQuestions.filter(q => q.difficulty >= rule.minDifficulty && q.difficulty <= rule.maxDifficulty).length;
-    const shortage = Math.max(0, rule.count - inRange);
+  // Lowers rule counts to what is actually available, but never to 0: rules with
+  // no available questions keep their count and are reported instead.
+  const fixRules = (rulesToFix: SimulationRule[], forTargetId: string) => {
+    const allocations = allocateRules(readyQuestions, rulesToFix, forTargetId);
+    const emptyRules: SimulationRule[] = [];
+    const fixedRules = rulesToFix.map((rule, i) => {
+      const available = allocations[i].allocated;
+      if (rule.count <= available) return rule;
+      if (available === 0) {
+        emptyRules.push(rule);
+        return rule;
+      }
+      return { ...rule, count: available };
+    });
+    const totalQuestions = fixedRules.reduce((sum, rule) => sum + rule.count, 0);
+    return { fixedRules, totalQuestions, emptyRules };
+  };
+
+  const topicLabel = (topicId: string) => {
+    const topic = topics.find(t => t.id === topicId);
+    return `${topic?.icon ?? ''} ${topic?.name ?? topicId}`.trim();
+  };
+
+  const currentAllocations = useMemo(
+    () => allocateRules(readyQuestions, rules, targetId),
+    [readyQuestions, rules, targetId]
+  );
+
+  const rulePlanningRows = useMemo(() => rules.map((rule, i) => {
+    const allocation = currentAllocations[i];
+    const shortage = Math.max(0, rule.count - allocation.allocated);
     return {
       rule,
-      topicName: `${topic?.icon ?? ''} ${topic?.name ?? rule.topicId}`.trim(),
-      available: topicQuestions.length,
-      inRange,
+      topicName: topicLabel(rule.topicId),
+      available: allocation.topicTotal,
+      inRange: allocation.allocated,
+      free: allocation.free,
       shortage,
       ready: shortage === 0,
     };
-  }), [questions, rules, topics]);
+  }), [currentAllocations, rules, topics]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const contentAudit = useMemo(() => {
     const rows = templates.map(template => ({ template, audit: getTemplateAudit(template) }));
@@ -224,16 +275,28 @@ export default function SimulationBuilder() {
     const tooFastCount = rows.filter(row => row.audit.avgSeconds > 0 && row.audit.avgSeconds < 45).length;
     const adaptiveReadyCount = rows.filter(row => row.template.rules.length > 0 && row.audit.adaptiveRules === row.template.rules.length).length;
     return { shortageCount, inactiveCount, tooFastCount, adaptiveReadyCount };
-  }, [templates, questionsPerTopic]);
+  }, [templates, readyQuestions]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fixTemplateShortages = (template: SmartExamTemplate) => {
-    const fixedRules = template.rules.map(rule => {
-      const available = getAvailableForRule(rule);
-      return rule.count > available ? { ...rule, count: available } : rule;
-    });
-    const totalQuestions = fixedRules.reduce((sum, rule) => sum + rule.count, 0);
-    updateTemplate(template.id, { rules: fixedRules, totalQuestions });
+  const reportTemplateSaveErrors = (errors: string[]) => {
+    if (errors.length > 0) {
+      Alert.alert('שגיאת שמירה', `השמירה ב-Supabase נכשלה:\n${[...new Set(errors)].join('\n')}`);
+      return false;
+    }
+    return true;
+  };
+
+  const fixTemplateShortages = async (template: SmartExamTemplate) => {
+    const { fixedRules, totalQuestions, emptyRules } = fixRules(template.rules, template.targetId);
+    if (totalQuestions === 0) {
+      Alert.alert('לא ניתן לתקן', 'אין שאלות זמינות לאף כלל בתבנית. הוסף/אשר שאלות או השבת את התבנית.');
+      return;
+    }
+    const result = await updateTemplate(template.id, { rules: fixedRules, totalQuestions });
+    if (!reportTemplateSaveErrors(result.ok ? [] : [result.error ?? 'שגיאה לא ידועה'])) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (emptyRules.length > 0) {
+      Alert.alert('נותרו פרקים ללא שאלות', `לפרקים הבאים אין שאלות זמינות כלל, והם לא אופסו:\n${emptyRules.map(r => topicLabel(r.topicId)).join('\n')}\nהוסף שאלות או הסר את הכללים ידנית.`);
+    }
   };
 
   const applyBalancedTiming = () => {
@@ -243,11 +306,12 @@ export default function SimulationBuilder() {
   };
 
   const fixCurrentRuleShortages = () => {
-    setRules(prev => prev.map(rule => {
-      const available = getAvailableForRule(rule);
-      return rule.count > available ? { ...rule, count: available } : rule;
-    }));
+    const { fixedRules, emptyRules } = fixRules(rules, targetId);
+    setRules(fixedRules);
     markDirty();
+    if (emptyRules.length > 0) {
+      Alert.alert('נותרו פרקים ללא שאלות', `לפרקים הבאים אין שאלות זמינות כלל:\n${emptyRules.map(r => topicLabel(r.topicId)).join('\n')}`);
+    }
   };
 
   const setCurrentRulesAdaptive = () => {
@@ -255,7 +319,7 @@ export default function SimulationBuilder() {
     markDirty();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimName = name.trim();
     if (!trimName) { Alert.alert('שגיאה', 'נא להזין שם לתבנית'); return; }
     if (trimName.length < 3) { Alert.alert('שגיאה', 'שם חייב להכיל לפחות 3 תווים'); return; }
@@ -265,6 +329,7 @@ export default function SimulationBuilder() {
     const pass = parseInt(passingScore) || 65;
     if (time < 5 || time > 300) { Alert.alert('שגיאה', 'זמן חייב להיות בין 5 ל-300 דקות'); return; }
     if (pass < 0 || pass > 100) { Alert.alert('שגיאה', 'ציון מעבר חייב להיות בין 0 ל-100%'); return; }
+    if (totalQ <= 0 || rules.some(r => !(r.count > 0))) { Alert.alert('שגיאה', 'לכל כלל חייבת להיות לפחות שאלה אחת, וסך השאלות חייב להיות גדול מ-0'); return; }
 
     const data = {
       name: trimName,
@@ -277,13 +342,12 @@ export default function SimulationBuilder() {
       rules,
     };
 
-    if (editId) {
-      updateTemplate(editId, data);
-      Alert.alert('עודכן!', 'תבנית הסימולציה עודכנה בהצלחה');
-    } else {
-      addTemplate(data);
-      Alert.alert('נוצר!', 'תבנית הסימולציה נוצרה בהצלחה');
+    const result = editId ? await updateTemplate(editId, data) : await addTemplate(data);
+    if (!result.ok) {
+      Alert.alert('שגיאת שמירה', result.error ?? 'השמירה ב-Supabase נכשלה.');
+      return;
     }
+    Alert.alert(editId ? 'עודכן!' : 'נוצר!', editId ? 'תבנית הסימולציה עודכנה בהצלחה' : 'תבנית הסימולציה נוצרה בהצלחה');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowForm(false); resetForm();
   };
@@ -298,7 +362,17 @@ export default function SimulationBuilder() {
     return list.filter(t =>
       t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)
     );
-  }, [templates, search, templateFilter, questionsPerTopic]);
+  }, [templates, search, templateFilter, readyQuestions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Whole-list template saves must run in order, otherwise an older snapshot can land last.
+  const runTemplateUpdates = async (updates: Array<[string, Partial<SmartExamTemplate>]>) => {
+    const errors: string[] = [];
+    for (const [id, patch] of updates) {
+      const result = await updateTemplate(id, patch);
+      if (!result.ok) errors.push(result.error ?? 'שגיאה לא ידועה');
+    }
+    return reportTemplateSaveErrors(errors);
+  };
 
   const bulkUpdateVisibleTemplates = (updates: Partial<SmartExamTemplate>, label: string) => {
     if (filteredTemplates.length === 0) return;
@@ -306,35 +380,43 @@ export default function SimulationBuilder() {
       { text: 'ביטול', style: 'cancel' },
       {
         text: 'עדכן',
-        onPress: () => {
-          filteredTemplates.forEach(template => updateTemplate(template.id, updates));
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onPress: async () => {
+          const eligible = updates.isActive
+            ? filteredTemplates.filter(template => template.totalQuestions > 0)
+            : filteredTemplates;
+          const ok = await runTemplateUpdates(eligible.map(template => [template.id, updates]));
+          if (ok) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          if (eligible.length < filteredTemplates.length) {
+            Alert.alert('חלק מהמבחנים לא הופעלו', `${filteredTemplates.length - eligible.length} מבחנים ללא שאלות לא הופעלו.`);
+          }
         },
       },
     ]);
   };
 
-  const fixVisibleTemplateShortages = () => {
+  const fixVisibleTemplateShortages = async () => {
     if (filteredTemplates.length === 0) return;
+    const updates: Array<[string, Partial<SmartExamTemplate>]> = [];
+    let skipped = 0;
     filteredTemplates.forEach(template => {
-      const fixedRules = template.rules.map(rule => {
-        const available = getAvailableForRule(rule);
-        return rule.count > available ? { ...rule, count: available } : rule;
-      });
-      const totalQuestions = fixedRules.reduce((sum, rule) => sum + rule.count, 0);
-      updateTemplate(template.id, { rules: fixedRules, totalQuestions });
+      if (getTemplateAudit(template).shortages.length === 0) return;
+      const { fixedRules, totalQuestions } = fixRules(template.rules, template.targetId);
+      if (totalQuestions === 0) { skipped++; return; }
+      updates.push([template.id, { rules: fixedRules, totalQuestions }]);
     });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const ok = await runTemplateUpdates(updates);
+    if (ok) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (skipped > 0) {
+      Alert.alert('חלק מהמבחנים לא תוקנו', `${skipped} מבחנים ללא שאלות זמינות כלל לא אופסו. הוסף שאלות או השבת אותם.`);
+    }
   };
 
-  const setVisibleTemplatesAdaptive = () => {
+  const setVisibleTemplatesAdaptive = async () => {
     if (filteredTemplates.length === 0) return;
-    filteredTemplates.forEach(template => {
-      updateTemplate(template.id, {
-        rules: template.rules.map(rule => ({ ...rule, useAdaptive: true })),
-      });
-    });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const ok = await runTemplateUpdates(filteredTemplates.map(template => [template.id, {
+      rules: template.rules.map(rule => ({ ...rule, useAdaptive: true })),
+    }]));
+    if (ok) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const syncLabel = lastSyncedAt
@@ -452,7 +534,7 @@ export default function SimulationBuilder() {
                     <View style={styles.planInfo}>
                       <Text style={styles.planTopic}>{row.topicName}</Text>
                       <Text style={styles.planMeta}>
-                        נדרש {row.rule.count} · מתאים לטווח {row.inRange} · מאושרות בנושא {row.available} · קושי {row.rule.minDifficulty}-{row.rule.maxDifficulty}
+                        נדרש {row.rule.count} · זמין לכלל {row.inRange} · מוכנות בנושא למסלול {row.available} · חינמיות בטווח {row.free} · קושי {row.rule.minDifficulty}-{row.rule.maxDifficulty}
                       </Text>
                     </View>
                   </View>
@@ -460,9 +542,9 @@ export default function SimulationBuilder() {
               </View>
             )}
 
-            {rules.map(rule => {
+            {rules.map((rule, ruleIndex) => {
               const topic = topics.find(t => t.id === rule.topicId);
-              const available = questionsPerTopic[rule.topicId] ?? 0;
+              const available = currentAllocations[ruleIndex]?.inRange ?? 0;
               const customVal = customCounts[rule.id] ?? '';
               return (
                 <View key={rule.id} style={styles.ruleCard}>
@@ -598,9 +680,9 @@ export default function SimulationBuilder() {
               <Text style={styles.summaryLine}>
                 זמן ממוצע לשאלה: ~{totalQ > 0 ? Math.round((parseInt(timeLimitMinutes) || 45) * 60 / totalQ) : 0} שניות
               </Text>
-              {rules.map(r => {
+              {rules.map((r, ruleIndex) => {
                 const t = topics.find(x => x.id === r.topicId);
-                const avail = questionsPerTopic[r.topicId] ?? 0;
+                const avail = currentAllocations[ruleIndex]?.allocated ?? 0;
                 const shortage = r.count > avail;
                 return (
                   <Text key={r.id} style={[styles.summaryLine, shortage && { color: Colors.danger }]}>
@@ -793,9 +875,9 @@ export default function SimulationBuilder() {
 
               {/* Rules summary */}
               <View style={styles.rulesSummary}>
-                {t.rules.map(r => {
+                {t.rules.map((r, ruleIndex) => {
                   const topic = topics.find(x => x.id === r.topicId);
-                  const avail = questionsPerTopic[r.topicId] ?? 0;
+                  const avail = audit.allocations[ruleIndex]?.allocated ?? 0;
                   const shortage = r.count > avail;
                   return (
                     <Text key={r.id} style={[styles.ruleSummaryText, shortage && { color: Colors.warning }]}>
@@ -810,7 +892,10 @@ export default function SimulationBuilder() {
                 <Pressable
                   onPress={() => Alert.alert('מחיקה', `למחוק את "${t.name}"?`, [
                     { text: 'ביטול', style: 'cancel' },
-                    { text: 'מחק', style: 'destructive', onPress: () => deleteTemplate(t.id) },
+                    { text: 'מחק', style: 'destructive', onPress: async () => {
+                      const result = await deleteTemplate(t.id);
+                      if (!result.ok) Alert.alert('שגיאת מחיקה', result.error ?? 'המחיקה ב-Supabase נכשלה.');
+                    } },
                   ])}
                   style={[styles.tAction, styles.tActionSecondary, { backgroundColor: Colors.dangerLight }]}
                 >
@@ -829,7 +914,14 @@ export default function SimulationBuilder() {
                   <Text style={[styles.tActionText, { color: Colors.primary }]}>👁 תצוגה</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => updateTemplate(t.id, { isActive: !t.isActive })}
+                  onPress={async () => {
+                    if (!t.isActive && t.totalQuestions <= 0) {
+                      Alert.alert('לא ניתן להפעיל', 'למבחן אין שאלות (סה״כ 0). ערוך את הכללים לפני הפעלה.');
+                      return;
+                    }
+                    const result = await updateTemplate(t.id, { isActive: !t.isActive });
+                    if (!result.ok) Alert.alert('שגיאת שמירה', result.error ?? 'השמירה ב-Supabase נכשלה.');
+                  }}
                   style={[styles.tAction, styles.tActionSecondary, { backgroundColor: t.isActive ? Colors.warningLight : Colors.successLight }]}
                 >
                   <Text style={[styles.tActionText, { color: t.isActive ? Colors.warning : Colors.success }]}>

@@ -6,7 +6,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
-import { useAdminStore } from '../../store/adminStore';
+import { useAdminStore, BulkValidateResult } from '../../store/adminStore';
 import { AccessLevel, Question, QuestionType, ValidationStatus } from '../../data/types';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -86,6 +86,11 @@ export default function QuestionsAdmin() {
     loadSessionHistory();
   }, [loadSessionHistory]);
 
+  // A selection made under one filter must not silently carry over to another.
+  useEffect(() => {
+    clearSelection();
+  }, [search, filterStatus, filterTopicId, filterAccess, filterType, filterPool, qualityFilter, clearSelection]);
+
   const filtered = useMemo(() => {
     let q = questions.filter(x => x.validationStatus !== 'deleted');
     if (search.trim()) {
@@ -104,8 +109,8 @@ export default function QuestionsAdmin() {
     if (qualityFilter !== 'all') q = q.filter(x => hasQualityIssue(x, qualityFilter));
 
     switch (sortIdx) {
-      case 0: q = q.slice().reverse(); break;
-      case 1: /* natural order = oldest first */ break;
+      case 0: /* natural order = newest first (loaded by created_at desc) */ break;
+      case 1: q = q.slice().reverse(); break;
       case 2: q = q.slice().sort((a, b) => a.difficulty - b.difficulty); break;
       case 3: q = q.slice().sort((a, b) => b.difficulty - a.difficulty); break;
       case 4: q = q.slice().sort((a, b) => (a.accessLevel === 'free' ? -1 : 1) - (b.accessLevel === 'free' ? -1 : 1)); break;
@@ -169,9 +174,9 @@ export default function QuestionsAdmin() {
               const result = await deleteQuestions(selectedQuestionIds);
               Alert.alert(result.ok ? 'נמחק' : 'שגיאת מחיקה', result.ok ? 'השאלות נמחקו גם מ-Supabase.' : result.error ?? 'המחיקה נכשלה.');
             } else if (action === 'approve') {
-              bulkValidate(selectedQuestionIds, 'validated');
+              reportValidateResult(await bulkValidate(selectedQuestionIds, 'validated'), 'אושרו');
             } else {
-              bulkValidate(selectedQuestionIds, 'rejected');
+              reportValidateResult(await bulkValidate(selectedQuestionIds, 'rejected'), 'נדחו');
             }
             clearSelection();
             setBulkMode(false);
@@ -181,28 +186,45 @@ export default function QuestionsAdmin() {
     );
   };
 
-  const handleDuplicate = (item: Question) => {
+  const reportValidateResult = (result: BulkValidateResult, verb: string) => {
+    const lines: string[] = [];
+    if (result.error) lines.push(`השמירה ב-Supabase נכשלה: ${result.error}`);
+    if (result.blocked.length > 0) {
+      lines.push(`${result.updatedIds.length} ${verb}. ${result.blocked.length} נחסמו בבדיקת איכות:`);
+      lines.push(...result.blocked.slice(0, 5).map(row => `• ${row.id}: ${row.issues.join(' ')}`));
+      if (result.blocked.length > 5) lines.push(`ועוד ${result.blocked.length - 5}...`);
+    }
+    if (lines.length > 0) {
+      Alert.alert(result.error ? 'שגיאת שמירה' : 'חלק מהשאלות לא אושרו', lines.join('\n'));
+    }
+  };
+
+  const handleDuplicate = async (item: Question) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    addQuestion({
-      ...item,
+    const { id: _id, ...rest } = item;
+    const result = await addQuestion({
+      ...rest,
       questionText: `[עותק] ${item.questionText}`,
       validationStatus: 'draft',
       smartPracticeEligible: false,
       generalPracticeEligible: false,
     });
-    Alert.alert('שוכפל', 'עותק נוצר כטיוטה');
+    if (result.ok) Alert.alert('שוכפל', 'עותק נוצר כטיוטה');
+    else Alert.alert('שגיאת שמירה', result.error ?? 'השכפול לא נשמר ב-Supabase.');
   };
 
-  const applyBulkAccess = (level: AccessLevel) => {
+  const applyBulkAccess = async (level: AccessLevel) => {
     if (selectedQuestionIds.length === 0) return;
-    setQuestionsAccessLevel(selectedQuestionIds, level);
+    const result = await setQuestionsAccessLevel(selectedQuestionIds, level);
+    if (!result.ok) Alert.alert('שגיאת שמירה', result.error ?? 'השמירה ב-Supabase נכשלה.');
     clearSelection();
     setBulkMode(false);
   };
 
-  const applyBulkPool = (smart: boolean, general: boolean) => {
+  const applyBulkPool = async (smart: boolean, general: boolean) => {
     if (selectedQuestionIds.length === 0) return;
-    setQuestionsAdaptiveEligibility(selectedQuestionIds, smart, general);
+    const result = await setQuestionsAdaptiveEligibility(selectedQuestionIds, smart, general);
+    if (!result.ok) Alert.alert('שגיאת שמירה', result.error ?? 'השמירה ב-Supabase נכשלה.');
     clearSelection();
     setBulkMode(false);
   };
@@ -328,9 +350,10 @@ export default function QuestionsAdmin() {
             </Pressable>
             {item.validationStatus !== 'validated' && (
               <Pressable
-                onPress={() => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  bulkValidate([item.id], 'validated');
+                onPress={async () => {
+                  const result = await bulkValidate([item.id], 'validated');
+                  if (result.ok) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  reportValidateResult(result, 'אושרו');
                 }}
                 style={[styles.qaBtn, { backgroundColor: Colors.successLight }]}
               >
@@ -339,9 +362,9 @@ export default function QuestionsAdmin() {
             )}
             {(item.validationStatus === 'pending' || item.validationStatus === 'validated') && (
               <Pressable
-                onPress={() => {
+                onPress={async () => {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                  bulkValidate([item.id], 'rejected');
+                  reportValidateResult(await bulkValidate([item.id], 'rejected'), 'נדחו');
                 }}
                 style={[styles.qaBtn, { backgroundColor: Colors.dangerLight }]}
               >
@@ -608,7 +631,7 @@ export default function QuestionsAdmin() {
             <Text style={styles.bulkCancelText}>✕ ביטול</Text>
           </Pressable>
           <Text style={styles.bulkCount}>{selectedQuestionIds.length} נבחרו</Text>
-          <Pressable onPress={() => selectAll()} style={styles.bulkAction}>
+          <Pressable onPress={() => selectAll(filtered.map(q => q.id))} style={styles.bulkAction}>
             <Text style={styles.bulkActionText}>בחר הכל</Text>
           </Pressable>
           <Pressable onPress={() => handleBulkAction('approve')} style={[styles.bulkAction, { backgroundColor: Colors.successLight }]}>

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAdminStore } from '../../store/adminStore';
 import { supabase } from '../../lib/supabase';
+import { fetchAllAdminRows } from '../../lib/db';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -29,9 +30,11 @@ export default function RevenueScreen() {
     const cutoffDate = cutoff.toISOString().slice(0, 10);
 
     const loadProfiles = async () => {
-      const { data } = await supabase
+      const data = await fetchAllAdminRows<any>((from, to) => supabase
         .from('user_profiles')
-        .select('is_premium,last_practiced_date');
+        .select('id,is_premium,last_practiced_date')
+        .order('id', { ascending: true })
+        .range(from, to), 'admin:revenue').catch(() => null);
 
         const rows = data ?? [];
         setProfileStats({

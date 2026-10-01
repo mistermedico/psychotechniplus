@@ -10,7 +10,7 @@ import { logger } from '../utils/logger';
 import { useAdminStore } from './adminStore';
 import { logOutPurchases } from '../lib/purchases';
 import { PerformanceLevel, computeAdaptiveLevel, LEVEL_LABELS } from '../utils/adaptive';
-import { localDateKey, previousLocalDateKey, normalizeStoredDateKey } from '../utils/date';
+import { serverDateKey, previousServerDateKey, normalizeStoredDateKey, effectiveStreak } from '../utils/date';
 
 const GUEST_USER_ID_KEY = '@psychotechniplus/guestUserId';
 const GUEST_STATE_KEY = '@psychotechniplus/guestState';
@@ -19,6 +19,67 @@ const DEFAULT_TARGET_ID = 'target_psychometric';
 let userRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let userRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
 const USER_REALTIME_DEBOUNCE_MS = 500;
+
+// Set while the store itself is signing out / switching identities, so the
+// global onAuthStateChange listener doesn't react to our own auth transitions.
+let authTransitionDepth = 0;
+export function isUserAuthTransitionInProgress(): boolean {
+  return authTransitionDepth > 0;
+}
+async function withAuthTransition<T>(fn: () => Promise<T>): Promise<T> {
+  authTransitionDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    authTransitionDepth -= 1;
+  }
+}
+
+let inflightInitialize: { userId: string; promise: Promise<void> } | null = null;
+
+function isGuestAuthUser(user: { is_anonymous?: boolean; user_metadata?: Record<string, any> } | null | undefined): boolean {
+  return !!user && (user.is_anonymous === true || !!user.user_metadata?.guest);
+}
+
+// practice_sessions etc. reference user_profiles(id), so guests need a profile row.
+async function ensureGuestProfile(userId: string): Promise<void> {
+  try {
+    const { error } = await supabase.from('user_profiles').upsert(
+      {
+        id: userId,
+        name: GUEST_NAME,
+        has_completed_onboarding: true,
+        selected_target_id: DEFAULT_TARGET_ID,
+      },
+      { onConflict: 'id', ignoreDuplicates: true },
+    );
+    if (error) logger.warn('userStore:ensureGuestProfile', 'יצירת פרופיל אורח נכשלה', error.message);
+  } catch (e: any) {
+    logger.warn('userStore:ensureGuestProfile', 'חריגה ביצירת פרופיל אורח', e?.message);
+  }
+}
+
+function toTopicPerformance(
+  saved: Record<string, { elo: number; history: any[] }>,
+): Record<string, TopicPerformance> {
+  return Object.entries(saved).reduce<Record<string, TopicPerformance>>((acc, [topicId, value]) => {
+    const rawHistory = Array.isArray(value.history) ? value.history : [];
+    const history = rawHistory
+      .filter((entry: any) => typeof entry.isCorrect === 'boolean')
+      .map((entry: any) => ({
+        isCorrect: !!entry.isCorrect,
+        difficulty: clampDifficulty(entry.difficulty),
+        date: typeof entry.date === 'string' ? entry.date : undefined,
+      }))
+      .slice(-40);
+    if (history.length === 0) return acc;
+    acc[topicId] = {
+      history,
+      currentLevel: computeAdaptiveLevel(history, 'beginner'),
+    };
+    return acc;
+  }, {});
+}
 
 async function getOrCreateGuestUserId(): Promise<string> {
   const saved = await AsyncStorage.getItem(GUEST_USER_ID_KEY).catch(() => null);
@@ -72,9 +133,10 @@ interface UserState {
   stopRealtimeSync: () => void;
   continueAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
+  clearLocalSession: () => void;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
 
-  completeOnboarding: (name: string, targetId: string) => void;
+  completeOnboarding: (name: string, targetId: string) => Promise<void>;
   recordAnswer: (topicId: string, difficulty: number, isCorrect: boolean) => void;
   addXp: (amount: number) => void;
   updateStreak: () => void;
@@ -131,6 +193,12 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   initialize: async (overrideUserId?: string) => {
     if (get().isLoaded && !overrideUserId) return;
+    // The auth listener and the auth screens may both initialize the same new
+    // user; share one in-flight load instead of racing two.
+    if (overrideUserId && inflightInitialize?.userId === overrideUserId) {
+      return inflightInitialize.promise;
+    }
+    const promise = (async () => {
     get().stopRealtimeSync();
     set({ isSyncing: true });
 
@@ -146,7 +214,7 @@ export const useUserStore = create<UserState>((set, get) => ({
           userId = session.user.id;
           sessionEmail = session.user.email ?? '';
           sessionIsAnonymous = session.user.is_anonymous === true;
-          sessionIsGuest = sessionIsAnonymous || session.user.user_metadata?.guest === true;
+          sessionIsGuest = isGuestAuthUser(session.user);
           logger.info('userStore:initialize', sessionIsGuest ? 'משתמש אורח מאומת בשרת' : `משתמש מחובר: ${sessionEmail}`);
         } else {
           set({ isLoaded: true, isSyncing: false, isAuthenticated: false });
@@ -161,6 +229,10 @@ export const useUserStore = create<UserState>((set, get) => ({
       try {
         const { data: { session } } = await supabase.auth.getSession();
         sessionEmail = session?.user?.email ?? '';
+        if (session?.user?.id === userId) {
+          sessionIsAnonymous = session.user.is_anonymous === true;
+          sessionIsGuest = isGuestAuthUser(session.user);
+        }
       } catch {}
     }
 
@@ -169,9 +241,11 @@ export const useUserStore = create<UserState>((set, get) => ({
       let guestState: Partial<UserState> = {};
       try { guestState = rawGuestState ? JSON.parse(rawGuestState) : {}; } catch {}
       await AsyncStorage.setItem(GUEST_USER_ID_KEY, userId).catch(() => null);
+      await ensureGuestProfile(userId);
       set({
         ...INITIAL_STATE,
         ...guestState,
+        streak: effectiveStreak(guestState.streak, guestState.lastPracticedDate),
         userId,
         email: '',
         name: GUEST_NAME,
@@ -219,8 +293,9 @@ export const useUserStore = create<UserState>((set, get) => ({
         // store entitlement. The DB trigger prevents regular clients from
         // changing is_premium, so an admin grant is safe to honor on every platform.
         serverPremium: !!profile.is_premium,
-        isPremium: !!profile.is_premium,
-        streak: profile.streak,
+        // A store entitlement may have been reported while the profile loaded.
+        isPremium: !!profile.is_premium || get().purchasePremium,
+        streak: effectiveStreak(profile.streak, profile.last_practiced_date),
         longestStreak: profile.longest_streak,
         lastPracticedDate: profile.last_practiced_date,
         level: profile.level,
@@ -231,32 +306,20 @@ export const useUserStore = create<UserState>((set, get) => ({
       });
     }
 
-    if (badges.length > 0) set({ badges });
-
-    const topicPerformance = Object.entries(savedTopicPerformance).reduce<Record<string, TopicPerformance>>(
-      (acc, [topicId, value]) => {
-        const rawHistory = Array.isArray(value.history) ? value.history : [];
-        const history = rawHistory
-          .filter((entry: any) => typeof entry.isCorrect === 'boolean')
-          .map((entry: any) => ({
-            isCorrect: !!entry.isCorrect,
-            difficulty: clampDifficulty(entry.difficulty),
-            date: typeof entry.date === 'string' ? entry.date : undefined,
-          }))
-          .slice(-40);
-        if (history.length === 0) return acc;
-        acc[topicId] = {
-          history,
-          currentLevel: computeAdaptiveLevel(history, 'beginner'),
-        };
-        return acc;
-      },
-      {},
-    );
-    if (Object.keys(topicPerformance).length > 0) set({ topicPerformance });
+    // null = load failed: keep what we have rather than wiping history/badges.
+    if (badges) set({ badges });
+    if (savedTopicPerformance) set({ topicPerformance: toTopicPerformance(savedTopicPerformance) });
 
     set({ isLoaded: true, isSyncing: false });
     get().startRealtimeSync();
+    })();
+
+    if (overrideUserId) inflightInitialize = { userId: overrideUserId, promise };
+    try {
+      await promise;
+    } finally {
+      if (inflightInitialize?.promise === promise) inflightInitialize = null;
+    }
   },
 
   refreshFromServer: async () => {
@@ -271,27 +334,10 @@ export const useUserStore = create<UserState>((set, get) => ({
         loadUserElos(state.userId),
       ]);
 
+      // The user may have switched accounts while this request was in flight.
+      if (get().userId !== state.userId) return;
+
       const sessionEmail = session?.user?.email ?? state.email;
-      const topicPerformance = Object.entries(savedTopicPerformance).reduce<Record<string, TopicPerformance>>(
-        (acc, [topicId, value]) => {
-          const rawHistory = Array.isArray(value.history) ? value.history : [];
-          const history = rawHistory
-            .filter((entry: any) => typeof entry.isCorrect === 'boolean')
-            .map((entry: any) => ({
-              isCorrect: !!entry.isCorrect,
-              difficulty: clampDifficulty(entry.difficulty),
-              date: typeof entry.date === 'string' ? entry.date : undefined,
-            }))
-            .slice(-40);
-          if (history.length === 0) return acc;
-          acc[topicId] = {
-            history,
-            currentLevel: computeAdaptiveLevel(history, 'beginner'),
-          };
-          return acc;
-        },
-        {},
-      );
 
       set(current => ({
         email: sessionEmail,
@@ -301,7 +347,7 @@ export const useUserStore = create<UserState>((set, get) => ({
           hasCompletedOnboarding: profile.has_completed_onboarding,
           serverPremium: !!profile.is_premium,
           isPremium: !!profile.is_premium || current.purchasePremium,
-          streak: profile.streak,
+          streak: effectiveStreak(profile.streak, profile.last_practiced_date),
           longestStreak: profile.longest_streak,
           lastPracticedDate: profile.last_practiced_date,
           level: profile.level,
@@ -310,8 +356,9 @@ export const useUserStore = create<UserState>((set, get) => ({
           totalCorrect: profile.total_correct,
           totalAnswered: profile.total_answered,
         } : {}),
-        badges,
-        topicPerformance,
+        // null = load failed: keep the current badges/history instead of wiping them.
+        ...(badges ? { badges } : {}),
+        ...(savedTopicPerformance ? { topicPerformance: toTopicPerformance(savedTopicPerformance) } : {}),
         isLoaded: true,
         isSyncing: false,
       }));
@@ -356,33 +403,48 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  continueAsGuest: async () => {
+  continueAsGuest: async () => withAuthTransition(async () => {
     get().stopRealtimeSync();
-    await logOutPurchases().catch(() => null);
-    await supabase.auth.signOut().catch(() => null);
     useAdminStore.getState().setIsAdmin(false);
 
+    // Reuse an existing guest identity instead of minting a new one each time,
+    // so the guest keeps their server-side quota/progress.
     let guestUserId = '';
-    const anonymousAttempt = await supabase.auth.signInAnonymously().catch(() => ({ data: { user: null }, error: new Error('anonymous unavailable') } as any));
-    if (anonymousAttempt.data?.user?.id) {
-      guestUserId = anonymousAttempt.data.user.id;
-    } else {
-      // Some production projects disable Supabase anonymous sign-ins.
-      // Fall back to a server-created throwaway Auth user so quota/RLS still use auth.uid().
-      const { data: guestData, error: guestError } = await supabase.functions.invoke('guest-session', { body: {} });
-      if (guestError || !guestData?.email || !guestData?.password) {
-        throw new Error('לא ניתן לפתוח כרגע מצב אורח מאובטח. נסה שוב בעוד רגע.');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const sessionUser = session?.user;
+      const savedGuestId = await AsyncStorage.getItem(GUEST_USER_ID_KEY).catch(() => null);
+      if (sessionUser?.id && (isGuestAuthUser(sessionUser) || (savedGuestId && savedGuestId === sessionUser.id))) {
+        guestUserId = sessionUser.id;
       }
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-        email: guestData.email,
-        password: guestData.password,
-      });
-      if (loginError || !loginData.user?.id) {
-        throw new Error('לא ניתן לאמת את סשן האורח.');
+    } catch {}
+
+    if (!guestUserId) {
+      await logOutPurchases().catch(() => null);
+      await supabase.auth.signOut().catch(() => null);
+
+      const anonymousAttempt = await supabase.auth.signInAnonymously().catch(() => ({ data: { user: null }, error: new Error('anonymous unavailable') } as any));
+      if (anonymousAttempt.data?.user?.id) {
+        guestUserId = anonymousAttempt.data.user.id;
+      } else {
+        // Some production projects disable Supabase anonymous sign-ins.
+        // Fall back to a server-created throwaway Auth user so quota/RLS still use auth.uid().
+        const { data: guestData, error: guestError } = await supabase.functions.invoke('guest-session', { body: {} });
+        if (guestError || !guestData?.email || !guestData?.password) {
+          throw new Error('לא ניתן לפתוח כרגע מצב אורח מאובטח. נסה שוב בעוד רגע.');
+        }
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email: guestData.email,
+          password: guestData.password,
+        });
+        if (loginError || !loginData.user?.id) {
+          throw new Error('לא ניתן לאמת את סשן האורח.');
+        }
+        guestUserId = loginData.user.id;
       }
-      guestUserId = loginData.user.id;
     }
     await AsyncStorage.setItem(GUEST_USER_ID_KEY, guestUserId).catch(() => null);
+    await ensureGuestProfile(guestUserId);
     set({
       ...INITIAL_STATE,
       userId: guestUserId,
@@ -399,13 +461,21 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (rawGuestState) {
       try {
         const guestState = JSON.parse(rawGuestState);
-        set(current => ({ ...current, ...guestState, userId: guestUserId, isAuthenticated: true, isGuest: true, isLoaded: true }));
+        set(current => ({
+          ...current,
+          ...guestState,
+          streak: effectiveStreak(guestState.streak, guestState.lastPracticedDate),
+          userId: guestUserId,
+          isAuthenticated: true,
+          isGuest: true,
+          isLoaded: true,
+        }));
       } catch {}
     }
     logger.info('userStore:continueAsGuest', 'משתמש נכנס כאורח מאומת ב-Supabase');
-  },
+  }),
 
-  signOut: async () => {
+  signOut: async () => withAuthTransition(async () => {
     get().stopRealtimeSync();
     logger.info('userStore:signOut', 'משתמש התנתק');
     await logOutPurchases().catch(() => null);
@@ -414,6 +484,17 @@ export const useUserStore = create<UserState>((set, get) => ({
     adminStore.logActivity('משתמש התנתק', 'user');
     adminStore.setIsAdmin(false);
     adminStore.stopRealtimeSync();
+    set({ ...INITIAL_STATE, isLoaded: true });
+  }),
+
+  // Local-only reset used when the Supabase session ends outside our own
+  // signOut (expired refresh token, sign-out in another tab, etc.).
+  clearLocalSession: () => {
+    get().stopRealtimeSync();
+    const adminStore = useAdminStore.getState();
+    adminStore.setIsAdmin(false);
+    adminStore.stopRealtimeSync();
+    logOutPurchases().catch(() => null);
     set({ ...INITIAL_STATE, isLoaded: true });
   },
 
@@ -437,8 +518,10 @@ export const useUserStore = create<UserState>((set, get) => ({
       if (data?.success !== true) throw new Error(data?.error ?? 'Account deletion failed');
 
       logger.success('userStore:deleteAccount', 'נתוני המשתמש וחשבון האימות נמחקו');
-      await logOutPurchases().catch(() => null);
-      await supabase.auth.signOut().catch(() => null);
+      await withAuthTransition(async () => {
+        await logOutPurchases().catch(() => null);
+        await supabase.auth.signOut().catch(() => null);
+      });
       const adminStore = useAdminStore.getState();
       adminStore.setIsAdmin(false);
       adminStore.stopRealtimeSync();
@@ -451,13 +534,17 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
 
-  completeOnboarding: (name, _targetId) => {
+  completeOnboarding: async (name, _targetId) => {
     const targetId = DEFAULT_TARGET_ID;
-    set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true });
     const { userId, isGuest } = get();
-    if (userId && !isGuest) saveUserProfile(userId, {
-      name, selected_target_id: targetId, has_completed_onboarding: true,
-    });
+    // Persist first: if the save fails the caller shows an error and can retry,
+    // instead of the user silently losing onboarding on the next load.
+    if (userId && !isGuest) {
+      await saveUserProfile(userId, {
+        name, selected_target_id: targetId, has_completed_onboarding: true,
+      });
+    }
+    set({ name, selectedTargetId: targetId, hasCompletedOnboarding: true });
     logger.success('userStore:completeOnboarding', `אונבורדינג הושלם — ${name}, מסלול: ${targetId}`);
     useAdminStore.getState().logActivity(`${name} השלים אונבורדינג — מסלול: ${targetId}`, 'user');
   },
@@ -528,8 +615,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   updateStreak: () => {
     set(state => {
-      const today = localDateKey();
-      const yesterday = previousLocalDateKey();
+      const today = serverDateKey();
+      const yesterday = previousServerDateKey();
       const lastPracticedDate = normalizeStoredDateKey(state.lastPracticedDate);
       if (lastPracticedDate === today) return {};
       const newStreak = lastPracticedDate === yesterday ? state.streak + 1 : 1;
@@ -572,8 +659,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       let newLevel = state.level;
       while (newXp >= xpForLevel(newLevel)) { newXp -= xpForLevel(newLevel); newLevel++; }
 
-      const today = localDateKey();
-      const yesterday = previousLocalDateKey();
+      const today = serverDateKey();
+      const yesterday = previousServerDateKey();
       const lastPracticedDate = normalizeStoredDateKey(state.lastPracticedDate);
       const newStreak = lastPracticedDate === today
         ? state.streak
@@ -624,7 +711,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (!challengeId) return false;
 
     if (isGuest) {
-      const key = `@psychotechniplus/dailyChallengeClaim/${localDateKey()}/${challengeId}`;
+      const key = `@psychotechniplus/dailyChallengeClaim/${serverDateKey()}/${challengeId}`;
       const alreadyClaimed = await AsyncStorage.getItem(key).catch(() => null);
       if (alreadyClaimed) return false;
 
@@ -655,17 +742,31 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   setPremium: (val) => {
-    const { serverPremium } = get();
+    const { serverPremium, userId, isGuest } = get();
     // Store entitlement may affect purchase UI immediately, but protected
     // catalogue access is still enforced by server RLS/profile entitlement.
     set({
       purchasePremium: val,
       isPremium: serverPremium || val,
     });
+    // The purchase layer has just asked the server to sync the entitlement
+    // (revenuecat-entitlement); reload the profile so serverPremium reflects it.
+    if (!userId || isGuest) return;
+    loadUserProfile(userId).then(profile => {
+      if (!profile || get().userId !== userId) return;
+      set(current => ({
+        serverPremium: !!profile.is_premium,
+        isPremium: !!profile.is_premium || current.purchasePremium,
+      }));
+    }).catch(() => null);
   },
 
   reset: async () => {
     const { userId, isGuest } = get();
+
+    if (isGuest) {
+      await AsyncStorage.removeItem(GUEST_STATE_KEY).catch(() => null);
+    }
 
     if (userId && !isGuest) {
       try {

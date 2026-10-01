@@ -1,6 +1,7 @@
 import { Stack, router, usePathname, useRootNavigationState } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontFamily, FontSize } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { useAdminStore } from '../../store/adminStore';
@@ -39,6 +40,9 @@ const PAGE_NAMES: Record<string, string> = {
 
 export default function AdminLayout() {
   const { isAdmin, setIsAdmin, loadAdminData, logActivity, startRealtimeSync, stopRealtimeSync } = useAdminStore();
+  // Save/load failures are shown on every admin page (not only pages with AdminSyncToolbar).
+  const syncError = useAdminStore(s => s.syncError);
+  const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const rootNavigationState = useRootNavigationState();
   const lastLoggedPath = useRef<string | null>(null);
@@ -96,6 +100,7 @@ export default function AdminLayout() {
   if (!checkedAdminSession || !isAdmin) return null;
 
   return (
+    <View style={styles.root}>
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: '#0F172A' },
@@ -153,10 +158,42 @@ export default function AdminLayout() {
       <Stack.Screen name="activity-log" options={{ title: 'יומן פעילות' }} />
       <Stack.Screen name="logs" options={{ title: 'לוגים' }} />
     </Stack>
+    {!!syncError && (
+      <Pressable
+        onPress={() => useAdminStore.setState({ syncError: null })}
+        style={[styles.errorBanner, { paddingBottom: 8 + insets.bottom }]}
+      >
+        <Text style={styles.errorText} numberOfLines={4}>⚠️ {syncError}</Text>
+        <Text style={styles.errorDismiss}>סגור ✕</Text>
+      </Pressable>
+    )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
+  errorBanner: {
+    backgroundColor: '#7F1D1D',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: '#fff',
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  errorDismiss: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: '#FECACA',
+  },
   backBtn: {
     paddingHorizontal: 8,
     paddingVertical: 4,

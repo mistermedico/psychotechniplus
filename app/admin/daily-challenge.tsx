@@ -16,6 +16,15 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Strict YYYY-MM-DD check that also rejects impossible dates such as 2026-02-31.
+function isValidDateStr(dateStr: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) return false;
+  const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
 function formatDateHe(dateStr: string) {
   try {
     const [y, m, day] = dateStr.split('-').map(Number);
@@ -46,7 +55,8 @@ export default function DailyChallengeScreen() {
   const filteredQuestions = useMemo(() => {
     const q = qSearch.toLowerCase();
     return questions
-      .filter(q2 => q2.validationStatus === 'validated')
+      // Daily challenges are shown to everyone: only free, validated questions.
+      .filter(q2 => q2.validationStatus === 'validated' && q2.accessLevel !== 'premium')
       .filter(q2 => !q || q2.questionText.toLowerCase().includes(q) || q2.id.includes(q))
       .slice(0, 30);
   }, [questions, qSearch]);
@@ -70,11 +80,20 @@ export default function DailyChallengeScreen() {
   };
 
   const handleSave = () => {
-    if (!dateInput.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      Alert.alert('שגיאה', 'פורמט תאריך: YYYY-MM-DD'); return;
+    const date = dateInput.trim();
+    if (!isValidDateStr(date)) {
+      Alert.alert('שגיאה', 'תאריך לא תקין. פורמט: YYYY-MM-DD (תאריך קיים בלוח השנה)'); return;
     }
     if (!selectedQId) {
       Alert.alert('שגיאה', 'בחר שאלה לאתגר'); return;
+    }
+    const pickedQuestion = questions.find(q => q.id === selectedQId);
+    if (!pickedQuestion || pickedQuestion.validationStatus !== 'validated' || pickedQuestion.accessLevel === 'premium') {
+      Alert.alert('שגיאה', 'יש לבחור שאלה מאושרת וחינמית לאתגר היומי'); return;
+    }
+    const exists = dailyChallenges.find(c => c.date === date && c.id !== editTarget?.id);
+    if (exists) {
+      Alert.alert('שגיאה', 'כבר קיים אתגר לתאריך זה'); return;
     }
     const bonus = parseInt(bonusXpInput, 10);
     if (isNaN(bonus) || bonus < 0 || bonus > 1000) {
@@ -83,13 +102,9 @@ export default function DailyChallengeScreen() {
     const title = titleInput.trim() || 'אתגר יומי';
 
     if (editTarget) {
-      updateDailyChallenge(editTarget.id, { date: dateInput, questionId: selectedQId, title, bonusXp: bonus });
+      updateDailyChallenge(editTarget.id, { date, questionId: selectedQId, title, bonusXp: bonus });
     } else {
-      const exists = dailyChallenges.find(c => c.date === dateInput);
-      if (exists) {
-        Alert.alert('שגיאה', 'כבר קיים אתגר לתאריך זה'); return;
-      }
-      addDailyChallenge({ date: dateInput, questionId: selectedQId, title, bonusXp: bonus });
+      addDailyChallenge({ date, questionId: selectedQId, title, bonusXp: bonus });
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

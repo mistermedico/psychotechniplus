@@ -16,6 +16,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '../../utils/haptics';
 import { supabase } from '../../lib/supabase';
+import { fetchAllAdminRows } from '../../lib/db';
 import { useAdminStore } from '../../store/adminStore';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -190,17 +191,18 @@ export default function UsersScreen() {
     if (!silent) setLoading(true);
     setSyncError(null);
     try {
-      const [{ data: profiles, error: profilesError }, { data: sessionRows, error: sessionsError }] = await Promise.all([
+      const [{ data: profiles, error: profilesError }, sessionRows] = await Promise.all([
         supabase.rpc('admin_list_user_profiles'),
-        supabase
+        // Paginated: a single PostgREST response is capped at 1000 rows.
+        fetchAllAdminRows<SessionRow>((from, to) => supabase
           .from('practice_sessions')
           .select('id,user_id,mode,topic_id,total_questions,correct_answers,score,time_spent_seconds,completed_at')
           .order('completed_at', { ascending: false })
-          .limit(5000),
+          .order('id', { ascending: true })
+          .range(from, to), 'admin:users'),
       ]);
 
       if (profilesError) throw profilesError;
-      if (sessionsError) throw sessionsError;
 
       const allSessions = (sessionRows ?? []) as SessionRow[];
       const sevenDaysAgo = new Date();

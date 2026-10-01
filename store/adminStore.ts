@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { Question, Topic, Target, ValidationStatus, QuestionType, AccessLevel } from '../data/types';
-import { fetchAllQuestions, fetchTargets, upsertQuestions as dbUpsertMany, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTarget as dbUpsertTarget, upsertTopic as dbUpsertTopic, deleteTopicFromDB, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics, saveAdminState, loadAdminState } from '../lib/db';
+import { fetchAllQuestions, fetchTargets, upsertQuestions as dbUpsertMany, deleteQuestion as dbDelete, seedDatabase, saveSessionRecord, loadUserSessionHistory, loadAllSessionHistory, SessionRecord, upsertTarget as dbUpsertTarget, upsertTopic as dbUpsertTopic, deleteTopicFromDB, countTopicQuestions, fetchAllAdminRows, saveTemplates, loadTemplates, saveAdminSettings, loadAdminSettings, fetchTopics, saveAdminState, loadAdminState } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
 import { ensureSpatialVisualAssets } from '../utils/spatialVisualAssets';
+import { auditPsychotechnicQuestion } from '../utils/questionQuality';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ACTIVITY_LOG_KEY = '@psychotechniplus/admin/activityLog';
@@ -11,6 +12,7 @@ const DELETED_QUESTIONS_KEY = '@psychotechniplus/admin/deletedQuestionIds';
 const DELETED_QUESTIONS_REMOTE_KEY = 'deleted_question_ids';
 const ADMIN_COLLECTIONS_KEY = 'collections';
 const PUBLIC_DAILY_CHALLENGES_KEY = 'public_daily_challenges';
+const ADMIN_ACTIVITY_LOG_REMOTE_KEY = 'activity_log';
 let adminRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let adminRealtimeReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let publicRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -28,6 +30,22 @@ const ADMIN_COLLECTION_SAVE_DEBOUNCE_MS = 700;
 const ADMIN_REALTIME_SELF_WRITE_MUTE_MS = 1800;
 const ADMIN_DELETE_RELOAD_MUTE_MS = 10000;
 
+// Whole-object admin_state keys may only be written after they were read
+// successfully; otherwise local defaults would overwrite the remote copy.
+let templatesLoaded = false;
+let settingsLoaded = false;
+let collectionsLoaded = false;
+let deletedIdsRemoteLoaded = false;
+let pendingActivityEntries: AdminActivityLog[] = [];
+let activityLogClearPending = false;
+let activityLogSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+export type AdminSaveResult = { ok: boolean; error?: string };
+
+const TEMPLATES_NOT_LOADED_ERROR = 'תבניות הסימולציה לא נטענו מ-Supabase, ולכן השמירה נחסמה כדי לא לדרוס נתונים קיימים. רענן את הנתונים ונסה שוב.';
+const SETTINGS_NOT_LOADED_ERROR = 'הגדרות הניהול לא נטענו מ-Supabase, ולכן השמירה נחסמה כדי לא לדרוס נתונים קיימים. רענן את הנתונים ונסה שוב.';
+const COLLECTIONS_NOT_LOADED_ERROR = 'נתוני הניהול (קופונים, התראות, אתגרים יומיים) לא נטענו מ-Supabase, ולכן השמירה נחסמה כדי לא לדרוס נתונים קיימים. רענן את הנתונים ונסה שוב.';
+
 async function loadDeletedQuestionIds(): Promise<void> {
   if (deletedQuestionsLoadPromise) return deletedQuestionsLoadPromise;
   deletedQuestionsLoadPromise = (async () => {
@@ -40,7 +58,8 @@ async function loadDeletedQuestionIds(): Promise<void> {
           ids.filter(id => typeof id === 'string').forEach(id => deletedQuestionIds.add(id));
         }
       }
-      const remote = await loadAdminState<string[]>(DELETED_QUESTIONS_REMOTE_KEY).catch(() => null);
+      const remote = await loadAdminState<string[]>(DELETED_QUESTIONS_REMOTE_KEY);
+      deletedIdsRemoteLoaded = true;
       if (Array.isArray(remote)) {
         remote.filter(id => typeof id === 'string').forEach(id => deletedQuestionIds.add(id));
         await AsyncStorage.setItem(DELETED_QUESTIONS_KEY, JSON.stringify([...deletedQuestionIds]));
@@ -58,6 +77,8 @@ async function persistDeletedQuestionIds(): Promise<void> {
   try {
     const ids = [...deletedQuestionIds];
     await AsyncStorage.setItem(DELETED_QUESTIONS_KEY, JSON.stringify(ids));
+    // Never overwrite the remote list unless it was read successfully first.
+    if (!deletedIdsRemoteLoaded) return;
     await saveAdminState(DELETED_QUESTIONS_REMOTE_KEY, ids).catch((e: any) => {
       logger.warn('adminStore:deletedQuestions', 'לא ניתן לשמור רשימת מחיקות ב-Supabase', e?.message);
     });
@@ -87,20 +108,80 @@ function pickAdminCollections(s: any) {
     promoCodes: s.promoCodes,
     pushNotifications: s.pushNotifications,
     revenueSnapshots: s.revenueSnapshots,
-    activityLog: s.activityLog,
     generationSessions: s.generationSessions,
     generationPresets: s.generationPresets,
   };
 }
 
 function saveAdminCollections(s: any) {
+  if (!collectionsLoaded) {
+    useAdminStore.setState({ syncError: COLLECTIONS_NOT_LOADED_ERROR, isSyncing: false });
+    logger.error('adminStore:saveAdminCollections', COLLECTIONS_NOT_LOADED_ERROR);
+    return;
+  }
   if (adminCollectionsSaveTimer) clearTimeout(adminCollectionsSaveTimer);
   adminCollectionsSaveTimer = setTimeout(() => {
-    adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
-    saveAdminState(ADMIN_COLLECTIONS_KEY, pickAdminCollections(s));
-    saveAdminState(PUBLIC_DAILY_CHALLENGES_KEY, Array.isArray(s.dailyChallenges) ? s.dailyChallenges : []);
     adminCollectionsSaveTimer = null;
+    const latest = useAdminStore.getState();
+    adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
+    Promise.all([
+      saveAdminState(ADMIN_COLLECTIONS_KEY, pickAdminCollections(latest)),
+      saveAdminState(PUBLIC_DAILY_CHALLENGES_KEY, Array.isArray(latest.dailyChallenges) ? latest.dailyChallenges : []),
+    ]).then(() => {
+      useAdminStore.setState({ lastSyncedAt: new Date().toISOString() });
+    }).catch((e: any) => {
+      const message = e?.message ?? 'שגיאה בשמירת נתוני ניהול';
+      useAdminStore.setState({ syncError: message, isSyncing: false });
+      logger.error('adminStore:saveAdminCollections', message);
+    });
   }, ADMIN_COLLECTION_SAVE_DEBOUNCE_MS);
+}
+
+function sortActivityLog(entries: AdminActivityLog[]): AdminActivityLog[] {
+  return entries
+    .filter(item => item && typeof item.id === 'string' && !/^log_00[1-8]$/.test(item.id))
+    .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
+    .slice(0, 500);
+}
+
+function mergeActivityLogs(...lists: Array<AdminActivityLog[] | null | undefined>): AdminActivityLog[] {
+  const byId = new Map<string, AdminActivityLog>();
+  lists.forEach(list => (Array.isArray(list) ? list : []).forEach(item => {
+    if (item?.id && !byId.has(item.id)) byId.set(item.id, item);
+  }));
+  return sortActivityLog([...byId.values()]);
+}
+
+// The activity log has its own admin_state key and is written with a
+// read-modify-write of only that key, so logging a page visit never rewrites
+// other admin collections from (possibly stale) local state.
+function scheduleActivityLogSave() {
+  if (activityLogSaveTimer) clearTimeout(activityLogSaveTimer);
+  activityLogSaveTimer = setTimeout(() => {
+    activityLogSaveTimer = null;
+    flushActivityLog();
+  }, ADMIN_COLLECTION_SAVE_DEBOUNCE_MS);
+}
+
+async function flushActivityLog(): Promise<void> {
+  const entries = pendingActivityEntries;
+  const clear = activityLogClearPending;
+  pendingActivityEntries = [];
+  activityLogClearPending = false;
+  if (entries.length === 0 && !clear) return;
+  try {
+    const remote = clear ? [] : await loadAdminState<AdminActivityLog[]>(ADMIN_ACTIVITY_LOG_REMOTE_KEY);
+    // First write of the new key: carry over the log already shown locally (incl. legacy entries).
+    const seed = remote === null ? useAdminStore.getState().activityLog : null;
+    const merged = mergeActivityLogs(entries, remote, seed);
+    adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
+    await saveAdminState(ADMIN_ACTIVITY_LOG_REMOTE_KEY, merged);
+  } catch (e: any) {
+    // Keep the entries for the next attempt.
+    pendingActivityEntries = [...entries, ...pendingActivityEntries];
+    if (clear) activityLogClearPending = true;
+    logger.warn('adminStore:activityLog', 'שמירת יומן הפעילות ב-Supabase נכשלה', e?.message);
+  }
 }
 
 function normalizeAdminCollections(collections: any) {
@@ -128,54 +209,120 @@ function normalizeAdminCollections(collections: any) {
   return Object.keys(next).length > 0 ? next : null;
 }
 
-function syncQuestionsToSupabase(
-  set: (partial: Partial<AdminState> | ((state: AdminState) => Partial<AdminState>)) => void,
+type AdminSetter = (partial: Partial<AdminState> | ((state: AdminState) => Partial<AdminState>)) => void;
+
+async function syncQuestionsToSupabase(
+  set: AdminSetter,
   questions: Question[],
   context: string
-) {
+): Promise<AdminSaveResult> {
   const questionsToSync = filterDeletedQuestions(questions);
-  if (questionsToSync.length === 0) return;
+  if (questionsToSync.length === 0) return { ok: true };
   set({ isSyncing: true, syncError: null });
-  dbUpsertMany(questionsToSync).then(result => {
+  adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
+  try {
+    const result = await dbUpsertMany(questionsToSync);
     if (result.error) {
       set({ isSyncing: false, syncError: result.error });
       logger.error(context, `שגיאה בסנכרון ${questionsToSync.length} שאלות`, result.error);
-      return;
+      return { ok: false, error: result.error };
     }
     set({ isSyncing: false, lastSyncedAt: new Date().toISOString(), syncError: null });
     logger.success(context, `${questionsToSync.length} שאלות סונכרנו ל-Supabase`);
-  }).catch((e: any) => {
+    return { ok: true };
+  } catch (e: any) {
     const message = e?.message ?? 'שגיאת סנכרון שאלות';
     set({ isSyncing: false, syncError: message });
     logger.error(context, message);
+    return { ok: false, error: message };
+  }
+}
+
+// Restores questions to their pre-edit versions after a rejected save so the
+// admin UI never shows data that is not in Supabase.
+function rollbackQuestions(set: AdminSetter, previous: Question[], removeIds: string[] = []) {
+  const prevById = new Map(previous.map(q => [q.id, q]));
+  const remove = new Set(removeIds);
+  set(s => ({
+    questions: s.questions
+      .filter(q => !remove.has(q.id))
+      .map(q => prevById.get(q.id) ?? q),
+  }));
+}
+
+async function updateQuestionsAndSync(
+  set: AdminSetter,
+  get: () => AdminState,
+  ids: string[],
+  patch: (q: Question) => Question,
+  context: string
+): Promise<AdminSaveResult> {
+  const idSet = new Set(ids);
+  const previous = get().questions.filter(q => idSet.has(q.id));
+  let toSync: Question[] = [];
+  set(s => {
+    const updated = s.questions.map(q => (idSet.has(q.id) ? patch(q) : q));
+    toSync = updated.filter(q => idSet.has(q.id));
+    return { questions: updated };
   });
+  const result = await syncQuestionsToSupabase(set, toSync, context);
+  if (!result.ok) rollbackQuestions(set, previous);
+  return result;
 }
 
 function trackAdminPersistence(
-  set: (partial: Partial<AdminState>) => void,
+  set: AdminSetter,
   promise: Promise<unknown>,
   context: string,
   successMessage: string
-) {
+): Promise<AdminSaveResult> {
   set({ isSyncing: true, syncError: null });
   adminRealtimeMutedUntil = Date.now() + ADMIN_REALTIME_SELF_WRITE_MUTE_MS;
-  promise.then(() => {
+  return promise.then(() => {
     set({ isSyncing: false, lastSyncedAt: new Date().toISOString(), syncError: null });
     logger.success(context, successMessage);
+    return { ok: true };
   }).catch((e: any) => {
     const message = e?.message ?? 'שגיאת סנכרון ניהול';
     set({ isSyncing: false, syncError: message });
     logger.error(context, message);
+    return { ok: false, error: message };
   });
 }
 
-async function buildRevenueSnapshotsFromProfiles(): Promise<RevenueSnapshot[]> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('created_at,is_premium');
-  if (error) throw error;
+function refuseUnloaded(set: AdminSetter, context: string, message: string): Promise<AdminSaveResult> {
+  set({ isSyncing: false, syncError: message });
+  logger.error(context, message);
+  return Promise.resolve({ ok: false, error: message });
+}
 
-  const profiles = data ?? [];
+function persistTemplates(set: AdminSetter, templates: SmartExamTemplate[], context: string, successMessage: string): Promise<AdminSaveResult> {
+  if (!templatesLoaded) return refuseUnloaded(set, context, TEMPLATES_NOT_LOADED_ERROR);
+  return trackAdminPersistence(set, saveTemplates(templates), context, successMessage);
+}
+
+function persistAdminSettings(set: AdminSetter, s: AdminState, context: string): Promise<AdminSaveResult> {
+  if (!settingsLoaded) return refuseUnloaded(set, context, SETTINGS_NOT_LOADED_ERROR);
+  return trackAdminPersistence(
+    set,
+    saveAdminSettings({
+      practiceSettings: s.practiceSettings,
+      examSettings: s.examSettings,
+      premiumConfig: s.premiumConfig,
+      freePracticeLimit: s.freePracticeLimit,
+      appConfig: s.appConfig,
+    }),
+    context,
+    'הגדרות הניהול נשמרו ב-Supabase'
+  );
+}
+
+async function buildRevenueSnapshotsFromProfiles(): Promise<RevenueSnapshot[]> {
+  const profiles = await fetchAllAdminRows<{ id: string; created_at: string | null; is_premium: boolean | null }>((from, to) => supabase
+    .from('user_profiles')
+    .select('id,created_at,is_premium')
+    .order('id', { ascending: true })
+    .range(from, to), 'adminStore:revenueSnapshots');
   const months: string[] = [];
   const cursor = new Date();
   cursor.setUTCDate(1);
@@ -391,7 +538,7 @@ export interface SmartExamTemplate {
 
 function toSmartRule(rule: SimulationRule, existing?: SmartRule, index = 0): SmartRule {
   return {
-    id: existing?.id ?? rule.id,
+    id: rule.id,
     name: existing?.name ?? `כלל ${index + 1}`,
     topicId: rule.topicId,
     count: rule.count,
@@ -407,9 +554,12 @@ function toSmartRule(rule: SimulationRule, existing?: SmartRule, index = 0): Sma
 function normalizeTemplateRules(template: SmartExamTemplate): SmartExamTemplate {
   const smartRulesById = new Map((template.smartRules ?? []).map(rule => [rule.id, rule]));
   const rules = Array.isArray(template.rules) ? template.rules : [];
-  const smartRules = rules.map((rule, index) => (
-    toSmartRule(rule, smartRulesById.get(rule.id) ?? template.smartRules?.[index], index)
-  ));
+  const smartRules = rules.map((rule, index) => {
+    const positional = template.smartRules?.[index];
+    const existing = smartRulesById.get(rule.id)
+      ?? (positional && positional.topicId === rule.topicId && !rules.some(r => r.id === positional.id) ? positional : undefined);
+    return toSmartRule(rule, existing, index);
+  });
   return {
     ...template,
     rules,
@@ -867,6 +1017,11 @@ const SEED_GENERATION_PRESETS: GenerationPreset[] = [
   },
 ];
 
+export interface BulkValidateResult extends AdminSaveResult {
+  updatedIds: string[];
+  blocked: Array<{ id: string; issues: string[] }>;
+}
+
 interface AdminState {
   isAdmin: boolean;
   freePracticeLimit: number;
@@ -920,36 +1075,36 @@ interface AdminState {
   logout: () => Promise<void>;
 
   // Actions — questions
-  addQuestion: (q: Omit<Question, 'id'>) => Question;
-  updateQuestion: (id: string, updates: Partial<Question>) => void;
+  addQuestion: (q: Omit<Question, 'id'>) => Promise<AdminSaveResult & { question: Question }>;
+  updateQuestion: (id: string, updates: Partial<Question>) => Promise<AdminSaveResult>;
   deleteQuestion: (id: string) => Promise<{ ok: boolean; error?: string }>;
   deleteQuestions: (ids: string[]) => Promise<{ ok: boolean; error?: string }>;
-  validateQuestion: (id: string, status: ValidationStatus) => void;
-  bulkValidate: (ids: string[], status: ValidationStatus) => void;
+  validateQuestion: (id: string, status: ValidationStatus) => Promise<BulkValidateResult>;
+  bulkValidate: (ids: string[], status: ValidationStatus) => Promise<BulkValidateResult>;
   toggleSelectQuestion: (id: string) => void;
   clearSelection: () => void;
-  selectAll: () => void;
-  assignQuestionsToTopic: (questionIds: string[], topicId: string) => void;
-  assignQuestionsToTargets: (questionIds: string[], targetIds: string[]) => void;
-  setQuestionsAccessLevel: (questionIds: string[], level: AccessLevel) => void;
-  setQuestionsAdaptiveEligibility: (questionIds: string[], smart: boolean, general: boolean) => void;
+  selectAll: (ids?: string[]) => void;
+  assignQuestionsToTopic: (questionIds: string[], topicId: string) => Promise<AdminSaveResult>;
+  assignQuestionsToTargets: (questionIds: string[], targetIds: string[]) => Promise<AdminSaveResult>;
+  setQuestionsAccessLevel: (questionIds: string[], level: AccessLevel) => Promise<AdminSaveResult>;
+  setQuestionsAdaptiveEligibility: (questionIds: string[], smart: boolean, general: boolean) => Promise<AdminSaveResult>;
 
   // Actions — topics
   addTopic: (t: Omit<Topic, 'id'>) => Topic;
-  updateTopic: (id: string, updates: Partial<Topic>) => void;
-  deleteTopic: (id: string) => void;
+  updateTopic: (id: string, updates: Partial<Topic>) => Promise<AdminSaveResult>;
+  deleteTopic: (id: string) => Promise<AdminSaveResult>;
 
   // Actions — targets
-  updateTarget: (id: string, updates: Partial<Target>) => void;
+  updateTarget: (id: string, updates: Partial<Target>) => Promise<AdminSaveResult>;
 
   // Actions — templates
-  addTemplate: (t: Omit<SmartExamTemplate, 'id' | 'createdAt'>) => SmartExamTemplate;
-  updateTemplate: (id: string, updates: Partial<SmartExamTemplate>) => void;
-  deleteTemplate: (id: string) => void;
-  addTopicRuleToTemplate: (templateId: string, rule: SimulationRule) => void;
-  removeTopicRuleFromTemplate: (templateId: string, ruleId: string) => void;
-  pinQuestionToTemplate: (templateId: string, questionId: string) => void;
-  unpinQuestionFromTemplate: (templateId: string, questionId: string) => void;
+  addTemplate: (t: Omit<SmartExamTemplate, 'id' | 'createdAt'>) => Promise<AdminSaveResult>;
+  updateTemplate: (id: string, updates: Partial<SmartExamTemplate>) => Promise<AdminSaveResult>;
+  deleteTemplate: (id: string) => Promise<AdminSaveResult>;
+  addTopicRuleToTemplate: (templateId: string, rule: SimulationRule) => Promise<AdminSaveResult>;
+  removeTopicRuleFromTemplate: (templateId: string, ruleId: string) => Promise<AdminSaveResult>;
+  pinQuestionToTemplate: (templateId: string, questionId: string) => Promise<AdminSaveResult>;
+  unpinQuestionFromTemplate: (templateId: string, questionId: string) => Promise<AdminSaveResult>;
 
   // Actions — promo codes
   addPromoCode: (code: Omit<PromoCode, 'id' | 'createdAt' | 'usedCount'>) => PromoCode;
@@ -1441,36 +1596,28 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   setBgGenProgress: (p) => set({ bgGenProgress: p }),
 
   setAppConfig: (updates) => {
-    set(s => {
-      const next = { ...s.appConfig, ...updates };
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: next });
-      return { appConfig: next };
-    });
+    if (!settingsLoaded) { refuseUnloaded(set, 'adminStore:setAppConfig', SETTINGS_NOT_LOADED_ERROR); return; }
+    set(s => ({ appConfig: { ...s.appConfig, ...updates } }));
+    persistAdminSettings(set, get(), 'adminStore:setAppConfig');
   },
 
   setFeatureFlag: (flag, value) => {
-    set(s => {
-      const next = { ...s.appConfig, featureFlags: { ...s.appConfig.featureFlags, [flag]: value } };
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: next });
-      return { appConfig: next };
-    });
+    if (!settingsLoaded) { refuseUnloaded(set, 'adminStore:setFeatureFlag', SETTINGS_NOT_LOADED_ERROR); return; }
+    set(s => ({ appConfig: { ...s.appConfig, featureFlags: { ...s.appConfig.featureFlags, [flag]: value } } }));
+    persistAdminSettings(set, get(), 'adminStore:setFeatureFlag');
   },
 
   applyAppControlPreset: (preset) => {
-    set(s => {
-      const next = APP_CONTROL_PRESETS[preset].config;
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: next });
-      return { appConfig: next };
-    });
+    if (!settingsLoaded) { refuseUnloaded(set, 'adminStore:applyAppControlPreset', SETTINGS_NOT_LOADED_ERROR); return; }
+    set({ appConfig: APP_CONTROL_PRESETS[preset].config });
+    persistAdminSettings(set, get(), 'adminStore:applyAppControlPreset');
     get().logActivity(`הופעל פריסט שליטה: ${APP_CONTROL_PRESETS[preset].label}`, 'system');
   },
 
   resetAppConfig: () => {
-    set(s => {
-      const next = DEFAULT_APP_CONFIG;
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: next });
-      return { appConfig: next };
-    });
+    if (!settingsLoaded) { refuseUnloaded(set, 'adminStore:resetAppConfig', SETTINGS_NOT_LOADED_ERROR); return; }
+    set({ appConfig: DEFAULT_APP_CONFIG });
+    persistAdminSettings(set, get(), 'adminStore:resetAppConfig');
     get().logActivity('אופסו הגדרות מרכז השליטה לברירת מחדל', 'system');
   },
 
@@ -1508,40 +1655,36 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   setIsAdmin: (val) => set({ isAdmin: val }),
 
   setFreePracticeLimit: (n) => {
+    if (!settingsLoaded) { refuseUnloaded(set, 'adminStore:setFreePracticeLimit', SETTINGS_NOT_LOADED_ERROR); return; }
     const val = Math.max(5, Math.min(200, n));
     set({ freePracticeLimit: val });
-    const s = get();
-    saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: val, appConfig: s.appConfig });
+    persistAdminSettings(set, get(), 'adminStore:setFreePracticeLimit');
   },
 
   setPracticeSettings: (updates) => {
-    set(s => {
-      const next = { ...s.practiceSettings, ...updates };
-      saveAdminSettings({ practiceSettings: next, examSettings: s.examSettings, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
-      return { practiceSettings: next };
-    });
+    if (!settingsLoaded) { refuseUnloaded(set, 'adminStore:setPracticeSettings', SETTINGS_NOT_LOADED_ERROR); return; }
+    set(s => ({ practiceSettings: { ...s.practiceSettings, ...updates } }));
+    persistAdminSettings(set, get(), 'adminStore:setPracticeSettings');
   },
 
   setExamSettings: (updates) => {
-    set(s => {
-      const next = { ...s.examSettings, ...updates };
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: next, premiumConfig: s.premiumConfig, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
-      return { examSettings: next };
-    });
+    if (!settingsLoaded) { refuseUnloaded(set, 'adminStore:setExamSettings', SETTINGS_NOT_LOADED_ERROR); return; }
+    set(s => ({ examSettings: { ...s.examSettings, ...updates } }));
+    persistAdminSettings(set, get(), 'adminStore:setExamSettings');
   },
   setPremiumConfig: (updates) => {
-    set(s => {
-      const next = withDefaultPremiumConfig({
+    if (!settingsLoaded) { refuseUnloaded(set, 'adminStore:setPremiumConfig', SETTINGS_NOT_LOADED_ERROR); return; }
+    set(s => ({
+      premiumConfig: withDefaultPremiumConfig({
         ...s.premiumConfig,
         ...updates,
         premiumFeatures: {
           ...s.premiumConfig.premiumFeatures,
           ...(updates.premiumFeatures ?? {}),
         },
-      });
-      saveAdminSettings({ practiceSettings: s.practiceSettings, examSettings: s.examSettings, premiumConfig: next, freePracticeLimit: s.freePracticeLimit, appConfig: s.appConfig });
-      return { premiumConfig: next };
-    });
+      }),
+    }));
+    persistAdminSettings(set, get(), 'adminStore:setPremiumConfig');
   },
   addSessionRecord: async (record) => {
     const saved = await saveSessionRecord(record);
@@ -1594,27 +1737,44 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set({ isAdmin: false, selectedQuestionIds: [] });
   },
 
-  addQuestion: (q) => {
+  addQuestion: async (q) => {
     const newQ: Question = ensureSpatialVisualAssets({ ...q, id: `q_admin_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` });
-    set(s => ({ questions: [...s.questions, newQ] }));
-    syncQuestionsToSupabase(set, [newQ], 'adminStore:addQuestion');
+    // Admin lists are ordered newest first (created_at desc).
+    set(s => ({ questions: [newQ, ...s.questions] }));
+    const result = await syncQuestionsToSupabase(set, [newQ], 'adminStore:addQuestion');
+    if (!result.ok) {
+      rollbackQuestions(set, [], [newQ.id]);
+      return { ...result, question: newQ };
+    }
     get().logActivity(`הוסיף שאלה: "${newQ.questionText.slice(0, 40)}..."`, 'question');
-    return newQ;
+    return { ok: true, question: newQ };
   },
 
-  updateQuestion: (id, updates) => {
-    set(s => {
-      const updated = s.questions.map(q => (q.id === id ? ensureSpatialVisualAssets({ ...q, ...updates }) : q));
-      const q = updated.find(x => x.id === id);
-      if (q) syncQuestionsToSupabase(set, [q], 'adminStore:updateQuestion');
-      return { questions: updated };
-    });
-    get().logActivity(`עדכן שאלה ${id}`, 'question');
+  updateQuestion: async (id, updates) => {
+    if (!get().questions.some(q => q.id === id)) {
+      return { ok: false, error: `השאלה ${id} לא נמצאה בניהול. רענן את הנתונים ונסה שוב.` };
+    }
+    const result = await updateQuestionsAndSync(
+      set, get, [id],
+      q => ensureSpatialVisualAssets({ ...q, ...updates }),
+      'adminStore:updateQuestion'
+    );
+    if (result.ok) get().logActivity(`עדכן שאלה ${id}`, 'question');
+    return result;
   },
 
   deleteQuestion: async (id) => {
-    await markQuestionDeletedLocally(id);
+    // Delete in Supabase first; the question leaves the admin list only after
+    // the database confirmed the delete.
     adminRealtimeMutedUntil = Date.now() + ADMIN_DELETE_RELOAD_MUTE_MS;
+    const result = await dbDelete(id);
+    if (result.error) {
+      const message = `מחיקת השאלה ב-Supabase נכשלה: ${result.error}`;
+      set({ syncError: message, isSyncing: false });
+      logger.error('adminStore:deleteQuestion', `מחיקה נכשלה עבור ${id}`, result.error);
+      return { ok: false, error: message };
+    }
+    await markQuestionDeletedLocally(id);
     set(s => ({
       questions: s.questions.filter(q => q.id !== id),
       selectedQuestionIds: s.selectedQuestionIds.filter(i => i !== id),
@@ -1623,84 +1783,89 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(qId => qId !== id),
       })),
     }));
-    const result = await dbDelete(id);
-    if (result.error) {
-      const message = `השאלה הוסרה מהניהול ונשמרה ברשימת מחיקות, אבל המחיקה הפיזית ב-Supabase דורשת בדיקה: ${result.error}`;
-      set({ syncError: message, isSyncing: false });
-      logger.error('adminStore:deleteQuestion', `מחיקה לוגית נשמרה, מחיקה פיזית נכשלה עבור ${id}`, result.error);
-      get().logActivity(`מחק שאלה ${id} (מחיקה לוגית; נדרש אימות Supabase)`, 'question');
-      return { ok: true, error: message };
+    if (templatesLoaded) {
+      await saveTemplates(get().templates).catch(e => {
+        logger.warn('adminStore:deleteQuestion', 'השאלה נמחקה אך ניקוי תבניות המבחן לא נשמר מיד.', e?.message);
+      });
     }
-    await saveTemplates(get().templates).catch(e => {
-      logger.warn('adminStore:deleteQuestion', 'השאלה נמחקה אך ניקוי תבניות המבחן לא נשמר מיד.', e?.message);
-    });
     logger.info('adminStore:deleteQuestion', `שאלה נמחקה: ${id}`);
     get().logActivity(`מחק שאלה ${id}`, 'question');
     return { ok: true };
   },
 
   deleteQuestions: async (ids) => {
-    const idSet = new Set(ids);
-    await loadDeletedQuestionIds();
-    ids.forEach(id => deletedQuestionIds.add(id));
-    await persistDeletedQuestionIds();
     adminRealtimeMutedUntil = Date.now() + ADMIN_DELETE_RELOAD_MUTE_MS;
-    set(s => ({
-      questions: s.questions.filter(q => !idSet.has(q.id)),
-      selectedQuestionIds: [],
-      templates: s.templates.map(t => ({
-        ...t,
-        pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(qId => !idSet.has(qId)),
-      })),
-    }));
     const results = await Promise.all(ids.map(id => dbDelete(id)));
     const failed = results
       .map((result, index) => ({ result, id: ids[index] }))
       .filter(row => row.result.error);
-    if (failed.length > 0) {
-      const message = failed.map(row => `${row.id}: ${row.result.error}`).join('\n');
-      set({ syncError: `חלק מהשאלות הוסרו לוגית, אך המחיקה הפיזית דורשת בדיקה:\n${message}`, isSyncing: false });
-      logger.error('adminStore:deleteQuestions', `מחיקה לוגית נשמרה; ${failed.length} מחיקות פיזיות נכשלו`, message);
-      get().logActivity(`מחק ${ids.length} שאלות (מחיקה לוגית; ${failed.length} דורשות אימות Supabase)`, 'question');
-      return { ok: true, error: message };
+    const failedIds = new Set(failed.map(row => row.id));
+    const deletedIds = ids.filter(id => !failedIds.has(id));
+    const idSet = new Set(deletedIds);
+    if (deletedIds.length > 0) {
+      await loadDeletedQuestionIds();
+      deletedIds.forEach(id => deletedQuestionIds.add(id));
+      await persistDeletedQuestionIds();
+      set(s => ({
+        questions: s.questions.filter(q => !idSet.has(q.id)),
+        selectedQuestionIds: s.selectedQuestionIds.filter(id => !idSet.has(id)),
+        templates: s.templates.map(t => ({
+          ...t,
+          pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(qId => !idSet.has(qId)),
+        })),
+      }));
+      if (templatesLoaded) {
+        await saveTemplates(get().templates).catch(e => {
+          logger.warn('adminStore:deleteQuestions', 'השאלות נמחקו אך ניקוי תבניות המבחן לא נשמר מיד.', e?.message);
+        });
+      }
+      get().logActivity(`מחק ${deletedIds.length} שאלות`, 'question');
     }
-    await saveTemplates(get().templates).catch(e => {
-      logger.warn('adminStore:deleteQuestions', 'השאלות נמחקו אך ניקוי תבניות המבחן לא נשמר מיד.', e?.message);
-    });
+    if (failed.length > 0) {
+      const details = failed.map(row => `${row.id}: ${row.result.error}`).join('\n');
+      const message = `${failed.length} מתוך ${ids.length} מחיקות נכשלו ב-Supabase (השאלות לא נמחקו):\n${details}`;
+      set({ syncError: message, isSyncing: false });
+      logger.error('adminStore:deleteQuestions', `${failed.length} מחיקות נכשלו`, details);
+      return { ok: false, error: message };
+    }
     logger.info('adminStore:deleteQuestions', `${ids.length} שאלות נמחקו`);
-    get().logActivity(`מחק ${ids.length} שאלות`, 'question');
     return { ok: true };
   },
 
-  validateQuestion: (id, status) => {
-    set(s => {
-      const updated = s.questions.map(q =>
-        q.id === id
-          ? ensureSpatialVisualAssets({ ...q, validationStatus: status, smartPracticeEligible: status === 'validated', generalPracticeEligible: status === 'validated' })
-          : q
-      );
-      const q = updated.find(x => x.id === id);
-      if (q) syncQuestionsToSupabase(set, [q], 'adminStore:validateQuestion');
-      return { questions: updated };
-    });
-    get().logActivity(`אימת שאלה ${id} → ${status}`, 'question');
-  },
+  validateQuestion: (id, status) => get().bulkValidate([id], status),
 
-  bulkValidate: (ids, status) => {
-    const idSet = new Set(ids);
-    let toSync: Question[] = [];
-    set(s => {
-      const updated = s.questions.map(q =>
-        idSet.has(q.id)
-          ? ensureSpatialVisualAssets({ ...q, validationStatus: status, generalPracticeEligible: status === 'validated', smartPracticeEligible: status === 'validated' })
-          : q
-      );
-      toSync = updated.filter(q => idSet.has(q.id));
-      return { questions: updated, selectedQuestionIds: [] };
+  bulkValidate: async (ids, status) => {
+    // Approving always passes through the psychotechnic quality audit.
+    const byId = new Map(get().questions.map(q => [q.id, q]));
+    const blocked: Array<{ id: string; issues: string[] }> = [];
+    const allowed = ids.filter(id => {
+      const q = byId.get(id);
+      if (!q) {
+        blocked.push({ id, issues: ['השאלה לא נמצאה בניהול.'] });
+        return false;
+      }
+      if (status !== 'validated') return true;
+      const issues = auditPsychotechnicQuestion(q);
+      if (issues.length > 0) {
+        blocked.push({ id, issues });
+        return false;
+      }
+      return true;
     });
-    syncQuestionsToSupabase(set, toSync, 'adminStore:bulkValidate');
-    logger.info('adminStore:bulkValidate', `${ids.length} שאלות → ${status}`);
-    get().logActivity(`אימות מרובה: ${ids.length} שאלות → ${status}`, 'question');
+    set({ selectedQuestionIds: [] });
+    if (allowed.length === 0) {
+      // `error` is reserved for save failures; quality blocks are reported via `blocked`.
+      return { ok: blocked.length === 0, updatedIds: [], blocked };
+    }
+    const result = await updateQuestionsAndSync(
+      set, get, allowed,
+      q => ensureSpatialVisualAssets({ ...q, validationStatus: status, generalPracticeEligible: status === 'validated', smartPracticeEligible: status === 'validated' }),
+      'adminStore:bulkValidate'
+    );
+    if (!result.ok) return { ...result, updatedIds: [], blocked };
+    logger.info('adminStore:bulkValidate', `${allowed.length} שאלות → ${status}`);
+    get().logActivity(`אימות מרובה: ${allowed.length} שאלות → ${status}`, 'question');
+    return { ok: true, updatedIds: allowed, blocked };
   },
 
   toggleSelectQuestion: (id) => {
@@ -1713,178 +1878,193 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   clearSelection: () => set({ selectedQuestionIds: [] }),
 
-  selectAll: () => {
-    set(s => ({ selectedQuestionIds: s.questions.map(q => q.id) }));
+  selectAll: (ids) => {
+    set(s => ({ selectedQuestionIds: ids ? [...new Set(ids)] : s.questions.filter(isVisibleAdminQuestion).map(q => q.id) }));
   },
 
-  assignQuestionsToTopic: (questionIds, topicId) => {
-    const idSet = new Set(questionIds);
-    let toSync: Question[] = [];
-    set(s => {
-      const updated = s.questions.map(q =>
-        idSet.has(q.id) ? { ...q, topicId } : q
-      );
-      toSync = updated.filter(q => idSet.has(q.id));
-      return { questions: updated };
-    });
-    syncQuestionsToSupabase(set, toSync, 'adminStore:assignQuestionsToTopic');
-    logger.info('adminStore:assignQuestionsToTopic', `${questionIds.length} שאלות → נושא ${topicId}`);
+  assignQuestionsToTopic: async (questionIds, topicId) => {
+    const topicTargetId = get().topics.find(t => t.id === topicId)?.targetId;
+    const result = await updateQuestionsAndSync(
+      set, get, questionIds,
+      q => ({
+        ...q,
+        topicId,
+        targetIds: topicTargetId && !q.targetIds.includes(topicTargetId) ? [...q.targetIds, topicTargetId] : q.targetIds,
+      }),
+      'adminStore:assignQuestionsToTopic'
+    );
+    if (result.ok) logger.info('adminStore:assignQuestionsToTopic', `${questionIds.length} שאלות → נושא ${topicId}`);
+    return result;
   },
 
-  setQuestionsAccessLevel: (questionIds, level) => {
-    const idSet = new Set(questionIds);
-    let toSync: Question[] = [];
-    set(s => {
-      const updated = s.questions.map(q =>
-        idSet.has(q.id) ? { ...q, accessLevel: level } : q
-      );
-      toSync = updated.filter(q => idSet.has(q.id));
-      return { questions: updated };
-    });
-    syncQuestionsToSupabase(set, toSync, 'adminStore:setQuestionsAccessLevel');
-    logger.info('adminStore:setQuestionsAccessLevel', `${questionIds.length} שאלות → ${level}`);
+  setQuestionsAccessLevel: async (questionIds, level) => {
+    const result = await updateQuestionsAndSync(
+      set, get, questionIds,
+      q => ({ ...q, accessLevel: level }),
+      'adminStore:setQuestionsAccessLevel'
+    );
+    if (result.ok) logger.info('adminStore:setQuestionsAccessLevel', `${questionIds.length} שאלות → ${level}`);
+    return result;
   },
 
-  assignQuestionsToTargets: (questionIds, targetIds) => {
-    const idSet = new Set(questionIds);
-    let toSync: Question[] = [];
-    set(s => {
-      const updated = s.questions.map(q =>
-        idSet.has(q.id) ? { ...q, targetIds } : q
-      );
-      toSync = updated.filter(q => idSet.has(q.id));
-      return { questions: updated };
-    });
-    syncQuestionsToSupabase(set, toSync, 'adminStore:assignQuestionsToTargets');
-    logger.info('adminStore:assignQuestionsToTargets', `${questionIds.length} שאלות → מסלולים: ${targetIds.join(',')}`);
-    get().logActivity(`שויכו ${questionIds.length} שאלות למסלולים: ${targetIds.join(', ')}`, 'question');
+  assignQuestionsToTargets: async (questionIds, targetIds) => {
+    const result = await updateQuestionsAndSync(
+      set, get, questionIds,
+      q => ({ ...q, targetIds }),
+      'adminStore:assignQuestionsToTargets'
+    );
+    if (result.ok) {
+      logger.info('adminStore:assignQuestionsToTargets', `${questionIds.length} שאלות → מסלולים: ${targetIds.join(',')}`);
+      get().logActivity(`שויכו ${questionIds.length} שאלות למסלולים: ${targetIds.join(', ')}`, 'question');
+    }
+    return result;
   },
 
-  setQuestionsAdaptiveEligibility: (questionIds, smart, general) => {
-    const idSet = new Set(questionIds);
-    let toSync: Question[] = [];
-    set(s => {
-      const updated = s.questions.map(q =>
-        idSet.has(q.id) ? { ...q, smartPracticeEligible: smart, generalPracticeEligible: general } : q
-      );
-      toSync = updated.filter(q => idSet.has(q.id));
-      return { questions: updated };
-    });
-    syncQuestionsToSupabase(set, toSync, 'adminStore:setQuestionsAdaptiveEligibility');
-    logger.info('adminStore:setQuestionsAdaptiveEligibility', `${questionIds.length} שאלות — חכם:${smart} כללי:${general}`);
-    get().logActivity(`עודכנה כשירות אדפטיבית ל-${questionIds.length} שאלות`, 'question');
+  setQuestionsAdaptiveEligibility: async (questionIds, smart, general) => {
+    const result = await updateQuestionsAndSync(
+      set, get, questionIds,
+      q => ({ ...q, smartPracticeEligible: smart, generalPracticeEligible: general }),
+      'adminStore:setQuestionsAdaptiveEligibility'
+    );
+    if (result.ok) {
+      logger.info('adminStore:setQuestionsAdaptiveEligibility', `${questionIds.length} שאלות — חכם:${smart} כללי:${general}`);
+      get().logActivity(`עודכנה כשירות אדפטיבית ל-${questionIds.length} שאלות`, 'question');
+    }
+    return result;
   },
 
   addTopic: (t) => {
     const newT: Topic = { ...t, id: `topic_admin_${Date.now()}` };
     set(s => ({ topics: [...s.topics, newT] }));
-    trackAdminPersistence(set, dbUpsertTopic(newT), 'adminStore:addTopic', `נושא נשמר ב-Supabase: ${newT.name}`);
+    trackAdminPersistence(set, dbUpsertTopic(newT), 'adminStore:addTopic', `נושא נשמר ב-Supabase: ${newT.name}`)
+      .then(result => {
+        if (!result.ok) set(s => ({ topics: s.topics.filter(x => x.id !== newT.id) }));
+      });
     get().logActivity(`הוסיף נושא: ${newT.name}`, 'system');
     return newT;
   },
 
-  updateTopic: (id, updates) => {
-    set(s => {
-      const updated = s.topics.map(t => (t.id === id ? { ...t, ...updates } : t));
-      const t = updated.find(x => x.id === id);
-      if (t) trackAdminPersistence(set, dbUpsertTopic(t), 'adminStore:updateTopic', `נושא עודכן ב-Supabase: ${t.name}`);
-      return { topics: updated };
-    });
+  updateTopic: async (id, updates) => {
+    const previous = get().topics.find(t => t.id === id);
+    if (!previous) return { ok: false, error: `הנושא ${id} לא נמצא.` };
+    const next = { ...previous, ...updates };
+    set(s => ({ topics: s.topics.map(t => (t.id === id ? next : t)) }));
+    const result = await trackAdminPersistence(set, dbUpsertTopic(next), 'adminStore:updateTopic', `נושא עודכן ב-Supabase: ${next.name}`);
+    if (!result.ok) set(s => ({ topics: s.topics.map(t => (t.id === id ? previous : t)) }));
+    return result;
   },
 
-  deleteTopic: (id) => {
-    set(s => ({ topics: s.topics.filter(t => t.id !== id) }));
-    trackAdminPersistence(set, deleteTopicFromDB(id), 'adminStore:deleteTopic', `נושא נמחק מ-Supabase: ${id}`);
-    get().logActivity(`מחק נושא ${id}`, 'system');
+  deleteTopic: async (id) => {
+    // Questions reference topics with ON DELETE SET NULL, so deleting a topic
+    // that still has questions would orphan them. Block until they are moved.
+    const localCount = get().questions.filter(q => q.topicId === id && isVisibleAdminQuestion(q)).length;
+    let remoteCount = 0;
+    try {
+      remoteCount = await countTopicQuestions(id);
+    } catch (e: any) {
+      const message = e?.message ?? 'לא ניתן לבדוק אם יש שאלות בנושא.';
+      set({ syncError: message });
+      return { ok: false, error: message };
+    }
+    const count = Math.max(localCount, remoteCount);
+    if (count > 0) {
+      return { ok: false, error: `לנושא יש ${count} שאלות. יש להעביר אותן לנושא אחר (במסך שיוך שאלות) לפני המחיקה.` };
+    }
+    const result = await trackAdminPersistence(set, deleteTopicFromDB(id), 'adminStore:deleteTopic', `נושא נמחק מ-Supabase: ${id}`);
+    if (result.ok) {
+      set(s => ({ topics: s.topics.filter(t => t.id !== id) }));
+      get().logActivity(`מחק נושא ${id}`, 'system');
+    }
+    return result;
   },
 
-  updateTarget: (id, updates) => {
-    set(s => {
-      const targets = s.targets.map(t => (t.id === id ? { ...t, ...updates } : t));
-      const target = targets.find(t => t.id === id);
-      if (target) trackAdminPersistence(set, dbUpsertTarget(target), 'adminStore:updateTarget', `מסלול עודכן ב-Supabase: ${target.name}`);
-      return { targets };
-    });
+  updateTarget: async (id, updates) => {
+    const previous = get().targets.find(t => t.id === id);
+    if (!previous) return { ok: false, error: `המסלול ${id} לא נמצא.` };
+    const next = { ...previous, ...updates };
+    set(s => ({ targets: s.targets.map(t => (t.id === id ? next : t)) }));
+    const result = await trackAdminPersistence(set, dbUpsertTarget(next), 'adminStore:updateTarget', `מסלול עודכן ב-Supabase: ${next.name}`);
+    if (!result.ok) set(s => ({ targets: s.targets.map(t => (t.id === id ? previous : t)) }));
+    return result;
   },
 
-  addTemplate: (t) => {
+  addTemplate: async (t) => {
+    if (!templatesLoaded) return refuseUnloaded(set, 'adminStore:addTemplate', TEMPLATES_NOT_LOADED_ERROR);
     const newT = normalizeTemplateRules({
       ...t,
       id: `tmpl_${Date.now()}`,
       createdAt: new Date(),
     });
-    set(s => {
-      const next = [...s.templates, newT];
-      trackAdminPersistence(set, saveTemplates(next), 'adminStore:addTemplate', `תבנית נשמרה: ${newT.name}`);
-      return { templates: next };
-    });
+    const previous = get().templates;
+    const next = [...previous, newT];
+    set({ templates: next });
+    const result = await persistTemplates(set, next, 'adminStore:addTemplate', `תבנית נשמרה: ${newT.name}`);
+    if (!result.ok) {
+      set(s => ({ templates: s.templates.filter(x => x.id !== newT.id) }));
+      return result;
+    }
     get().logActivity(`יצר תבנית סימולציה: ${newT.name}`, 'system');
-    return newT;
+    return result;
   },
 
   updateTemplate: (id, updates) => {
-    set(s => {
-      const next = s.templates.map(t => (t.id === id ? normalizeTemplateRules({ ...t, ...updates }) : t));
-      trackAdminPersistence(set, saveTemplates(next), 'adminStore:updateTemplate', `תבנית עודכנה: ${id}`);
-      return { templates: next };
-    });
+    if (!templatesLoaded) return refuseUnloaded(set, 'adminStore:updateTemplate', TEMPLATES_NOT_LOADED_ERROR);
+    const next = get().templates.map(t => (t.id === id ? normalizeTemplateRules({ ...t, ...updates }) : t));
+    set({ templates: next });
+    return persistTemplates(set, next, 'adminStore:updateTemplate', `תבנית עודכנה: ${id}`);
   },
 
-  deleteTemplate: (id) => {
-    set(s => {
-      const next = s.templates.filter(t => t.id !== id);
-      trackAdminPersistence(set, saveTemplates(next), 'adminStore:deleteTemplate', `תבנית נמחקה: ${id}`);
-      return { templates: next };
-    });
-    get().logActivity(`מחק תבנית סימולציה ${id}`, 'system');
+  deleteTemplate: async (id) => {
+    if (!templatesLoaded) return refuseUnloaded(set, 'adminStore:deleteTemplate', TEMPLATES_NOT_LOADED_ERROR);
+    const next = get().templates.filter(t => t.id !== id);
+    set({ templates: next });
+    const result = await persistTemplates(set, next, 'adminStore:deleteTemplate', `תבנית נמחקה: ${id}`);
+    if (result.ok) get().logActivity(`מחק תבנית סימולציה ${id}`, 'system');
+    return result;
   },
 
   addTopicRuleToTemplate: (templateId, rule) => {
-    set(s => {
-      const templates = s.templates.map(t =>
-        t.id === templateId
-          ? normalizeTemplateRules({ ...t, rules: [...t.rules.filter(r => r.id !== rule.id), rule] })
-          : t
-      );
-      trackAdminPersistence(set, saveTemplates(templates), 'adminStore:addTopicRuleToTemplate', `כלל תבנית נשמר: ${templateId}`);
-      return { templates };
-    });
+    if (!templatesLoaded) return refuseUnloaded(set, 'adminStore:addTopicRuleToTemplate', TEMPLATES_NOT_LOADED_ERROR);
+    const templates = get().templates.map(t =>
+      t.id === templateId
+        ? normalizeTemplateRules({ ...t, rules: [...t.rules.filter(r => r.id !== rule.id), rule] })
+        : t
+    );
+    set({ templates });
+    return persistTemplates(set, templates, 'adminStore:addTopicRuleToTemplate', `כלל תבנית נשמר: ${templateId}`);
   },
 
   removeTopicRuleFromTemplate: (templateId, ruleId) => {
-    set(s => {
-      const templates = s.templates.map(t =>
-        t.id === templateId
-          ? normalizeTemplateRules({ ...t, rules: t.rules.filter(r => r.id !== ruleId) })
-          : t
-      );
-      trackAdminPersistence(set, saveTemplates(templates), 'adminStore:removeTopicRuleFromTemplate', `כלל תבנית הוסר: ${templateId}`);
-      return { templates };
-    });
+    if (!templatesLoaded) return refuseUnloaded(set, 'adminStore:removeTopicRuleFromTemplate', TEMPLATES_NOT_LOADED_ERROR);
+    const templates = get().templates.map(t =>
+      t.id === templateId
+        ? normalizeTemplateRules({ ...t, rules: t.rules.filter(r => r.id !== ruleId) })
+        : t
+    );
+    set({ templates });
+    return persistTemplates(set, templates, 'adminStore:removeTopicRuleFromTemplate', `כלל תבנית הוסר: ${templateId}`);
   },
 
   pinQuestionToTemplate: (templateId, questionId) => {
-    set(s => {
-      const templates = s.templates.map(t =>
-        t.id === templateId
-          ? { ...t, pinnedQuestionIds: [...new Set([...(t.pinnedQuestionIds ?? []), questionId])] }
-          : t
-      );
-      trackAdminPersistence(set, saveTemplates(templates), 'adminStore:pinQuestionToTemplate', `שאלה הוצמדה לתבנית: ${questionId}`);
-      return { templates };
-    });
+    if (!templatesLoaded) return refuseUnloaded(set, 'adminStore:pinQuestionToTemplate', TEMPLATES_NOT_LOADED_ERROR);
+    const templates = get().templates.map(t =>
+      t.id === templateId
+        ? { ...t, pinnedQuestionIds: [...new Set([...(t.pinnedQuestionIds ?? []), questionId])] }
+        : t
+    );
+    set({ templates });
+    return persistTemplates(set, templates, 'adminStore:pinQuestionToTemplate', `שאלה הוצמדה לתבנית: ${questionId}`);
   },
 
   unpinQuestionFromTemplate: (templateId, questionId) => {
-    set(s => {
-      const templates = s.templates.map(t =>
-        t.id === templateId
-          ? { ...t, pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(id => id !== questionId) }
-          : t
-      );
-      trackAdminPersistence(set, saveTemplates(templates), 'adminStore:unpinQuestionFromTemplate', `שאלה הוסרה מתבנית: ${questionId}`);
-      return { templates };
-    });
+    if (!templatesLoaded) return refuseUnloaded(set, 'adminStore:unpinQuestionFromTemplate', TEMPLATES_NOT_LOADED_ERROR);
+    const templates = get().templates.map(t =>
+      t.id === templateId
+        ? { ...t, pinnedQuestionIds: (t.pinnedQuestionIds ?? []).filter(id => id !== questionId) }
+        : t
+    );
+    set({ templates });
+    return persistTemplates(set, templates, 'adminStore:unpinQuestionFromTemplate', `שאלה הוסרה מתבנית: ${questionId}`);
   },
 
   // ── Activity Log ──────────────────────────────────────────────────────────
@@ -1898,13 +2078,16 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set(s => ({ activityLog: [entry, ...s.activityLog].slice(0, 500) }));
     const updated = get().activityLog;
     AsyncStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(updated)).catch(() => null);
-    saveAdminCollections(get());
+    pendingActivityEntries.push(entry);
+    scheduleActivityLogSave();
   },
 
   clearActivityLog: () => {
     set({ activityLog: [] });
     AsyncStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify([])).catch(() => null);
-    saveAdminCollections(get());
+    pendingActivityEntries = [];
+    activityLogClearPending = true;
+    scheduleActivityLogSave();
   },
 
   // ── Promo Codes ────────────────────────────────────────────────────────────
@@ -2070,24 +2253,43 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
     publicDataLoadPromise = (async () => {
       try {
-        const [remoteTargets, remoteTopics, templates, settings, publicDailyChallenges] = await Promise.all([
+        const [remoteTargets, remoteTopics, templatesResult, settingsResult, publicDailyChallenges] = await Promise.all([
           fetchTargets(),
           fetchTopics(),
-          loadTemplates(),
-          loadAdminSettings(),
+          loadTemplates().then(
+            value => ({ ok: true, value }),
+            (e: any) => {
+              logger.warn('adminStore:loadPublicData', 'טעינת תבניות נכשלה', e?.message);
+              return { ok: false, value: null };
+            }
+          ),
+          loadAdminSettings().then(
+            value => ({ ok: true, value }),
+            (e: any) => {
+              logger.warn('adminStore:loadPublicData', 'טעינת הגדרות נכשלה', e?.message);
+              return { ok: false, value: null };
+            }
+          ),
           loadAdminState<DailyChallenge[]>(PUBLIC_DAILY_CHALLENGES_KEY).catch(() => null),
         ]);
 
         const updates: Partial<AdminState> = {
-          targets: remoteTargets,
-          topics: remoteTopics,
           lastSyncedAt: new Date().toISOString(),
         };
+        // fetchTargets/fetchTopics return null on error: keep previous values.
+        if (remoteTargets) updates.targets = remoteTargets;
+        if (remoteTopics) updates.topics = remoteTopics;
 
-        if (templates && templates.length > 0) {
-          updates.templates = templates.map(normalizeTemplateRules);
+        const templates = templatesResult.value;
+        const settings = settingsResult.value;
+        if (templatesResult.ok) {
+          templatesLoaded = true;
+          if (templates && templates.length > 0) {
+            updates.templates = templates.map(normalizeTemplateRules);
+          }
         }
 
+        if (settingsResult.ok) settingsLoaded = true;
         if (settings) {
           if (settings.practiceSettings) updates.practiceSettings = settings.practiceSettings;
           if (settings.examSettings) updates.examSettings = settings.examSettings;
@@ -2103,7 +2305,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         set(updates);
         logger.success(
           'adminStore:loadPublicData',
-          `נטענו נתונים ציבוריים: ${remoteTargets.length} מסלולים, ${remoteTopics.length} נושאים`
+          `נטענו נתונים ציבוריים: ${remoteTargets?.length ?? 0} מסלולים, ${remoteTopics?.length ?? 0} נושאים`
         );
       } catch (e: any) {
         logger.error('adminStore:loadPublicData', 'טעינת נתונים ציבוריים נכשלה', e?.message);
@@ -2127,6 +2329,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       logger.info('adminStore:loadAdminData', 'טוען נתוני אדמין...');
       set({ isSyncing: true, syncError: null });
 
+      const loadErrors: string[] = [];
+
       // 1. Load all questions from Supabase. In admin, Supabase is the source of truth.
       try {
         await loadDeletedQuestionIds();
@@ -2135,40 +2339,46 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         logger.success('adminStore:loadAdminData', `Loaded ${remote.length} questions from Supabase`);
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'Failed loading questions', e?.message);
-        set({ questions: [] });
+        loadErrors.push(e?.message ?? 'טעינת שאלות נכשלה');
       }
 
-      // 2. Load targets and topics from Supabase. Admin views must not mask DB issues with mock data.
+      // 2. Load targets and topics from Supabase. On error (null) keep the previous values.
       try {
         const remoteTargets = await fetchTargets();
-        set({ targets: remoteTargets });
+        if (remoteTargets) set({ targets: remoteTargets });
+        else loadErrors.push('טעינת מסלולים נכשלה');
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'Failed loading targets', e?.message);
-        set({ targets: [] });
+        loadErrors.push(e?.message ?? 'טעינת מסלולים נכשלה');
       }
 
       try {
         const remoteTopics = await fetchTopics();
-        set({ topics: remoteTopics });
+        if (remoteTopics) set({ topics: remoteTopics });
+        else loadErrors.push('טעינת נושאים נכשלה');
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'Failed loading topics', e?.message);
-        set({ topics: [] });
+        loadErrors.push(e?.message ?? 'טעינת נושאים נכשלה');
       }
 
-      // 3. Load simulation templates from AsyncStorage
+      // 3. Load simulation templates. A failed read keeps templatesLoaded false so
+      // local seed templates never overwrite the remote copy.
       try {
         const templates = await loadTemplates();
+        templatesLoaded = true;
         if (templates && templates.length > 0) {
           const normalizedTemplates = templates.map(normalizeTemplateRules);
           set({ templates: normalizedTemplates });
         }
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'שגיאה בטעינת תבניות', e?.message);
+        loadErrors.push(e?.message ?? 'טעינת תבניות נכשלה');
       }
 
-      // 4. Load admin settings from AsyncStorage
+      // 4. Load admin settings
       try {
         const settings = await loadAdminSettings();
+        settingsLoaded = true;
         if (settings) {
           if (settings.practiceSettings) set({ practiceSettings: settings.practiceSettings });
           if (settings.examSettings) set({ examSettings: settings.examSettings });
@@ -2178,16 +2388,27 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         }
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'שגיאה בטעינת הגדרות', e?.message);
+        loadErrors.push(e?.message ?? 'טעינת הגדרות נכשלה');
       }
 
-      // 5. Load synced admin collections from Supabase when available.
+      // 5. Load synced admin collections + the separate activity log key.
       try {
-        const collections = normalizeAdminCollections(await loadAdminState<any>(ADMIN_COLLECTIONS_KEY));
+        const rawCollections = await loadAdminState<any>(ADMIN_COLLECTIONS_KEY);
+        collectionsLoaded = true;
+        const collections = normalizeAdminCollections(rawCollections);
         if (collections) {
           set(collections);
         }
+        const remoteActivity = await loadAdminState<AdminActivityLog[]>(ADMIN_ACTIVITY_LOG_REMOTE_KEY).catch((e: any) => {
+          logger.warn('adminStore:loadAdminData', 'שגיאה בטעינת יומן פעילות', e?.message);
+          return null;
+        });
+        // Legacy: the log used to live inside `collections`; only migrate it while the new key is missing.
+        const legacyActivity = remoteActivity === null && Array.isArray(rawCollections?.activityLog) ? rawCollections.activityLog : null;
+        set(s => ({ activityLog: mergeActivityLogs(s.activityLog, remoteActivity, legacyActivity) }));
       } catch (e: any) {
         logger.error('adminStore:loadAdminData', 'שגיאה בטעינת אוספי אדמין', e?.message);
+        loadErrors.push(e?.message ?? 'טעינת נתוני ניהול נכשלה');
       }
 
       // 6. Revenue snapshots are derived from real profiles only. MRR stays 0
@@ -2225,8 +2446,13 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         }
       } catch {}
 
-      set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
-      logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');
+      if (loadErrors.length > 0) {
+        set({ isSyncing: false, syncError: loadErrors.join('\n') });
+        logger.error('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה עם שגיאות', loadErrors.join('; '));
+      } else {
+        set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
+        logger.success('adminStore:loadAdminData', 'טעינת נתוני אדמין הושלמה');
+      }
     })().finally(() => {
       adminDataLoadPromise = null;
     });
@@ -2237,6 +2463,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   syncAll: async () => {
     try {
       await get().loadAdminData(true);
+      const loadError = get().syncError;
+      if (loadError) return { ok: false, message: loadError };
       get().logActivity('סנכרון מלא הופעל מפאנל הניהול', 'system');
       return { ok: true, message: 'כל נתוני הניהול סונכרנו בהצלחה.' };
     } catch (e: any) {
@@ -2286,16 +2514,24 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   startRealtimeSync: () => {
     if (adminRealtimeChannel) return;
-    const scheduleReload = () => {
-      if (Date.now() < adminRealtimeMutedUntil) return;
+    // Changes that arrive during the self-write mute window are deferred until
+    // the window ends instead of being dropped.
+    const scheduleReload = (payload?: any) => {
+      const key = payload?.new?.key ?? payload?.old?.key;
+      if (key === ADMIN_ACTIVITY_LOG_REMOTE_KEY) return;
       if (adminRealtimeReloadTimer) clearTimeout(adminRealtimeReloadTimer);
+      const delay = Math.max(ADMIN_REALTIME_RELOAD_DEBOUNCE_MS, adminRealtimeMutedUntil - Date.now() + 50);
       adminRealtimeReloadTimer = setTimeout(() => {
-        if (Date.now() < adminRealtimeMutedUntil) return;
+        adminRealtimeReloadTimer = null;
+        if (Date.now() < adminRealtimeMutedUntil) {
+          scheduleReload();
+          return;
+        }
         get().loadAdminData().catch((e: any) => {
           const message = e?.message ?? 'Realtime sync failed';
           set({ syncError: message, isSyncing: false });
         });
-      }, ADMIN_REALTIME_RELOAD_DEBOUNCE_MS);
+      }, delay);
     };
 
     adminRealtimeChannel = supabase

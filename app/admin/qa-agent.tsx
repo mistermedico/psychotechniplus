@@ -63,7 +63,11 @@ export default function AdminQaAgent() {
     setApplying(finding.question.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      updateQuestion(finding.question.id, finding.suggestedQuestion);
+      const result = await updateQuestion(finding.question.id, finding.suggestedQuestion);
+      if (!result.ok) {
+        Alert.alert('שגיאת שמירה', result.error ?? 'התיקון לא נשמר ב-Supabase.');
+        return;
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } finally {
       setApplying(null);
@@ -89,11 +93,19 @@ export default function AdminQaAgent() {
             setBulkApplying(true);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             try {
-              candidates.forEach(finding => updateQuestion(finding.question.id, finding.suggestedQuestion));
+              const results = await Promise.all(candidates.map(finding => updateQuestion(finding.question.id, finding.suggestedQuestion)));
               const recheckIds = candidates
-                .filter(finding => finding.suggestedQuestion.validationStatus === 'pending')
+                .filter((finding, i) => results[i].ok && finding.suggestedQuestion.validationStatus === 'pending')
                 .map(finding => finding.question.id);
-              if (recheckIds.length > 0) bulkValidate(recheckIds, 'pending');
+              const recheck = recheckIds.length > 0 ? await bulkValidate(recheckIds, 'pending') : null;
+              const errors = [
+                ...results.filter(r => !r.ok).map(r => r.error ?? 'שגיאה לא ידועה'),
+                ...(recheck?.error ? [recheck.error] : []),
+              ];
+              if (errors.length > 0) {
+                Alert.alert('שגיאת שמירה', `${errors.length} עדכונים נכשלו ב-Supabase:\n${[...new Set(errors)].join('\n')}`);
+                return;
+              }
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } finally {
               setBulkApplying(false);

@@ -79,6 +79,32 @@ function ensurePurchasesConfigured(userId?: string): boolean {
   return true;
 }
 
+function getEntitlementApiKey(): string {
+  if (isRevenueCatSupported) return getApiKey().trim();
+  return REVENUECAT_API_KEY_IOS.trim() || REVENUECAT_API_KEY_ANDROID.trim();
+}
+
+/**
+ * Asks the server to re-read the RevenueCat entitlement for the signed-in user
+ * and persist it on user_profiles.is_premium (the flag server RLS relies on).
+ * Returns the server's view of premium, or null when the sync could not run.
+ */
+export async function syncServerEntitlement(): Promise<boolean | null> {
+  if (!USE_REAL_PURCHASES || !currentAppUserId) return null;
+  const apiKey = getEntitlementApiKey();
+  if (!apiKey) return null;
+  const { data, error } = await supabase.functions.invoke('revenuecat-entitlement', {
+    body: { apiKey },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(String(data.error));
+  return Boolean(data?.isPremium);
+}
+
+async function syncServerEntitlementSafely(): Promise<void> {
+  await syncServerEntitlement().catch(() => null);
+}
+
 function normalizePackageIdentifier(pkg: PurchasesPackage): PurchasePackageId | null {
   const raw = `${pkg.identifier} ${pkg.packageType} ${pkg.product.identifier}`.toLowerCase();
   if (raw.includes('lifetime')) return 'lifetime';
@@ -206,6 +232,7 @@ export async function purchasePackage(
 
     const result = await Purchases.purchasePackage(rcPackage);
     latestCustomerInfo = result.customerInfo;
+    await syncServerEntitlementSafely();
     return {
       success: hasPremiumEntitlement(result.customerInfo),
       customerInfo: result.customerInfo,
@@ -224,6 +251,7 @@ export async function restorePurchases(): Promise<{ isPremium: boolean; error?: 
   try {
     const info = await Purchases.restorePurchases();
     latestCustomerInfo = info;
+    await syncServerEntitlementSafely();
     return { isPremium: hasPremiumEntitlement(info) };
   } catch (error: unknown) {
     return { isPremium: false, error: getErrorMessage(error) };
@@ -231,17 +259,15 @@ export async function restorePurchases(): Promise<{ isPremium: boolean; error?: 
 }
 
 export async function checkPremiumStatus(): Promise<boolean> {
-  if (Platform.OS === 'web') {
-    if (!currentAppUserId || !REVENUECAT_API_KEY_IOS.trim()) return false;
-    const { data, error } = await supabase.functions.invoke('revenuecat-entitlement', {
-      body: { apiKey: REVENUECAT_API_KEY_IOS },
-    });
-    if (error) throw error;
-    if (data?.error) throw new Error(String(data.error));
-    return Boolean(data?.isPremium);
+  if (!isRevenueCatSupported) {
+    // Web has no RevenueCat SDK: the server-side check is the source of truth.
+    return Boolean(await syncServerEntitlement());
   }
 
   const info = await getCustomerInfo();
+  // Keep the server's protected entitlement in sync on native too, so premium
+  // DB content (gated by server RLS) unlocks after store purchases/renewals.
+  await syncServerEntitlementSafely();
   return hasPremiumEntitlement(info);
 }
 

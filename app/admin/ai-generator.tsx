@@ -152,19 +152,25 @@ export default function AiGenerator() {
     setIsGenerating(false);
   };
 
-  const saveDraft = (draft: DraftQuestion) => {
+  const saveDraft = async (draft: DraftQuestion) => {
     const { localId: _localId, ...question } = draft;
-    addQuestion(question);
+    const result = await addQuestion(question);
+    if (!result.ok) {
+      Alert.alert('שגיאת שמירה', result.error ?? 'הטיוטה לא נשמרה ב-Supabase.');
+      return;
+    }
     setDrafts(prev => prev.filter(item => item.localId !== draft.localId));
   };
 
   const saveAll = async () => {
     if (drafts.length === 0) return;
     setSavingAll(true);
-    drafts.forEach(draft => {
+    const results = await Promise.all(drafts.map(draft => {
       const { localId: _localId, ...question } = draft;
-      addQuestion(question);
-    });
+      return addQuestion(question).then(result => ({ draft, result }));
+    }));
+    const failed = results.filter(row => !row.result.ok);
+    const savedCount = results.length - failed.length;
     addGenerationSession({
       topicId: selectedTopic?.id ?? '',
       topicName: selectedTopic?.name ?? '',
@@ -172,12 +178,16 @@ export default function AiGenerator() {
       difficulty,
       count: drafts.length,
       customPrompt: prompt,
-      savedCount: drafts.length,
+      savedCount,
       discardedCount: 0,
     });
-    setDrafts([]);
+    setDrafts(failed.map(row => row.draft));
     setSavingAll(false);
-    Alert.alert('נשמר', `${drafts.length} טיוטות נוספו לתור השאלות הממתינות לאימות.`);
+    if (failed.length > 0) {
+      Alert.alert('שמירה חלקית', `${savedCount} טיוטות נשמרו. ${failed.length} נכשלו ונשארו ברשימה:\n${failed[0].result.error ?? ''}`);
+      return;
+    }
+    Alert.alert('נשמר', `${savedCount} טיוטות נוספו לתור השאלות הממתינות לאימות.`);
   };
 
   const savePreset = () => {
