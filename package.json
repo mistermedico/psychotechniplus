@@ -66,7 +66,6 @@
     "node": "22.x"
   },
   "overrides": {
-    "shell-quote": "1.10.0",
-    "tar": "7.5.22"
+    "shell-quote": "1.10.0"
   }
 }
