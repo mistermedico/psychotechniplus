@@ -262,6 +262,15 @@ export default function RootLayout() {
     if (!fontsLoaded && !fontError) return;
 
     let cancelled = false;
+    // On a slow or failing network the Supabase calls below can take 20s+ (auth
+    // refresh retries). Never keep the whole app blank that long: release the UI
+    // after a short grace period and let the bootstrap finish in the background.
+    const releaseTimer = setTimeout(() => {
+      if (!cancelled) {
+        setBootstrapReady(true);
+        SplashScreen.hideAsync().catch(() => null);
+      }
+    }, 5000);
     const bootstrap = async () => {
       try {
         await initialize();
@@ -297,6 +306,7 @@ export default function RootLayout() {
         }
         initializeAds().catch(() => null);
       } finally {
+        clearTimeout(releaseTimer);
         if (!cancelled) {
           setBootstrapReady(true);
           SplashScreen.hideAsync().catch(() => null);
@@ -307,6 +317,7 @@ export default function RootLayout() {
     bootstrap();
     return () => {
       cancelled = true;
+      clearTimeout(releaseTimer);
     };
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps
 

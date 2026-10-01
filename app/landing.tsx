@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useRootNavigationState } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { useUserStore } from '../store/userStore';
@@ -88,9 +88,15 @@ export default function LandingScreen() {
 
   // Signed-in users and existing guests belong in the app, not on the landing
   // page (where "start" would otherwise replace their session with a new guest).
+  // Wait until the root navigator is mounted: navigating earlier throws
+  // "Attempted to navigate before mounting the Root Layout component".
+  const rootNavigationKey = useRootNavigationState()?.key;
   useEffect(() => {
-    if (isUserLoaded && isAuthenticated && !startingGuestRef.current) router.replace('/');
-  }, [isUserLoaded, isAuthenticated]);
+    if (!rootNavigationKey) return;
+    if (!isUserLoaded || !isAuthenticated || startingGuestRef.current) return;
+    const timer = setTimeout(() => router.replace('/'), 0);
+    return () => clearTimeout(timer);
+  }, [rootNavigationKey, isUserLoaded, isAuthenticated]);
 
   // Animation refs
   const navOpacity    = useRef(new Animated.Value(0)).current;

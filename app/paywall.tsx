@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useRootNavigationState } from 'expo-router';
 import * as Haptics from '../utils/haptics';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { useUserStore } from '../store/userStore';
@@ -78,9 +78,13 @@ export default function PaywallScreen() {
   };
 
   // Already premium — close paywall
+  // (wait for the root navigator: navigating before it mounts throws on web)
+  const rootNavigationKey = useRootNavigationState()?.key;
   useEffect(() => {
-    if (isPremium) close();
-  }, [isPremium]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!rootNavigationKey || !isPremium) return;
+    const timer = setTimeout(close, 0);
+    return () => clearTimeout(timer);
+  }, [isPremium, rootNavigationKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePurchase = async () => {
     if (isGuest) {
