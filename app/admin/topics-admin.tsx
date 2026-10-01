@@ -4,6 +4,7 @@ import {
   TextInput, Alert, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
 import { Topic } from '../../data/types';
@@ -77,7 +78,7 @@ export default function TopicsAdmin() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimName = name.trim();
     if (!trimName) { Alert.alert('שגיאה', 'נא להזין שם לנושא'); return; }
     if (trimName.length < 2) { Alert.alert('שגיאה', 'שם חייב להכיל לפחות 2 תווים'); return; }
@@ -104,7 +105,11 @@ export default function TopicsAdmin() {
     };
 
     if (editId) {
-      updateTopic(editId, data);
+      const result = await updateTopic(editId, data);
+      if (!result.ok) {
+        Alert.alert('שגיאת שמירה', result.error ?? 'השמירה ב-Supabase נכשלה.');
+        return;
+      }
       Alert.alert('עודכן!', `הנושא "${trimName}" עודכן`);
     } else {
       addTopic(data);
@@ -426,18 +431,22 @@ export default function TopicsAdmin() {
                       <Pressable
                         onPress={() => {
                           if (qc.total > 0) {
+                            // Deleting would orphan the questions (topic_id → NULL).
                             Alert.alert(
-                              'מחיקת נושא',
-                              `לנושא "${topic.name}" יש ${qc.total} שאלות. מחיקת הנושא לא תמחק את השאלות. להמשיך?`,
+                              'לא ניתן למחוק נושא',
+                              `לנושא "${topic.name}" יש ${qc.total} שאלות. יש להעביר אותן לנושא אחר (במסך שיוך שאלות) לפני מחיקת הנושא.`,
                               [
-                                { text: 'ביטול', style: 'cancel' },
-                                { text: 'מחק נושא', style: 'destructive', onPress: () => deleteTopic(topic.id) },
+                                { text: 'סגור', style: 'cancel' },
+                                { text: 'לשיוך שאלות', onPress: () => router.push('/admin/question-assignment') },
                               ]
                             );
                           } else {
                             Alert.alert('מחיקה', `למחוק את "${topic.name}"?`, [
                               { text: 'ביטול', style: 'cancel' },
-                              { text: 'מחק', style: 'destructive', onPress: () => deleteTopic(topic.id) },
+                              { text: 'מחק', style: 'destructive', onPress: async () => {
+                                const result = await deleteTopic(topic.id);
+                                if (!result.ok) Alert.alert('לא ניתן למחוק נושא', result.error ?? 'המחיקה ב-Supabase נכשלה.');
+                              } },
                             ]);
                           }
                         }}

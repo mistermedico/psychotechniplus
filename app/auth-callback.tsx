@@ -7,7 +7,8 @@ import { FontFamily, FontSize } from '../constants/theme';
 import { finishOAuthCallback, getCurrentOAuthCallbackUrl } from '../lib/oauth';
 import { supabase } from '../lib/supabase';
 import { useUserStore } from '../store/userStore';
-import { ADMIN_EMAIL, useAdminStore } from '../store/adminStore';
+import { useAdminStore } from '../store/adminStore';
+import { usePurchaseStore } from '../store/purchaseStore';
 
 export default function AuthCallbackScreen() {
   const [message, setMessage] = useState('מסיים התחברות...');
@@ -29,7 +30,13 @@ export default function AuthCallbackScreen() {
         const user = data.session?.user;
         if (!user?.id) throw new Error('לא נמצא משתמש מחובר');
         await initialize(user.id);
-        setIsAdmin(user.email?.toLowerCase() === ADMIN_EMAIL);
+        let adminAllowed = false;
+        try {
+          const adminResult = await supabase.rpc('is_app_admin');
+          adminAllowed = !adminResult.error && adminResult.data === true;
+        } catch {}
+        setIsAdmin(adminAllowed);
+        await usePurchaseStore.getState().initialize(user.id).catch(() => null);
         const { hasCompletedOnboarding } = useUserStore.getState();
         router.replace(hasCompletedOnboarding ? '/(tabs)' : '/onboarding');
       } catch (err: any) {

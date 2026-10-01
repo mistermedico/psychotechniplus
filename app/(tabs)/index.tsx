@@ -13,7 +13,8 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
-import { localDateKey } from '../../utils/date';
+import { serverDateKey } from '../../utils/date';
+import { canAccessMode, canAccessPremiumFeature } from '../../lib/accessControl';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 const TOPIC_META: Record<string, { icon: string; gradient: [string, string]; glow: string }> = {
@@ -40,21 +41,28 @@ export default function Dashboard() {
   const {
     name, streak, level, xp, badges,
     totalSessions, totalCorrect, totalAnswered,
-    selectedTargetId, getTopicLevel,
+    selectedTargetId, getTopicLevel, isPremium,
   } = useUserStore();
 
-  const { dailyChallenges, targets, topics, appConfig } = useAdminStore();
+  const { dailyChallenges, targets, topics, appConfig, premiumConfig, practiceSettings } = useAdminStore();
 
   const selectedTarget =
     targets.find(t => t.id === 'target_psychometric' && t.isActive !== false && !t.comingSoon);
   const targetTopics = selectedTarget ? visiblePracticeTopics(topics.filter(t => t.targetId === selectedTarget.id)) : [];
 
-  const today = localDateKey();
+  // Daily challenges are keyed by the server's (Israel) calendar day.
+  const today = serverDateKey();
   const todayChallenge = dailyChallenges.find(c => c.date === today);
   const mainTopic = targetTopics[0] ?? null;
   const showDailyChallenge =
     appConfig.featureFlags.dailyChallenge !== false &&
     (Boolean(todayChallenge) || (Boolean(mainTopic) && appConfig.featureFlags.speedMode !== false));
+  const dailyChallengeLocked = !canAccessPremiumFeature('dailyChallenge', isPremium, premiumConfig);
+  const challengeMode =
+    appConfig.featureFlags.speedMode !== false &&
+    canAccessMode('speed', isPremium, premiumConfig, practiceSettings.premiumOnlyModes)
+      ? 'speed'
+      : 'practice';
   const title = mainTopic ? LEVEL_LABELS[getTopicLevel(mainTopic.id)] : LEVEL_LABELS['beginner'];
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const xpPercent = Math.min(100, Math.round((xp / (level * 100)) * 100));
@@ -297,26 +305,33 @@ export default function Dashboard() {
                         <Animated.View style={[styles.section, { opacity: fadeIn }]}>
                           <Pressable
                             onPress={() => {
+                              if (dailyChallengeLocked) {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push('/paywall');
+                                return;
+                              }
                               if (todayChallenge) {
                                 // Navigate to the specific challenge question in speed mode
                                 router.push({
                                   pathname: '/practice-session',
                                   params: {
                                     targetId: selectedTarget?.id ?? 'target_psychometric',
-                                    mode: appConfig.featureFlags.speedMode === false ? 'practice' : 'speed',
+                                    mode: challengeMode,
                                     questionLimit: '1',
                                     challengeQuestionId: todayChallenge.questionId,
                       challengeId: todayChallenge.id,
                                   },
                                 });
                               } else if (mainTopic) {
-                                go(mainTopic.id, { mode: 'speed', questionLimit: '10' });
+                                go(mainTopic.id, { mode: challengeMode, questionLimit: '10' });
                               }
                             }}
                             accessibilityRole="button"
-                            accessibilityLabel={todayChallenge
-                              ? `אתגר יומי — ${todayChallenge.title} — שאלה אחת`
-                              : 'אתגר יומי — 10 שאלות'}
+                            accessibilityLabel={dailyChallengeLocked
+                              ? 'אתגר יומי — זמין למנויי פרימיום'
+                              : todayChallenge
+                                ? `אתגר יומי — ${todayChallenge.title} — שאלה אחת`
+                                : 'אתגר יומי — 10 שאלות'}
                             style={({ pressed }) => [styles.challengeBtn, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}
                           >
                             <LinearGradient
@@ -328,12 +343,14 @@ export default function Dashboard() {
                               <View style={styles.challengeRight}>
                                 <Text style={styles.challengeTitle}>אתגר יומי</Text>
                                 <Text style={styles.challengeSub}>
-                                  {todayChallenge
-                                    ? `${todayChallenge.title} · ${todayChallenge.bonusXp} XP בונוס`
-                                    : '10 שאלות · מיוחד להיום ← '}
+                                  {dailyChallengeLocked
+                                    ? 'זמין למנויי פרימיום · לחץ לשדרוג ←'
+                                    : todayChallenge
+                                      ? `${todayChallenge.title} · ${todayChallenge.bonusXp} XP בונוס`
+                                      : '10 שאלות · מיוחד להיום ← '}
                                 </Text>
                               </View>
-                              <Text style={styles.challengeEmoji}>⚡</Text>
+                              <Text style={styles.challengeEmoji}>{dailyChallengeLocked ? '🔒' : '⚡'}</Text>
                             </LinearGradient>
                           </Pressable>
                         </Animated.View>

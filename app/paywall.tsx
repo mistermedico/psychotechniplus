@@ -67,10 +67,20 @@ export default function PaywallScreen() {
     }
   }, [isGuest, isNativeStore, reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Single idempotent close: the premium effect and the success alerts can
+  // both fire, and a second router.back() would pop the screen underneath.
+  const closedRef = useRef(false);
+  const close = () => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
+
   // Already premium — close paywall
   useEffect(() => {
-    if (isPremium) router.back();
-  }, [isPremium]);
+    if (isPremium) close();
+  }, [isPremium]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePurchase = async () => {
     if (isGuest) {
@@ -92,7 +102,7 @@ export default function PaywallScreen() {
       Alert.alert(
         '🎉 ברוך הבא לפרמיום!',
         'גישה מלאה הופעלה בהצלחה. תודה שהצטרפת!',
-        [{ text: 'בוא נתחיל ←', onPress: () => router.back() }],
+        [{ text: 'בוא נתחיל ←', onPress: close }],
       );
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -105,7 +115,7 @@ export default function PaywallScreen() {
     const result = await restore();
     if (result.isPremium) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('✅ שוחזר', 'המנוי שלך שוחזר בהצלחה', [{ text: 'המשך', onPress: () => router.back() }]);
+      Alert.alert('✅ שוחזר', 'המנוי שלך שוחזר בהצלחה', [{ text: 'המשך', onPress: close }]);
     } else if (result.error) {
       Alert.alert('שגיאה', result.error);
     } else {
@@ -133,7 +143,7 @@ export default function PaywallScreen() {
         >
           {/* Close button */}
           <Pressable
-            onPress={() => router.back()}
+            onPress={close}
             style={({ pressed }) => [styles.closeBtn, { opacity: pressed ? 0.7 : 1 }]}
             accessibilityLabel="סגור"
             accessibilityRole="button"

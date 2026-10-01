@@ -20,6 +20,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { serverDateKey, serverDateKeyDaysAgo, normalizeStoredDateKey } from '../../utils/date';
 
 const BADGE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
   first_session: { icon: '🌱', label: 'סשן ראשון', desc: 'השלמת את הסשן הראשון שלך' },
@@ -38,16 +39,25 @@ const BOTTOM_TAB_CLEARANCE = 170;
 // Hebrew day-of-week letters (א = Sunday ... ש = Saturday)
 const DAY_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 
+// Weekday letter (Sunday = א) of the server calendar day `daysAgo` days before today.
+function dayLetterForDaysAgo(daysAgo: number): string {
+  const key = serverDateKeyDaysAgo(daysAgo);
+  const weekday = new Date(`${key}T12:00:00Z`).getUTCDay();
+  return DAY_LETTERS[weekday] ?? '';
+}
+
 export default function ProgressTab() {
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const {
     name, level, xp, streak, longestStreak,
     totalSessions, totalCorrect, totalAnswered,
-    badges, selectedTargetId, getTopicAccuracy, getTopicLevel,
+    badges, selectedTargetId, getTopicAccuracy, getTopicLevel, lastPracticedDate,
   } = useUserStore();
   const { topics: allTopics, appConfig } = useAdminStore();
   const streakEnabled = appConfig.featureFlags.streakMode !== false;
+  // If today hasn't been practiced yet, the (still alive) streak ends yesterday.
+  const streakOffset = normalizeStoredDateKey(lastPracticedDate) === serverDateKey() ? 0 : 1;
 
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const topics = allTopics.filter(t => t.targetId === 'target_psychometric');
@@ -207,48 +217,31 @@ export default function ProgressTab() {
                     </View>
                     <View style={styles.streakCard}>
                       <View style={styles.streakAccentStripe} />
-                      {/* Row 1: days 1–7 (oldest) */}
-                      <View style={styles.streakRow}>
-                        {Array.from({ length: 7 }).map((_, i) => {
-                          const dayIndex = i; // days 0–6 (14 days ago to 8 days ago)
-                          const active = dayIndex >= 7 - Math.min(streak, 7) && streak >= 7;
-                          return (
-                            <View
-                              key={`r1-${i}`}
-                              style={[
-                                styles.streakDay,
-                                active && { backgroundColor: Colors.warning },
-                              ]}
-                            >
-                              <Text style={[styles.streakDayText, active && { color: '#fff' }]}>
-                                {DAY_LETTERS[i % 7]}
-                              </Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-                      {/* Row 2: days 8–14 (most recent, last = today) */}
-                      <View style={[styles.streakRow, { marginTop: 8 }]}>
-                        {Array.from({ length: 7 }).map((_, i) => {
-                          const isToday = i === 6;
-                          const daysAgo = 6 - i; // 0 = today, 6 = 6 days ago
-                          const active = daysAgo < streak;
-                          return (
-                            <View
-                              key={`r2-${i}`}
-                              style={[
-                                styles.streakDay,
-                                active && { backgroundColor: Colors.warning },
-                                isToday && styles.streakDayToday,
-                              ]}
-                            >
-                              <Text style={[styles.streakDayText, active && { color: '#fff' }]}>
-                                {DAY_LETTERS[i % 7]}
-                              </Text>
-                            </View>
-                          );
-                        })}
-                      </View>
+                      {/* Two rows of 7: row 1 = 13–7 days ago, row 2 = 6–0 days ago (last cell = today) */}
+                      {[0, 1].map(row => (
+                        <View key={`row-${row}`} style={[styles.streakRow, row === 1 && { marginTop: 8 }]}>
+                          {Array.from({ length: 7 }).map((_, col) => {
+                            const i = row * 7 + col;
+                            const daysAgo = 13 - i;
+                            const isToday = daysAgo === 0;
+                            const active = daysAgo >= streakOffset && daysAgo < streak + streakOffset;
+                            return (
+                              <View
+                                key={`d-${i}`}
+                                style={[
+                                  styles.streakDay,
+                                  active && { backgroundColor: Colors.warning },
+                                  isToday && styles.streakDayToday,
+                                ]}
+                              >
+                                <Text style={[styles.streakDayText, active && { color: '#fff' }]}>
+                                  {dayLetterForDaysAgo(daysAgo)}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      ))}
                       <Text style={styles.streakSummary}>
                         {streak === 0
                           ? 'התחל לתרגל היום!'
@@ -268,7 +261,7 @@ export default function ProgressTab() {
         <View style={styles.trendCard}>
           {totalAnswered > 0 ? (
             <Text style={styles.trendText}>
-              📈 השבוע ענית על {totalAnswered} שאלות עם {accuracy}% דיוק
+              📈 עד כה ענית על {totalAnswered} שאלות עם {accuracy}% דיוק
             </Text>
           ) : (
             <Text style={styles.trendText}>

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { loadAdminState } from '../../lib/db';
+import { fetchAllAdminRows, loadAdminState } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
@@ -83,13 +83,16 @@ export default function AppStoreAdminScreen() {
     if (showLoader) setLoading(true);
     setError(null);
     try {
-      const [eventRows, profilesResult] = await Promise.all([
+      const [eventRows, profileRows] = await Promise.all([
         loadAdminState<AdminEvent[]>(ADMIN_EVENTS_KEY),
-        supabase.from('user_profiles').select('id,created_at,updated_at,is_premium,total_sessions'),
+        fetchAllAdminRows<ProfileRow>((from, to) => supabase
+          .from('user_profiles')
+          .select('id,created_at,updated_at,is_premium,total_sessions')
+          .order('id', { ascending: true })
+          .range(from, to), 'admin:app-store'),
       ]);
-      if (profilesResult.error) throw profilesResult.error;
       setEvents(Array.isArray(eventRows) ? eventRows : []);
-      setProfiles((profilesResult.data ?? []) as ProfileRow[]);
+      setProfiles(profileRows);
     } catch (e: any) {
       const message = e?.message ?? 'לא ניתן לטעון מדדי App Store כרגע';
       setError(message);

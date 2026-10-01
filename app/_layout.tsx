@@ -14,10 +14,11 @@ import {
 import { SuezOne_400Regular } from '@expo-google-fonts/suez-one';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useUserStore } from '../store/userStore';
-import { useAdminStore, ADMIN_EMAIL } from '../store/adminStore';
+import { useUserStore, isUserAuthTransitionInProgress } from '../store/userStore';
+import { useAdminStore } from '../store/adminStore';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { ensureDbSeeded } from '../lib/db';
+import { supabase } from '../lib/supabase';
 import { notifyFirstOpenOnce } from '../lib/adminEmail';
 import { initializeAds } from '../lib/ads';
 
@@ -205,6 +206,15 @@ const errorStyles = StyleSheet.create({
 
 installWebAlertPolyfill();
 
+async function checkIsAppAdmin(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('is_app_admin');
+    return !error && data === true;
+  } catch {
+    return false;
+  }
+}
+
 export default function RootLayout() {
   const initialize = useUserStore(s => s.initialize);
   const refreshUserFromServer = useUserStore(s => s.refreshFromServer);
@@ -267,7 +277,7 @@ export default function RootLayout() {
           stopUserRealtimeSync();
         }
 
-        if (email.toLowerCase() === ADMIN_EMAIL) {
+        if (userId && !isGuest && await checkIsAppAdmin()) {
           setIsAdmin(true);
           await loadAdminData();
           startRealtimeSync();
@@ -300,6 +310,44 @@ export default function RootLayout() {
     };
   }, [fontsLoaded, fontError]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keep the stores in sync with Supabase auth changes that happen outside the
+  // app's own flows (expired session, sign-in/out in another tab, recovery link).
+  useEffect(() => {
+    if (!bootstrapReady) return;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
+      // Our own signOut/continueAsGuest drive these transitions themselves.
+      if (isUserAuthTransitionInProgress()) return;
+      const nextUserId = session?.user?.id ?? null;
+
+      // Defer: Supabase recommends not awaiting auth calls inside this callback.
+      setTimeout(() => {
+        if (isUserAuthTransitionInProgress()) return;
+        const { userId, isAuthenticated } = useUserStore.getState();
+        if (event === 'SIGNED_OUT' || !nextUserId) {
+          if (isAuthenticated || userId) useUserStore.getState().clearLocalSession();
+          return;
+        }
+        if (nextUserId === userId) return;
+        (async () => {
+          await initialize(nextUserId);
+          const { isGuest } = useUserStore.getState();
+          if (useUserStore.getState().userId !== nextUserId) return;
+          const adminAllowed = !isGuest && await checkIsAppAdmin();
+          setIsAdmin(adminAllowed);
+          if (adminAllowed) {
+            loadAdminData().catch(() => null);
+            startRealtimeSync();
+          } else {
+            stopRealtimeSync();
+          }
+          initializePurchases(isGuest ? undefined : nextUserId).catch(() => null);
+        })().catch(() => null);
+      }, 0);
+    });
+    return () => subscription.unsubscribe();
+  }, [bootstrapReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => () => {
     stopRealtimeSync();
     stopPublicRealtimeSync();
@@ -314,6 +362,7 @@ export default function RootLayout() {
       pathname === '/landing' ||
       pathname === '/auth' ||
       pathname === '/auth-callback' ||
+      pathname === '/reset-password' ||
       pathname === '/terms' ||
       pathname === '/privacy' ||
       pathname.startsWith('/admin');
@@ -361,6 +410,7 @@ export default function RootLayout() {
           <Stack.Screen name="landing" options={{ animation: 'fade' }} />
           <Stack.Screen name="auth" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="auth-callback" options={{ animation: 'fade' }} />
+          <Stack.Screen name="reset-password" options={{ animation: 'fade' }} />
           <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
           <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
           <Stack.Screen

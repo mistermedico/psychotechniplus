@@ -15,21 +15,26 @@ export function auditPsychotechnicQuestion(
     'true_false',
     'fill_in_the_blank',
   ];
-  const cleanOptions = q.options.filter(o => o.text.trim() || o.imageUrl);
+  const options = Array.isArray(q.options) ? q.options : [];
+  const cleanOptions = options.filter(o => String(o?.text ?? '').trim() || o?.imageUrl);
   const correctOptions = cleanOptions.filter(o => o.isCorrect);
-  const optionTexts = cleanOptions.map(o => o.text.trim()).filter(Boolean);
+  const optionTexts = cleanOptions.map(o => String(o.text ?? '').trim()).filter(Boolean);
   const uniqueOptionTexts = new Set(optionTexts);
+  const optionIds = options.map(o => String(o?.id ?? ''));
+  const questionText = String(q.questionText ?? '').trim();
+  const explanation = String(q.explanation ?? '').trim();
 
-  if (!q.questionText.trim() || q.questionText.trim().length < 8) issues.push('טקסט השאלה קצר מדי או חסר.');
+  if (!questionText || questionText.length < 8) issues.push('טקסט השאלה קצר מדי או חסר.');
   if (!q.topicId) issues.push('חסר נושא פסיכוטכני.');
-  if (!q.targetIds.length) issues.push('חסר מסלול/מבחן יעד.');
+  if (!q.targetIds?.length) issues.push('חסר מסלול/מבחן יעד.');
   if (!allowedTypes.includes(q.questionType)) issues.push('סוג השאלה אינו מתאים למבחן פסיכוטכני.');
   if (q.difficulty < 1 || q.difficulty > 10) issues.push('רמת הקושי חייבת להיות בין 1 ל-10.');
   if (cleanOptions.length < 2) issues.push('חייבות להיות לפחות שתי אפשרויות תשובה.');
   if (uniqueOptionTexts.size !== optionTexts.length) issues.push('יש אפשרויות תשובה כפולות.');
+  if (optionIds.some(id => !id) || new Set(optionIds).size !== optionIds.length) issues.push('מזהי אפשרויות כפולים');
   if (correctOptions.length !== 1) issues.push('חייבת להיות תשובה נכונה אחת בלבד.');
   if (correctOptions.length === 1 && q.correctAnswer !== correctOptions[0].id) issues.push('שדה התשובה הנכונה לא תואם לאפשרות המסומנת.');
-  if (!q.explanation.trim() || q.explanation.trim().length < 25) issues.push('חסר הסבר מקיף מספיק למשתמש.');
+  if (!explanation || explanation.length < 25) issues.push('חסר הסבר מקיף מספיק למשתמש.');
   const mismatchedTitle = imageTitleMismatch(q.questionText, q.mediaUrl);
   if (mismatchedTitle) issues.push(`התמונה מציגה שאלה אחרת ("${mismatchedTitle}") מזו שבטקסט.`);
   const optionImages = cleanOptions.map(o => o.imageUrl).filter(Boolean) as string[];

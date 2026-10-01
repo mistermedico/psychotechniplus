@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { localDateKey } from '../utils/date';
+import { serverDateKey } from '../utils/date';
 
 export interface FreePracticeUsage {
   date: string;
@@ -14,7 +14,7 @@ export interface FreePracticeClaim {
 }
 
 export function emptyFreePracticeUsage(): FreePracticeUsage {
-  return { date: localDateKey(), count: 0, lastStartedAt: null };
+  return { date: serverDateKey(), count: 0, lastStartedAt: null };
 }
 
 export function getFreePracticeBlock(
@@ -23,7 +23,7 @@ export function getFreePracticeBlock(
   cooldownMinutes: number,
 ): string | null {
   const limit = Math.max(1, dailyLimit);
-  const current = usage.date === localDateKey() ? usage : emptyFreePracticeUsage();
+  const current = usage.date === serverDateKey() ? usage : emptyFreePracticeUsage();
 
   if (current.count >= limit) {
     return `הגעת למגבלת ${limit} סשנים חינמיים להיום. אפשר לשדרג לפרימיום או לחזור מחר.`;
@@ -53,7 +53,7 @@ export async function loadFreePracticeUsage(
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
   return {
-    date: row?.usage_date ?? localDateKey(),
+    date: row?.usage_date ?? serverDateKey(),
     count: Math.max(0, Number(row?.session_count) || 0),
     lastStartedAt: row?.last_started_at ?? null,
   };
@@ -87,7 +87,7 @@ export async function claimFreePracticeSession(input: {
     allowed: Boolean(row?.allowed),
     reason: row?.reason ?? undefined,
     usage: {
-      date: row?.usage_date ?? localDateKey(),
+      date: row?.usage_date ?? serverDateKey(),
       count: Math.max(0, Number(row?.session_count) || 0),
       lastStartedAt: row?.last_started_at ?? null,
     },

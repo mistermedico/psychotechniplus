@@ -69,7 +69,13 @@ Deno.serve(async (req: Request) => {
   if (userError || !user) return json({ error: 'Unauthorized' }, 401);
 
   const body = await req.json().catch(() => ({}));
-  const apiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
+  const clientKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
+  // Prefer the server's own RevenueCat keys (Supabase secrets) so a client cannot point the
+  // lookup at a different RevenueCat project. Fall back to the client's public SDK key.
+  const serverKey = (clientKey.startsWith('goog_')
+    ? Deno.env.get('REVENUECAT_ANDROID_API_KEY')
+    : Deno.env.get('REVENUECAT_IOS_API_KEY')) ?? Deno.env.get('REVENUECAT_API_KEY') ?? '';
+  const apiKey = serverKey.trim() || clientKey;
   if (!apiKey || (!apiKey.startsWith('appl_') && !apiKey.startsWith('goog_'))) {
     return json({ error: 'RevenueCat public API key is not configured' }, 400);
   }
@@ -91,9 +97,26 @@ Deno.serve(async (req: Request) => {
   }
 
   const customerInfo = await response.json();
+  const isPremium = hasPremium(customerInfo);
+
+  // Premium questions are unlocked by the database (private.has_server_premium reads
+  // user_profiles.is_premium), so an active entitlement must be written server-side.
+  // Only ever upgrade here: premium granted by the admin or a promo code must not be revoked.
+  let synced = false;
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (isPremium && serviceKey) {
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { error } = await admin.from('user_profiles').update({ is_premium: true }).eq('id', user.id);
+    synced = !error;
+    if (error) console.error('is_premium sync failed', error.message);
+  }
+
   return json({
     ok: true,
     userId: user.id,
-    isPremium: hasPremium(customerInfo),
+    isPremium,
+    synced,
   });
 });

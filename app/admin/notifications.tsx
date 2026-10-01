@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore, PushNotification } from '../../store/adminStore';
 import { supabase } from '../../lib/supabase';
+import { fetchAllAdminRows } from '../../lib/db';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -63,9 +64,11 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     const loadReach = async () => {
-      const { data } = await supabase
+      const data = await fetchAllAdminRows<any>((from, to) => supabase
         .from('user_profiles')
-        .select('is_premium,last_practiced_date');
+        .select('id,is_premium,last_practiced_date')
+        .order('id', { ascending: true })
+        .range(from, to), 'admin:notifications').catch(() => null);
       const rows = data ?? [];
       const cutoff7 = new Date();
       cutoff7.setDate(cutoff7.getDate() - 7);

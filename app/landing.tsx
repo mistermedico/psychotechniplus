@@ -82,6 +82,15 @@ export default function LandingScreen() {
   const reducedMotion = useReducedMotion();
   const { packages, fetchOfferings } = usePurchaseStore();
   const continueAsGuest = useUserStore(s => s.continueAsGuest);
+  const isUserLoaded = useUserStore(s => s.isLoaded);
+  const isAuthenticated = useUserStore(s => s.isAuthenticated);
+  const startingGuestRef = useRef(false);
+
+  // Signed-in users and existing guests belong in the app, not on the landing
+  // page (where "start" would otherwise replace their session with a new guest).
+  useEffect(() => {
+    if (isUserLoaded && isAuthenticated && !startingGuestRef.current) router.replace('/');
+  }, [isUserLoaded, isAuthenticated]);
 
   // Animation refs
   const navOpacity    = useRef(new Animated.Value(0)).current;
@@ -176,10 +185,12 @@ export default function LandingScreen() {
 
   const handleStart = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    startingGuestRef.current = true;
     try {
       await continueAsGuest();
       router.replace('/(tabs)');
     } catch (error: any) {
+      startingGuestRef.current = false;
       Alert.alert(
         'לא ניתן להתחיל כאורח',
         error?.message ?? 'לא הצלחנו לפתוח סשן אורח מאובטח. נסה שוב.'

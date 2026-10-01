@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Platform, StyleSheet, View, Text, Animated } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -117,9 +117,13 @@ function AnnouncementBanner() {
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const isPremium = useUserStore(s => s.isPremium);
+  const isUserLoaded = useUserStore(s => s.isLoaded);
+  const isAuthenticated = useUserStore(s => s.isAuthenticated);
   const isAdmin = useAdminStore(s => s.isAdmin);
   const TAB_HEIGHT = 64;
   const BAR_HEIGHT = TAB_HEIGHT + Math.max(insets.bottom, 12);
+
+  if (isUserLoaded && !isAuthenticated) return <Redirect href="/landing" />;
 
   return (
     <View style={{ flex: 1 }}>

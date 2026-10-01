@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -71,9 +72,14 @@ export default function AdminEventsScreen() {
 
   const refresh = async (showLoader = true) => {
     if (showLoader) setLoading(true);
-    const next = await loadAdminState<AdminEvent[]>(ADMIN_EVENTS_KEY);
-    setEvents(Array.isArray(next) ? next : []);
-    if (showLoader) setLoading(false);
+    try {
+      const next = await loadAdminState<AdminEvent[]>(ADMIN_EVENTS_KEY);
+      setEvents(Array.isArray(next) ? next : []);
+    } catch (e: any) {
+      Alert.alert('שגיאת טעינה', e?.message ?? 'לא ניתן לטעון אירועים');
+    } finally {
+      if (showLoader) setLoading(false);
+    }
   };
 
   useEffect(() => {

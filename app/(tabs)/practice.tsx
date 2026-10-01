@@ -316,6 +316,7 @@ export default function PracticeTab() {
             cooldownMinutes={appConfig.sessionCooldownMinutes}
             usageBlock={usageBlock}
             premiumConfig={premiumConfig}
+            premiumOnlyModes={premiumOnlyModes}
             isAdmin={isAdmin}
           />
         ) : featureFlags.simulations !== false ? (
@@ -351,6 +352,7 @@ function FreePracticePane({
   isPremium, freePracticeLimit, canStart, onStart, showSpeedMode,
   dailyLimit, dailyUsed, cooldownMinutes, usageBlock,
   premiumConfig,
+  premiumOnlyModes,
   isAdmin,
 }: {
   topics: Topic[];
@@ -367,6 +369,7 @@ function FreePracticePane({
   cooldownMinutes: number;
   usageBlock: string | null;
   premiumConfig: PremiumConfig;
+  premiumOnlyModes: string[];
   isAdmin: boolean;
 }) {
   const insets = useSafeAreaInsets();
@@ -421,14 +424,26 @@ function FreePracticePane({
           directionalLockEnabled
           style={styles.modesRowOuter}
         >
-          {FREE_MODES.filter(mode => mode.id !== 'speed' || showSpeedMode !== false).map(mode => (
-            <ModeChip
-              key={mode.id}
-              mode={mode}
-              isSelected={selectedMode === mode.id}
-              onPress={() => { Haptics.selectionAsync(); setSelectedMode(mode.id); }}
-            />
-          ))}
+          {FREE_MODES.filter(mode => mode.id !== 'speed' || showSpeedMode !== false).map(mode => {
+            const isLocked = !canAccessMode(mode.id, isPremium, premiumConfig, premiumOnlyModes);
+            return (
+              <ModeChip
+                key={mode.id}
+                mode={mode}
+                isSelected={!isLocked && selectedMode === mode.id}
+                isLocked={isLocked}
+                onPress={() => {
+                  if (isLocked) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    router.push('/paywall');
+                    return;
+                  }
+                  Haptics.selectionAsync();
+                  setSelectedMode(mode.id);
+                }}
+              />
+            );
+          })}
         </ScrollView>
 
         {/* Mode detail card */}
@@ -493,7 +508,7 @@ function FreePracticePane({
                     return;
                   }
                   Haptics.selectionAsync();
-                  setSelectedTopicId(selectedTopicId === topic.id ? null : topic.id);
+                  setSelectedTopicId(topic.id);
                 }}
                 style={({ pressed }) => [
                   styles.topicCard,
@@ -587,13 +602,13 @@ function FreePracticePane({
 }
 
 function ModeChip({
-  mode, isSelected, onPress,
-}: { mode: typeof FREE_MODES[0]; isSelected: boolean; onPress: () => void }) {
+  mode, isSelected, isLocked = false, onPress,
+}: { mode: typeof FREE_MODES[0]; isSelected: boolean; isLocked?: boolean; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
-      accessibilityLabel={mode.label}
+      accessibilityLabel={`${mode.label}${isLocked ? ', פרימיום בלבד' : ''}`}
       accessibilityState={{ checked: isSelected }}
       style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
     >
@@ -608,8 +623,8 @@ function ModeChip({
           <Text style={[styles.modeChipLabel, { color: '#fff' }]}>{mode.label}</Text>
         </LinearGradient>
       ) : (
-        <View style={[styles.modeChip, styles.modeChipInactive]}>
-          <Text style={styles.modeChipIcon}>{mode.icon}</Text>
+        <View style={[styles.modeChip, styles.modeChipInactive, isLocked && { opacity: 0.55 }]}>
+          <Text style={styles.modeChipIcon}>{isLocked ? '💎' : mode.icon}</Text>
           <Text style={[styles.modeChipLabel, { color: 'rgba(255,255,255,0.6)' }]}>{mode.label}</Text>
         </View>
       )}

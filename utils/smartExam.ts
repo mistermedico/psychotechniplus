@@ -282,6 +282,8 @@ export function calcSmartExamScore(
   answers: Array<{ isCorrect: boolean; timeSpent: number; difficulty: number; isSkipped?: boolean }>,
   passingScore: number
 ): {
+  /** Final weighted exam score (0–100). This is the score that is saved, shown and compared to passingScore. */
+  score: number;
   rawScore: number;
   difficultyWeightedScore: number;
   speedAdjustedScore: number;
@@ -292,7 +294,7 @@ export function calcSmartExamScore(
 } {
   const total = answers.length;
   if (total === 0) return {
-    rawScore: 0, difficultyWeightedScore: 0, speedAdjustedScore: 0,
+    score: 0, rawScore: 0, difficultyWeightedScore: 0, speedAdjustedScore: 0,
     stabilityScore: 0, percentileRank: 0, performanceLevel: 'low', passed: false,
   };
 
@@ -349,6 +351,7 @@ export function calcSmartExamScore(
     finalScore >= 50 ? 'medium' : 'low';
 
   return {
+    score: finalScore,
     rawScore,
     difficultyWeightedScore,
     speedAdjustedScore,

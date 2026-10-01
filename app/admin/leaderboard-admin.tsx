@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import * as Haptics from '../../utils/haptics';
 import { useAdminStore } from '../../store/adminStore';
 import { supabase } from '../../lib/supabase';
+import { fetchAllAdminRows } from '../../lib/db';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 
@@ -29,10 +30,12 @@ export default function LeaderboardAdminScreen() {
 
   useEffect(() => {
     const loadEntries = async () => {
-      const { data } = await supabase
+      const data = await fetchAllAdminRows<any>((from, to) => supabase
         .from('user_profiles')
         .select('id,name,xp,level,total_sessions,streak,is_premium')
-        .order('xp', { ascending: false });
+        .order('xp', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to), 'admin:leaderboard').catch(() => null);
 
         setEntries((data ?? []).map(row => ({
           id: row.id,

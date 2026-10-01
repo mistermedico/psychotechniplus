@@ -11,6 +11,7 @@ import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVi
 import { imageShowsQuestionText } from '../utils/svgTitle';
 import { VisualImage } from './VisualImage';
 import { shuffleOptionsSafely } from '../utils/optionOrder';
+import { shuffleArray } from '../utils/shuffle';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 interface Props {
@@ -18,15 +19,6 @@ interface Props {
   selectedId: string | null;
   revealed: boolean;
   onSelect: (id: string) => void;
-}
-
-function shuffleArray<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
 }
 
 const fontSizeMap: Record<FontSizeOption, number> = {
@@ -111,6 +103,14 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
     if (opt?.isCorrect) return '✓';
     if (selectedId === optId) return '✗';
     return '○';
+  };
+
+  const getOptionA11yLabel = (optId: string, baseLabel: string) => {
+    if (!revealed) return baseLabel;
+    const opt = displayQuestion.options.find(o => o.id === optId);
+    if (opt?.isCorrect) return `${baseLabel} (תשובה נכונה)`;
+    if (selectedId === optId) return `${baseLabel} (התשובה שלך — שגויה)`;
+    return baseLabel;
   };
 
   const questionFontSize_ = fontSizeMap[questionFontSize];
@@ -213,7 +213,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                     disabled={revealed}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: selectedId === opt.id, disabled: revealed }}
-                    accessibilityLabel={opt.text?.trim() || `אפשרות ${index + 1}`}
+                    accessibilityLabel={getOptionA11yLabel(opt.id, opt.text?.trim() || `אפשרות ${index + 1}`)}
                     style={({ pressed }) => [
                       styles.optionGridCell,
                       compact && styles.optionGridCellCompact,
@@ -254,7 +254,7 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selectedId === opt.id, disabled: revealed }}
-                  accessibilityLabel={opt.text?.trim() || `אפשרות ${index + 1}`}
+                  accessibilityLabel={getOptionA11yLabel(opt.id, opt.text?.trim() || `אפשרות ${index + 1}`)}
                   style={({ pressed }) => [
                     styles.optionBase,
                     getOptionStyle(opt.id),

@@ -93,17 +93,29 @@ export async function fetchQuestions(opts?: {
   targetId?: string;
   status?: string;
 }): Promise<Question[]> {
-  let query = supabase.from('questions').select('*');
-  if (opts?.topicId) query = query.eq('topic_id', opts.topicId);
-  if (opts?.status)  query = query.eq('validation_status', opts.status);
-  else query = query.or(`validation_status.is.null,validation_status.neq.${DELETED_QUESTION_STATUS}`);
-  if (opts?.targetId) query = query.contains('target_ids', [opts.targetId]);
-  const { data, error } = await query;
-  if (error) {
-    logger.error('db:fetchQuestions', 'שגיאה בטעינת שאלות', error.message);
-    return [];
+  // PostgREST caps each response (default 1000 rows), so page through results.
+  // Errors are thrown so callers can distinguish "no questions" from "no connection".
+  const PAGE_SIZE = 1000;
+  const buildQuery = () => {
+    let query = supabase.from('questions').select('*');
+    if (opts?.topicId) query = query.eq('topic_id', opts.topicId);
+    if (opts?.status)  query = query.eq('validation_status', opts.status);
+    else query = query.or(`validation_status.is.null,validation_status.neq.${DELETED_QUESTION_STATUS}`);
+    if (opts?.targetId) query = query.contains('target_ids', [opts.targetId]);
+    return query.order('id', { ascending: true });
+  };
+  const rows: any[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) {
+      logger.error('db:fetchQuestions', 'שגיאה בטעינת שאלות', error.message);
+      throw new Error(error.message || 'שגיאה בטעינת שאלות');
+    }
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
   }
-  const questions = (data ?? []).map(rowToQuestion);
+  const questions = rows.map(rowToQuestion);
   if (opts?.status === 'validated') {
     const ready = questions.filter(isPsychotechnicQuestionReady);
     const blocked = questions.length - ready.length;
@@ -142,20 +154,40 @@ export async function fetchQuestionById(id: string): Promise<Question | null> {
   }
 }
 
-export async function fetchAllQuestions(): Promise<Question[]> {
-  try {
-    const { data, error } = await supabase
-      .from('questions')
-      .select('*')
-      .or(`validation_status.is.null,validation_status.neq.${DELETED_QUESTION_STATUS}`)
-      .order('created_at', { ascending: false });
-    if (error) { logger.error('db:fetchAllQuestions', 'שגיאה בטעינת שאלות', error.message); return []; }
-    logger.info('db:fetchAllQuestions', `נטענו ${data?.length ?? 0} שאלות מסופאבייס`);
-    return (data ?? []).map(rowToQuestion);
-  } catch (e: any) {
-    logger.error('db:fetchAllQuestions', 'חריגה בטעינת שאלות', e?.message);
-    return [];
+const ADMIN_PAGE_SIZE = 1000;
+
+// Admin list helper: pages through a query with .range() (PostgREST caps a
+// single response at 1000 rows). `page(from, to)` must apply a stable order
+// ending in a unique column and `.range(from, to)`. Throws on error.
+export async function fetchAllAdminRows<T = any>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  context = 'db:fetchAllAdminRows'
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += ADMIN_PAGE_SIZE) {
+    const { data, error } = await page(from, from + ADMIN_PAGE_SIZE - 1);
+    if (error) {
+      logger.error(context, 'שגיאה בטעינת נתונים', error.message);
+      throw new Error(`שגיאה בטעינת נתונים: ${error.message}`);
+    }
+    rows.push(...(data ?? []));
+    if (!data || data.length < ADMIN_PAGE_SIZE) break;
   }
+  return rows;
+}
+
+// Admin loader: paginates past PostgREST's 1000-row cap and throws on error
+// so callers never mistake a failed load for an empty bank.
+export async function fetchAllQuestions(): Promise<Question[]> {
+  const rows = await fetchAllAdminRows<any>((from, to) => supabase
+    .from('questions')
+    .select('*')
+    .or(`validation_status.is.null,validation_status.neq.${DELETED_QUESTION_STATUS}`)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: true })
+    .range(from, to), 'db:fetchAllQuestions');
+  logger.info('db:fetchAllQuestions', `נטענו ${rows.length} שאלות מסופאבייס`);
+  return rows.map(rowToQuestion);
 }
 
 export async function upsertQuestion(q: Question): Promise<{ error?: string }> {
@@ -314,7 +346,8 @@ export async function loadQuestionUsageStats(questionId: string): Promise<Questi
 
 // ── Targets & Topics ───────────────────────────────────────────────────────
 
-export async function fetchTargets(): Promise<Target[]> {
+/** Returns null on failure so callers keep their current list instead of emptying it. */
+export async function fetchTargets(): Promise<Target[] | null> {
   try {
     const { data, error } = await supabase.from('targets').select('*').order('order_index');
     if (error) throw error;
@@ -322,11 +355,12 @@ export async function fetchTargets(): Promise<Target[]> {
     return data.map(rowToTarget);
   } catch (e: any) {
     logger.error('db:fetchTargets', 'Failed loading targets from Supabase', e?.message);
-    return [];
+    return null;
   }
 }
 
-export async function fetchTopics(targetId?: string): Promise<Topic[]> {
+/** Returns null on failure so callers keep their current list instead of emptying it. */
+export async function fetchTopics(targetId?: string): Promise<Topic[] | null> {
   try {
     let query = supabase.from('topics').select('*').order('order_index');
     if (targetId) query = query.eq('target_id', targetId);
@@ -336,7 +370,7 @@ export async function fetchTopics(targetId?: string): Promise<Topic[]> {
     return data.map(rowToTopic);
   } catch (e: any) {
     logger.error('db:fetchTopics', 'Failed loading topics from Supabase', e?.message);
-    return [];
+    return null;
   }
 }
 
@@ -368,12 +402,12 @@ export async function loadUserProfile(userId: string): Promise<UserProfileRow | 
   }
 }
 
+/** Throws on failure so callers can surface the error and retry. */
 export async function saveUserProfile(userId: string, profile: Partial<UserProfileRow>): Promise<void> {
-  try {
-    const { error } = await supabase.from('user_profiles').upsert({ id: userId, ...profile, updated_at: new Date().toISOString() });
-    if (error) logger.error('db:saveUserProfile', 'שגיאה בשמירת פרופיל', error.message);
-  } catch (e: any) {
-    logger.error('db:saveUserProfile', 'חריגה בשמירת פרופיל', e?.message);
+  const { error } = await supabase.from('user_profiles').upsert({ id: userId, ...profile, updated_at: new Date().toISOString() });
+  if (error) {
+    logger.error('db:saveUserProfile', 'שגיאה בשמירת פרופיל', error.message);
+    throw new Error(error.message || 'שגיאה בשמירת פרופיל');
   }
 }
 
@@ -388,17 +422,18 @@ export type UserEloHistoryEntry = {
 
 const eloSaveQueues = new Map<string, Promise<void>>();
 
-export async function loadUserElos(userId: string): Promise<Record<string, { elo: number; history: UserEloHistoryEntry[] }>> {
+/** Returns null on failure (vs {} for "no data") so callers don't wipe local history. */
+export async function loadUserElos(userId: string): Promise<Record<string, { elo: number; history: UserEloHistoryEntry[] }> | null> {
   try {
     const { data, error } = await supabase.from('user_elos').select('*').eq('user_id', userId);
-    if (error) { logger.error('db:loadUserElos', 'שגיאה בטעינת ELO', error.message); return {}; }
+    if (error) { logger.error('db:loadUserElos', 'שגיאה בטעינת ELO', error.message); return null; }
     if (!data) return {};
     const result: Record<string, { elo: number; history: UserEloHistoryEntry[] }> = {};
     data.forEach(row => { result[row.topic_id] = { elo: row.elo, history: row.history ?? [] }; });
     return result;
   } catch (e: any) {
     logger.error('db:loadUserElos', 'חריגה בטעינת ELO', e?.message);
-    return {};
+    return null;
   }
 }
 
@@ -429,10 +464,11 @@ export function saveUserElo(userId: string, topicId: string, elo: number, histor
 
 // ── User Badges ────────────────────────────────────────────────────────────
 
-export async function loadUserBadges(userId: string): Promise<UserBadge[]> {
+/** Returns null on failure (vs [] for "no badges") so callers don't wipe local badges. */
+export async function loadUserBadges(userId: string): Promise<UserBadge[] | null> {
   try {
     const { data, error } = await supabase.from('user_badges').select('*').eq('user_id', userId);
-    if (error) { logger.error('db:loadUserBadges', 'שגיאה בטעינת תגים', error.message); return []; }
+    if (error) { logger.error('db:loadUserBadges', 'שגיאה בטעינת תגים', error.message); return null; }
     if (!data) return [];
     return data.map(row => ({
       id: row.id,
@@ -443,7 +479,7 @@ export async function loadUserBadges(userId: string): Promise<UserBadge[]> {
     }));
   } catch (e: any) {
     logger.error('db:loadUserBadges', 'חריגה בטעינת תגים', e?.message);
-    return [];
+    return null;
   }
 }
 
@@ -455,7 +491,7 @@ export async function saveUserBadge(badge: UserBadge): Promise<void> {
       badge_type: badge.badgeType,
       earned_at: badge.earnedAt.toISOString(),
       metadata: badge.metadata,
-    }, { onConflict: 'user_id,badge_type' });
+    }, { onConflict: 'user_id,badge_type', ignoreDuplicates: true }); // never overwrite an existing earned_at
     if (error) logger.error('db:saveUserBadge', `שגיאה בשמירת תג ${badge.badgeType}`, error.message);
   } catch (e: any) {
     logger.error('db:saveUserBadge', `חריגה בשמירת תג ${badge.badgeType}`, e?.message);
@@ -613,75 +649,83 @@ function rowToTopic(row: any): Topic {
 // ── Target persistence ─────────────────────────────────────────────────────
 
 export async function upsertTarget(t: Target): Promise<void> {
-  try {
-    const { error } = await supabase.from('targets').upsert(targetToRow(t));
-    if (error) logger.error('db:upsertTarget', `שגיאה בשמירת מסלול ${t.id}`, error.message);
-  } catch (e: any) {
-    logger.error('db:upsertTarget', `חריגה בשמירת מסלול ${t.id}`, e?.message);
+  const { error } = await supabase.from('targets').upsert(targetToRow(t));
+  if (error) {
+    logger.error('db:upsertTarget', `שגיאה בשמירת מסלול ${t.id}`, error.message);
+    throw new Error(`שגיאה בשמירת מסלול ${t.id}: ${error.message}`);
   }
 }
 
 // ── Topic persistence ──────────────────────────────────────────────────────
 
 export async function upsertTopic(t: Topic): Promise<void> {
-  try {
-    const { error } = await supabase.from('topics').upsert({
-      id: t.id,
-      target_id: t.targetId,
-      name: t.name,
-      slug: t.slug ?? t.id,
-      description: t.description ?? '',
-      icon: t.icon,
-      order_index: t.order ?? 99,
-      is_premium_only: t.isPremiumOnly ?? false,
-      color: t.color,
-    });
-    if (error) logger.error('db:upsertTopic', `שגיאה בשמירת נושא ${t.id}`, error.message);
-  } catch (e: any) {
-    logger.error('db:upsertTopic', `חריגה בשמירת נושא ${t.id}`, e?.message);
+  const { error } = await supabase.from('topics').upsert({
+    id: t.id,
+    target_id: t.targetId,
+    name: t.name,
+    slug: t.slug ?? t.id,
+    description: t.description ?? '',
+    icon: t.icon,
+    order_index: t.order ?? 99,
+    is_premium_only: t.isPremiumOnly ?? false,
+    color: t.color,
+  });
+  if (error) {
+    logger.error('db:upsertTopic', `שגיאה בשמירת נושא ${t.id}`, error.message);
+    throw new Error(`שגיאה בשמירת נושא ${t.id}: ${error.message}`);
   }
 }
 
+export async function countTopicQuestions(topicId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('questions')
+    .select('id', { count: 'exact', head: true })
+    .eq('topic_id', topicId)
+    .or(`validation_status.is.null,validation_status.neq.${DELETED_QUESTION_STATUS}`);
+  if (error) throw new Error(`שגיאה בספירת שאלות בנושא ${topicId}: ${error.message}`);
+  return count ?? 0;
+}
+
 export async function deleteTopicFromDB(id: string): Promise<void> {
-  try {
-    const { error } = await supabase.from('topics').delete().eq('id', id);
-    if (error) logger.error('db:deleteTopicFromDB', `שגיאה במחיקת נושא ${id}`, error.message);
-  } catch (e: any) {
-    logger.error('db:deleteTopicFromDB', `חריגה במחיקת נושא ${id}`, e?.message);
+  const { data, error } = await supabase.from('topics').delete().eq('id', id).select('id');
+  if (error) {
+    logger.error('db:deleteTopicFromDB', `שגיאה במחיקת נושא ${id}`, error.message);
+    throw new Error(`שגיאה במחיקת נושא ${id}: ${error.message}`);
+  }
+  if (!data?.length) {
+    const message = `Supabase לא מחק את הנושא ${id}. ייתכן שהרשאות RLS חסמו את המחיקה.`;
+    logger.error('db:deleteTopicFromDB', message);
+    throw new Error(message);
   }
 }
 
 // ── Admin cloud state + local fallback ─────────────────────────────────────
 
 export async function saveAdminState(key: string, value: unknown): Promise<void> {
-  try {
-    const { error } = await supabase.from('admin_state').upsert({
-      key,
-      value,
-      updated_at: new Date().toISOString(),
-    });
-    if (error) logger.info('db:saveAdminState', `שמירה מקומית בלבד עבור ${key}: ${error.message}`);
-  } catch (e: any) {
-    logger.info('db:saveAdminState', `שמירה מקומית בלבד עבור ${key}: ${e?.message}`);
+  const { error } = await supabase.from('admin_state').upsert({
+    key,
+    value,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) {
+    logger.error('db:saveAdminState', `שגיאה בשמירת ${key}`, error.message);
+    throw new Error(`שגיאה בשמירת ${key}: ${error.message}`);
   }
 }
 
+// Returns null only when the key is missing; throws when the read failed so
+// callers never treat a failed load as "no data" and overwrite remote state.
 export async function loadAdminState<T>(key: string): Promise<T | null> {
-  try {
-    const { data, error } = await supabase
-      .from('admin_state')
-      .select('value')
-      .eq('key', key)
-      .maybeSingle();
-    if (error) {
-      logger.info('db:loadAdminState', `טעינה מקומית בלבד עבור ${key}: ${error.message}`);
-      return null;
-    }
-    return (data?.value ?? null) as T | null;
-  } catch (e: any) {
-    logger.info('db:loadAdminState', `טעינה מקומית בלבד עבור ${key}: ${e?.message}`);
-    return null;
+  const { data, error } = await supabase
+    .from('admin_state')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle();
+  if (error) {
+    logger.warn('db:loadAdminState', `שגיאה בטעינת ${key}`, error.message);
+    throw new Error(`שגיאה בטעינת ${key}: ${error.message}`);
   }
+  return (data?.value ?? null) as T | null;
 }
 
 // ── Template persistence (Supabase + AsyncStorage fallback) ────────────────
@@ -689,28 +733,26 @@ export async function loadAdminState<T>(key: string): Promise<T | null> {
 const TEMPLATES_KEY = '@psychotechniplus/admin/templates';
 
 export async function saveTemplates(templates: any[]): Promise<void> {
-  try {
-    const normalized = templates.map(t => ({
-      ...t,
-      createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt,
-    }));
-    await saveAdminState('templates', normalized);
-    const serialized = JSON.stringify(normalized);
-    await asyncSet(TEMPLATES_KEY, serialized);
-  } catch {}
+  const normalized = templates.map(t => ({
+    ...t,
+    createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt,
+  }));
+  await saveAdminState('templates', normalized);
+  await asyncSet(TEMPLATES_KEY, JSON.stringify(normalized)).catch(() => null);
 }
 
+// Throws when the remote read fails; returns null only when nothing is stored.
 export async function loadTemplates(): Promise<any[] | null> {
+  const remote = await loadAdminState<any[]>('templates');
+  if (remote !== null) {
+    await asyncSet(TEMPLATES_KEY, JSON.stringify(remote)).catch(() => null);
+    return remote.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) }));
+  }
   try {
-    const remote = await loadAdminState<any[]>('templates');
-    if (remote !== null) {
-      await asyncSet(TEMPLATES_KEY, JSON.stringify(remote)).catch(() => null);
-      return remote.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) }));
-    }
     const raw = await asyncGet(TEMPLATES_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) }));
+    return Array.isArray(parsed) ? parsed.map((t: any) => ({ ...t, createdAt: new Date(t.createdAt) })) : null;
   } catch {
     return null;
   }
@@ -721,19 +763,18 @@ export async function loadTemplates(): Promise<any[] | null> {
 const ADMIN_SETTINGS_KEY = '@psychotechniplus/admin/settings';
 
 export async function saveAdminSettings(settings: Record<string, any>): Promise<void> {
-  try {
-    await saveAdminState('settings', settings);
-    await asyncSet(ADMIN_SETTINGS_KEY, JSON.stringify(settings));
-  } catch {}
+  await saveAdminState('settings', settings);
+  await asyncSet(ADMIN_SETTINGS_KEY, JSON.stringify(settings)).catch(() => null);
 }
 
+// Throws when the remote read fails; returns null only when nothing is stored.
 export async function loadAdminSettings(): Promise<Record<string, any> | null> {
+  const remote = await loadAdminState<Record<string, any>>('settings');
+  if (remote) {
+    await asyncSet(ADMIN_SETTINGS_KEY, JSON.stringify(remote)).catch(() => null);
+    return remote;
+  }
   try {
-    const remote = await loadAdminState<Record<string, any>>('settings');
-    if (remote) {
-      await asyncSet(ADMIN_SETTINGS_KEY, JSON.stringify(remote)).catch(() => null);
-      return remote;
-    }
     const raw = await asyncGet(ADMIN_SETTINGS_KEY);
     if (!raw) return null;
     return JSON.parse(raw);

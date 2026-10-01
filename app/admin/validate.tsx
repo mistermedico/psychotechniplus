@@ -86,15 +86,6 @@ function confirmDeleteQuestion(message: string): Promise<boolean> {
   });
 }
 
-function markDraftDeleted(q: Question): Partial<Question> {
-  return {
-    validationStatus: 'deleted' as ValidationStatus,
-    smartPracticeEligible: false,
-    generalPracticeEligible: false,
-    accessLevel: q.accessLevel,
-  };
-}
-
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function ValidateQueue() {
@@ -108,6 +99,8 @@ export default function ValidateQueue() {
   const [filter, setFilter] = useState<'pending' | 'rejected'>('pending');
   const [editMode, setEditMode] = useState(false);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
+  // The question being edited is tracked by id: the queue re-orders while saving.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showGenLog, setShowGenLog] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [hiddenDeletedIds, setHiddenDeletedIds] = useState<string[]>([]);
@@ -130,6 +123,7 @@ export default function ValidateQueue() {
   const queue = filter === 'pending' ? pending : rejected;
   const safeIdx = Math.min(currentIdx, Math.max(0, queue.length - 1));
   const current = queue[safeIdx];
+  const editingQuestion = editingId ? questions.find(q => q.id === editingId) : undefined;
 
   const slideAnim = useState(new Animated.Value(0))[0];
   const [isAnimating, setIsAnimating] = useState(false);
@@ -155,16 +149,24 @@ export default function ValidateQueue() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    animateOut('approve', () => {
-      validateQuestion(q.id, 'validated');
+    animateOut('approve', async () => {
+      reportValidateFailure(await validateQuestion(q.id, 'validated'));
       setCurrentIdx(i => Math.max(0, i >= pending.length - 1 ? 0 : i));
     });
   };
 
+  const reportValidateFailure = (result: { ok: boolean; error?: string; blocked: Array<{ id: string; issues: string[] }> }) => {
+    if (result.error) {
+      Alert.alert('שגיאת שמירה', `השמירה ב-Supabase נכשלה: ${result.error}`);
+    } else if (result.blocked.length > 0) {
+      Alert.alert('השאלה לא מוכנה לאימות', result.blocked.map(row => row.issues.map(issue => `• ${issue}`).join('\n')).join('\n'));
+    }
+  };
+
   const handleReject = (q: Question) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    animateOut('reject', () => {
-      validateQuestion(q.id, 'rejected');
+    animateOut('reject', async () => {
+      reportValidateFailure(await validateQuestion(q.id, 'rejected'));
       setCurrentIdx(i => Math.max(0, i >= pending.length - 1 ? 0 : i));
     });
   };
@@ -176,8 +178,8 @@ export default function ValidateQueue() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    animateOut('approve', () => {
-      validateQuestion(q.id, 'validated');
+    animateOut('approve', async () => {
+      reportValidateFailure(await validateQuestion(q.id, 'validated'));
       setCurrentIdx(i => Math.max(0, i >= rejected.length - 1 ? 0 : i));
     });
   };
@@ -188,12 +190,17 @@ export default function ValidateQueue() {
   };
 
   const handleOpenEdit = (q: Question) => {
+    setEditingId(q.id);
     setEditDraft(questionToDraft(q));
     setEditMode(true);
   };
 
-  const handleSaveEdit = (markValidated = false) => {
-    if (!current || !editDraft) return;
+  const handleSaveEdit = async (markValidated = false) => {
+    const current = editingQuestion;
+    if (!current || !editDraft) {
+      if (editMode) Alert.alert('שגיאה', 'השאלה שנערכה לא נמצאה עוד בניהול. רענן ונסה שוב.');
+      return;
+    }
     if (!editDraft.questionText.trim()) {
       showAdminErrorToast(setToastError, 'חסר טקסט שאלה', 'אי אפשר לשמור שאלה בלי נוסח.', { questionId: current.id }, 'admin:validate');
       return;
@@ -206,12 +213,11 @@ export default function ValidateQueue() {
       showAdminErrorToast(setToastError, 'חסר שיוך למסלול', 'יש לבחור לפחות מסלול/קורס אחד לפני שמירה.', { questionId: current.id }, 'admin:validate');
       return;
     }
-    const hasEmptyOptions = editDraft.options.some(o => !o.text.trim() && !o.imageUrl);
+    const hasEmptyOptions = editDraft.options.some(o => !String(o.text ?? '').trim() && !o.imageUrl);
     if (editDraft.options.length < 2 || hasEmptyOptions) {
       showAdminErrorToast(setToastError, 'אפשרויות לא תקינות', 'יש למלא לפחות שתי אפשרויות תקינות, עם טקסט או תמונה.', { questionId: current.id, options: editDraft.options }, 'admin:validate');
       return;
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     // Fix correctAnswer to match the option marked isCorrect
     const correctOpt = editDraft.options.find(o => o.isCorrect);
     const validationStatus = markValidated ? 'validated' : editDraft.validationStatus;
@@ -227,9 +233,16 @@ export default function ValidateQueue() {
       Alert.alert('השאלה לא מוכנה לאימות', `תקן לפני שמירה כמאומתת:\n${issues.map(issue => `• ${issue}`).join('\n')}`);
       return;
     }
-    updateQuestion(current.id, finalDraft);
+    const result = await updateQuestion(current.id, finalDraft);
+    if (!result.ok) {
+      showAdminErrorToast(setToastError, 'השמירה נכשלה', result.error ?? 'Supabase דחה את השמירה.', { questionId: current.id }, 'admin:validate');
+      Alert.alert('שגיאת שמירה', result.error ?? 'Supabase דחה את השמירה. השינויים לא נשמרו.');
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setEditMode(false);
     setEditDraft(null);
+    setEditingId(null);
   };
 
   const handleDeleteCurrent = async (q: Question) => {
@@ -239,7 +252,6 @@ export default function ValidateQueue() {
 
     setHiddenDeletedIds(ids => ids.includes(q.id) ? ids : [...ids, q.id]);
     setCurrentIdx(i => Math.max(0, Math.min(i, queue.length - 2)));
-    updateQuestion(q.id, markDraftDeleted(q));
     setDeletingId(q.id);
     const result = await deleteQuestion(q.id);
     setDeletingId(null);
@@ -251,31 +263,41 @@ export default function ValidateQueue() {
     }
     setEditMode(false);
     setEditDraft(null);
+    setEditingId(null);
     Alert.alert('נמחק', 'השאלה נמחקה מתור האימות ומהמאגר המסונכרן.');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   };
 
-  const handleBulkApprove = (items: Question[]) => {
-    const valid = items.filter(q => auditPsychotechnicQuestion(q).length === 0);
-    const invalidCount = items.length - valid.length;
-    if (valid.length > 0) {
-      bulkValidate(valid.map(q => q.id), 'validated');
-      setCurrentIdx(0);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const handleBulkApprove = async (items: Question[]) => {
+    // bulkValidate runs the quality audit and only approves questions that pass.
+    const result = await bulkValidate(items.map(q => q.id), 'validated');
+    setCurrentIdx(0);
+    if (result.error) {
+      Alert.alert('שגיאת שמירה', `השמירה ב-Supabase נכשלה: ${result.error}`);
+      return;
     }
-    if (invalidCount > 0) {
+    if (result.updatedIds.length > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (result.blocked.length > 0) {
       Alert.alert(
         'נדרש תיקון לפני אישור',
-        `${valid.length} שאלות אושרו.\n${invalidCount} שאלות נשארו בתור כי חסר להן הסבר, יש יותר/פחות מתשובה נכונה אחת, או שהן לא עומדות בכללי שאלה פסיכוטכנית.`
+        `${result.updatedIds.length} שאלות אושרו.\n${result.blocked.length} שאלות נשארו בתור כי חסר להן הסבר, יש יותר/פחות מתשובה נכונה אחת, או שהן לא עומדות בכללי שאלה פסיכוטכנית.`
       );
       return;
     }
-    Alert.alert('אושר', `${valid.length} שאלות אושרו ונכנסו למאגר.`);
+    Alert.alert('אושר', `${result.updatedIds.length} שאלות אושרו ונכנסו למאגר.`);
   };
 
   const handleCancelEdit = () => {
     setEditMode(false);
     setEditDraft(null);
+    setEditingId(null);
+  };
+
+  // The background generator expects a synchronous addQuestion; save errors
+  // surface through the store's syncError.
+  const addGeneratedQuestion = (q: Omit<Question, 'id'>): Question => {
+    addQuestion(q).catch(() => null);
+    return { ...q, id: '' };
   };
 
   // ── Background generator ───────────────────────────────────────────────
@@ -291,7 +313,7 @@ export default function ValidateQueue() {
             setBgGenRunning(true);
             setBgGenProgress({ done: 0, total: 40, currentTopic: '...', currentType: '...', log: [] });
             startBulkGeneration(
-              addQuestion,
+              addGeneratedQuestion,
               (p) => setBgGenProgress(p),
               (totalDone) => {
                 setBgGenRunning(false);
@@ -393,7 +415,7 @@ export default function ValidateQueue() {
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
-            {editMode && editDraft && current ? (
+            {editMode && editDraft && editingQuestion ? (
               <QuestionEditForm
                 draft={editDraft}
                 onChange={setEditDraft}
@@ -416,10 +438,10 @@ export default function ValidateQueue() {
                   </Pressable>
                   <Pressable
                     disabled={!!deletingId}
-                    onPress={() => current && handleDeleteCurrent(current)}
+                    onPress={() => editingQuestion && handleDeleteCurrent(editingQuestion)}
                     style={({ pressed }) => [styles.deleteBtn, (pressed || !!deletingId) && { opacity: 0.75 }]}
                   >
-                    <Text style={styles.deleteText}>{deletingId === current?.id ? 'מוחק...' : 'מחק'}</Text>
+                    <Text style={styles.deleteText}>{deletingId === editingQuestion?.id ? 'מוחק...' : 'מחק'}</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => handleSaveEdit(false)}
@@ -576,7 +598,8 @@ function QuestionEditForm({
 
   const addOption = () => {
     if (draft.options.length >= 6) return;
-    const nextId = String.fromCharCode(97 + draft.options.length);
+    const nextId = 'abcdef'.split('').find(letter => !draft.options.some(o => o.id === letter));
+    if (!nextId) return;
     onChange({
       ...draft,
       options: [...draft.options, { id: nextId, text: '', isCorrect: false }],

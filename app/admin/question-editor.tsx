@@ -81,6 +81,9 @@ export default function QuestionEditor() {
   );
   const [imageOnlyMode, setImageOnlyMode] = useState(false);
   const [toastError, setToastError] = useState<AdminToastError | null>(null);
+  // Id of the question created in this "add" session, so repeated saves update it.
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const markDirty = () => { if (!isDirty) setIsDirty(true); };
 
@@ -150,7 +153,8 @@ export default function QuestionEditor() {
 
   const addOption = () => {
     if (options.length >= 6) return;
-    const nextId = String.fromCharCode(97 + options.length);
+    const nextId = 'abcdef'.split('').find(letter => !options.some(o => o.id === letter));
+    if (!nextId) return;
     setOptions(prev => [...prev, { id: nextId, text: '', isCorrect: false }]);
     markDirty();
   };
@@ -195,13 +199,18 @@ export default function QuestionEditor() {
       explanation,
       explanationImageUrl: explanationImageUrl || undefined,
       difficulty,
-      psychometricStats: { elo, discrimination: 0.75, guessProbability: 0.25 },
+      psychometricStats: {
+        ...existing?.psychometricStats,
+        elo,
+        discrimination: existing?.psychometricStats?.discrimination ?? 0.75,
+        guessProbability: existing?.psychometricStats?.guessProbability ?? 0.25,
+      },
       accessLevel,
       validationStatus,
       smartPracticeEligible: validationStatus === 'validated',
       generalPracticeEligible: validationStatus === 'validated',
     };
-  }, [accessLevel, difficulty, eloOverride, explanation, explanationImageUrl, mediaUrl, options, questionText, questionType, readingPassage, targetIds, topicId, validationStatus]);
+  }, [existing, accessLevel, difficulty, eloOverride, explanation, explanationImageUrl, mediaUrl, options, questionText, questionType, readingPassage, targetIds, topicId, validationStatus]);
 
   const qualityIssues = useMemo(() => auditPsychotechnicQuestion(currentDraftForAudit), [currentDraftForAudit]);
   const selectedTopic = topics.find(t => t.id === topicId);
@@ -209,7 +218,8 @@ export default function QuestionEditor() {
   const correctOption = options.find(o => o.isCorrect);
   const imageCount = (mediaUrl ? 1 : 0) + (explanationImageUrl ? 1 : 0) + options.filter(o => o.imageUrl).length;
 
-  const handleSave = (nextAction: 'back' | 'stay' | 'preview' = 'back') => {
+  const handleSave = async (nextAction: 'back' | 'stay' | 'preview' = 'back') => {
+    if (isSaving) return;
     if (!questionText.trim()) {
       showAdminErrorToast(setToastError, 'חסר טקסט שאלה', 'נא להזין את טקסט השאלה לפני שמירה.', { questionId, mode, currentDraftForAudit }, 'admin:question-editor');
       return;
@@ -219,7 +229,7 @@ export default function QuestionEditor() {
       return;
     }
     const optionsNeedText = !imageOnlyMode && !options.every(o => !!o.imageUrl);
-    if (optionsNeedText && options.some(o => !o.text.trim())) {
+    if (optionsNeedText && options.some(o => !String(o.text ?? '').trim())) {
       showAdminErrorToast(setToastError, 'אפשרויות חסרות', 'נא למלא טקסט או תמונה לכל אפשרות תשובה.', { questionId, options }, 'admin:question-editor');
       return;
     }
@@ -237,8 +247,23 @@ export default function QuestionEditor() {
       return;
     }
 
+    if (validationStatus === 'validated' && qualityIssues.length > 0) {
+      showAdminErrorToast(
+        setToastError,
+        'לא ניתן לשמור כמאושרת',
+        `השאלה לא עברה את בדיקת האיכות:\n${qualityIssues.join('\n')}\nתקן את הבעיות או שמור כטיוטה/ממתינה.`,
+        { questionId, qualityIssues },
+        'admin:question-editor'
+      );
+      return;
+    }
+
     const rawElo = parseInt(eloOverride);
     const elo = isNaN(rawElo) ? difficultyToElo(difficulty) : Math.max(800, Math.min(2000, rawElo));
+    // The question being updated: the edited one, or the one already created in this add session.
+    const targetQuestionId = isEdit && questionId ? questionId : savedId;
+    const baseQuestion = targetQuestionId ? questions.find(x => x.id === targetQuestionId) : undefined;
+    const statusChanged = !baseQuestion || baseQuestion.validationStatus !== validationStatus;
     const q: Omit<Question, 'id'> = {
       targetIds,
       topicId,
@@ -258,63 +283,106 @@ export default function QuestionEditor() {
       explanation: explanation.trim(),
       explanationImageUrl: explanationImageUrl || undefined,
       difficulty,
-      psychometricStats: { elo, discrimination: 0.75, guessProbability: 0.25 },
+      // Preserve calibrated stats; only the ELO is edited here.
+      psychometricStats: {
+        ...baseQuestion?.psychometricStats,
+        elo,
+        discrimination: baseQuestion?.psychometricStats?.discrimination ?? 0.75,
+        guessProbability: baseQuestion?.psychometricStats?.guessProbability ?? 0.25,
+      },
       accessLevel,
       validationStatus,
-      smartPracticeEligible: validationStatus === 'validated',
-      generalPracticeEligible: validationStatus === 'validated',
+      // Eligibility flags change only when the status changed; manual pool settings are kept otherwise.
+      smartPracticeEligible: statusChanged || !baseQuestion ? validationStatus === 'validated' : baseQuestion.smartPracticeEligible,
+      generalPracticeEligible: statusChanged || !baseQuestion ? validationStatus === 'validated' : baseQuestion.generalPracticeEligible,
     };
 
     const openPreview = (savedId: string) => {
       router.push({ pathname: '/practice-session', params: { questionId: savedId, adminPreview: '1' } });
     };
 
-    if (isEdit && questionId) {
-      updateQuestion(questionId, q);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const resetForNextQuestion = () => {
+      setQuestionText('');
+      setReadingPassage('');
+      setExplanation('');
+      setExplanationImageUrl('');
+      setMediaUrl('');
+      setMediaType(undefined);
+      setImageOnlyMode(false);
+      setValidationStatus('draft');
+      setOptions(DEFAULT_OPTIONS.map(o => ({ ...o })));
+      setDifficulty(5);
+      setEloOverride(String(difficultyToElo(5)));
+      eloManuallyEdited.current = false;
+      setSavedId(null);
       setIsDirty(false);
-      if (nextAction === 'stay') {
-        Alert.alert('נשמר', 'השאלה עודכנה ונשמרה ל-Supabase.');
-        return;
+    };
+
+    setIsSaving(true);
+    try {
+      if (targetQuestionId) {
+        const result = await updateQuestion(targetQuestionId, q);
+        if (!result.ok) {
+          showAdminErrorToast(setToastError, 'השמירה נכשלה', result.error ?? 'Supabase דחה את השמירה.', { questionId: targetQuestionId }, 'admin:question-editor');
+          Alert.alert('שגיאת שמירה', result.error ?? 'Supabase דחה את השמירה. השינויים לא נשמרו.');
+          return;
+        }
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setIsDirty(false);
+        if (nextAction === 'stay') {
+          Alert.alert('נשמר', 'השאלה עודכנה ונשמרה ל-Supabase.');
+          return;
+        }
+        if (nextAction === 'preview') {
+          openPreview(targetQuestionId);
+          return;
+        }
+        if (!isEdit) {
+          Alert.alert(
+            '✅ שאלה נשמרה',
+            `נשמרה ל-Supabase עם סטטוס "${validationStatus}"`,
+            [
+              { text: 'הוסף עוד', onPress: resetForNextQuestion },
+              { text: 'אוקי', onPress: () => router.back() },
+            ]
+          );
+          return;
+        }
+        Alert.alert(
+          '✅ שאלה עודכנה',
+          `נשמרה ל-Supabase עם סטטוס "${validationStatus}"\nעדכונים יופיעו מיד.`,
+          [{ text: 'אוקי', onPress: () => router.back() }]
+        );
+      } else {
+        const result = await addQuestion(q);
+        if (!result.ok) {
+          showAdminErrorToast(setToastError, 'השמירה נכשלה', result.error ?? 'Supabase דחה את השמירה.', { mode }, 'admin:question-editor');
+          Alert.alert('שגיאת שמירה', result.error ?? 'Supabase דחה את השמירה. השאלה לא נוצרה.');
+          return;
+        }
+        const saved = result.question;
+        setSavedId(saved.id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setIsDirty(false);
+        if (nextAction === 'stay') {
+          Alert.alert('נשמר', 'השאלה נוצרה ונשמרה ל-Supabase.');
+          return;
+        }
+        if (nextAction === 'preview') {
+          openPreview(saved.id);
+          return;
+        }
+        Alert.alert(
+          '✅ שאלה נוצרה',
+          `נשמרה ל-Supabase עם סטטוס "${validationStatus}"\nתופיע בתור ולידציה.`,
+          [
+            { text: 'הוסף עוד', onPress: resetForNextQuestion },
+            { text: 'אוקי', onPress: () => router.back() },
+          ]
+        );
       }
-      if (nextAction === 'preview') {
-        openPreview(questionId);
-        return;
-      }
-      Alert.alert(
-        '✅ שאלה עודכנה',
-        `נשמרה ל-Supabase עם סטטוס "${validationStatus}"\nעדכונים יופיעו מיד.`,
-        [{ text: 'אוקי', onPress: () => router.back() }]
-      );
-    } else {
-      const saved = addQuestion(q);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setIsDirty(false);
-      if (nextAction === 'stay') {
-        Alert.alert('נשמר', 'השאלה נוצרה ונשמרה ל-Supabase.');
-        return;
-      }
-      if (nextAction === 'preview') {
-        openPreview(saved.id);
-        return;
-      }
-      Alert.alert(
-        '✅ שאלה נוצרה',
-        `נשמרה ל-Supabase עם סטטוס "${validationStatus}"\nתופיע בתור ולידציה.`,
-        [
-          { text: 'הוסף עוד', onPress: () => {
-            setQuestionText('');
-            setExplanation('');
-            setExplanationImageUrl('');
-            setOptions(DEFAULT_OPTIONS.map(o => ({ ...o })));
-            setDifficulty(5);
-            setEloOverride(String(difficultyToElo(5)));
-            eloManuallyEdited.current = false;
-            setIsDirty(false);
-          }},
-          { text: 'אוקי', onPress: () => router.back() },
-        ]
-      );
+    } finally {
+      setIsSaving(false);
     }
   };
 

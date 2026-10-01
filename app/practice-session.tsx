@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView,
-  Animated, Alert, TextInput, Modal, KeyboardAvoidingView, Platform,
+  Animated, Alert, TextInput, Modal, KeyboardAvoidingView, Platform, AppState,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { useAdminStore } from '../store/adminStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { fetchQuestionById, fetchQuestions } from '../lib/db';
 import { shuffleOptionsSafely } from '../utils/optionOrder';
+import { shuffleArray } from '../utils/shuffle';
+import { useNotesStore } from '../store/notesStore';
 import { AdBanner } from '../components/AdBanner';
 import { QuestionCard } from '../components/QuestionCard';
 import { VisualImage } from '../components/VisualImage';
@@ -30,6 +32,7 @@ import { claimFreePracticeSession } from '../lib/freePracticeUsage';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 const SPEED_LIMIT = 60; // seconds per question in speed mode
+const KNOWN_SESSION_MODES: readonly SessionMode[] = ['practice', 'speed', 'simulation', 'review', 'adaptive'];
 
 function practiceQuestionFamilyKey(question: Question): string {
   const text = question.questionText
@@ -97,9 +100,19 @@ export default function PracticeSession() {
 
   const {
     showTimerInPractice,
-    autoAdvanceDelay,
-    showExplanationAuto,
+    autoAdvanceDelay: userAutoAdvanceDelay,
+    showExplanationAuto: userShowExplanationAuto,
   } = useSettingsStore();
+
+  // User settings always carry a value (store defaults), so a user value at its "off" default
+  // (0 seconds) falls back to the admin default; any explicit user choice wins.
+  const autoAdvanceDelay = userAutoAdvanceDelay > 0
+    ? userAutoAdvanceDelay
+    : Math.max(0, Math.round(Number(practiceSettings.autoAdvanceDelaySeconds) || 0));
+  // Explanations: the user store defaults to "on" and cannot tell a default from an explicit
+  // choice, so the user value (on by default, off only when the user turned it off) always wins;
+  // admin showExplanationsAuto=true is therefore already honoured unless the user opted out.
+  const showExplanationAuto = userShowExplanationAuto;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -109,10 +122,17 @@ export default function PracticeSession() {
   const [simulationRemaining, setSimulationRemaining] = useState(0);
   const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(0);
   const [loadError, setLoadError] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
 
-  // Favorite & note features
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [notes, setNotes] = useState<Record<string, string>>({});
+  // Favorite & note features — persisted per question id on the device
+  const notes = useNotesStore(s => s.notes);
+  const favorites = useNotesStore(s => s.favorites);
+  const loadNotes = useNotesStore(s => s.load);
+  const setNote = useNotesStore(s => s.setNote);
+  const toggleFavorite = useNotesStore(s => s.toggleFavorite);
+  useEffect(() => {
+    loadNotes().catch(() => null);
+  }, [loadNotes]);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [noteTargetId, setNoteTargetId] = useState<string | null>(null);
@@ -124,8 +144,21 @@ export default function PracticeSession() {
   const [restCountdown, setRestCountdown] = useState(0);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const simulationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const effectiveMode = mode ?? (challengeQuestionId ? 'speed' : 'practice');
-  const isSimulation = effectiveMode === 'simulation' && !!templateId;
+  // Wall-clock deadline of the simulation; null while paused (rest screen) or not running.
+  const simulationDeadlineRef = useRef<number | null>(null);
+  const simulationRemainingRef = useRef(0);
+  const ownSessionIdRef = useRef<string | null>(null);
+  // State mirror of ownSessionIdRef: guarantees a re-render once the id is known. On the legacy
+  // (non-concurrent) native renderer the store update inside startSession renders synchronously,
+  // before the ref is assigned, which would otherwise leave the screen on "loading".
+  const [ownSessionId, setOwnSessionId] = useState<string | null>(null);
+  const isSingleQuestionSession = !!(challengeQuestionId ?? questionId);
+  const requestedMode = mode && KNOWN_SESSION_MODES.includes(mode) ? mode : undefined;
+  const effectiveMode: SessionMode =
+    requestedMode && !(requestedMode === 'simulation' && (!templateId || isSingleQuestionSession))
+      ? requestedMode
+      : (challengeQuestionId ? 'speed' : 'practice');
+  const isSimulation = effectiveMode === 'simulation';
   const isAdminPreview = adminPreview === '1' && isAdmin;
   const hasPremiumAccess = isPremium || isAdminPreview;
 
@@ -151,6 +184,25 @@ export default function PracticeSession() {
     return current;
   }, [getCurrentQuestion]);
 
+  // Starts a session and remembers its id, so a stale session left in the store
+  // (previous visit, another screen) is never rendered or finished by this screen.
+  const beginSession = useCallback((config: Parameters<typeof startSession>[0]) => {
+    startSession(config);
+    const id = usePracticeStore.getState().session?.id ?? null;
+    ownSessionIdRef.current = id;
+    setOwnSessionId(id);
+    setLoadError(false);
+  }, [startSession]);
+
+  // Fresh selection/reveal state for every new session.
+  useEffect(() => {
+    setSelectedId(null);
+    setRevealed(false);
+    setLastAnswerCorrect(false);
+    setShowExplanation(false);
+    explanationAnim.setValue(0);
+  }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Whether to show the timer (speed mode OR user enabled showTimerInPractice OR admin forced showTimerAlways)
   const showTimer = isSimulation || isSpeedMode || showTimerInPractice || practiceSettings.showTimerAlways;
 
@@ -163,7 +215,8 @@ export default function PracticeSession() {
       !hasPremiumAccess &&
       !isSimulation &&
       !isAdminPreview &&
-      !questionId;
+      !questionId &&
+      !challengeQuestionId; // the daily challenge must not consume a free practice session
 
     if (!needsQuota) return true;
 
@@ -204,6 +257,7 @@ export default function PracticeSession() {
     isSimulation,
     isAdminPreview,
     questionId,
+    challengeQuestionId,
     userId,
     isGuest,
     premiumConfig.freeUserSessionLimit,
@@ -266,15 +320,17 @@ export default function PracticeSession() {
       : generated.sections.reduce((sum, section) => sum + section.timeLimitSeconds, 0)
         || Math.max(1, generated.estimatedMinutes) * 60;
     setSimulationRemaining(totalSimulationSeconds);
+    simulationRemainingRef.current = totalSimulationSeconds;
+    simulationDeadlineRef.current = null;
     const firstSection = generated.sections[0];
-    startSession({
+    beginSession({
       targetId: targetId ?? template.targetId ?? '',
       topicId: firstSection?.topicId ?? topicId ?? '',
       mode: 'simulation',
       questions: generated.allQuestions,
     });
     return true;
-  }, [adminQuestions, exitToPractice, hasPremiumAccess, startSession, targetId, templateId, templates, topicId, topicPerformance]);
+  }, [adminQuestions, beginSession, exitToPractice, hasPremiumAccess, targetId, templateId, templates, topicId, topicPerformance]);
 
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -297,6 +353,36 @@ export default function PracticeSession() {
   useEffect(() => {
     if (!rootNavigationReady) return;
     let cancelled = false;
+    let loadTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    // Drop any leftover session from a previous visit so it is never shown or resumed here.
+    usePracticeStore.setState({ session: null });
+    ownSessionIdRef.current = null;
+    setOwnSessionId(null);
+    finishingRef.current = false;
+
+    const startLoadTimeout = () => {
+      setLoadError(false);
+      loadTimeout = setTimeout(() => {
+        // Never flag a load error once our session has started.
+        if (cancelled || ownSessionIdRef.current) return;
+        setLoadError(true);
+      }, 10000);
+    };
+
+    const cleanup = () => {
+      cancelled = true;
+      if (loadTimeout) clearTimeout(loadTimeout);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
+      if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+      // Abandoned (not finishing) session of this screen must not linger in the store.
+      const ownId = ownSessionIdRef.current;
+      if (ownId && !finishingRef.current && usePracticeStore.getState().session?.id === ownId) {
+        usePracticeStore.setState({ session: null });
+      }
+    };
 
     if (topic && isEnglishPracticeTopic(topic)) {
       Alert.alert('תרגול לא זמין', 'תרגול אנגלית הוסר כרגע מהאפליקציה.');
@@ -324,15 +410,12 @@ export default function PracticeSession() {
 
     const singleQuestionId = challengeQuestionId ?? questionId;
     if (singleQuestionId) {
-      setLoadError(false);
-      const loadTimeout = setTimeout(() => {
-        if (!cancelled) setLoadError(true);
-      }, 10000);
+      startLoadTimeout();
 
       Promise.resolve(adminQuestions.find(q => q.id === singleQuestionId) ?? null)
         .then(localQuestion => localQuestion ?? fetchQuestionById(singleQuestionId))
         .then(async previewQuestion => {
-          clearTimeout(loadTimeout);
+          if (loadTimeout) clearTimeout(loadTimeout);
           if (cancelled) return;
           if (!previewQuestion) {
             Alert.alert('שגיאה', challengeQuestionId ? 'שאלת האתגר היומי לא נמצאה.' : 'השאלה לתצוגה מקדימה לא נמצאה.');
@@ -352,11 +435,12 @@ export default function PracticeSession() {
           }
           if (!canAccessQuestion(previewQuestion, hasPremiumAccess)) {
             Alert.alert('פרימיום בלבד', 'השאלה הזו נעולה למנויי פרימיום.');
-            router.push('/paywall');
+            // replace (not push): going back must not land on a session screen stuck on loading
+            router.replace('/paywall');
             return;
           }
-          if (!(await claimQuotaIfNeeded())) return;
-          startSession({
+          if (!(await claimQuotaIfNeeded()) || cancelled) return;
+          beginSession({
             targetId: targetId ?? previewQuestion.targetIds[0] ?? 'target_psychometric',
             topicId: previewQuestion.topicId,
             mode: challengeQuestionId ? effectiveMode : 'practice',
@@ -364,7 +448,7 @@ export default function PracticeSession() {
           });
         })
         .catch((error: unknown) => {
-          clearTimeout(loadTimeout);
+          if (loadTimeout) clearTimeout(loadTimeout);
           if (cancelled) return;
           logger.error(
             'practiceSession:singleQuestionLoad',
@@ -374,17 +458,14 @@ export default function PracticeSession() {
           setLoadError(true);
         });
 
-      return () => {
-        cancelled = true;
-        clearTimeout(loadTimeout);
-      };
+      return cleanup;
     }
 
     if (isSimulation && templateId) {
       if (!hasPremiumAccess) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        router.push('/paywall');
-        return;
+        router.replace('/paywall');
+        return cleanup;
       }
       if (!canAccessMode('simulation', hasPremiumAccess, premiumConfig, practiceSettings.premiumOnlyModes)) {
         Alert.alert('פרימיום בלבד', 'מבחן זה נעול לפי הגדרות המנהל.');
@@ -393,10 +474,7 @@ export default function PracticeSession() {
       }
       // Always refresh from Supabase before building a new simulation.
       // Seed/in-memory data may be stale even when it contains the same template id.
-      setLoadError(false);
-      const loadTimeout = setTimeout(() => {
-        if (!cancelled) setLoadError(true);
-      }, 10000);
+      startLoadTimeout();
       const loadSimulationSource = async () => {
         if (isAdminPreview) {
           await loadAdminData(true);
@@ -417,18 +495,18 @@ export default function PracticeSession() {
 
       loadSimulationSource()
         .then(source => {
-          clearTimeout(loadTimeout);
+          if (loadTimeout) clearTimeout(loadTimeout);
           if (cancelled) return;
           startSimulationPreview(source.templates, source.questions);
         })
         .catch((error: unknown) => {
-          clearTimeout(loadTimeout);
+          if (loadTimeout) clearTimeout(loadTimeout);
           if (cancelled) return;
           const message = error instanceof Error ? error.message : String(error);
           logger.error('practiceSession:simulationLoad', 'טעינת מבחן נכשלה', message);
           setLoadError(true);
         });
-      return () => { cancelled = true; };
+      return cleanup;
     }
 
     // FREE / ADAPTIVE PRACTICE MODE
@@ -446,13 +524,11 @@ export default function PracticeSession() {
       return;
     }
 
-    const loadTimeout = setTimeout(() => {
-      if (cancelled) return;
-      setLoadError(true);
-    }, 10000);
+    startLoadTimeout();
 
+    // A rejected fetch (network error) lands in .catch below and shows the loadError UI.
     fetchQuestions({ topicId: topicId ?? '', status: 'validated' }).then(async questions => {
-      clearTimeout(loadTimeout);
+      if (loadTimeout) clearTimeout(loadTimeout);
       if (cancelled) return;
       if (questions.length === 0) {
         Alert.alert('שגיאה', 'לא נמצאו שאלות לנושא זה');
@@ -506,19 +582,19 @@ export default function PracticeSession() {
       if (practiceSettings.shuffleAnswerOptions) {
         questionPool = questionPool.map(q => ({
           ...q,
-          options: shuffleOptionsSafely(q.options, opts => [...opts].sort(() => Math.random() - 0.5)),
+          options: shuffleOptionsSafely(q.options, shuffleArray),
         }));
       }
-      if (!(await claimQuotaIfNeeded())) return;
-      startSession({
+      if (!(await claimQuotaIfNeeded()) || cancelled) return;
+      beginSession({
         targetId: targetId ?? '',
         topicId: topicId ?? '',
         mode: effectiveMode,
-        questions: [...questionPool].sort(() => Math.random() - 0.5).slice(0, effectiveLimit),
+        questions: shuffleArray(questionPool).slice(0, effectiveLimit),
         initialLevel: userLevel,
       });
     }).catch((error: unknown) => {
-      clearTimeout(loadTimeout);
+      if (loadTimeout) clearTimeout(loadTimeout);
       if (cancelled) return;
       logger.error(
         'practiceSession:loadQuestions',
@@ -527,14 +603,7 @@ export default function PracticeSession() {
       );
       setLoadError(true);
     });
-    return () => {
-      cancelled = true;
-      clearTimeout(loadTimeout);
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-      if (restTimerRef.current) clearInterval(restTimerRef.current);
-      if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
-    };
+    return cleanup;
   }, [rootNavigationReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Active simulations are intentionally immutable snapshots.
@@ -545,50 +614,71 @@ export default function PracticeSession() {
   // Content changes apply to the next session, never halfway through an attempt.
 
   // Full simulation timer. In simulations, answers/explanations are revealed only on the results screen.
+  // Driven by a wall-clock deadline (not per-tick decrements), so background throttling or a
+  // paused JS thread cannot extend the exam. Paused during rest breaks: the remaining time is
+  // saved on cleanup and a new deadline is set when the next section starts.
+  const finishSessionRef = useRef<() => void>(() => {});
   useEffect(() => {
-    if (!isSimulation || !session || showRestScreen || simulationRemaining <= 0) return;
+    if (!isSimulation || !session || session.id !== ownSessionIdRef.current || showRestScreen) return;
+    if (simulationRemainingRef.current <= 0) return;
     if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
-    simulationTimerRef.current = setInterval(() => {
-      setSimulationRemaining(prev => {
-        if (prev <= 1) {
-          if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
-          finishSession();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    simulationDeadlineRef.current = Date.now() + simulationRemainingRef.current * 1000;
+
+    const tick = () => {
+      const deadline = simulationDeadlineRef.current;
+      if (deadline === null) return;
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      simulationRemainingRef.current = remaining;
+      setSimulationRemaining(remaining);
+      if (remaining <= 0) {
+        if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+        simulationDeadlineRef.current = null;
+        finishSessionRef.current();
+      }
+    };
+
+    simulationTimerRef.current = setInterval(tick, 1000);
+    const appStateSub = AppState.addEventListener('change', state => {
+      if (state === 'active') tick();
+    });
     return () => {
       if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+      appStateSub.remove();
+      if (simulationDeadlineRef.current !== null) {
+        simulationRemainingRef.current = Math.max(0, Math.ceil((simulationDeadlineRef.current - Date.now()) / 1000));
+        simulationDeadlineRef.current = null;
+      }
     };
-  }, [isSimulation, session?.id, showRestScreen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isSimulation, session?.id, ownSessionId, showRestScreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Speed mode timer (only in speed mode — showTimerInPractice shows timer but doesn't auto-skip)
   useEffect(() => {
     if (!isSpeedMode || !session || revealed) return;
-    setTimer(practiceSettings.speedModeSecondsPerQuestion);
+    const seconds = practiceSettings.speedModeSecondsPerQuestion;
+    const deadline = Date.now() + seconds * 1000;
+    setTimer(seconds);
     timerRef.current = setInterval(() => {
-      setTimer(prev => {
-        if (prev <= 1) {
-          handleTimeUp();
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setTimer(remaining);
+      if (remaining <= 0) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        handleTimeUp();
+      }
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [session?.id, session?.currentIndex, revealed, handleTimeUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Non-speed timer display (counts up to SPEED_LIMIT for display only)
+  // Non-speed timer display (counts up to SPEED_LIMIT for display only).
+  // Skipped when the timer is hidden or in simulations so the screen doesn't re-render every second.
   const [practiceTimer, setPracticeTimer] = useState(0);
   useEffect(() => {
-    if (!session || isSpeedMode || revealed) return;
+    if (!session || isSpeedMode || isSimulation || !showTimer || revealed) return;
     setPracticeTimer(0);
     const id = setInterval(() => {
       setPracticeTimer(prev => prev + 1);
     }, 1000);
     return () => clearInterval(id);
-  }, [session?.id, session?.currentIndex, revealed, isSpeedMode]);
+  }, [session?.id, session?.currentIndex, revealed, isSpeedMode, isSimulation, showTimer]);
 
   // Auto-advance after answer is revealed — also drives the live countdown banner
   useEffect(() => {
@@ -720,14 +810,17 @@ export default function PracticeSession() {
 
   const startSectionBreak = (nextSectionIdx: number) => {
     const template = templates.find(t => t.id === templateId);
-    const restTime = template?.restTimeBetweenRules ?? 0;
+    // Template value wins; otherwise the admin default rest time between sections.
+    const restTime = Math.max(0, Math.round(Number(
+      template?.restTimeBetweenRules ?? examSettings.defaultRestTimeBetweenRules ?? 0,
+    ) || 0));
     if (restTime > 0) {
       setShowRestScreen(true);
       setRestCountdown(restTime);
-      let remaining = restTime;
+      const restDeadline = Date.now() + restTime * 1000;
       if (restTimerRef.current) clearInterval(restTimerRef.current);
       restTimerRef.current = setInterval(() => {
-        remaining -= 1;
+        const remaining = Math.max(0, Math.ceil((restDeadline - Date.now()) / 1000));
         setRestCountdown(remaining);
         if (remaining <= 0) {
           if (restTimerRef.current) clearInterval(restTimerRef.current);
@@ -763,12 +856,19 @@ export default function PracticeSession() {
 
   const finishSession = async () => {
     if (finishingRef.current) return;
+    const ownId = ownSessionIdRef.current;
+    if (!ownId || usePracticeStore.getState().session?.id !== ownId) return;
     finishingRef.current = true;
+    setIsFinishing(true);
     if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    if (restTimerRef.current) clearInterval(restTimerRef.current);
     completeUnansweredAsSkipped();
     const finished = endSession();
-    if (!finished) { finishingRef.current = false; return; }
+    if (!finished) { finishingRef.current = false; setIsFinishing(false); return; }
     const template = isSimulation ? templates.find(t => t.id === templateId) : undefined;
+    const simulationPassingScore = Number(template?.passingScore ?? examSettings.defaultPassingScore);
     const genericScores = calcAllScores(finished.answers);
     const correct = finished.answers.filter(a => a.isCorrect).length;
     const simulationScores = isSimulation
@@ -779,7 +879,7 @@ export default function PracticeSession() {
             difficulty: answer.questionDifficulty,
             isSkipped: answer.isSkipped,
           })),
-          Number(template?.passingScore ?? examSettings.defaultPassingScore),
+          simulationPassingScore,
         )
       : null;
     const rawAccuracyScore = finished.answers.length > 0
@@ -788,13 +888,7 @@ export default function PracticeSession() {
     const scores = simulationScores
       ? {
           ...genericScores,
-          score: Math.max(0, Math.min(100, Math.round(
-            simulationScores.rawScore * 0.42 +
-            simulationScores.difficultyWeightedScore * 0.38 +
-            simulationScores.speedAdjustedScore * 0.12 +
-            simulationScores.stabilityScore * 0.08 -
-            (finished.answers.filter(answer => answer.isSkipped).length / Math.max(1, finished.answers.length)) * 8
-          ))),
+          score: simulationScores.score,
           difficultyWeightedScore: simulationScores.difficultyWeightedScore,
           speedAdjustedScore: simulationScores.speedAdjustedScore,
           stabilityScore: simulationScores.stabilityScore,
@@ -808,7 +902,7 @@ export default function PracticeSession() {
       userName: userName || undefined,
       targetId: finished.targetId ?? targetId ?? '',
       topicId: finished.topicId ?? topicId ?? '',
-      mode: finished.mode ?? mode ?? 'practice',
+      mode: finished.mode ?? effectiveMode,
       templateId: templateId ?? undefined,
       templateName: template?.name ?? undefined,
       totalQuestions: finished.answers.length,
@@ -830,28 +924,32 @@ export default function PracticeSession() {
     };
     let sessionPersisted = isAdminPreview;
     if (userId && !isAdminPreview) {
-      sessionPersisted = await addSessionRecord(sessionRec);
+      try {
+        sessionPersisted = await addSessionRecord(sessionRec);
+      } catch (error: unknown) {
+        logger.error('practiceSession:finish', 'שמירת הסשן נכשלה', error instanceof Error ? error.message : String(error));
+        sessionPersisted = false;
+      }
     }
 
     logger.info('practiceSession:finish', `סשן הסתיים — ${correct}/${finished.answers.length} נכון, ציון: ${scores.score}`);
     if (!isAdminPreview && sessionPersisted) {
       // Commit topic performance only after the canonical session was saved.
       // Abandoned/failed sessions must not alter accuracy, ELO or badges.
-      for (const answer of finished.answers) {
+      // Skipped / unreached questions are not attempts and must not count as wrong answers.
+      const attemptedAnswers = finished.answers.filter(answer => !answer.isSkipped);
+      for (const answer of attemptedAnswers) {
         const answeredQuestion = finished.questions.find(question => question.id === answer.questionId);
         if (answeredQuestion) {
           recordAnswer(answeredQuestion.topicId, answeredQuestion.difficulty, answer.isCorrect);
         }
       }
-      recordSession(correct, finished.answers.length);
+      recordSession(correct, attemptedAnswers.length);
 
       const fastCorrect = finished.answers.filter(a => a.isCorrect && a.timeSpent < 10).length;
       if (fastCorrect >= 5) earnBadge('speed_master');
 
-      if (isSimulation) {
-        const passingScore = Number(template?.passingScore ?? 65);
-        if (scores.score >= passingScore) earnBadge('simulation_pass');
-      }
+      if (simulationScores?.passed) earnBadge('simulation_pass');
 
       const completedTopicId = finished.topicId ?? topicId ?? '';
       if (completedTopicId) {
@@ -892,17 +990,19 @@ export default function PracticeSession() {
         stability: scores.stabilityScore,
         mode: finished.mode,
         templateId: templateId ?? '',
-        passingScore: isSimulation ? String(template?.passingScore ?? examSettings.defaultPassingScore) : '',
-        passed: isSimulation ? String(scores.score >= Number(template?.passingScore ?? examSettings.defaultPassingScore)) : '',
+        passingScore: isSimulation ? String(simulationPassingScore) : '',
+        passed: simulationScores ? String(simulationScores.passed) : '',
       },
     });
   };
+  finishSessionRef.current = () => { void finishSession(); };
 
   const handleQuit = () => {
     const quit = () => {
       if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
       endSession();
       router.replace(isAdminPreview ? '/admin/simulation-builder' : '/(tabs)');
     };
@@ -922,12 +1022,7 @@ export default function PracticeSession() {
 
   const handleToggleFavorite = (questionId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setFavorites(prev => {
-      const next = new Set(prev);
-      if (next.has(questionId)) next.delete(questionId);
-      else next.add(questionId);
-      return next;
-    });
+    toggleFavorite(questionId);
   };
 
   const handleOpenNote = (questionId: string) => {
@@ -938,11 +1033,7 @@ export default function PracticeSession() {
 
   const handleSaveNote = () => {
     if (!noteTargetId) return;
-    if (noteText.trim()) {
-      setNotes(prev => ({ ...prev, [noteTargetId]: noteText.trim() }));
-    } else {
-      setNotes(prev => { const n = { ...prev }; delete n[noteTargetId]; return n; });
-    }
+    setNote(noteTargetId, noteText);
     setShowNoteModal(false);
     setNoteTargetId(null);
   };
@@ -1022,16 +1113,27 @@ export default function PracticeSession() {
           >
             <Text style={styles.restSkipText}>דלג על המנוחה ←</Text>
           </Pressable>
+          <Pressable
+            onPress={handleQuit}
+            accessibilityRole="button"
+            accessibilityLabel="יציאה מהמבחן"
+            style={[styles.restSkipBtn, styles.restQuitBtn]}
+          >
+            <Text style={styles.restSkipText}>יציאה מהמבחן</Text>
+          </Pressable>
         </LinearGradient>
       </SafeAreaView>
     );
   }
 
-  if (!session) {
+  // Also covers a stale session in the store that this screen did not start.
+  if (!session || session.id !== ownSessionIdRef.current) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.loading}>
-          {loadError ? (
+          {isFinishing ? (
+            <Text style={styles.loadingText}>שומר תוצאות...</Text>
+          ) : loadError ? (
             <>
               <Text style={styles.loadingText}>לא ניתן לטעון שאלות. בדוק חיבור לאינטרנט.</Text>
               <Pressable onPress={exitToPractice} style={styles.loadErrorBtn}>
@@ -1051,7 +1153,16 @@ export default function PracticeSession() {
   const question = getCurrentQuestion();
   if (!question) return null;
 
-  const progress = (session.currentIndex + 1) / session.questions.length;
+  // Adaptive mode jumps around the pool, so currentIndex is not the question's position.
+  const isAdaptive = effectiveMode === 'adaptive';
+  const currentAnswered = session.answers.some(a => a.questionId === question.id);
+  const displayPosition = isAdaptive
+    ? Math.min(session.questions.length, session.answers.length + (currentAnswered ? 0 : 1))
+    : session.currentIndex + 1;
+  const isLastQuestion = isAdaptive
+    ? session.answers.length >= session.questions.length
+    : session.currentIndex + 1 >= session.questions.length;
+  const progress = displayPosition / session.questions.length;
   const correct = session.answers.filter(a => a.isCorrect).length;
 
   // Timer display values
@@ -1067,7 +1178,12 @@ export default function PracticeSession() {
       {noteModal}
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={handleQuit} style={styles.quitBtn}>
+        <Pressable
+          onPress={handleQuit}
+          accessibilityRole="button"
+          accessibilityLabel="יציאה מהתרגול"
+          style={styles.quitBtn}
+        >
           <Text style={styles.quitText}>✕</Text>
         </Pressable>
 
@@ -1078,7 +1194,7 @@ export default function PracticeSession() {
               : (topic?.name ?? 'תרגול')}
           </Text>
           <Text style={styles.headerProgress}>
-            {session.currentIndex + 1} / {session.questions.length}
+            {displayPosition} / {session.questions.length}
             {!isSimulation ? `  ✅ ${correct}` : ''}
           </Text>
         </View>
@@ -1131,11 +1247,11 @@ export default function PracticeSession() {
           </Pressable>
           <Pressable
             onPress={() => handleToggleFavorite(question.id)}
-            style={[styles.quickBtn, favorites.has(question.id) ? styles.quickBtnFav : null]}
+            style={[styles.quickBtn, favorites[question.id] ? styles.quickBtnFav : null]}
           >
-            <Text style={styles.quickBtnIcon}>{favorites.has(question.id) ? '⭐' : '☆'}</Text>
-            <Text style={[styles.quickBtnLabel, favorites.has(question.id) ? { color: '#F59E0B' } : null]}>
-              {favorites.has(question.id) ? 'מסומן' : 'מועדף'}
+            <Text style={styles.quickBtnIcon}>{favorites[question.id] ? '⭐' : '☆'}</Text>
+            <Text style={[styles.quickBtnLabel, favorites[question.id] ? { color: '#F59E0B' } : null]}>
+              {favorites[question.id] ? 'מסומן' : 'מועדף'}
             </Text>
           </Pressable>
         </View>
@@ -1258,7 +1374,7 @@ export default function PracticeSession() {
               style={styles.nextBtnGrad}
             >
               <Text style={styles.nextText}>
-                {session.currentIndex + 1 >= session.questions.length
+                {isLastQuestion
                   ? 'סיום וראה תוצאות 🏁'
                   : 'שאלה הבאה ←'}
               </Text>
@@ -1288,6 +1404,7 @@ const styles = StyleSheet.create({
   restCountdownLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: '#94A3B8' },
   restSkipBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: Radius.lg, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   restSkipText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: '#fff' },
+  restQuitBtn: { marginTop: 12, backgroundColor: 'transparent', borderColor: 'rgba(248,113,113,0.5)' },
 
   header: {
     flexDirection: 'row-reverse',

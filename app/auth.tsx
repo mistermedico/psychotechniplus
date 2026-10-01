@@ -13,11 +13,20 @@ import { useUserStore } from '../store/userStore';
 import { useAdminStore } from '../store/adminStore';
 import { usePurchaseStore } from '../store/purchaseStore';
 import { notifySignup } from '../lib/adminEmail';
+import * as Linking from 'expo-linking';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize, Radius } from '../constants/theme';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 type AuthMode = 'login' | 'register';
+
+// Mirrors getOAuthRedirectUrl (lib/oauth.ts) but targets the recovery screen.
+function getPasswordResetRedirectUrl(): string {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return `${window.location.origin}/reset-password`;
+  }
+  return Linking.createURL('reset-password', { scheme: 'psychotechniplus' });
+}
 
 export default function AuthScreen() {
   const reducedMotion = useReducedMotion();
@@ -75,7 +84,10 @@ export default function AuthScreen() {
   const completeAuthNavigation = async (userId: string, fallback: '/(tabs)' | '/onboarding') => {
     await initializePurchases(userId).catch(() => null);
     if (params.redirect === 'paywall') {
-      router.replace('/paywall');
+      // Put the app underneath the modal paywall so closing it doesn't land
+      // back on the auth screen (or nowhere).
+      router.replace(fallback);
+      router.push('/paywall');
       return;
     }
     router.replace(fallback);
@@ -211,7 +223,9 @@ export default function AuthScreen() {
     setError('');
     setResettingPassword(true);
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: getPasswordResetRedirectUrl(),
+      });
       if (resetError) throw resetError;
       Alert.alert('קישור לאיפוס סיסמה נשלח', 'בדוק את תיבת המייל שלך ופעל לפי הקישור לאיפוס הסיסמה.');
     } catch (resetError: any) {

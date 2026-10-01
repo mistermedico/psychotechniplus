@@ -49,16 +49,44 @@ interface ImportedQuestion {
   readingPassage?: string;
 }
 
-function validateQuestion(q: unknown, index: number): string | null {
+function normalizeQuestionText(text: unknown): string {
+  return String(text ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function validateQuestion(q: unknown, index: number, topicIds: Set<string>): string | null {
   if (typeof q !== 'object' || q === null) return `שאלה ${index + 1}: לא אובייקט תקין`;
   const item = q as Record<string, unknown>;
-  if (!item.questionText) return `שאלה ${index + 1}: חסר questionText`;
+  if (!String(item.questionText ?? '').trim()) return `שאלה ${index + 1}: חסר questionText`;
   if (!item.topicId) return `שאלה ${index + 1}: חסר topicId`;
+  if (topicIds.size > 0 && !topicIds.has(String(item.topicId))) return `שאלה ${index + 1}: topicId ("${item.topicId}") לא קיים במערכת`;
   if (!Array.isArray(item.options) || item.options.length < 2) return `שאלה ${index + 1}: options חייב להכיל לפחות 2 אפשרויות`;
+  const options = item.options as any[];
+  if (options.some(o => typeof o !== 'object' || o === null || !String(o.id ?? '').trim())) return `שאלה ${index + 1}: לכל אפשרות חייב להיות id`;
+  const optionIds = options.map(o => String(o.id));
+  if (new Set(optionIds).size !== optionIds.length) return `שאלה ${index + 1}: מזהי אפשרויות כפולים (${optionIds.join(', ')})`;
   if (!item.correctAnswer) return `שאלה ${index + 1}: חסר correctAnswer`;
-  const hasCorrectOption = (item.options as any[]).some(o => o.id === item.correctAnswer);
+  const hasCorrectOption = options.some(o => String(o.id) === String(item.correctAnswer));
   if (!hasCorrectOption) return `שאלה ${index + 1}: correctAnswer ("${item.correctAnswer}") לא קיים ב-options`;
   return null;
+}
+
+// correctAnswer is the source of truth: isCorrect is derived from it so a
+// missing or conflicting isCorrect flag never produces 0 or 2 correct options.
+function normalizeImportedQuestion(raw: any): ImportedQuestion {
+  const correctAnswer = String(raw.correctAnswer);
+  return {
+    ...raw,
+    questionText: String(raw.questionText ?? '').trim(),
+    topicId: String(raw.topicId),
+    correctAnswer,
+    options: (raw.options as any[]).map(o => ({
+      id: String(o.id),
+      text: String(o.text ?? ''),
+      isCorrect: String(o.id) === correctAnswer,
+      analysisTag: o.analysisTag,
+      imageUrl: o.imageUrl || undefined,
+    })),
+  };
 }
 
 export default function JsonImportScreen() {
@@ -103,9 +131,10 @@ export default function JsonImportScreen() {
 
     const arr = Array.isArray(parsed) ? parsed : [parsed];
 
+    const topicIds = new Set(topics.map(t => t.id));
     const errors: string[] = [];
     arr.forEach((q, i) => {
-      const err = validateQuestion(q, i);
+      const err = validateQuestion(q, i, topicIds);
       if (err) errors.push(err);
     });
 
@@ -116,13 +145,15 @@ export default function JsonImportScreen() {
       return;
     }
 
-    const importedArr = arr as ImportedQuestion[];
+    const importedArr = arr.map(normalizeImportedQuestion);
 
-    // Detect duplicates by exact questionText match
-    const existingTexts = new Set(existingQuestions.map(q => q.questionText.trim().toLowerCase()));
+    // Detect duplicates against the bank and within the batch (normalized text).
+    const seenTexts = new Set(existingQuestions.map(q => normalizeQuestionText(q.questionText)));
     const dupIndexes: number[] = [];
     importedArr.forEach((q, i) => {
-      if (existingTexts.has(q.questionText.trim().toLowerCase())) dupIndexes.push(i);
+      const key = normalizeQuestionText(q.questionText);
+      if (seenTexts.has(key)) dupIndexes.push(i);
+      else seenTexts.add(key);
     });
     setDuplicates(dupIndexes);
 
@@ -143,7 +174,7 @@ export default function JsonImportScreen() {
       const item = preview[i];
       if (skipDups && duplicates.includes(i)) { skipped++; continue; }
       try {
-        addQuestion({
+        const result = await addQuestion({
           targetIds: item.targetIds ?? (targets[0]?.id ? [targets[0].id] : []),
           topicId: item.topicId,
           questionType: (item.questionType as any) ?? 'multiple_choice',
@@ -152,7 +183,7 @@ export default function JsonImportScreen() {
           mediaUrl: item.mediaUrl || undefined,
           mediaType: item.mediaUrl ? (item.mediaType ?? 'image') : undefined,
           options: item.options.map(o => ({
-            id: o.id, text: o.text, isCorrect: o.isCorrect, analysisTag: o.analysisTag, imageUrl: o.imageUrl || undefined,
+            id: o.id, text: String(o.text ?? ''), isCorrect: o.id === item.correctAnswer, analysisTag: o.analysisTag, imageUrl: o.imageUrl || undefined,
           })),
           correctAnswer: item.correctAnswer,
           explanation: item.explanation ?? '',
@@ -164,6 +195,7 @@ export default function JsonImportScreen() {
           smartPracticeEligible: false,
           generalPracticeEligible: false,
         });
+        if (!result.ok) throw new Error(result.error ?? 'Supabase דחה את השמירה');
         success++;
       } catch (error: any) {
         showAdminErrorToast(setToastError, 'שמירת שאלה נכשלה', error?.message ?? 'שגיאה לא ידועה בזמן ייבוא.', { index: i, item }, 'admin:json-import');
