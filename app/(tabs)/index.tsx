@@ -16,6 +16,7 @@ import { visiblePracticeTopics } from '../../utils/topicVisibility';
 import { serverDateKey } from '../../utils/date';
 import { canAccessMode, canAccessPremiumFeature } from '../../lib/accessControl';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { PremiumUpgradeCard } from '../../components/PremiumUpgradeCard';
 
 const TOPIC_META: Record<string, { icon: string; gradient: [string, string]; glow: string }> = {
   topic_quantitative: { icon: '⚡', gradient: ['#5A52D5', '#7C6FF7'], glow: '#7C6FF7' },
@@ -267,6 +268,15 @@ export default function Dashboard() {
               })}
             </ScrollView>
           </Animated.View>
+
+          {!isPremium && (
+            <Animated.View style={[styles.section, { opacity: fadeIn }]}>
+              <PremiumUpgradeCard
+                title="יותר תרגול, בלי לעצור"
+                body="פתח סימולציות מלאות, את כל רמות הקושי, תרגול אדפטיבי וניתוח התקדמות מפורט."
+              />
+            </Animated.View>
+          )}
 
           {/* ── Stats Bento ── */}
           <Animated.View style={[styles.section, { opacity: fadeIn }]}>

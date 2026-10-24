@@ -42,6 +42,18 @@ async function asyncSet(key: string, val: string): Promise<void> {
 
 const USER_ID_KEY = '@psychotechniplus/userId';
 const DELETED_QUESTION_STATUS = 'deleted';
+const QUESTION_FETCH_RETRIES = 2;
+
+function isTransientSupabaseError(error: any): boolean {
+  const status = Number(error?.status ?? error?.statusCode ?? 0);
+  const message = String(error?.message ?? '').toLowerCase();
+  return status === 0 || status === 408 || status === 429 || status >= 500 ||
+    message.includes('network') || message.includes('fetch') || message.includes('timeout');
+}
+
+async function wait(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // ── User identity ──────────────────────────────────────────────────────────
 
@@ -106,12 +118,23 @@ export async function fetchQuestions(opts?: {
   };
   const rows: any[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
-    if (error) {
-      logger.error('db:fetchQuestions', 'שגיאה בטעינת שאלות', error.message);
-      throw new Error(error.message || 'שגיאה בטעינת שאלות');
+    let page: any[] | null = null;
+    let lastError: any = null;
+    for (let attempt = 0; attempt <= QUESTION_FETCH_RETRIES; attempt += 1) {
+      const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+      if (!error) {
+        page = data ?? [];
+        break;
+      }
+      lastError = error;
+      if (!isTransientSupabaseError(error) || attempt === QUESTION_FETCH_RETRIES) break;
+      await wait(350 * (attempt + 1));
     }
-    const page = data ?? [];
+    if (page === null) {
+      const message = lastError?.message || 'שגיאה בטעינת שאלות';
+      logger.error('db:fetchQuestions', 'שגיאה בטעינת שאלות', message);
+      throw new Error(message);
+    }
     rows.push(...page);
     if (page.length < PAGE_SIZE) break;
   }

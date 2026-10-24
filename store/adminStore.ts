@@ -2489,6 +2489,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     publicRealtimeChannel = supabase
       .channel('psychotechniplus-public-live-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_state' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'topics' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'targets' }, scheduleReload)
       .subscribe(status => {

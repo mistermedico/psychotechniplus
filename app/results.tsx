@@ -21,6 +21,7 @@ import { Question } from '../data/types';
 import { detectDir, textAlign as ta } from '../utils/textDirection';
 import { canShowAdsForUser, showInterstitialAfterSession } from '../lib/ads';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { PremiumUpgradeCard } from '../components/PremiumUpgradeCard';
 
 
 function getTrustedBreakdown(answers: any[]) {
@@ -292,6 +293,14 @@ export default function Results() {
               onPress={() => router.replace({ pathname: '/practice-session', params: { topicId: params.topicId, targetId: params.targetId, mode: 'speed', questionLimit: params.total } })}
             />
           </View>
+
+          {!isPremium && (
+            <PremiumUpgradeCard
+              compact
+              title="הפוך את התוצאה לתוכנית שיפור"
+              body="פתח תרגול אדפטיבי, סימולציות מלאות וניתוח ביצועים מתקדם."
+            />
+          )}
 
           <AdBanner isPremium={isPremium} isAdmin={isAdmin} placement="session" />
           <SponsoredOfferCard

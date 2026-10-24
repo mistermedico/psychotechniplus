@@ -21,6 +21,7 @@ import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { serverDateKey, serverDateKeyDaysAgo, normalizeStoredDateKey } from '../../utils/date';
+import { PremiumUpgradeCard } from '../../components/PremiumUpgradeCard';
 
 const BADGE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
   first_session: { icon: '🌱', label: 'סשן ראשון', desc: 'השלמת את הסשן הראשון שלך' },
@@ -52,7 +53,7 @@ export default function ProgressTab() {
   const {
     name, level, xp, streak, longestStreak,
     totalSessions, totalCorrect, totalAnswered,
-    badges, selectedTargetId, getTopicAccuracy, getTopicLevel, lastPracticedDate,
+    badges, selectedTargetId, getTopicAccuracy, getTopicLevel, lastPracticedDate, isPremium,
   } = useUserStore();
   const { topics: allTopics, appConfig } = useAdminStore();
   const streakEnabled = appConfig.featureFlags.streakMode !== false;
@@ -251,6 +252,16 @@ export default function ProgressTab() {
             
             
           </>
+        )}
+
+        {!isPremium && (
+          <View style={{ marginBottom: 24 }}>
+            <PremiumUpgradeCard
+              compact
+              title="קבל תמונת התקדמות מלאה"
+              body="פרימיום פותח אנליטיקה מפורטת, סימולציות וכל מאגר השאלות."
+            />
+          </View>
         )}
 
         {/* ── מגמה אחרונה ── */}
