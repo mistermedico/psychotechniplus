@@ -10,9 +10,6 @@ workflows:
     environment:
       groups:
         - psychotechniplus-production
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.psychotechniplus.app
       vars:
         APP_STORE_ID: "6776568241"
         BUNDLE_ID: "com.psychotechniplus.app"
