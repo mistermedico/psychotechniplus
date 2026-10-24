@@ -85,7 +85,11 @@ workflows:
       - name: Build signed IPA
         script: |
           set -euo pipefail
-          xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
+          if ! xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"; then
+            echo "Xcode archive failed. Printing complete xcodebuild logs:"
+            find /tmp/xcodebuild_logs -type f -maxdepth 2 -print -exec cat {} \; || true
+            exit 1
+          fi
 
     artifacts:
       - build/ios/ipa/*.ipa
