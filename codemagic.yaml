@@ -14,7 +14,7 @@ workflows:
         certificates:
           - ovrim-distribution
         provisioning_profiles:
-          - psychotechniplus-app-store-profile
+          - psychotechniplus-app-store-profile-valid
       vars:
         APP_STORE_ID: "6776568241"
         BUNDLE_ID: "com.psychotechniplus.app"
