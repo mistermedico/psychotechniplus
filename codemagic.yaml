@@ -11,8 +11,10 @@ workflows:
       groups:
         - psychotechniplus-production
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.psychotechniplus.app
+        certificates:
+          - ovrim-distribution
+        provisioning_profiles:
+          - psychotechniplus-app-store-profile
       vars:
         APP_STORE_ID: "6776568241"
         BUNDLE_ID: "com.psychotechniplus.app"
