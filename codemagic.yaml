@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 120
 
     integrations:
-      app_store_connect: psychotechniplus-app-store
+      app_store_connect: hapolitikai-apple
 
     environment:
       groups:
