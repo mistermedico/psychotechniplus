@@ -381,6 +381,22 @@ function FreePracticePane({
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="פתיחת מעבדת מיומנויות פסיכוטכניות"
+          onPress={() => router.push('/cognitive-lab')}
+          style={({ pressed }) => [styles.cognitiveCard, pressed && { opacity: 0.82 }]}
+        >
+          <LinearGradient colors={['#123044', '#302D72']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cognitiveGradient}>
+            <View style={styles.cognitiveIcon}><Text style={styles.cognitiveIconText}>🧠</Text></View>
+            <View style={styles.cognitiveCopy}>
+              <Text style={styles.cognitiveTitle}>מעבדת ביצועים</Text>
+              <Text style={styles.cognitiveBody}>זיכרון עבודה, זריזות תגובה ודיוק תחת לחץ</Text>
+              <Text style={styles.cognitiveMeta}>חינמי · כולל פרסומות למשתמשים חינמיים</Text>
+            </View>
+            <Text style={styles.cognitiveArrow}>‹</Text>
+          </LinearGradient>
+        </Pressable>
         {/* Access badge row */}
         <View style={styles.accessRow}>
           <View style={[styles.accessBadge, isPremium ? styles.accessPremium : styles.accessFree]}>
@@ -883,6 +899,23 @@ const styles = StyleSheet.create({
   upgradeChip: { borderRadius: Radius.full, overflow: 'hidden' },
   upgradeChipGrad: { paddingHorizontal: 14, paddingVertical: 8 },
   upgradeChipText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: '#fff' },
+  cognitiveCard: { borderRadius: Radius.lg, overflow: 'hidden', marginBottom: 14 },
+  cognitiveGradient: {
+    minHeight: 116,
+    padding: 16,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(34,211,238,0.28)',
+  },
+  cognitiveIcon: { width: 58, height: 58, borderRadius: Radius.md, backgroundColor: 'rgba(34,211,238,0.15)', alignItems: 'center', justifyContent: 'center' },
+  cognitiveIconText: { fontSize: 28 },
+  cognitiveCopy: { flex: 1, alignItems: 'flex-end' },
+  cognitiveTitle: { color: '#fff', fontFamily: FontFamily.bold, fontSize: FontSize.lg, textAlign: 'right' },
+  cognitiveBody: { color: 'rgba(255,255,255,0.82)', fontFamily: FontFamily.regular, fontSize: FontSize.sm, textAlign: 'right', writingDirection: 'rtl', marginTop: 3 },
+  cognitiveMeta: { color: Colors.cyan, fontFamily: FontFamily.medium, fontSize: FontSize.xs, textAlign: 'right', marginTop: 7 },
+  cognitiveArrow: { color: '#fff', fontSize: 28 },
 
   /* ── Section label ── */
   quotaCard: {

@@ -2,6 +2,8 @@ import { Platform } from 'react-native';
 import mobileAds, {
   AdEventType,
   InterstitialAd,
+  RewardedAd,
+  RewardedAdEventType,
 } from 'react-native-google-mobile-ads';
 import { logger } from '../utils/logger';
 
@@ -64,6 +66,10 @@ let interstitial: InterstitialAd | null = null;
 let interstitialLoaded = false;
 let interstitialLoading = false;
 let cleanupInterstitialListeners: (() => void) | null = null;
+let rewarded: RewardedAd | null = null;
+let rewardedLoaded = false;
+let rewardedLoading = false;
+let cleanupRewardedListeners: (() => void) | null = null;
 
 function prepareInterstitial(): void {
   if (!isAdMobRuntimeSupported()) return;
@@ -101,12 +107,48 @@ function prepareInterstitial(): void {
   interstitial.load();
 }
 
+function prepareRewarded(): void {
+  if (!isAdMobRuntimeSupported()) return;
+  const unitId = getRewardedAdUnitId();
+  if (!unitId || rewardedLoaded || rewardedLoading) return;
+
+  cleanupRewardedListeners?.();
+  rewardedLoading = true;
+  rewarded = RewardedAd.createForAdRequest(unitId, {
+    requestNonPersonalizedAdsOnly: true,
+  });
+
+  const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => {
+    rewardedLoaded = true;
+    rewardedLoading = false;
+  });
+  const unsubscribeClosed = rewarded.addAdEventListener(AdEventType.CLOSED, () => {
+    rewardedLoaded = false;
+    rewardedLoading = false;
+    prepareRewarded();
+  });
+  const unsubscribeError = rewarded.addAdEventListener(AdEventType.ERROR, error => {
+    rewardedLoaded = false;
+    rewardedLoading = false;
+    logger.warn('ads', `Rewarded failed: ${error.message}`);
+  });
+
+  cleanupRewardedListeners = () => {
+    unsubscribeLoaded();
+    unsubscribeClosed();
+    unsubscribeError();
+    cleanupRewardedListeners = null;
+  };
+  rewarded.load();
+}
+
 export async function initializeAds(): Promise<void> {
   if (!isAdMobRuntimeSupported() || initialized) return;
   try {
     await mobileAds().initialize();
     initialized = true;
     prepareInterstitial();
+    prepareRewarded();
   } catch (error: any) {
     logger.warn('ads', `AdMob initialization failed: ${error?.message ?? String(error)}`);
   }
@@ -133,5 +175,42 @@ export async function showInterstitialAfterSession(): Promise<boolean> {
 }
 
 export async function showRewardedAdForBonus(): Promise<boolean> {
-  return false;
+  if (!isAdMobRuntimeSupported()) return false;
+  if (!initialized) await initializeAds();
+  if (!rewardedLoaded || !rewarded) {
+    prepareRewarded();
+    return false;
+  }
+
+  const ad = rewarded;
+  rewardedLoaded = false;
+  return new Promise(resolve => {
+    let earned = false;
+    const unsubscribeEarned = ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
+      earned = true;
+    });
+    const unsubscribeError = ad.addAdEventListener(AdEventType.ERROR, error => {
+      unsubscribeEarned();
+      unsubscribeClosed();
+      unsubscribeError();
+      logger.warn('ads', `Rewarded show failed: ${error.message}`);
+      prepareRewarded();
+      resolve(false);
+    });
+    const unsubscribeClosed = ad.addAdEventListener(AdEventType.CLOSED, () => {
+      unsubscribeEarned();
+      unsubscribeClosed();
+      unsubscribeError();
+      prepareRewarded();
+      resolve(earned);
+    });
+    ad.show().catch(error => {
+      unsubscribeEarned();
+      unsubscribeClosed();
+      unsubscribeError();
+      logger.warn('ads', `Rewarded show failed: ${error?.message ?? String(error)}`);
+      prepareRewarded();
+      resolve(false);
+    });
+  });
 }
