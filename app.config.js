@@ -1,5 +1,3 @@
-const appJson = require('./app.json');
-
 const TEST_ADMOB_APP_IDS = {
   ios: 'ca-app-pub-3940256099942544~1458002511',
   android: 'ca-app-pub-3940256099942544~3347511713',
@@ -17,7 +15,7 @@ const withEnvAdMobAppIds = (config) => {
 
   requireProductionAdMobId('ios', iosAppId);
 
-  const plugins = config.expo.plugins.map((plugin) => {
+  const plugins = config.plugins.map((plugin) => {
     if (Array.isArray(plugin) && plugin[0] === 'react-native-google-mobile-ads') {
       return [
         plugin[0],
@@ -32,13 +30,7 @@ const withEnvAdMobAppIds = (config) => {
     return plugin;
   });
 
-  return {
-    ...config,
-    expo: {
-      ...config.expo,
-      plugins,
-    },
-  };
+  return { ...config, plugins };
 };
 
-module.exports = ({ config }) => withEnvAdMobAppIds(appJson);
+module.exports = ({ config }) => withEnvAdMobAppIds(config);
