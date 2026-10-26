@@ -183,9 +183,12 @@ export default function PracticeTab() {
       ]);
       return;
     }
-    if (isGuest && usageBlock) {
+    if (!isPremium && usageBlock) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      router.push('/paywall');
+      Alert.alert('מכסת התרגול הסתיימה', usageBlock, [
+        { text: 'שדרג לפרימיום', onPress: () => router.push('/paywall') },
+        { text: 'הבנתי', style: 'cancel' },
+      ]);
       return;
     }
     // Check if mode is premium-only
@@ -391,8 +394,8 @@ function FreePracticePane({
             <View style={styles.cognitiveIcon}><Text style={styles.cognitiveIconText}>🧠</Text></View>
             <View style={styles.cognitiveCopy}>
               <Text style={styles.cognitiveTitle}>מעבדת ביצועים</Text>
-              <Text style={styles.cognitiveBody}>זיכרון עבודה, זריזות תגובה ודיוק תחת לחץ</Text>
-              <Text style={styles.cognitiveMeta}>חינמי · כולל פרסומות למשתמשים חינמיים</Text>
+              <Text style={styles.cognitiveBody}>זיכרון, קשב, גמישות מחשבתית, זריזות ודיוק תחת לחץ</Text>
+              <Text style={styles.cognitiveMeta}>תרגילים חינמיים ותרגילי פרימיום מתקדמים</Text>
             </View>
             <Text style={styles.cognitiveArrow}>‹</Text>
           </LinearGradient>
@@ -513,10 +516,9 @@ function FreePracticePane({
             return (
               <Pressable
                 key={topic.id}
-                disabled={isLocked}
                 accessibilityRole="radio"
                 accessibilityLabel={`${topic.name}${isLocked ? ', פרימיום בלבד' : ''}`}
-                accessibilityState={{ checked: isSelected, disabled: isLocked }}
+                accessibilityState={{ checked: isSelected }}
                 onPress={() => {
                   if (isLocked) {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

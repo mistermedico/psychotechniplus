@@ -17,6 +17,7 @@ import { serverDateKey } from '../../utils/date';
 import { canAccessMode, canAccessPremiumFeature } from '../../lib/accessControl';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { PremiumUpgradeCard } from '../../components/PremiumUpgradeCard';
+import { AdBanner } from '../../components/AdBanner';
 
 const TOPIC_META: Record<string, { icon: string; gradient: [string, string]; glow: string }> = {
   topic_quantitative: { icon: '⚡', gradient: ['#5A52D5', '#7C6FF7'], glow: '#7C6FF7' },
@@ -45,7 +46,7 @@ export default function Dashboard() {
     selectedTargetId, getTopicLevel, isPremium,
   } = useUserStore();
 
-  const { dailyChallenges, targets, topics, appConfig, premiumConfig, practiceSettings } = useAdminStore();
+  const { dailyChallenges, targets, topics, appConfig, premiumConfig, practiceSettings, isAdmin } = useAdminStore();
 
   const selectedTarget =
     targets.find(t => t.id === 'target_psychometric' && t.isActive !== false && !t.comingSoon);
@@ -273,10 +274,12 @@ export default function Dashboard() {
             <Animated.View style={[styles.section, { opacity: fadeIn }]}>
               <PremiumUpgradeCard
                 title="יותר תרגול, בלי לעצור"
-                body="פתח סימולציות מלאות, את כל רמות הקושי, תרגול אדפטיבי וניתוח התקדמות מפורט."
+                body="קבל תרגול ללא הגבלה וללא מודעות, סימולציות מלאות, כל רמות הקושי וניתוח התקדמות מפורט."
               />
             </Animated.View>
           )}
+
+          <AdBanner isPremium={isPremium} isAdmin={isAdmin} placement="tabs" />
 
           {/* ── Stats Bento ── */}
           <Animated.View style={[styles.section, { opacity: fadeIn }]}>
