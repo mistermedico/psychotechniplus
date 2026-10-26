@@ -766,7 +766,7 @@ export const DEFAULT_PREMIUM_CONFIG: PremiumConfig = {
   freeUserSessionLimit: 3,
   freePremiumTopics: [],
   trialDays: 7,
-  paywallTitle: 'שדרג לפרמיום',
+  paywallTitle: 'שדרג לפרימיום',
   paywallSubtitle: 'קבל גישה מלאה לכל הכלים',
 };
 
@@ -922,7 +922,7 @@ const SEED_PUSH_NOTIFICATIONS: PushNotification[] = [
   },
   {
     id: 'notif_002',
-    title: 'תזכורת למשתמשי פרמיום',
+    title: 'תזכורת למשתמשי פרימיום',
     body: 'שבוע חדש, אתגרים חדשים! האתגר היומי שלך מחכה.',
     targetSegment: 'premium',
     status: 'scheduled',
@@ -952,7 +952,7 @@ const SEED_ACTIVITY_LOG: AdminActivityLog[] = [
   { id: 'log_003', action: 'שלח הודעת Push לכלל המשתמשים', timestamp: '2025-05-18T09:00:00Z', category: 'notification' },
   { id: 'log_004', action: 'עדכן הגדרות אפליקציה — מגבלת שאלות חינמיות', timestamp: '2025-05-17T17:45:00Z', category: 'system' },
   { id: 'log_005', action: 'הסתיר קוד קופון BETA', timestamp: '2025-05-17T16:20:00Z', category: 'promo' },
-  { id: 'log_006', action: 'שדרג משתמש user_042 לפרמיום', timestamp: '2025-05-17T14:00:00Z', category: 'user' },
+  { id: 'log_006', action: 'שדרג משתמש user_042 לפרימיום', timestamp: '2025-05-17T14:00:00Z', category: 'user' },
   { id: 'log_007', action: 'ייבא 12 שאלות חדשות מ-JSON', timestamp: '2025-05-16T11:00:00Z', category: 'question' },
   { id: 'log_008', action: 'הפעיל מצב תחזוקה לבדיקה', timestamp: '2025-05-15T09:30:00Z', category: 'system' },
 ];

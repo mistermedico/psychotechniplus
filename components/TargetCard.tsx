@@ -55,7 +55,7 @@ export function TargetCard({ target, progress = 0, sessionsCount = 0, onPress, c
         )}
         {target.accessSettings.accessType === 'premium_only' && (
           <View style={styles.premiumBadge}>
-            <Text style={styles.premiumBadgeText}>💎 פרמיום</Text>
+            <Text style={styles.premiumBadgeText}>💎 פרימיום</Text>
           </View>
         )}
       </View>

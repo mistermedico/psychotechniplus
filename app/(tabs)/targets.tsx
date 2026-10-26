@@ -13,6 +13,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize, Radius, Shadow } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { useAdminStore } from '../../store/adminStore';
+import { AdBanner } from '../../components/AdBanner';
 import { LEVEL_LABELS } from '../../utils/adaptive';
 import { canAccessTopic } from '../../lib/accessControl';
 import { visiblePracticeTopics } from '../../utils/topicVisibility';
@@ -93,7 +94,7 @@ export default function TargetsTab() {
   const [selectedId, setSelectedId] = useState<string | null>(PRIMARY_TARGET_ID);
   const [refreshing, setRefreshing] = useState(false);
   const { getTopicAccuracy, getTopicLevel, totalSessions, isPremium } = useUserStore();
-  const { premiumConfig, targets, topics: allTopics, loadPublicData } = useAdminStore();
+  const { premiumConfig, targets, topics: allTopics, loadPublicData, isAdmin } = useAdminStore();
 
   const visibleTargets = targets.filter(
     t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon
@@ -153,6 +154,7 @@ export default function TargetsTab() {
           />
         }
       >
+        <AdBanner isPremium={isPremium} isAdmin={isAdmin} placement="practice" />
         {visibleTargets.map(target => {
           const topics = visiblePracticeTopics(allTopics.filter(t => t.targetId === target.id));
           const accuracies = topics.map(t => getTopicAccuracy(t.id));

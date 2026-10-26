@@ -104,7 +104,7 @@ export default function PaywallScreen() {
     if (result.success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        '🎉 ברוך הבא לפרמיום!',
+        '🎉 ברוך הבא לפרימיום!',
         'גישה מלאה הופעלה בהצלחה. תודה שהצטרפת!',
         [{ text: 'בוא נתחיל ←', onPress: close }],
       );
@@ -167,7 +167,7 @@ export default function PaywallScreen() {
             </View>
             <Text style={styles.heroTitle}>פסיכוטכניPlus</Text>
             <View style={styles.heroPremiumBadge}>
-              <Text style={styles.heroPremiumBadgeText}>פרמיום</Text>
+              <Text style={styles.heroPremiumBadgeText}>פרימיום</Text>
             </View>
             <Text style={styles.heroSub}>כלים מתקדמים לתרגול פסיכוטכני מסודר</Text>
           </Animated.View>

@@ -191,8 +191,8 @@ export default function PracticeTab() {
     // Check if mode is premium-only
     if (!canAccessMode(selectedMode, isPremium, premiumConfig, premiumOnlyModes)) {
       Alert.alert(
-        'פרמיום בלבד',
-        'מצב זה זמין למנויי פרמיום בלבד. שדרג את החשבון שלך.',
+        'פרימיום בלבד',
+        'מצב זה זמין למנויי פרימיום בלבד. שדרג את החשבון שלך.',
         [
           { text: 'שדרג', onPress: () => router.push('/paywall') },
           { text: 'ביטול', style: 'cancel' },
@@ -401,7 +401,7 @@ function FreePracticePane({
         <View style={styles.accessRow}>
           <View style={[styles.accessBadge, isPremium ? styles.accessPremium : styles.accessFree]}>
             <Text style={styles.accessBadgeText}>
-              {isPremium ? '💎 פרמיום — תרגול ללא הגבלה' : `🆓 חינמי — עד ${freePracticeLimit} שאלות לסשן`}
+              {isPremium ? '💎 פרימיום — תרגול ללא הגבלה' : `🆓 חינמי — עד ${freePracticeLimit} שאלות לסשן`}
             </Text>
           </View>
           {!isPremium && (

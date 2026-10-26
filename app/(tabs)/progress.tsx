@@ -22,13 +22,14 @@ import { LEVEL_LABELS } from '../../utils/adaptive';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { serverDateKey, serverDateKeyDaysAgo, normalizeStoredDateKey } from '../../utils/date';
 import { PremiumUpgradeCard } from '../../components/PremiumUpgradeCard';
+import { AdBanner } from '../../components/AdBanner';
 
 const BADGE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
   first_session: { icon: '🌱', label: 'סשן ראשון', desc: 'השלמת את הסשן הראשון שלך' },
   streak_7: { icon: '🔥', label: 'שבוע רצוף', desc: '7 ימי תרגול ברצף' },
   streak_30: { icon: '🌟', label: 'חודש רצוף!', desc: '30 ימי תרגול ברצף' },
   perfect_score: { icon: '💯', label: 'ניקוד מושלם', desc: '100% בסשן אחד' },
-  speed_master: { icon: '⚡', label: 'מהיר כברק', desc: 'ענית נכון ב-< 10 שניות על 5 שאלות' },
+  speed_master: { icon: '⚡', label: 'מהיר כברק', desc: 'ענית נכון על 5 שאלות בפחות מ־10 שניות' },
   topic_complete: { icon: '🏆', label: 'נושא הושלם', desc: 'השלמת נושא שלם' },
   simulation_pass: { icon: '🎖️', label: 'עבר סימולציה', desc: 'עברת סימולציה בהצלחה' },
   level_up: { icon: '⬆️', label: 'רמה חדשה!', desc: 'עלית רמה' },
@@ -55,7 +56,7 @@ export default function ProgressTab() {
     totalSessions, totalCorrect, totalAnswered,
     badges, selectedTargetId, getTopicAccuracy, getTopicLevel, lastPracticedDate, isPremium,
   } = useUserStore();
-  const { topics: allTopics, appConfig } = useAdminStore();
+  const { topics: allTopics, appConfig, isAdmin } = useAdminStore();
   const streakEnabled = appConfig.featureFlags.streakMode !== false;
   // If today hasn't been practiced yet, the (still alive) streak ends yesterday.
   const streakOffset = normalizeStoredDateKey(lastPracticedDate) === serverDateKey() ? 0 : 1;
@@ -145,6 +146,7 @@ export default function ProgressTab() {
         bounces={Platform.OS === 'ios'}
         decelerationRate={Platform.OS === 'ios' ? 'normal' : 'fast'}
       >
+        <AdBanner isPremium={isPremium} isAdmin={isAdmin} placement="profile" />
         {/* ── Gradient Hero Banner ── */}
         <LinearGradient
           colors={['#1E1A4A', '#150F38', '#0E0B2A']}
