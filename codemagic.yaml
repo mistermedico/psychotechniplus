@@ -13,7 +13,7 @@ workflows:
       vars:
         APP_STORE_ID: "6776568241"
         BUNDLE_ID: "com.psychotechniplus.app"
-      node: 20.19.4
+      node: 22.14.0
       xcode: latest
       cocoapods: default
 
@@ -47,7 +47,11 @@ workflows:
           echo "Building App Store version $(node -p \"require('./app.json').expo.version\") ($next_build_number)"
 
       - name: Generate native iOS project
-        script: npx expo prebuild --platform ios --clean --no-install
+        script: |
+          set -euo pipefail
+          npx expo prebuild --platform ios --clean --no-install
+          test -d ios || { echo "Expo prebuild did not create the ios directory"; exit 1; }
+          test -f ios/Podfile || { echo "Expo prebuild did not create ios/Podfile"; exit 1; }
 
       - name: Install CocoaPods
         script: |
