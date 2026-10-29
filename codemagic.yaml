@@ -5,16 +5,14 @@ workflows:
     max_build_duration: 120
 
     integrations:
-      app_store_connect: hapolitikai-apple
+      app_store_connect: psychotechniplus-codemagic
 
     environment:
       groups:
         - psychotechniplus-production
       ios_signing:
-        certificates:
-          - ovrim-distribution
-        provisioning_profiles:
-          - psychotechniplus-app-store-profile-valid
+        distribution_type: app_store
+        bundle_identifier: com.psychotechniplus.app
       vars:
         APP_STORE_ID: "6776568241"
         BUNDLE_ID: "com.psychotechniplus.app"
@@ -64,6 +62,7 @@ workflows:
         script: |
           set -euo pipefail
           keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
           xcode-project use-profiles
 
