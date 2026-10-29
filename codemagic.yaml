@@ -4,6 +4,15 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 120
 
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: claude/exam-prep-ios-app-DkN5g
+          include: true
+          source: true
+      cancel_previous_builds: true
+
     integrations:
       app_store_connect: psychotechniplus-codemagic
 
