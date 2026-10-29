@@ -19,6 +19,9 @@ workflows:
     environment:
       groups:
         - psychotechniplus-production
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.psychotechniplus.app
       vars:
         APP_STORE_ID: "6776568241"
         BUNDLE_ID: "com.psychotechniplus.app"
@@ -38,7 +41,7 @@ workflows:
       - name: Validate production configuration
         script: |
           set -euo pipefail
-          required_vars="EXPO_PUBLIC_REVENUECAT_IOS_API_KEY EXPO_PUBLIC_ADMOB_IOS_APP_ID EXPO_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_AD_UNIT_ID EXPO_PUBLIC_ADMOB_IOS_REWARDED_AD_UNIT_ID CERTIFICATE_PRIVATE_KEY"
+          required_vars="EXPO_PUBLIC_REVENUECAT_IOS_API_KEY EXPO_PUBLIC_ADMOB_IOS_APP_ID EXPO_PUBLIC_ADMOB_IOS_BANNER_AD_UNIT_ID EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_AD_UNIT_ID EXPO_PUBLIC_ADMOB_IOS_REWARDED_AD_UNIT_ID"
           for variable_name in $required_vars; do
             eval "variable_value=\${$variable_name:-}"
             if [ -z "$variable_value" ]; then
@@ -72,7 +75,6 @@ workflows:
         script: |
           set -euo pipefail
           keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --certificate-key=@env:CERTIFICATE_PRIVATE_KEY
           keychain add-certificates
           xcode-project use-profiles
 
