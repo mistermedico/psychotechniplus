@@ -20,8 +20,10 @@ workflows:
       groups:
         - psychotechniplus-production
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.psychotechniplus.app
+        provisioning_profiles:
+          - Psychotechni Plus Codemagic App Store 2026
+        certificates:
+          - Legionnaire Distribution 2026
       vars:
         APP_STORE_ID: "6776568241"
         BUNDLE_ID: "com.psychotechniplus.app"
@@ -74,8 +76,6 @@ workflows:
       - name: Configure App Store signing
         script: |
           set -euo pipefail
-          keychain initialize
-          keychain add-certificates
           xcode-project use-profiles
 
       - name: Detect Xcode workspace and scheme
