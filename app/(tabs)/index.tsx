@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Animated,
+  Animated, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -87,15 +87,15 @@ export default function Dashboard() {
     }
 
     Animated.parallel([
-      Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+      Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 80, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
 
     if (streak > 0) {
       const pulse = Animated.loop(
         Animated.sequence([
-          Animated.timing(streakScale, { toValue: 1.08, duration: 900, useNativeDriver: true }),
-          Animated.timing(streakScale, { toValue: 1, duration: 900, useNativeDriver: true }),
+          Animated.timing(streakScale, { toValue: 1.08, duration: 900, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(streakScale, { toValue: 1, duration: 900, useNativeDriver: Platform.OS !== 'web' }),
         ]),
       );
       pulse.start();
