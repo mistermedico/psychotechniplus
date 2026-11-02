@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     ...Shadow.md,
   },
   header: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
   },

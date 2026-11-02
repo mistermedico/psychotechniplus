@@ -63,6 +63,7 @@ export default function PracticeTab() {
   const [activeTab, setActiveTab] = useState<PracticeTab>('free');
   const [selectedMode, setSelectedMode] = useState('practice');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [questionCount, setQuestionCount] = useState(10);
   const defaultDifficulty = useSettingsStore(s => s.defaultDifficulty);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyFilter>(
     defaultDifficulty === 'auto' ? 'all' : defaultDifficulty
@@ -74,6 +75,15 @@ export default function PracticeTab() {
   const featureFlags = appConfig.featureFlags;
   const premiumOnlyModes = practiceSettings.premiumOnlyModes;
   const [usage, setUsage] = useState<FreePracticeUsage>(emptyFreePracticeUsage);
+  const freeSessionMax = Math.min(
+    30,
+    Math.max(1, Math.floor(freePracticeLimit || 30)),
+    Math.max(1, Math.floor(premiumConfig.freeUserDailyQuestionLimit || 30)),
+  );
+
+  useEffect(() => {
+    setQuestionCount(current => Math.min(Math.max(1, current), isPremium ? 30 : freeSessionMax));
+  }, [freeSessionMax, isPremium]);
 
   const target =
     targets.find(t => t.id === PRIMARY_TARGET_ID && t.isActive !== false && !t.comingSoon);
@@ -211,7 +221,7 @@ export default function PracticeTab() {
         targetId: target?.id ?? '',
         mode: selectedMode,
         difficulty: selectedDifficulty,
-        questionLimit: isPremium ? '999' : String(freePracticeLimit),
+        questionLimit: String(Math.min(30, Math.max(1, questionCount))),
       },
     });
   };
@@ -310,7 +320,9 @@ export default function PracticeTab() {
             getTopicAccuracy={getTopicAccuracy}
             getTopicLevelLabel={getTopicLevelLabel}
             isPremium={isPremium}
-            freePracticeLimit={freePracticeLimit}
+            freePracticeLimit={isPremium ? 30 : freeSessionMax}
+            questionCount={questionCount}
+            setQuestionCount={setQuestionCount}
             canStart={selectedTopicId !== null}
             onStart={handleStartFree}
             showSpeedMode={featureFlags.speedMode}
@@ -353,6 +365,7 @@ function FreePracticePane({
   selectedDifficulty, setSelectedDifficulty,
   getTopicAccuracy, getTopicLevelLabel,
   isPremium, freePracticeLimit, canStart, onStart, showSpeedMode,
+  questionCount, setQuestionCount,
   dailyLimit, dailyUsed, cooldownMinutes, usageBlock,
   premiumConfig,
   premiumOnlyModes,
@@ -365,6 +378,7 @@ function FreePracticePane({
   getTopicAccuracy: (id: string) => number;
   getTopicLevelLabel: (id: string) => string;
   isPremium: boolean; freePracticeLimit: number;
+  questionCount: number; setQuestionCount: (count: number) => void;
   canStart: boolean; onStart: () => void;
   showSpeedMode?: boolean;
   dailyLimit: number;
@@ -376,6 +390,7 @@ function FreePracticePane({
   isAdmin: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const maxQuestionCount = isPremium ? 30 : Math.min(30, Math.max(1, freePracticeLimit));
   return (
     <>
       <ScrollView
@@ -476,6 +491,50 @@ function FreePracticePane({
           </View>
         ))}
 
+        <Text style={styles.sectionLabel}>מספר שאלות בסשן</Text>
+        <View style={styles.questionCountCard}>
+          <View style={styles.questionCountCopy}>
+            <Text style={styles.questionCountTitle}>{questionCount} שאלות</Text>
+            <Text style={styles.questionCountHint}>
+              {isPremium ? 'בחר את אורך התרגול הרצוי' : `בסשן חינמי ניתן לבחור עד ${maxQuestionCount} שאלות`}
+            </Text>
+          </View>
+          <View style={styles.questionCountControls}>
+            <Pressable
+              onPress={() => setQuestionCount(Math.min(maxQuestionCount, questionCount + 1))}
+              disabled={questionCount >= maxQuestionCount}
+              accessibilityRole="button"
+              accessibilityLabel="הוספת שאלה לסשן"
+              style={[styles.countButton, questionCount >= maxQuestionCount && styles.countButtonDisabled]}
+            >
+              <Text style={styles.countButtonText}>+</Text>
+            </Pressable>
+            <Text style={styles.countValue}>{questionCount}</Text>
+            <Pressable
+              onPress={() => setQuestionCount(Math.max(1, questionCount - 1))}
+              disabled={questionCount <= 1}
+              accessibilityRole="button"
+              accessibilityLabel="הפחתת שאלה מהסשן"
+              style={[styles.countButton, questionCount <= 1 && styles.countButtonDisabled]}
+            >
+              <Text style={styles.countButtonText}>−</Text>
+            </Pressable>
+          </View>
+          <View style={styles.quickCountRow}>
+            {[5, 10, 15, 20, 25, 30].filter(value => value <= maxQuestionCount).map(value => (
+              <Pressable
+                key={value}
+                onPress={() => setQuestionCount(value)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: questionCount === value }}
+                style={[styles.quickCountChip, questionCount === value && styles.quickCountChipActive]}
+              >
+                <Text style={[styles.quickCountText, questionCount === value && styles.quickCountTextActive]}>{value}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         {/* Difficulty selector */}
         <>
             <Text style={styles.sectionLabel}>רמת קושי</Text>
@@ -573,7 +632,7 @@ function FreePracticePane({
         {canStart && !isPremium && (
           <View style={styles.limitInfo}>
             <Text style={styles.limitInfoText}>
-              ⚠️ סשן זה יכלול עד {freePracticeLimit} שאלות (מגבלת חינמי)
+              סשן זה יכלול {questionCount} שאלות מתוך המאגר החינמי
             </Text>
           </View>
         )}
@@ -609,7 +668,7 @@ function FreePracticePane({
               {usageBlock
                 ? 'מגבלת שימוש חינמי פעילה'
                 : canStart
-                ? `התחל תרגול ← (${isPremium ? 'ללא הגבלה' : `עד ${freePracticeLimit}`})`
+                ? `התחל תרגול ← (${questionCount} שאלות)`
                 : 'בחר נושא להתחלה'}
             </Text>
           </LinearGradient>
@@ -1024,6 +1083,49 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     lineHeight: 20,
   },
+
+  questionCountCard: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.32)',
+    padding: 16,
+    marginBottom: 10,
+    alignItems: 'stretch',
+    gap: 14,
+  },
+  questionCountCopy: { alignItems: 'flex-end' },
+  questionCountTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: '#F8FAFC', textAlign: 'right' },
+  questionCountHint: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)', textAlign: 'right', marginTop: 3 },
+  questionCountControls: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 18 },
+  countButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
+  },
+  countButtonDisabled: { opacity: 0.3 },
+  countButtonText: { fontFamily: FontFamily.bold, fontSize: 26, color: '#fff', lineHeight: 30 },
+  countValue: { minWidth: 54, textAlign: 'center', fontFamily: FontFamily.heading, fontSize: FontSize['2xl'], color: Colors.text },
+  quickCountRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
+  quickCountChip: {
+    minWidth: 42,
+    height: 34,
+    paddingHorizontal: 10,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  quickCountChipActive: { backgroundColor: 'rgba(124,111,247,0.24)', borderColor: Colors.primaryLight },
+  quickCountText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textSecondary },
+  quickCountTextActive: { color: '#fff' },
 
   /* ── Topics grid ── */
   topicsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12, marginBottom: 8 },

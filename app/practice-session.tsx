@@ -86,6 +86,7 @@ export default function PracticeSession() {
   const {
     session, startSession, submitAnswer, skipQuestion,
     completeUnansweredAsSkipped, nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
+    hasHydratedSession, hydrateSession,
   } = usePracticeStore();
 
   const {
@@ -161,6 +162,11 @@ export default function PracticeSession() {
   const isSimulation = effectiveMode === 'simulation';
   const isAdminPreview = adminPreview === '1' && isAdmin;
   const hasPremiumAccess = isPremium || isAdminPreview;
+  const sessionSourceKey = [
+    targetId ?? '', topicId ?? '', effectiveMode, templateId ?? '', questionId ?? '',
+    challengeQuestionId ?? '', challengeId ?? '', difficulty ?? '', questionLimit ?? '',
+    isAdminPreview ? 'admin' : 'user',
+  ].join('|');
 
   const explanationAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -187,12 +193,12 @@ export default function PracticeSession() {
   // Starts a session and remembers its id, so a stale session left in the store
   // (previous visit, another screen) is never rendered or finished by this screen.
   const beginSession = useCallback((config: Parameters<typeof startSession>[0]) => {
-    startSession(config);
+    startSession({ ...config, sourceKey: sessionSourceKey });
     const id = usePracticeStore.getState().session?.id ?? null;
     ownSessionIdRef.current = id;
     setOwnSessionId(id);
     setLoadError(false);
-  }, [startSession]);
+  }, [sessionSourceKey, startSession]);
 
   // Fresh selection/reveal state for every new session.
   useEffect(() => {
@@ -352,13 +358,12 @@ export default function PracticeSession() {
   // Initialize session — simulation mode or free practice
   useEffect(() => {
     if (!rootNavigationReady) return;
+    if (!hasHydratedSession) {
+      hydrateSession().catch(() => null);
+      return;
+    }
     let cancelled = false;
     let loadTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    // Drop any leftover session from a previous visit so it is never shown or resumed here.
-    usePracticeStore.setState({ session: null });
-    ownSessionIdRef.current = null;
-    setOwnSessionId(null);
     finishingRef.current = false;
 
     const startLoadTimeout = () => {
@@ -377,12 +382,24 @@ export default function PracticeSession() {
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
       if (restTimerRef.current) clearInterval(restTimerRef.current);
       if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
-      // Abandoned (not finishing) session of this screen must not linger in the store.
-      const ownId = ownSessionIdRef.current;
-      if (ownId && !finishingRef.current && usePracticeStore.getState().session?.id === ownId) {
-        usePracticeStore.setState({ session: null });
-      }
     };
+
+    const resumableSession = usePracticeStore.getState().session;
+    if (
+      resumableSession?.sourceKey === sessionSourceKey
+      && resumableSession.questions.length > 0
+      && resumableSession.answers.length < resumableSession.questions.length
+    ) {
+      ownSessionIdRef.current = resumableSession.id;
+      setOwnSessionId(resumableSession.id);
+      setLoadError(false);
+      return cleanup;
+    }
+
+    // A session from a different route must never leak into this screen.
+    if (resumableSession) usePracticeStore.getState().discardSession();
+    ownSessionIdRef.current = null;
+    setOwnSessionId(null);
 
     if (topic && isEnglishPracticeTopic(topic)) {
       Alert.alert('תרגול לא זמין', 'תרגול אנגלית הוסר כרגע מהאפליקציה.');
@@ -604,7 +621,7 @@ export default function PracticeSession() {
       setLoadError(true);
     });
     return cleanup;
-  }, [rootNavigationReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rootNavigationReady, hasHydratedSession, sessionSourceKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Active simulations are intentionally immutable snapshots.
   // Supabase/template edits apply to the next simulation only, preventing

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Animated,
@@ -18,6 +18,7 @@ import { canAccessMode, canAccessPremiumFeature } from '../../lib/accessControl'
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { PremiumUpgradeCard } from '../../components/PremiumUpgradeCard';
 import { AdBanner } from '../../components/AdBanner';
+import { loadUserSessionHistory, type SessionRecord } from '../../lib/db';
 
 const TOPIC_META: Record<string, { icon: string; gradient: [string, string]; glow: string }> = {
   topic_quantitative: { icon: '⚡', gradient: ['#5A52D5', '#7C6FF7'], glow: '#7C6FF7' },
@@ -43,7 +44,7 @@ export default function Dashboard() {
   const {
     name, streak, level, xp, badges,
     totalSessions, totalCorrect, totalAnswered,
-    selectedTargetId, getTopicLevel, isPremium,
+    selectedTargetId, getTopicLevel, isPremium, userId,
   } = useUserStore();
 
   const { dailyChallenges, targets, topics, appConfig, premiumConfig, practiceSettings, isAdmin } = useAdminStore();
@@ -69,6 +70,21 @@ export default function Dashboard() {
   const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
   const xpPercent = Math.min(100, Math.round((xp / (level * 100)) * 100));
   const recentBadges = badges.slice(-3);
+  const [recentSessions, setRecentSessions] = useState<SessionRecord[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!userId) {
+      setRecentSessions([]);
+      return;
+    }
+    setSessionsLoading(true);
+    loadUserSessionHistory(userId, 8)
+      .then(rows => { if (!cancelled) setRecentSessions(rows); })
+      .finally(() => { if (!cancelled) setSessionsLoading(false); });
+    return () => { cancelled = true; };
+  }, [userId, totalSessions]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'בוקר טוב' : hour < 17 ? 'שלום' : 'ערב טוב';
@@ -309,6 +325,44 @@ export default function Dashboard() {
                   <View style={[styles.bentoAccent, { backgroundColor: Colors.accent }]} />
                 </LinearGradient>
               </View>
+            </View>
+          </Animated.View>
+
+          <Animated.View style={[styles.section, { opacity: fadeIn }]}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTag}>{recentSessions.length} אחרונים</Text>
+              <Text style={styles.sectionTitle}>הסשנים שלי</Text>
+            </View>
+            <View style={styles.sessionHistoryList}>
+              {sessionsLoading ? (
+                <Text style={styles.sessionEmptyText}>טוען את היסטוריית הסשנים...</Text>
+              ) : recentSessions.length === 0 ? (
+                <Text style={styles.sessionEmptyText}>לא השלמת עדיין סשן. התוצאות יופיעו כאן לאחר התרגול הראשון.</Text>
+              ) : recentSessions.map(item => {
+                const sessionTopic = topics.find(topic => topic.id === item.topicId);
+                const durationMinutes = Math.floor(item.timeSpentSeconds / 60);
+                const durationSeconds = item.timeSpentSeconds % 60;
+                const completedDate = item.completedAt ? new Date(item.completedAt) : null;
+                const validDate = completedDate && !Number.isNaN(completedDate.getTime());
+                return (
+                  <View key={item.id} style={styles.sessionHistoryCard}>
+                    <View style={styles.sessionScoreBadge}>
+                      <Text style={styles.sessionScoreValue}>{Math.round(item.score)}%</Text>
+                    </View>
+                    <View style={styles.sessionHistoryCopy}>
+                      <Text style={styles.sessionHistoryTitle} numberOfLines={1}>
+                        {sessionTopic?.icon ?? '🎯'} {sessionTopic?.name ?? item.templateName ?? 'תרגול פסיכוטכני'}
+                      </Text>
+                      <Text style={styles.sessionHistoryMeta}>
+                        {item.correctAnswers}/{item.totalQuestions} נכונות · {durationMinutes}:{String(durationSeconds).padStart(2, '0')} דקות
+                      </Text>
+                      <Text style={styles.sessionHistoryDate}>
+                        {validDate ? completedDate.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }) : 'הושלם לאחרונה'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           </Animated.View>
 
@@ -770,6 +824,45 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     textAlign: 'right',
     marginTop: 2,
+  },
+
+  sessionHistoryList: { gap: 10 },
+  sessionHistoryCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sessionScoreBadge: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(124,111,247,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(124,111,247,0.38)',
+  },
+  sessionScoreValue: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primaryLight, textAlign: 'center' },
+  sessionHistoryCopy: { flex: 1, alignItems: 'flex-end' },
+  sessionHistoryTitle: { width: '100%', fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' },
+  sessionHistoryMeta: { width: '100%', fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'right', marginTop: 4 },
+  sessionHistoryDate: { width: '100%', fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textTertiary, textAlign: 'right', marginTop: 3 },
+  sessionEmptyText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    padding: 16,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
 
   // Challenge

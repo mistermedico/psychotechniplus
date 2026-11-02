@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Question, UserAnswer, SessionMode } from '../data/types';
 import { selectAdaptiveQuestion, computeAdaptiveLevel, PerformanceLevel } from '../utils/adaptive';
 import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVisualAssets';
@@ -8,6 +9,8 @@ import { ensureSpatialVisualAssets, isSpatialQuestion } from '../utils/spatialVi
 function normalizeSessionQuestion(question: Question): Question {
   return isSpatialQuestion(question) ? ensureSpatialVisualAssets(question) : question;
 }
+
+const ACTIVE_SESSION_STORAGE_KEY = '@psychotechniplus/activePracticeSession';
 
 interface ActiveSession {
   id: string;
@@ -20,12 +23,14 @@ interface ActiveSession {
   startedAt: Date;
   questionStartedAt: Date;
   adaptiveLevel: PerformanceLevel;
+  sourceKey?: string;
 }
 
 interface PracticeState {
   session: ActiveSession | null;
   completedSession: ActiveSession | null;
   lastCompletedSessionId: string | null;
+  hasHydratedSession: boolean;
 
   startSession: (config: {
     targetId: string;
@@ -33,7 +38,10 @@ interface PracticeState {
     mode: SessionMode;
     questions: Question[];
     initialLevel?: PerformanceLevel;
+    sourceKey?: string;
   }) => void;
+  hydrateSession: () => Promise<ActiveSession | null>;
+  discardSession: () => void;
   refreshSessionQuestions: (questions: Question[]) => void;
 
   submitAnswer: (selectedAnswerId: string) => {
@@ -55,8 +63,9 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   session: null,
   completedSession: null,
   lastCompletedSessionId: null,
+  hasHydratedSession: false,
 
-  startSession: ({ targetId, topicId, mode, questions, initialLevel = 'beginner' }) => {
+  startSession: ({ targetId, topicId, mode, questions, initialLevel = 'beginner', sourceKey }) => {
     const now = new Date();
     const normalizedQuestions = questions.map(normalizeSessionQuestion);
     set({
@@ -73,8 +82,52 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
         startedAt: now,
         questionStartedAt: now,
         adaptiveLevel: initialLevel,
+        sourceKey,
       },
     });
+  },
+
+  hydrateSession: async () => {
+    if (get().hasHydratedSession) return get().session;
+    try {
+      const raw = await AsyncStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+      if (!raw) {
+        set({ hasHydratedSession: true });
+        return null;
+      }
+      const parsed = JSON.parse(raw) as ActiveSession;
+      const valid = parsed
+        && typeof parsed.id === 'string'
+        && Array.isArray(parsed.questions)
+        && parsed.questions.length > 0
+        && Array.isArray(parsed.answers)
+        && Number.isInteger(parsed.currentIndex)
+        && parsed.currentIndex >= 0
+        && parsed.currentIndex < parsed.questions.length;
+      if (!valid) {
+        await AsyncStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+        set({ hasHydratedSession: true, session: null });
+        return null;
+      }
+      const restored: ActiveSession = {
+        ...parsed,
+        questions: parsed.questions.map(normalizeSessionQuestion),
+        startedAt: new Date(parsed.startedAt),
+        questionStartedAt: new Date(),
+      };
+      if (Number.isNaN(restored.startedAt.getTime())) restored.startedAt = new Date();
+      set({ hasHydratedSession: true, session: restored });
+      return restored;
+    } catch {
+      await AsyncStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY).catch(() => null);
+      set({ hasHydratedSession: true, session: null });
+      return null;
+    }
+  },
+
+  discardSession: () => {
+    set({ session: null });
+    AsyncStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY).catch(() => null);
   },
 
   refreshSessionQuestions: (questions) => {
@@ -114,6 +167,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     if (!session) return { isCorrect: false, timeSpent: 0, correctAnswerId: '' };
 
     const question = session.questions[session.currentIndex];
+    if (!question) return { isCorrect: false, timeSpent: 0, correctAnswerId: '' };
     const existing = session.answers.find(answer => answer.questionId === question.id);
     if (existing) {
       return {
@@ -154,6 +208,7 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     const { session } = get();
     if (!session) return;
     const question = session.questions[session.currentIndex];
+    if (!question) return;
     if (session.answers.some(answer => answer.questionId === question.id)) return;
     const timeSpent = Math.round(
       (Date.now() - session.questionStartedAt.getTime()) / 1000
@@ -267,3 +322,14 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     return session.answers.find(a => a.questionId === q?.id);
   },
 }));
+
+let lastPersistedSession: ActiveSession | null = null;
+usePracticeStore.subscribe(state => {
+  if (state.session === lastPersistedSession) return;
+  lastPersistedSession = state.session;
+  if (state.session) {
+    AsyncStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, JSON.stringify(state.session)).catch(() => null);
+  } else if (state.hasHydratedSession) {
+    AsyncStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY).catch(() => null);
+  }
+});

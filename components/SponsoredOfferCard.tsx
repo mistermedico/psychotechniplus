@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   },
   header: {
     minHeight: 28,
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
