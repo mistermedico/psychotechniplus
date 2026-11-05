@@ -7,10 +7,10 @@ const eas = JSON.parse(fs.readFileSync(path.join(ROOT, 'eas.json'), 'utf8'));
 const appJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
 const ios = eas.submit.production.ios;
 
-const APP_ID = ios.ascAppId;
-const KEY_ID = ios.ascApiKeyId;
-const ISSUER_ID = ios.ascApiKeyIssuerId;
-const KEY_PATH = ios.ascApiKeyPath;
+const APP_ID = ios.ascAppId || process.env.ASC_APP_ID || '6776568241';
+const KEY_ID = ios.ascApiKeyId || process.env.ASC_API_KEY_ID || 'KATVC39NYB';
+const ISSUER_ID = ios.ascApiKeyIssuerId || process.env.ASC_API_KEY_ISSUER_ID || '782ebd58-87d7-4058-8ff3-7c037c00c6d8';
+const KEY_PATH = ios.ascApiKeyPath || process.env.ASC_API_KEY_PATH || 'C:/Users/nitai/Downloads/AuthKey_KATVC39NYB.p8';
 const VERSION = appJson.expo.version;
 
 const metadata = {
@@ -178,7 +178,72 @@ async function submitForReview(versionId) {
     });
     return { submitted: true, id: result.data.id };
   } catch (error) {
-    return { submitted: false, reason: 'submit_failed', warning: error.message };
+    if (error.status !== 403) {
+      return { submitted: false, reason: 'submit_failed', warning: error.message };
+    }
+
+    try {
+      const submissions = (await api(
+        'GET',
+        `/v1/apps/${APP_ID}/reviewSubmissions?filter[platform]=IOS&limit=20`,
+      )).data ?? [];
+      let submission = submissions.find(item =>
+        ['READY_FOR_REVIEW', 'DRAFT'].includes(item.attributes.state),
+      );
+
+      if (!submission) {
+        submission = (await api('POST', '/v1/reviewSubmissions', {
+          data: {
+            type: 'reviewSubmissions',
+            attributes: { platform: 'IOS' },
+            relationships: {
+              app: { data: { type: 'apps', id: APP_ID } },
+            },
+          },
+        })).data;
+      }
+
+      const items = (await api(
+        'GET',
+        `/v1/reviewSubmissions/${submission.id}/items?limit=200`,
+      )).data ?? [];
+      const hasVersion = items.some(item =>
+        item.relationships?.appStoreVersion?.data?.id === versionId,
+      );
+
+      if (!hasVersion) {
+        await api('POST', '/v1/reviewSubmissionItems', {
+          data: {
+            type: 'reviewSubmissionItems',
+            relationships: {
+              reviewSubmission: { data: { type: 'reviewSubmissions', id: submission.id } },
+              appStoreVersion: { data: { type: 'appStoreVersions', id: versionId } },
+            },
+          },
+        });
+      }
+
+      const submitted = await api('PATCH', `/v1/reviewSubmissions/${submission.id}`, {
+        data: {
+          type: 'reviewSubmissions',
+          id: submission.id,
+          attributes: { submitted: true },
+        },
+      });
+      return {
+        submitted: true,
+        id: submission.id,
+        state: submitted.data.attributes.state,
+        api: 'reviewSubmissions',
+      };
+    } catch (modernError) {
+      return {
+        submitted: false,
+        reason: 'review_submission_failed',
+        warning: modernError.message,
+        legacyWarning: error.message,
+      };
+    }
   }
 }
 
