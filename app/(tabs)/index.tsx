@@ -82,6 +82,7 @@ export default function Dashboard() {
     setSessionsLoading(true);
     loadUserSessionHistory(userId, 8)
       .then(rows => { if (!cancelled) setRecentSessions(rows); })
+      .catch(() => undefined)
       .finally(() => { if (!cancelled) setSessionsLoading(false); });
     return () => { cancelled = true; };
   }, [userId, totalSessions]);

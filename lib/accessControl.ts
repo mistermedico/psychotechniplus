@@ -42,7 +42,13 @@ export function getSessionQuestionLimit(
   premiumConfig: PremiumConfig,
   premiumUserQuestionLimit: number,
 ): number {
-  if (!isPremium) return Math.min(requestedLimit, freePracticeLimit, premiumConfig.freeUserDailyQuestionLimit);
-  if (premiumConfig.premiumFeatures.unlimitedQuestions) return requestedLimit;
-  return Math.min(requestedLimit, Math.max(1, premiumUserQuestionLimit));
+  const safeRequestedLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.floor(requestedLimit)) : 1;
+  const safeFreeLimit = Number.isFinite(freePracticeLimit) ? Math.max(1, Math.floor(freePracticeLimit)) : 30;
+  const safeDailyLimit = Number.isFinite(premiumConfig.freeUserDailyQuestionLimit)
+    ? Math.max(1, Math.floor(premiumConfig.freeUserDailyQuestionLimit))
+    : 30;
+
+  if (!isPremium) return Math.min(safeRequestedLimit, safeFreeLimit, safeDailyLimit, 30);
+  if (premiumConfig.premiumFeatures.unlimitedQuestions) return safeRequestedLimit;
+  return Math.min(safeRequestedLimit, Math.max(1, Math.floor(premiumUserQuestionLimit)));
 }

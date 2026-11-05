@@ -127,7 +127,6 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
 
   discardSession: () => {
     set({ session: null });
-    AsyncStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY).catch(() => null);
   },
 
   refreshSessionQuestions: (questions) => {
@@ -324,12 +323,23 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
 }));
 
 let lastPersistedSession: ActiveSession | null = null;
+let sessionPersistenceQueue: Promise<void> = Promise.resolve();
 usePracticeStore.subscribe(state => {
   if (state.session === lastPersistedSession) return;
   lastPersistedSession = state.session;
-  if (state.session) {
-    AsyncStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, JSON.stringify(state.session)).catch(() => null);
-  } else if (state.hasHydratedSession) {
-    AsyncStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY).catch(() => null);
-  }
+  const serializedSession = state.session ? JSON.stringify(state.session) : null;
+  const shouldRemove = !state.session && state.hasHydratedSession;
+
+  // AsyncStorage writes can finish out of order. Serializing them prevents an
+  // older save from resurrecting a session after it was completed or discarded.
+  sessionPersistenceQueue = sessionPersistenceQueue
+    .catch(() => undefined)
+    .then(async () => {
+      if (serializedSession) {
+        await AsyncStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, serializedSession);
+      } else if (shouldRemove) {
+        await AsyncStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+      }
+    })
+    .catch(() => undefined);
 });

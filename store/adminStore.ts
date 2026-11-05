@@ -1694,14 +1694,18 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     return saved;
   },
   loadSessionHistory: async (userId) => {
-    const records = userId
-      ? await loadUserSessionHistory(userId)
-      : await loadAllSessionHistory();
-    set(s => {
-      const existingIds = new Set(s.sessionHistory.map(r => r.id));
-      const fresh = records.filter(r => !existingIds.has(r.id));
-      return { sessionHistory: [...s.sessionHistory, ...fresh] };
-    });
+    try {
+      const records = userId
+        ? await loadUserSessionHistory(userId)
+        : await loadAllSessionHistory();
+      set(s => ({
+        sessionHistory: userId
+          ? [...records, ...s.sessionHistory.filter(record => record.userId !== userId)]
+          : records,
+      }));
+    } catch (error: any) {
+      logger.warn('admin:loadSessionHistory', 'טעינת היסטוריית הסשנים נכשלה', error?.message);
+    }
   },
   getSessionsByUser: (userId) => get().sessionHistory.filter(r => r.userId === userId),
 

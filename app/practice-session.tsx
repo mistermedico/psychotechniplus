@@ -85,7 +85,7 @@ export default function PracticeSession() {
 
   const {
     session, startSession, submitAnswer, skipQuestion,
-    completeUnansweredAsSkipped, nextQuestion, endSession, getCurrentQuestion, getAdaptiveNext,
+    completeUnansweredAsSkipped, nextQuestion, endSession, discardSession, getCurrentQuestion, getAdaptiveNext,
     hasHydratedSession, hydrateSession,
   } = usePracticeStore();
 
@@ -1020,7 +1020,7 @@ export default function PracticeSession() {
       if (timerRef.current) clearInterval(timerRef.current);
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
       if (restTimerRef.current) clearInterval(restTimerRef.current);
-      endSession();
+      discardSession();
       router.replace(isAdminPreview ? '/admin/simulation-builder' : '/(tabs)');
     };
     if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {

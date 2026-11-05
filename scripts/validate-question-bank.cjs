@@ -24,7 +24,13 @@ function arg(name, fallback) {
 function readSupabaseConfig() {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'supabase.ts'), 'utf8');
   const url = process.env.SUPABASE_URL || src.match(/SUPABASE_URL = '([^']+)'/)?.[1];
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || src.match(/SUPABASE_ANON_KEY =\s*'([^']+)'/s)?.[1];
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_PUBLISHABLE_KEY
+    || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+    || src.match(/SUPABASE_(?:PUBLISHABLE|ANON)_KEY\s*=\s*['"]([^'"]+)['"]/s)?.[1];
+  if (!url || !key) {
+    throw new Error('Supabase URL/key are missing. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (or SUPABASE_SERVICE_ROLE_KEY).');
+  }
   return { url, key, usingServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY };
 }
 
@@ -32,7 +38,9 @@ async function loadLive(status) {
   const { createClient } = require('@supabase/supabase-js');
   const { url, key, usingServiceRole } = readSupabaseConfig();
   if (!usingServiceRole) console.warn('! ללא SUPABASE_SERVICE_ROLE_KEY נבדקות רק שאלות חינמיות מאושרות (RLS).');
-  const supabase = createClient(url, key);
+  const supabase = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
   const rows = [];
   for (let from = 0; ; from += 1000) {
     let q = supabase.from('questions').select('*').range(from, from + 999);
@@ -59,8 +67,8 @@ async function loadLive(status) {
   const report = validateBank(rows);
   console.log(`נבדקו ${rows.length} שאלות\n`);
   console.log(formatReport(report, { showWarnings: !arg('--errors-only', false) }));
-  process.exit(report.ok ? 0 : 1);
+  process.exitCode = report.ok ? 0 : 1;
 })().catch(err => {
   console.error(err);
-  process.exit(1);
+  process.exitCode = 1;
 });

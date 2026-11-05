@@ -260,7 +260,10 @@ function validateBank(rows, opts = {}) {
   for (const group of byImage.values()) {
     const distinctTexts = new Set(group.map(q => normalizeText(q.questionText)));
     if (group.length < 2 || distinctTexts.size < 2) continue;
-    group.filter(q => incomingIds.has(q.id)).forEach(q => add(q.id, 'errors', `אותה תמונה משמשת ${group.length} שאלות שונות`));
+    // One visual stimulus may intentionally support several different tasks
+    // (for example, count the holes and then choose their final arrangement).
+    // Flag it for editorial review without rejecting an otherwise valid bank.
+    group.filter(q => incomingIds.has(q.id)).forEach(q => add(q.id, 'warnings', `אותה תמונה משמשת ${group.length} שאלות שונות — יש לוודא שהשאלות בוחנות היבטים שונים`));
   }
 
   let errorCount = 0;

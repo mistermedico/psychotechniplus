@@ -873,28 +873,36 @@ export async function saveSessionRecord(record: SessionRecord): Promise<boolean>
 
 export async function loadUserSessionHistory(userId: string, limit = 50): Promise<SessionRecord[]> {
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('practice_sessions')
       .select('*')
       .eq('user_id', userId)
       .order('completed_at', { ascending: false })
       .limit(limit);
+    if (error) {
+      logger.warn('db:loadUserSessionHistory', 'טעינת היסטוריית המשתמש נכשלה', error.message);
+      throw error;
+    }
     return (data ?? []).map(rowToSessionRecord);
-  } catch {
-    return [];
+  } catch (error) {
+    throw error;
   }
 }
 
 export async function loadAllSessionHistory(limit = 500): Promise<SessionRecord[]> {
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('practice_sessions')
       .select('*')
       .order('completed_at', { ascending: false })
       .limit(limit);
+    if (error) {
+      logger.warn('db:loadAllSessionHistory', 'טעינת היסטוריית הסשנים נכשלה', error.message);
+      throw error;
+    }
     return (data ?? []).map(rowToSessionRecord);
-  } catch {
-    return [];
+  } catch (error) {
+    throw error;
   }
 }
 
