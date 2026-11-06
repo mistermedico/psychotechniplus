@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView, Animated, useWindowDimensions,
+  View, Text, StyleSheet, Pressable, ScrollView, Animated, Platform, useWindowDimensions,
 } from 'react-native';
 import { Question } from '../data/types';
 import { Colors } from '../constants/colors';
@@ -72,8 +72,8 @@ export function QuestionCard({ question, selectedId, revealed, onSelect }: Props
     fadeAnim.setValue(0);
     slideAnim.setValue(20);
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   }, [displayQuestion.id, reducedMotion]);
 

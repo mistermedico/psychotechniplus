@@ -321,7 +321,12 @@ export default function ProfileTab() {
             )}
 
             {isGuest ? (
-              <Pressable onPress={() => router.push('/auth')} style={styles.heroSignOutBtn}>
+              <Pressable
+                onPress={() => router.push('/auth')}
+                accessibilityRole="button"
+                accessibilityLabel="התחברות או הרשמה"
+                style={styles.heroSignOutBtn}
+              >
                 <Text style={styles.heroSignOutText}>התחברות / הרשמה</Text>
               </Pressable>
             ) : (

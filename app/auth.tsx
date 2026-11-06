@@ -66,8 +66,8 @@ export default function AuthScreen() {
       return;
     }
     Animated.parallel([
-      Animated.timing(fadeIn, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
+      Animated.timing(fadeIn, { toValue: 1, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(slideUp, { toValue: 0, friction: 9, tension: 70, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   }, [reducedMotion]);
 
@@ -117,15 +117,20 @@ export default function AuthScreen() {
     setError('');
     setEmailPending(false);
 
-    if (!email.trim()) { setError('נא להזין כתובת מייל'); return; }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) { setError('נא להזין כתובת מייל'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError('כתובת מייל לא תקינה');
+      return;
+    }
     if (!password) { setError('נא להזין סיסמה'); return; }
+    if (password.length < 6) { setError('הסיסמה חייבת להכיל לפחות 6 תווים'); return; }
 
     if (mode === 'register') {
       if (!registrationOpen) {
         setError('ההרשמה דרך האפליקציה סגורה כרגע.');
         return;
       }
-      if (password.length < 6) { setError('הסיסמה חייבת להכיל לפחות 6 תווים'); return; }
       if (password !== confirmPassword) { setError('הסיסמאות אינן תואמות'); return; }
     }
 
@@ -133,7 +138,7 @@ export default function AuthScreen() {
 
     if (mode === 'login') {
       const { data, error: err } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password,
       });
       setLoading(false);
@@ -162,7 +167,7 @@ export default function AuthScreen() {
 
     } else {
       const { data, error: err } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password,
         options: {
           data: { display_name: displayName.trim() || undefined },
@@ -509,11 +514,21 @@ export default function AuthScreen() {
               {/* Legal */}
               <View style={styles.legalRow}>
                 <Text style={styles.legalText}>בהרשמה אתה מסכים ל</Text>
-                <Pressable onPress={() => router.push('/terms')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Pressable
+                  onPress={() => router.push('/terms')}
+                  accessibilityRole="link"
+                  accessibilityLabel="תנאי השימוש"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
                   <Text style={styles.legalLink}>תנאי שימוש</Text>
                 </Pressable>
                 <Text style={styles.legalText}> ו</Text>
-                <Pressable onPress={() => router.push('/privacy')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Pressable
+                  onPress={() => router.push('/privacy')}
+                  accessibilityRole="link"
+                  accessibilityLabel="מדיניות הפרטיות"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
                   <Text style={styles.legalLink}>מדיניות פרטיות</Text>
                 </Pressable>
               </View>

@@ -134,7 +134,7 @@ export default function ValidateQueue() {
     Animated.timing(slideAnim, {
       toValue: direction === 'approve' ? -400 : 400,
       duration: 220,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start(() => {
       slideAnim.setValue(0);
       setIsAnimating(false);

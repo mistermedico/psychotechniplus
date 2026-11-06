@@ -90,7 +90,7 @@ export default function ProgressTab() {
     Animated.spring(statsAnim, {
       toValue: 1,
       friction: 8,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [xpPercent, reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 

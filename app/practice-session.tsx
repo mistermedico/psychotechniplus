@@ -1382,6 +1382,8 @@ export default function PracticeSession() {
         ) : (
           <Pressable
             onPress={handleNext}
+            accessibilityRole="button"
+            accessibilityLabel={isLastQuestion ? 'סיום התרגול ומעבר לתוצאות' : 'מעבר לשאלה הבאה'}
             style={({ pressed }) => [styles.nextBtn, pressed && { opacity: 0.9 }]}
           >
             <LinearGradient

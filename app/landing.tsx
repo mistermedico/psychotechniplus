@@ -144,35 +144,35 @@ export default function LandingScreen() {
     }
 
     Animated.sequence([
-      Animated.timing(navOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.timing(navOpacity, { toValue: 1, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
       Animated.parallel([
-        Animated.timing(heroOpacity, { toValue: 1, duration: 550, useNativeDriver: true }),
-        Animated.spring(heroSlide,   { toValue: 0, friction: 9, tension: 70, useNativeDriver: true }),
-        Animated.spring(heroScale,   { toValue: 1, friction: 9, tension: 70, useNativeDriver: true }),
+        Animated.timing(heroOpacity, { toValue: 1, duration: 550, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(heroSlide,   { toValue: 0, friction: 9, tension: 70, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(heroScale,   { toValue: 1, friction: 9, tension: 70, useNativeDriver: Platform.OS !== 'web' }),
       ]),
       Animated.parallel([
-        Animated.timing(statsOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
-        Animated.spring(statsSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+        Animated.timing(statsOpacity, { toValue: 1, duration: 380, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(statsSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: Platform.OS !== 'web' }),
       ]),
       Animated.parallel([
-        Animated.timing(howOpacity, { toValue: 1, duration: 360, useNativeDriver: true }),
-        Animated.spring(howSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+        Animated.timing(howOpacity, { toValue: 1, duration: 360, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(howSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: Platform.OS !== 'web' }),
       ]),
       Animated.parallel([
-        Animated.timing(featOpacity, { toValue: 1, duration: 360, useNativeDriver: true }),
-        Animated.spring(featSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+        Animated.timing(featOpacity, { toValue: 1, duration: 360, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(featSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: Platform.OS !== 'web' }),
       ]),
       Animated.parallel([
-        Animated.timing(testOpacity, { toValue: 1, duration: 340, useNativeDriver: true }),
-        Animated.spring(testSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+        Animated.timing(testOpacity, { toValue: 1, duration: 340, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(testSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: Platform.OS !== 'web' }),
       ]),
       Animated.parallel([
-        Animated.timing(priceOpacity, { toValue: 1, duration: 340, useNativeDriver: true }),
-        Animated.spring(priceSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+        Animated.timing(priceOpacity, { toValue: 1, duration: 340, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(priceSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: Platform.OS !== 'web' }),
       ]),
       Animated.parallel([
-        Animated.timing(ctaOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
-        Animated.spring(ctaSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }),
+        Animated.timing(ctaOpacity, { toValue: 1, duration: 320, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(ctaSlide,   { toValue: 0, friction: 9, tension: 80, useNativeDriver: Platform.OS !== 'web' }),
       ]),
     ]).start();
   }, [reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -211,14 +211,14 @@ export default function LandingScreen() {
 
   const onCtaPressIn = () => {
     if (reducedMotion) return;
-    Animated.spring(ctaPressScale, { toValue: 0.96, friction: 10, tension: 120, useNativeDriver: true }).start();
+    Animated.spring(ctaPressScale, { toValue: 0.96, friction: 10, tension: 120, useNativeDriver: Platform.OS !== 'web' }).start();
   };
   const onCtaPressOut = () => {
     if (reducedMotion) {
       ctaPressScale.setValue(1);
       return;
     }
-    Animated.spring(ctaPressScale, { toValue: 1, friction: 10, tension: 120, useNativeDriver: true }).start();
+    Animated.spring(ctaPressScale, { toValue: 1, friction: 10, tension: 120, useNativeDriver: Platform.OS !== 'web' }).start();
   };
 
   return (
@@ -588,7 +588,7 @@ export default function LandingScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#050816', direction: 'rtl', writingDirection: 'rtl' },
+  root: { flex: 1, backgroundColor: '#050816', direction: 'rtl', writingDirection: 'rtl', overflow: 'hidden' },
   safe: { flex: 1, direction: 'rtl', writingDirection: 'rtl' },
   meshGrid: {
     ...StyleSheet.absoluteFillObject,
