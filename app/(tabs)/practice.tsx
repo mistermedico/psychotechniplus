@@ -415,6 +415,22 @@ function FreePracticePane({
             <Text style={styles.cognitiveArrow}>‹</Text>
           </LinearGradient>
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="פתיחת מבחני חשיבה בסגנון IQ"
+          onPress={() => router.push('/reasoning-tests')}
+          style={({ pressed }) => [styles.cognitiveCard, pressed && { opacity: 0.82 }]}
+        >
+          <LinearGradient colors={['#173153', '#352658']} style={styles.cognitiveGradient}>
+            <View style={styles.cognitiveIcon}><Text style={styles.cognitiveIconText}>◈</Text></View>
+            <View style={styles.cognitiveCopy}>
+              <Text style={styles.cognitiveTitle}>מבחני חשיבה בסגנון IQ</Text>
+              <Text style={styles.cognitiveBody}>שני מבחנים עם תוצאות לפי תחום והסברים מלאים</Text>
+              <Text style={styles.cognitiveMeta}>תרגול עצמאי · לא מבחן מתוקנן</Text>
+            </View>
+            <Text style={styles.cognitiveArrow}>‹</Text>
+          </LinearGradient>
+        </Pressable>
         {/* Access badge row */}
         <View style={styles.accessRow}>
           <View style={[styles.accessBadge, isPremium ? styles.accessPremium : styles.accessFree]}>

@@ -432,6 +432,7 @@ export default function RootLayout() {
             name="results"
             options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
           />
+          <Stack.Screen name="reasoning-tests" options={{ gestureEnabled: false }} />
           <Stack.Screen name="paywall" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="support" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="terms" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
