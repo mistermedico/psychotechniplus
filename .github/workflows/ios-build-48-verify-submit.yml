@@ -1,0 +1,82 @@
+name: Verify and submit iPhone build 48
+on:
+  push:
+    branches: [release/ios-1.0.19-build-48]
+    paths: [.github/workflows/ios-build-48-verify-submit.yml]
+permissions:
+  contents: read
+concurrency:
+  group: psychotechniplus-submit-build-48
+  cancel-in-progress: false
+jobs:
+  verify-submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BUILD_ID: ab5baae0-16fb-4611-89ea-b3dd3f79c9d2
+      SOURCE_SHA: 1c311dfa3f809eb88c51726a1203fbb43bc047c9
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: 1c311dfa3f809eb88c51726a1203fbb43bc047c9
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: 20.2.0
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Inspect the exact Expo build
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_json="$RUNNER_TEMP/verified-ios-build.json"
+          status=""
+          for i in $(seq 1 18); do
+            if ! eas build:view "$BUILD_ID" --json >"$build_json" 2>"$RUNNER_TEMP/eas-inspect-error"; then
+              echo "::error::Expo refused or could not return build metadata."
+              exit 1
+            fi
+            status="$(jq -r '.status' "$build_json")"
+            jq -c '{status,platform,appVersion,appBuildVersion,gitCommitHash}' "$build_json"
+            case "$status" in FINISHED) break;; ERRORED|CANCELED) exit 1;; esac
+            sleep 30
+          done
+          test "$status" = FINISHED
+          jq -e --arg b "$BUILD_ID" --arg sha "$SOURCE_SHA" '.id == $b and .platform == "IOS" and .appVersion == "1.0.19" and ((.appBuildVersion|tostring) == "48") and .gitCommitHash == $sha' "$build_json" >/dev/null
+          if ! jq -er '.artifacts.applicationArchiveUrl // .artifacts.buildUrl' "$build_json" | curl --fail --silent --location --max-time 180 --output "$RUNNER_TEMP/ios48.ipa" --config <(sed 's/.*/url = "&"/') 2>"$RUNNER_TEMP/eas-download-error"; then
+            echo "::error::Unable to download the Expo archive."
+            exit 1
+          fi
+          python - "$RUNNER_TEMP/ios48.ipa" <<'PY'
+          import plistlib, re, sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              p, = [x for x in z.namelist() if re.fullmatch(r'Payload/[^/]+\.app/Info\.plist', x)]
+              info = plistlib.loads(z.read(p))
+              app = p.rsplit('/', 1)[0]
+              assert info['CFBundleIdentifier'] == 'com.psychotechniplus.app'
+              assert info['CFBundleShortVersionString'] == '1.0.19'
+              assert str(info['CFBundleVersion']) == '48'
+              assert app + '/_CodeSignature/CodeResources' in z.namelist()
+              assert app + '/' + info['CFBundleExecutable'] in z.namelist()
+              assert z.testzip() is None
+              print('Verified IPA: com.psychotechniplus.app 1.0.19 (48), signed archive structure and ZIP integrity.')
+          PY
+      - name: Submit verified build to Apple
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/eas-submit-48.log"
+          if eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --wait >"$log" 2>&1; then
+            echo 'Apple upload reported successful by Expo Submit.'
+          else
+            if grep -qiE 'App Store Connect API Key|API Key.*not set|API Key.*not.*found' "$log"; then
+              echo '::error::Expo cannot submit without an App Store Connect API key for this app.'
+            elif grep -qiE 'already.*submitted|already.*uploaded|duplicate' "$log"; then
+              echo '::error::Expo reported a possible previous upload; verify build 48 in App Store Connect.'
+            else
+              echo '::error::Expo submission failed; inspect its authenticated submission dashboard.'
+            fi
+            exit 1
+          fi
