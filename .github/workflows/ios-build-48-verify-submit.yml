@@ -29,66 +29,36 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
       - name: Install Expo project dependencies
         run: npm ci --no-audit --no-fund
-      - name: Inspect the exact Expo build
-        shell: bash
+      - name: Diagnose the failed iOS build
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          build_json="$RUNNER_TEMP/verified-ios-build.json"
-          status=""
-          for i in $(seq 1 18); do
-            if ! eas build:view "$BUILD_ID" --json >"$build_json" 2>"$RUNNER_TEMP/eas-inspect-error"; then
-              if grep -qiE 'unknown flag|unexpected argument|unknown command' "$RUNNER_TEMP/eas-inspect-error"; then
-                echo "::error::EAS CLI rejected the command syntax."
-              elif grep -qiE 'not authorized|access denied|not logged|not authenticated|invalid token' "$RUNNER_TEMP/eas-inspect-error"; then
-                echo "::error::Expo did not authorize reading this build."
-              elif grep -qiE 'package|resolve|project|config' "$RUNNER_TEMP/eas-inspect-error"; then
-                echo "::error::EAS CLI could not load the project's configuration."
-              else
-                echo "::error::EAS CLI could not read build metadata."
-              fi
-              exit 1
-            fi
-            status="$(jq -r '.status' "$build_json")"
-            jq -c '{status,platform,appVersion,appBuildVersion,gitCommitHash}' "$build_json"
-            case "$status" in FINISHED) break;; ERRORED|CANCELED) exit 1;; esac
-            sleep 30
-          done
-          test "$status" = FINISHED
-          jq -e --arg b "$BUILD_ID" --arg sha "$SOURCE_SHA" '.id == $b and .platform == "IOS" and .appVersion == "1.0.19" and ((.appBuildVersion|tostring) == "48") and .gitCommitHash == $sha' "$build_json" >/dev/null
-          if ! jq -er '.artifacts.applicationArchiveUrl // .artifacts.buildUrl' "$build_json" | curl --fail --silent --location --max-time 180 --output "$RUNNER_TEMP/ios48.ipa" --config <(sed 's/.*/url = "&"/') 2>"$RUNNER_TEMP/eas-download-error"; then
-            echo "::error::Unable to download the Expo archive."
-            exit 1
-          fi
-          python - "$RUNNER_TEMP/ios48.ipa" <<'PY'
-          import plistlib, re, sys, zipfile
-          with zipfile.ZipFile(sys.argv[1]) as z:
-              p, = [x for x in z.namelist() if re.fullmatch(r'Payload/[^/]+\.app/Info\.plist', x)]
-              info = plistlib.loads(z.read(p))
-              app = p.rsplit('/', 1)[0]
-              assert info['CFBundleIdentifier'] == 'com.psychotechniplus.app'
-              assert info['CFBundleShortVersionString'] == '1.0.19'
-              assert str(info['CFBundleVersion']) == '48'
-              assert app + '/_CodeSignature/CodeResources' in z.namelist()
-              assert app + '/' + info['CFBundleExecutable'] in z.namelist()
-              assert z.testzip() is None
-              print('Verified IPA: com.psychotechniplus.app 1.0.19 (48), signed archive structure and ZIP integrity.')
+          eas build:view "$BUILD_ID" --json >"$RUNNER_TEMP/eas48.json" 2>"$RUNNER_TEMP/eas48.stderr"
+          python - "$RUNNER_TEMP/eas48.json" <<'PY'
+          import json, re, sys, urllib.request
+          j=json.load(open(sys.argv[1]))
+          assert j['status']=='ERRORED'
+          def scrub(s):
+              s=re.sub(r'https?://[^\s\'"]+', '[URL omitted]', s)
+              s=re.sub(r'/Users/[^/\s]+', '/Users/[name]', s)
+              s=re.sub(r'[A-Za-z0-9_-]{42,}', '[long value omitted]', s)
+              return s[:550]
+          error=j.get('error') or {}
+          print('Expo error:',scrub(f"{error.get('errorCode','')}: {error.get('message','')}"))
+          urls=[(j.get('artifacts') or {}).get('xcodeBuildLogsUrl'), *reversed(j.get('logFiles') or [])][:5]
+          match=re.compile(r'(?i)(?:fatal error:|\berror:|\[!\]|No profiles for|SDK version issue|Provisioning profile.+expired|Xcode version|deployment target.+not supported|Error building iOS application)')
+          sensitive=re.compile(r'(?i)\b(?:password|bearer|token|secret|authorization|private.key|api.key|BEGIN CERTIFICATE)\b')
+          picked=[]
+          for url in filter(None,urls):
+              try:
+                  with urllib.request.urlopen(url,timeout=15) as resp:
+                      raw=resp.read(8_000_000).decode('utf-8','replace')
+              except Exception:
+                  continue
+              for line in raw.splitlines():
+                  if match.search(line) and not sensitive.search(line):
+                      v=scrub(line.strip())
+                      if v not in picked: picked.append(v)
+          for v in picked[-24:]: print(v)
           PY
-      - name: Submit verified build to Apple
-        shell: bash
-        run: |
-          set -euo pipefail
-          log="$RUNNER_TEMP/eas-submit-48.log"
-          if eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --wait >"$log" 2>&1; then
-            echo 'Apple upload reported successful by Expo Submit.'
-          else
-            if grep -qiE 'App Store Connect API Key|API Key.*not set|API Key.*not.*found' "$log"; then
-              echo '::error::Expo cannot submit without an App Store Connect API key for this app.'
-            elif grep -qiE 'already.*submitted|already.*uploaded|duplicate' "$log"; then
-              echo '::error::Expo reported a possible previous upload; verify build 48 in App Store Connect.'
-            else
-              echo '::error::Expo submission failed; inspect its authenticated submission dashboard.'
-            fi
-            exit 1
-          fi
