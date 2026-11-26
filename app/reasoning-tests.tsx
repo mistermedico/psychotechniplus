@@ -5,10 +5,13 @@ import Svg, { Rect } from 'react-native-svg';
 import { router } from 'expo-router';
 import { Colors } from '../constants/colors';
 import { FontFamily, Radius } from '../constants/theme';
-import { AttentionBoard, Grid, ReasoningForm, reasoningDomains, reasoningForms, scoreReasoning } from '../data/reasoningTests';
-import { attentionForms } from '../data/attentionTests';
+import { AttentionBoard, Grid, ReasoningForm, reasoningDomains, reasoningForms } from '../data/reasoningTests';
+import { attentionForms, visualSearchItems } from '../data/attentionTests';
 import { minutesForForm, remainingMs, timerText } from '../data/reasoningClock';
 import { VisualSearch } from '../components/VisualSearch';
+import { ConstructionPractice } from '../components/ConstructionPractice';
+import { constructionItems } from '../data/constructionTests';
+import { multipleChoiceDetail, percent } from '../data/practiceScoring';
 
 const notice = 'זהו תרגול בסגנון IQ, לא מבחן IQ מתוקנן ולא אבחון. הציונים מתארים דיוק במבחן הזה בלבד ואינם מיועדים להשוואה לאוכלוסייה.';
 const attentionNotice = 'זהו תרגול דיוק במשימות ריכוז, לא אבחון קשב (ADHD). לא נועד להשוואה לאוכלוסייה.';
@@ -47,6 +50,8 @@ function Action({ title, onPress, secondary=false, disabled=false }: { title:str
 export default function ReasoningTestsScreen() {
   const scroll = useRef<ScrollView>(null);
   const [visual,setVisual] = useState(false);
+  const [construction,setConstruction] = useState(false);
+  const [onlyIncorrect,setOnlyIncorrect] = useState(false);
   const [showTimer,setShowTimer] = useState(true);
   const [deadline,setDeadline] = useState<number|null>(null);
   const deadlineRef=useRef<number|null>(null);
@@ -64,7 +69,7 @@ export default function ReasoningTestsScreen() {
   const [reviewJump,setReviewJump] = useState(false);
   const [submitConfirm,setSubmitConfirm] = useState(false);
   const question = form?.items[index];
-  const result = form && complete ? scoreReasoning(form,answers) : null;
+  const result = form && complete ? multipleChoiceDetail(form,answers) : null;
 
   const isAttention = form?.id === 'scan' || form?.id === 'rules';
   const answered = answers.filter(a => a !== null).length;
@@ -107,8 +112,8 @@ export default function ReasoningTestsScreen() {
     setTimedOut(false);
     setShowTimer(true);
   }
-  function menu() { resetClock(null); setForm(null); setIndex(0); setAnswers([]); setComplete(false); setConfirm(false); setReview(false); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
-  function start(f:ReasoningForm,minutes?: number) { resetClock(minutes===undefined?null:Date.now()+minutes*60000); setForm(f); setIndex(0); setAnswers(Array(f.items.length).fill(null)); setComplete(false); setConfirm(false); setReview(false); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
+  function menu() { resetClock(null); setForm(null); setIndex(0); setAnswers([]); setComplete(false); setConfirm(false); setReview(false); setOnlyIncorrect(false); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
+  function start(f:ReasoningForm,minutes?: number) { resetClock(minutes===undefined?null:Date.now()+minutes*60000); setForm(f); setIndex(0); setAnswers(Array(f.items.length).fill(null)); setComplete(false); setConfirm(false); setReview(false); setOnlyIncorrect(false); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
   function leave() {
     if (submitConfirm) { setSubmitConfirm(false); return; }
     if (form && !complete) { setConfirm(true); scroll.current?.scrollTo({y:0,animated:false}); return; }
@@ -154,6 +159,7 @@ export default function ReasoningTestsScreen() {
     else setIndex(index+1);
   }
 
+  if (construction) return <ConstructionPractice onExit={()=>setConstruction(false)}/>;
   if (visual) return <VisualSearch onExit={()=>setVisual(false)}/>;
   return <SafeAreaView style={styles.safe}>
     <View style={styles.header}>
@@ -184,8 +190,14 @@ export default function ReasoningTestsScreen() {
         <View style={styles.hero}>
           <Text style={styles.kicker}>חדש · משחק אינטראקטיבי</Text>
           <Text accessibilityRole="header" style={styles.sectionTitle}>חיפוש חזותי אינטראקטיבי</Text>
-          <Text style={styles.body}>20 לוחות בחמישה סוגים. לחצו על תאים כדי לסמן אותם ולחצו שוב כדי לבטל.</Text>
+          <Text style={styles.body}>{visualSearchItems.length} לוחות ב־{new Set(visualSearchItems.map(q=>q.kind)).size} סוגים. תרגלו מסלול מעורב או התמקדו בסוג אחד.</Text>
           <Action title="פתיחת חיפוש חזותי אינטראקטיבי" onPress={()=>setVisual(true)}/>
+        </View>
+        <View style={styles.hero}>
+          <Text style={styles.kicker}>חדש · בונים תשובות</Text>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>מעבדת חשיבה אינטראקטיבית</Text>
+          <Text style={styles.body}>{constructionItems.length} משימות שבהן מסדרים, משייכים, מסמנים, בונים לוח או מקלידים מספר. כולל ניקוד חלקי ודוח לפי יכולת.</Text>
+          <Action title="פתיחת מעבדת חשיבה אינטראקטיבית" onPress={()=>setConstruction(true)}/>
         </View>
         {[
           { title: 'חשיבה בסגנון IQ', notice, forms: reasoningForms },
@@ -209,19 +221,22 @@ export default function ReasoningTestsScreen() {
         <View style={styles.hero}>
           <Text style={styles.kicker}>{form.title} · תוצאות</Text>
           <Text accessibilityRole="header" style={styles.title}>{result.correct} מתוך {result.total} נכונות</Text>
-          <Text style={styles.body}>{result.skipped===0?'כל השאלות נענו.':`שאלות ללא תשובה: ${result.skipped}. הן נכללות בסך השאלות.`}</Text>
+          <Text style={styles.body}>{result.correct} נכונות · {result.wrong} שגויות · {result.skipped} ללא תשובה</Text>
+          <Text style={styles.body}>ציון תרגול: {percent(result.overallAccuracy)} · דיוק מבין השאלות שנענו: {percent(result.attemptedAccuracy)} · השלמה: {percent(result.completion)}</Text>
           {usedMs!==null&&<Text style={styles.body}>{timedOut?'הזמן נגמר. התשובות הוגשו אוטומטית.':'המבחן הוגש לפני תום הזמן.'} זמן שנוצל: {timerText(usedMs)}.</Text>}
           <Text style={styles.note}>{isAttention ? attentionNotice : notice}</Text>
         </View>
         <View style={styles.panel}>
           <Text accessibilityRole="header" style={styles.sectionTitle}>דיוק לפי תחום</Text>
-          {Object.entries(result.byDomain).filter(([,r])=>r.total>0).map(([domain,r])=><View key={domain} style={styles.domainRow}>
+          {result.byDomain.map(r=><View key={r.name} style={styles.domainRow}>
             <Text style={styles.score}>{r.correct}/{r.total}</Text>
-            <Text style={styles.body}>{reasoningDomains[domain as keyof typeof reasoningDomains]}</Text>
+            <Text style={styles.body}>{reasoningDomains[r.name as keyof typeof reasoningDomains]} · {r.wrong} שגויות · {r.skipped} פתוחות</Text>
           </View>)}
         </View>
         <Action title={review?'הסתרת פירוט התשובות':'הצגת התשובות וההסברים'} onPress={()=>setReview(r=>!r)} secondary />
-        {review && form.items.map((q,i)=><View key={q.id} style={styles.panel}>
+        {review&&<Action title={onlyIncorrect?'כל התשובות':'רק שאלות לשיפור'} onPress={()=>setOnlyIncorrect(v=>!v)} secondary/>}
+        {review&&onlyIncorrect&&result.correct===result.total&&<Text style={styles.note}>אין שאלות לשיפור בניסיון הזה.</Text>}
+        {review && form.items.map((q,i)=>(!onlyIncorrect||answers[i]!==q.answer)&&<View key={q.id} style={styles.panel}>
           <Text style={styles.kicker}>שאלה {i+1} · {reasoningDomains[q.domain]}</Text>
           <Text style={styles.sectionTitle}>{q.prompt}</Text>
           {q.board && <Board rows={q.board}/>}

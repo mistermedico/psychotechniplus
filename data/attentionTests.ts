@@ -109,14 +109,14 @@ function buildVisualItem(
   prompt: string,
   rationale: string,
   board: AttentionBoard,
-  matches: (token: string, row: number) => boolean,
+  matches: (token: string, row: number, col: number) => boolean,
 ): VisualSearchItem {
   const targets: number[] = [];
   let cell = 0;
   const counts = board.map(({ tokens }, row) => {
     let count = 0;
-    for (const token of tokens) {
-      if (matches(token, row)) {
+    for (const [col, token] of tokens.entries()) {
+      if (matches(token, row, col)) {
         targets.push(cell);
         count++;
       }
@@ -238,7 +238,171 @@ function orderSearch(round: number) {
   );
 }
 
+function visualDimensions(round: number) {
+  return { width: round === 0 ? 4 : 5, height: [3, 4, 4, 5][round] };
+}
+
+function visualBoard(round: number, seed: number) {
+  const pick = random(seed + round * 3917);
+  const { width, height } = visualDimensions(round);
+  const rows = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => pairs[pick(pairs.length)]));
+  return { pick, rows, width, height };
+}
+
+function twinSearch(round: number) {
+  const { pick, rows, width, height } = visualBoard(round, 4851681);
+  for (let row = 0; row < height; row += 2) {
+    const col = pick(width - 1);
+    rows[row][col + 1] = rows[row][col];
+    if (round === 3 && row === 0) rows[row].splice(0, 3, '58', '58', '58');
+  }
+  return buildVisualItem(
+    `visual-twin-${round + 1}`, 'תאומים צמודים',
+    'סמנו כל תא שיש לידו צירוף זהה בדיוק, משמאל או מימין באותה שורה. סמנו את שני הצדדים של כל זוג; ברצף של שלושה זהים סמנו את שלושתם. אל תחברו בין שורות.',
+    'רק שכנים אופקיים נבדקים. גם תא בקצה השורה יכול להיות חלק מזוג; זהות בין תאים שאינם צמודים אינה מספיקה.',
+    rows.map(tokens => ({ tokens })),
+    (token, row, col) => rows[row][col - 1] === token || rows[row][col + 1] === token,
+  );
+}
+
+function mirrorPositionSearch(round: number) {
+  const { pick, rows, width, height } = visualBoard(round, 8644531);
+  for (let row = 0; row < height; row++) {
+    if (row % 3 === 2) continue;
+    const col = pick(Math.floor(width / 2));
+    rows[row][width - 1 - col] = rows[row][col];
+  }
+  return buildVisualItem(
+    `visual-position-${round + 1}`, 'מיקומי מראה',
+    'סמנו את שני התאים בכל זוג שנמצא במיקומי מראה באותה שורה ובו מופיע אותו צירוף: הראשון מול האחרון, השני מול הלפני־אחרון. אל תסמנו תא אמצעי.',
+    'משווים מרחקים שווים משני הקצוות של השורה. הצירוף עצמו אינו מתהפך: שני הערכים צריכים להיות זהים בדיוק.',
+    rows.map(tokens => ({ tokens })),
+    (token, row, col) => col !== width - 1 - col && rows[row][width - 1 - col] === token,
+  );
+}
+
+function peakSearch(round: number) {
+  const { pick, rows, width } = visualBoard(round, 5581253);
+  const col = 1 + pick(width - 2);
+  rows[0].splice(col - 1, 3, '18', '89', '42');
+  if (round > 1) rows[1].splice(0, 3, '23', '84', '84');
+  return buildVisualItem(
+    `visual-peak-${round + 1}`, 'שיא מקומי',
+    'כל תא הוא מספר דו־ספרתי. סמנו מספר שגדול ממש משני המספרים הצמודים לו באותה שורה. אין לסמן תאים בקצוות או מספר ששווה לאחד משכניו.',
+    'משווים את ערך המספר לשכן המיידי משמאל ולשכן המיידי מימין בלבד. צריך להיות גדול משניהם, לא רק מאחד.',
+    rows.map(tokens => ({ tokens })),
+    (token, row, col) => col > 0 && col < width - 1
+      && Number(token) > Number(rows[row][col - 1]) && Number(token) > Number(rows[row][col + 1]),
+  );
+}
+
+function columnRepeatSearch(round: number) {
+  const { pick, rows, width, height } = visualBoard(round, 3735461);
+  for (let col = 0; col < width; col += 2) {
+    const first = pick(height);
+    const second = (first + 1 + pick(height - 1)) % height;
+    const pair = rows[first][col];
+    rows[second][col] = pair;
+    for (let row = 0; row < height; row++) {
+      if (row !== first && row !== second && rows[row][col] === pair) {
+        rows[row][col] = pair === '11' ? '29' : '11';
+      }
+    }
+  }
+  if (round > 1) for (let row = 0; row < 3; row++) rows[row][1] = '63';
+  return buildVisualItem(
+    `visual-column-${round + 1}`, 'חזרה אנכית מדויקת',
+    'סמנו את שני התאים עם כל צירוף שמופיע בדיוק פעמיים באותה עמודה. בדקו כל עמודה בנפרד. אל תסמנו צירוף שמופיע בעמודה רק פעם אחת או שלוש פעמים ויותר.',
+    'הספירה נעשית בכל עמודה לכל צירוף בנפרד. שני התאים לא חייבים להיות צמודים, ומופעים בעמודות אחרות אינם נספרים.',
+    rows.map(tokens => ({ tokens })),
+    (token, _row, col) => rows.reduce((count, tokens) => count + Number(tokens[col] === token), 0) === 2,
+  );
+}
+
+const visualShapes = [
+  { glyph: '○', label: 'עיגול' },
+  { glyph: '△', label: 'משולש' },
+  { glyph: '□', label: 'ריבוע' },
+  { glyph: '◇', label: 'מעוין' },
+] as const;
+function featureSearch(round: number) {
+  const pick = random(5743771 + round * 3917);
+  const { width, height } = visualDimensions(round);
+  const shape = visualShapes[round];
+  const parity = round % 2 === 0 ? 0 : 1;
+  const parityLabel = parity === 0 ? 'זוגית' : 'אי־זוגית';
+  const digitList = searchDigits.filter(digit => Number(digit) % 2 === parity);
+  const opposite = searchDigits.filter(digit => !digitList.includes(digit));
+  const answer = (token: string) => token.startsWith(shape.glyph) && Number(token.slice(1)) % 2 === parity;
+  const candidates = visualShapes.flatMap(({ glyph }) => searchDigits.map(digit => glyph + digit));
+  const others = candidates.filter(token => !answer(token));
+  const differentShape = visualShapes[(round + 1) % visualShapes.length].glyph;
+  const cells = shuffle([
+    ...Array.from({ length: 3 + round }, () => shape.glyph + digitList[pick(digitList.length)]),
+    shape.glyph + opposite[pick(opposite.length)],
+    differentShape + digitList[pick(digitList.length)],
+    ...Array.from({ length: width * height - 5 - round }, () => others[pick(others.length)]),
+  ], pick);
+  return buildVisualItem(
+    `visual-feature-${round + 1}`, 'צורה וגם ספרה',
+    `סמנו את כל התאים שמכילים גם ${shape.label} (${shape.glyph}) וגם ספרה ${parityLabel}. תא שעומד רק באחד התנאים אינו מטרה.`,
+    `המטרה מתקיימת רק כששני המאפיינים נמצאים באותו תא: ${shape.label} וספרה ${parityLabel}.`,
+    Array.from({ length: height }, (_, row) => ({ tokens: cells.slice(row * width, (row + 1) * width) })),
+    answer,
+  );
+}
+
+function aboveReverseSearch(round: number) {
+  const { pick, rows, width, height } = visualBoard(round, 6586711);
+  for (let row = 1; row < height; row++) {
+    const col = pick(width);
+    const reference = rows[row - 1][col];
+    if (reference === reverse(reference)) rows[row - 1][col] = '27';
+    rows[row][col] = reverse(rows[row - 1][col]);
+  }
+  if (round > 1) {
+    rows[0][0] = '66';
+    rows[1][0] = '66';
+    rows[0][width - 1] = '48';
+    rows[1][width - 1] = '84';
+  }
+  return buildVisualItem(
+    `visual-above-${round + 1}`, 'היפוך אנכי',
+    'סמנו רק את התא התחתון כאשר שתי ספרותיו מופיעות בסדר הפוך מהתא שמעליו באותה עמודה. לדוגמה: אם 27 מעל 72 סמנו 72. שתי ספרות זהות אינן נחשבות להיפוך.',
+    'בודקים את התא שמעל כל תא, לא את זה שמתחתיו. השורה העליונה לא יכולה להכיל מטרות.',
+    rows.map(tokens => ({ tokens })),
+    (token, row, col) => row > 0 && token[0] !== token[1] && token === reverse(rows[row - 1][col]),
+  );
+}
+
+function rowEndingSearch(round: number) {
+  const { pick, rows, width } = visualBoard(round, 7581731);
+  const clues = shuffle([...searchDigits], pick).slice(0, rows.length);
+  rows.forEach((tokens, row) => {
+    const col = pick(width);
+    const distractorCol = (col + 1) % width;
+    const clue = clues[row];
+    const different = searchDigits.filter(digit => digit !== clue);
+    tokens[col] = different[pick(different.length)] + clue;
+    tokens[distractorCol] = clue + different[pick(different.length)];
+  });
+  return buildVisualItem(
+    `visual-ending-${round + 1}`, 'סיומת לפי רמז',
+    'לכל שורה ספרת סיום משלה, המופיעה בתווית. סמנו כל תא שהספרה הימנית שלו תואמת לספרת הסיום של השורה. התאמה של הספרה השמאלית בלבד אינה מספיקה.',
+    'ספרת הסיום היא הספרה הימנית בכל צירוף. עוברים שורה־שורה ובודקים מחדש את התווית.',
+    rows.map((tokens, row) => ({ cue: `סיומת ${clues[row]}`, tokens })),
+    (token, row) => token[1] === clues[row],
+  );
+}
+
 /** Targets index individual cells left-to-right, top-to-bottom, starting at zero. */
-export const visualSearchItems: readonly VisualSearchItem[] = Array.from({ length: 4 }, (_, round) => [
-  exactSearch(round), eitherSearch(round), uniqueSearch(round), reverseSearch(round), orderSearch(round),
-]).flat();
+export const visualSearchItems: readonly VisualSearchItem[] = [
+  ...Array.from({ length: 4 }, (_, round) => [
+    exactSearch(round), eitherSearch(round), uniqueSearch(round), reverseSearch(round), orderSearch(round),
+  ]).flat(),
+  ...Array.from({ length: 4 }, (_, round) => [
+    twinSearch(round), mirrorPositionSearch(round), peakSearch(round), columnRepeatSearch(round),
+    featureSearch(round), aboveReverseSearch(round), rowEndingSearch(round),
+  ]).flat(),
+];
