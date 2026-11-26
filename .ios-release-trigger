@@ -1,5 +1,5 @@
 psychotechniplus iOS production release
 version=1.0.19
-source_commit=c7317ae3ef53a4b70261929a2593ad116df0278f
+source_commit=4ec872f0518121800321345e7c5ae19ce406650a
 submit=manual
-purpose=prepare a signed archive while automatic TestFlight submission lacks an Apple API key
+purpose=prepare the signed iPhone update with timed reasoning, 48 visual boards, and the construction lab
