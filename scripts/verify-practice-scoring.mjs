@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {constructionItems} from '../data/constructionTests.ts';
 import {visualSearchItems} from '../data/attentionTests.ts';
 import {reasoningForms} from '../data/reasoningTests.ts';
-import {hitScore,scoreVisual,parsePracticeNumber,constructionGrade,scoreConstruction,multipleChoiceDetail,percent} from '../data/practiceScoring.ts';
+import {hitScore,scoreVisual,parsePracticeNumber,constructionGrade,constructionGradeCategory,scoreConstruction,multipleChoiceDetail,percent} from '../data/practiceScoring.ts';
 
 test('visual index separates over-marking from missing targets and deduplicates marks',()=>{
   const exact=hitScore([1,3,3],[3,1]);
@@ -47,6 +47,16 @@ test('construction gives transparent partial credit without counting a partial a
   assert.equal(scoreConstruction(constructionItems,[]).skipped,28);
   const mixed=scoreConstruction([order,grid,num],[order.correct.slice(0,1),null,'bad']);
   assert.deepEqual([mixed.correct,mixed.partial,mixed.skipped,mixed.wrong],[0,1,1,1]);
+});
+test('construction review distinguishes skipped, full, partial and wrong answers',()=>{
+  const num=constructionItems.find(x=>x.type==='number');
+  const order=constructionItems.find(x=>x.type==='order');
+  const items=[num,num,order,num];
+  const answers=[' ',String(num.correct),order.correct.slice(0,1),String(num.correct+1)];
+  const categories=items.map((q,i)=>constructionGradeCategory(constructionGrade(q,answers[i])));
+  assert.deepEqual(categories,['skipped','correct','partial','wrong']);
+  const report=scoreConstruction(items,answers);
+  for(const category of categories)assert.equal(report[category],1);
 });
 test('reasoning result distinguishes attempted accuracy from total score and completion',()=>{
   const q=reasoningForms[0];
