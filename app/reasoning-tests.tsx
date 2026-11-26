@@ -177,7 +177,7 @@ export default function ReasoningTestsScreen() {
         </View>
         <View style={question.grid?styles.gridOptions:styles.textOptions}>
           {question.options.map((option,i)=><Pressable key={`${question.id}-${i}`} accessibilityRole="radio"
-            accessibilityState={{checked:answers[index]===i}}
+            accessibilityState={{checked:answers[index]===i}} aria-checked={answers[index]===i}
             accessibilityLabel={question.optionGrids?`${option}: ${question.optionGrids[i].map(p=>`שורה ${Math.floor(p/3)+1}, עמודה ${p%3+1} משמאל`).join('; ')}`:option}
             onPress={()=>setAnswers(old=>old.map((a,j)=>j===index?i:a))}
             style={({pressed})=>[styles.option,question.grid&&styles.gridOption,answers[index]===i&&styles.selected,pressed&&styles.pressed]}>
