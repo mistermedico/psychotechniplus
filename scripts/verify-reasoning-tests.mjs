@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { attentionForms } from '../data/attentionTests.ts';
-import { reasoningForms, scoreReasoning } from '../data/reasoningTests.ts';
+import { reasoningForms as allReasoningForms, scoreReasoning } from '../data/reasoningTests.ts';
 
+const reasoningForms = allReasoningForms.filter(f => f.id !== 'expert');
 const expectedNumeric = {
   'c-n1':'6 דקות','c-n2':'10%','c-n3':'12%','c-n4':'4/7','c-n5':'4.8 קמ״ש','c-n6':'88',
   'a-n1':'54','a-n2':'לא השתנה','a-n3':'7 ק״ג','a-n4':'1/3','a-n5':'8 דקות','a-n6':'6 ערכות',

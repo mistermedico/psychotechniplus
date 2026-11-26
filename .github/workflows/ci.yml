@@ -36,6 +36,9 @@ jobs:
       - name: TypeScript
         run: npm run typecheck
 
+      - name: Verify reasoning and visual search
+        run: node --test scripts/verify-reasoning-tests.mjs scripts/verify-timed-reasoning.mjs scripts/verify-visual-search.mjs
+
       - name: Web build
         run: npm run build:web
 

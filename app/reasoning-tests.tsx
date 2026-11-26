@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Rect } from 'react-native-svg';
 import { router } from 'expo-router';
@@ -7,16 +7,19 @@ import { Colors } from '../constants/colors';
 import { FontFamily, Radius } from '../constants/theme';
 import { AttentionBoard, Grid, ReasoningForm, reasoningDomains, reasoningForms, scoreReasoning } from '../data/reasoningTests';
 import { attentionForms } from '../data/attentionTests';
+import { minutesForForm, remainingMs, timerText } from '../data/reasoningClock';
+import { VisualSearch } from '../components/VisualSearch';
 
 const notice = 'זהו תרגול בסגנון IQ, לא מבחן IQ מתוקנן ולא אבחון. הציונים מתארים דיוק במבחן הזה בלבד ואינם מיועדים להשוואה לאוכלוסייה.';
-const attentionNotice = 'זהו תרגול דיוק במשימות ריכוז, לא אבחון קשב (ADHD). אין מדידת זמן או השוואה לאוכלוסייה.';
+const attentionNotice = 'זהו תרגול דיוק במשימות ריכוז, לא אבחון קשב (ADHD). לא נועד להשוואה לאוכלוסייה.';
 const letters = ['א', 'ב', 'ג', 'ד'];
 
-function Diagram({ cells, size=91 }: { cells: Grid; size?: number }) {
-  const descriptions = cells.map(i => `שורה ${Math.floor(i/3)+1}, עמודה ${i%3+1} משמאל`);
+function Diagram({ cells, size=91, side=3 }: { cells: Grid; size?: number; side?: number }) {
+  const descriptions = cells.map(i => `שורה ${Math.floor(i/side)+1}, עמודה ${i%side+1} משמאל`);
+  const pitch=96/side;
   return <View accessible accessibilityLabel={`משבצות מסומנות: ${descriptions.join('; ')}`} style={styles.diagram}>
     <Svg width={size} height={size} viewBox="0 0 96 96" accessible={false}>
-      {Array.from({length:9},(_,i)=><Rect key={i} x={2+(i%3)*32} y={2+Math.floor(i/3)*32} width={28} height={28} rx={5}
+      {Array.from({length:side*side},(_,i)=><Rect key={i} x={2+(i%side)*pitch} y={2+Math.floor(i/side)*pitch} width={pitch-4} height={pitch-4} rx={5}
         fill={cells.includes(i)?Colors.cyan:'#26314C'} stroke={cells.includes(i)?'#A9F1F7':'#60718E'} strokeWidth={1}/>)}
     </Svg>
   </View>;
@@ -43,6 +46,14 @@ function Action({ title, onPress, secondary=false, disabled=false }: { title:str
 
 export default function ReasoningTestsScreen() {
   const scroll = useRef<ScrollView>(null);
+  const [visual,setVisual] = useState(false);
+  const [showTimer,setShowTimer] = useState(true);
+  const [deadline,setDeadline] = useState<number|null>(null);
+  const deadlineRef=useRef<number|null>(null);
+  const settled=useRef(false);
+  const [msLeft,setMsLeft] = useState(0);
+  const [usedMs,setUsedMs] = useState<number|null>(null);
+  const [timedOut,setTimedOut] = useState(false);
   const [form,setForm] = useState<ReasoningForm|null>(null);
   const [index,setIndex] = useState(0);
   const [answers,setAnswers] = useState<(number|null)[]>([]);
@@ -57,9 +68,28 @@ export default function ReasoningTestsScreen() {
 
   const isAttention = form?.id === 'scan' || form?.id === 'rules';
   const answered = answers.filter(a => a !== null).length;
+  useEffect(()=>{
+    if (deadline===null||complete) return;
+    const sync=()=>{
+      if (settled.current||deadlineRef.current!==deadline) return;
+      const left=remainingMs(deadline,Date.now());
+      setMsLeft(Math.ceil(left/1000)*1000);
+      if (left===0) finish(true,0);
+    };
+    sync();
+    const interval=setInterval(sync,200);
+    const appState=AppState.addEventListener('change',sync);
+    const onVisibility=()=>sync();
+    if (typeof document!=='undefined') document.addEventListener('visibilitychange',onVisibility);
+    return ()=>{
+      clearInterval(interval);
+      appState.remove();
+      if (typeof document!=='undefined') document.removeEventListener('visibilitychange',onVisibility);
+    };
+  },[deadline,complete,form]); // The deadline is absolute, even if ticks are suspended in the background.
   useEffect(()=>{ scroll.current?.scrollTo({y:0,animated:false}); },[form,index,complete,checking,confirm,submitConfirm]);
   useEffect(() => {
-    if (!form || complete) return;
+    if (!form || complete || visual) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (confirm) setConfirm(false);
       else if (submitConfirm) setSubmitConfirm(false);
@@ -67,9 +97,18 @@ export default function ReasoningTestsScreen() {
       return true;
     });
     return () => subscription.remove();
-  }, [form, complete, confirm, submitConfirm]);
-  function menu() { setForm(null); setIndex(0); setAnswers([]); setComplete(false); setConfirm(false); setReview(false); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
-  function start(f:ReasoningForm) { setForm(f); setIndex(0); setAnswers(Array(f.items.length).fill(null)); setComplete(false); setConfirm(false); setReview(false); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
+  }, [form, complete, confirm, submitConfirm,visual]);
+  function resetClock(next:number|null) {
+    deadlineRef.current=next;
+    settled.current=false;
+    setDeadline(next);
+    setMsLeft(next===null?0:remainingMs(next,Date.now()));
+    setUsedMs(null);
+    setTimedOut(false);
+    setShowTimer(true);
+  }
+  function menu() { resetClock(null); setForm(null); setIndex(0); setAnswers([]); setComplete(false); setConfirm(false); setReview(false); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
+  function start(f:ReasoningForm,minutes?: number) { resetClock(minutes===undefined?null:Date.now()+minutes*60000); setForm(f); setIndex(0); setAnswers(Array(f.items.length).fill(null)); setComplete(false); setConfirm(false); setReview(false); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
   function leave() {
     if (submitConfirm) { setSubmitConfirm(false); return; }
     if (form && !complete) { setConfirm(true); scroll.current?.scrollTo({y:0,animated:false}); return; }
@@ -78,34 +117,79 @@ export default function ReasoningTestsScreen() {
   }
   function openCheck() { setChecking(true); setReviewJump(false); setSubmitConfirm(false); }
   function jumpTo(i: number) { setIndex(i); setReviewJump(true); setChecking(false); setSubmitConfirm(false); }
-  function submit() { setComplete(true); setChecking(false); setReviewJump(false); setSubmitConfirm(false); }
+  function finish(expired:boolean,left:number) {
+    if (settled.current) return;
+    settled.current=true;
+    setTimedOut(expired);
+    const minutes=form?minutesForForm(form.id):undefined;
+    if (deadlineRef.current!==null&&minutes!==undefined) setUsedMs(Math.max(0,minutes*60000-left));
+    setConfirm(false);
+    setComplete(true);
+    setChecking(false);
+    setReviewJump(false);
+    setSubmitConfirm(false);
+  }
+  function canContinue() {
+    if (settled.current) return false;
+    const d=deadlineRef.current;
+    if (d!==null&&remainingMs(d,Date.now())===0) {
+      finish(true,0);
+      return false;
+    }
+    return true;
+  }
+  function submit() {
+    if (!canContinue()) return;
+    const d=deadlineRef.current;
+    const left=d===null?0:remainingMs(d,Date.now());
+    finish(d!==null&&left===0,left);
+  }
+  function answer(value:number|null) {
+    if (canContinue()) setAnswers(old=>old.map((a,j)=>j===index?value:a));
+  }
   function next(skip=false) {
-    if (!form || !question) return;
+    if (!form || !question || !canContinue()) return;
     if (!skip && answers[index] == null) return;
     if (reviewJump || index === form.items.length - 1) openCheck();
     else setIndex(index+1);
   }
 
+  if (visual) return <VisualSearch onExit={()=>setVisual(false)}/>;
   return <SafeAreaView style={styles.safe}>
     <View style={styles.header}>
       <Pressable accessibilityRole="button" accessibilityLabel="חזרה" onPress={leave} style={styles.back}><Text style={styles.backLabel}>‹</Text></Pressable>
       <Text accessibilityRole="header" style={styles.heading}>מבחני חשיבה וריכוז</Text>
     </View>
+    {deadline!==null&&!complete&&<View style={[styles.timer,msLeft<=60000&&styles.timerWarning]}>
+      <Text style={styles.timerDigits} accessibilityLabel={showTimer?`זמן נותר ${timerText(msLeft)}`:'השעון פועל'}>
+        {showTimer?timerText(msLeft):'השעון פועל'}
+      </Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={showTimer?'הסתרת שעון':'הצגת שעון'} onPress={()=>setShowTimer(v=>!v)} style={styles.timerToggle}>
+        <Text style={styles.kicker}>{showTimer?'הסתרה':'הצגה'}</Text>
+      </Pressable>
+      <Text style={styles.note} accessibilityLiveRegion="polite">{msLeft<=60000?'דקה אחרונה':'מצב מתוזמן'}</Text>
+    </View>}
     <ScrollView ref={scroll} contentContainerStyle={styles.content}>
       {confirm ? <View style={styles.panel}>
         <Text accessibilityRole="header" style={styles.title}>לחזור לרשימת המבחנים?</Text>
-        <Text style={styles.body}>התשובות במבחן הנוכחי לא יישמרו.</Text>
+        <Text style={styles.body}>התשובות במבחן הנוכחי לא יישמרו.{deadline!==null?' הטיימר ממשיך לספור גם במסך הזה.':''}</Text>
         <Action title="המשך למבחן" onPress={()=>setConfirm(false)} />
         <Action title="יציאה מהמבחן" onPress={menu} secondary />
       </View> : !form ? <>
         <View style={styles.hero}>
           <Text style={styles.kicker}>פסיכוטכני פלוס · מבחנים מיוחדים</Text>
           <Text accessibilityRole="header" style={styles.title}>איך תרצו להתאמן?</Text>
-          <Text style={styles.body}>שלושה מבחני חשיבה ושני מבחני ריכוז. בכולם מתרגלים בקצב אישי, בלי הגבלת זמן.</Text>
+          <Text style={styles.body}>בחרו אתגר עם ספירה לאחור, או תרגלו בקצב אישי. בחיפוש החזותי מסמנים את המטרות ישירות על הלוח.</Text>
+        </View>
+        <View style={styles.hero}>
+          <Text style={styles.kicker}>חדש · משחק אינטראקטיבי</Text>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>חיפוש חזותי אינטראקטיבי</Text>
+          <Text style={styles.body}>20 לוחות בחמישה סוגים. לחצו על תאים כדי לסמן אותם ולחצו שוב כדי לבטל.</Text>
+          <Action title="פתיחת חיפוש חזותי אינטראקטיבי" onPress={()=>setVisual(true)}/>
         </View>
         {[
           { title: 'חשיבה בסגנון IQ', notice, forms: reasoningForms },
-          { title: 'ריכוז ודיוק', notice: attentionNotice, forms: attentionForms },
+          { title: 'ריכוז ודיוק', notice: attentionNotice, forms: attentionForms.filter(f=>f.id!=='scan') },
         ].map(section=><View key={section.title} style={styles.group}>
           <Text accessibilityRole="header" style={styles.sectionTitle}>{section.title}</Text>
           <Text style={styles.note}>{section.notice}</Text>
@@ -113,7 +197,11 @@ export default function ReasoningTestsScreen() {
             <Text style={styles.sectionTitle}>{f.title}</Text>
             <Text style={styles.body}>{f.description ?? 'חשיבה מילולית, לוגית, כמותית ומרחבית.'}</Text>
             <Text style={styles.note}>{f.items.length} שאלות · תוצאות והסברים בסיום</Text>
-            <Action title={`להתחיל את ${f.title}`} onPress={()=>start(f)}/>
+            {minutesForForm(f.id)!==undefined&&<>
+              <Text style={styles.note}>במצב מתוזמן השעון ממשיך גם ברקע ובהגעה לאפס התשובות מוגשות אוטומטית.</Text>
+              <Action title={`${f.title} · ${minutesForForm(f.id)} דקות`} onPress={()=>start(f,minutesForForm(f.id))}/>
+            </>}
+            <Action title={minutesForForm(f.id)!==undefined?`${f.title} · ללא הגבלת זמן`:`להתחיל את ${f.title}`} onPress={()=>start(f)} secondary={minutesForForm(f.id)!==undefined}/>
           </View>)}
         </View>)}
         <Text style={styles.note}>התוצאות מוצגות במכשיר בסיום ולא נשמרות בפרופיל.</Text>
@@ -122,6 +210,7 @@ export default function ReasoningTestsScreen() {
           <Text style={styles.kicker}>{form.title} · תוצאות</Text>
           <Text accessibilityRole="header" style={styles.title}>{result.correct} מתוך {result.total} נכונות</Text>
           <Text style={styles.body}>{result.skipped===0?'כל השאלות נענו.':`שאלות ללא תשובה: ${result.skipped}. הן נכללות בסך השאלות.`}</Text>
+          {usedMs!==null&&<Text style={styles.body}>{timedOut?'הזמן נגמר. התשובות הוגשו אוטומטית.':'המבחן הוגש לפני תום הזמן.'} זמן שנוצל: {timerText(usedMs)}.</Text>}
           <Text style={styles.note}>{isAttention ? attentionNotice : notice}</Text>
         </View>
         <View style={styles.panel}>
@@ -138,7 +227,7 @@ export default function ReasoningTestsScreen() {
           {q.board && <Board rows={q.board}/>}
           <Text style={styles.body}>התשובה שלך: {answers[i]==null?'לא נענתה':q.options[answers[i] as number]}</Text>
           <Text style={styles.score}>תשובה נכונה: {q.options[q.answer]}</Text>
-          {q.optionGrids && <Diagram cells={q.optionGrids[q.answer]} size={68}/>}
+          {q.optionGrids && <Diagram cells={q.optionGrids[q.answer]} size={68} side={q.gridSize}/>}
           <Text style={styles.body}>{q.explanation}</Text>
         </View>)}
         <Action title="לבחירת מבחן אחר" onPress={menu}/>
@@ -173,15 +262,15 @@ export default function ReasoningTestsScreen() {
           <Text style={styles.note}>{reasoningDomains[question.domain]} · נענו {answered} מתוך {form.items.length}</Text>
           <Text accessibilityRole="header" style={styles.sectionTitle}>{question.prompt}</Text>
           {question.board && <Board rows={question.board}/>}
-          {question.grid && <Diagram cells={question.grid}/>}
+          {question.grid && <Diagram cells={question.grid} side={question.gridSize}/>}
         </View>
         <View style={question.grid?styles.gridOptions:styles.textOptions}>
           {question.options.map((option,i)=><Pressable key={`${question.id}-${i}`} accessibilityRole="radio"
             accessibilityState={{checked:answers[index]===i}} aria-checked={answers[index]===i}
-            accessibilityLabel={question.optionGrids?`${option}: ${question.optionGrids[i].map(p=>`שורה ${Math.floor(p/3)+1}, עמודה ${p%3+1} משמאל`).join('; ')}`:option}
-            onPress={()=>setAnswers(old=>old.map((a,j)=>j===index?i:a))}
+            accessibilityLabel={question.optionGrids?`${option}: ${question.optionGrids[i].map(p=>`שורה ${Math.floor(p/(question.gridSize??3))+1}, עמודה ${p%(question.gridSize??3)+1} משמאל`).join('; ')}`:option}
+            onPress={()=>answer(i)}
             style={({pressed})=>[styles.option,question.grid&&styles.gridOption,answers[index]===i&&styles.selected,pressed&&styles.pressed]}>
-            {question.optionGrids && <Diagram cells={question.optionGrids[i]} size={62}/>}
+            {question.optionGrids && <Diagram cells={question.optionGrids[i]} size={62} side={question.gridSize}/>}
             <Text style={styles.optionLabel}>{question.grid?option:`${letters[i]}. ${option}`}</Text>
           </Pressable>)}
         </View>
@@ -189,7 +278,7 @@ export default function ReasoningTestsScreen() {
           ? <Action title="לבדיקה לפני הגשה" onPress={openCheck} />
           : <Action title="לשאלה הבאה" onPress={()=>next()} disabled={answers[index]==null}/>}
         {!reviewJump && index<form.items.length-1 && answers[index]==null && <Action title="דלג על השאלה" onPress={()=>next(true)} secondary/>}
-        {answers[index]!=null && <Action title="ניקוי התשובה" onPress={()=>setAnswers(old=>old.map((a,j)=>j===index?null:a))} secondary/>}
+        {answers[index]!=null && <Action title="ניקוי התשובה" onPress={()=>answer(null)} secondary/>}
         {!reviewJump && index>0 && <Action title="לשאלה הקודמת" onPress={()=>setIndex(index-1)} secondary/>}
         {!reviewJump && index<form.items.length-1 && <Action title="סקירת השאלות" onPress={openCheck} secondary/>}
       </>}
@@ -203,6 +292,10 @@ const styles=StyleSheet.create({
   back:{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center',backgroundColor:Colors.surface,borderRadius:12},
   backLabel:{color:Colors.text,fontSize:29},
   heading:{flex:1,textAlign:'right',color:Colors.text,fontFamily:FontFamily.bold,fontSize:20},
+  timer:{width:'100%',maxWidth:740,alignSelf:'center',minHeight:44,paddingHorizontal:16,backgroundColor:'#192442',flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8},
+  timerWarning:{backgroundColor:'#682533'},
+  timerDigits:{color:Colors.text,fontFamily:FontFamily.bold,fontVariant:['tabular-nums'],fontSize:21},
+  timerToggle:{paddingHorizontal:8,minHeight:44,justifyContent:'center'},
   content:{width:'100%',maxWidth:740,alignSelf:'center',padding:16,paddingBottom:36,gap:12},
   hero:{backgroundColor:'#192442',padding:17,borderRadius:Radius.lg,borderColor:'#405780',borderWidth:1,gap:9},
   panel:{backgroundColor:Colors.background2,padding:15,borderRadius:Radius.lg,borderColor:Colors.border,borderWidth:1,gap:9},
