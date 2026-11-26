@@ -62,7 +62,8 @@ workflows:
           fi
           next_build_number=$((10#$latest_build_number + 1))
           node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('app.json','utf8')); p.expo.ios={...(p.expo.ios||{}),buildNumber:process.argv[1]}; fs.writeFileSync('app.json',JSON.stringify(p,null,2)+'\n');" "$next_build_number"
-          echo "Building App Store version $(node -p \"require('./app.json').expo.version\") ($next_build_number)"
+          app_version=$(node -p "require('./app.json').expo.version")
+          echo "Building App Store version ${app_version} (${next_build_number})"
 
       - name: Generate native iOS project
         script: |
