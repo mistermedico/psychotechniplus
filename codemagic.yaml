@@ -55,8 +55,12 @@ workflows:
       - name: Set next App Store build number
         script: |
           set -euo pipefail
-          latest_build_number=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_ID")
-          next_build_number=$((latest_build_number + 1))
+          latest_build_number=$(app-store-connect get-latest-build-number --platform IOS --all-versions "$APP_STORE_ID")
+          if ! [[ "$latest_build_number" =~ ^[0-9]{1,9}$ ]]; then
+            echo "Could not verify the latest iOS build number in App Store Connect."
+            exit 1
+          fi
+          next_build_number=$((10#$latest_build_number + 1))
           node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('app.json','utf8')); p.expo.ios={...(p.expo.ios||{}),buildNumber:process.argv[1]}; fs.writeFileSync('app.json',JSON.stringify(p,null,2)+'\n');" "$next_build_number"
           echo "Building App Store version $(node -p \"require('./app.json').expo.version\") ($next_build_number)"
 
