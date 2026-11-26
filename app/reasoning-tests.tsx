@@ -5,9 +5,11 @@ import Svg, { Rect } from 'react-native-svg';
 import { router } from 'expo-router';
 import { Colors } from '../constants/colors';
 import { FontFamily, Radius } from '../constants/theme';
-import { Grid, ReasoningForm, reasoningDomains, reasoningForms, scoreReasoning } from '../data/reasoningTests';
+import { AttentionBoard, Grid, ReasoningForm, reasoningDomains, reasoningForms, scoreReasoning } from '../data/reasoningTests';
+import { attentionForms } from '../data/attentionTests';
 
 const notice = 'זהו תרגול בסגנון IQ, לא מבחן IQ מתוקנן ולא אבחון. הציונים מתארים דיוק במבחן הזה בלבד ואינם מיועדים להשוואה לאוכלוסייה.';
+const attentionNotice = 'זהו תרגול דיוק במשימות ריכוז, לא אבחון קשב (ADHD). אין מדידת זמן או השוואה לאוכלוסייה.';
 const letters = ['א', 'ב', 'ג', 'ד'];
 
 function Diagram({ cells, size=91 }: { cells: Grid; size?: number }) {
@@ -17,6 +19,18 @@ function Diagram({ cells, size=91 }: { cells: Grid; size?: number }) {
       {Array.from({length:9},(_,i)=><Rect key={i} x={2+(i%3)*32} y={2+Math.floor(i/3)*32} width={28} height={28} rx={5}
         fill={cells.includes(i)?Colors.cyan:'#26314C'} stroke={cells.includes(i)?'#A9F1F7':'#60718E'} strokeWidth={1}/>)}
     </Svg>
+  </View>;
+}
+
+function Board({ rows }: {rows: AttentionBoard}) {
+  return <View style={styles.board}>
+    {rows.map(({cue,tokens}, row)=><View key={row} accessible
+      accessibilityLabel={`שורה ${row+1}${cue ? `, ${cue}` : ''}: ${tokens.join(', ')}`} style={styles.boardRow}>
+      {cue && <Text style={styles.cue}>{cue}</Text>}
+      <View style={styles.cells}>
+        {tokens.map((token, col)=><View key={col} style={styles.cell}><Text style={styles.token}>{token}</Text></View>)}
+      </View>
+    </View>)}
   </View>;
 }
 
@@ -41,6 +55,7 @@ export default function ReasoningTestsScreen() {
   const question = form?.items[index];
   const result = form && complete ? scoreReasoning(form,answers) : null;
 
+  const isAttention = form?.id === 'scan' || form?.id === 'rules';
   const answered = answers.filter(a => a !== null).length;
   useEffect(()=>{ scroll.current?.scrollTo({y:0,animated:false}); },[form,index,complete,checking,confirm,submitConfirm]);
   useEffect(() => {
@@ -74,7 +89,7 @@ export default function ReasoningTestsScreen() {
   return <SafeAreaView style={styles.safe}>
     <View style={styles.header}>
       <Pressable accessibilityRole="button" accessibilityLabel="חזרה" onPress={leave} style={styles.back}><Text style={styles.backLabel}>‹</Text></Pressable>
-      <Text accessibilityRole="header" style={styles.heading}>מבחני חשיבה</Text>
+      <Text accessibilityRole="header" style={styles.heading}>מבחני חשיבה וריכוז</Text>
     </View>
     <ScrollView ref={scroll} contentContainerStyle={styles.content}>
       {confirm ? <View style={styles.panel}>
@@ -84,15 +99,22 @@ export default function ReasoningTestsScreen() {
         <Action title="יציאה מהמבחן" onPress={menu} secondary />
       </View> : !form ? <>
         <View style={styles.hero}>
-          <Text style={styles.kicker}>פסיכוטכני פלוס · תרגול בסגנון IQ</Text>
-          <Text accessibilityRole="header" style={styles.title}>ארבע דרכים לחשוב</Text>
-          <Text style={styles.body}>בחרו אחד משני מבחנים. בכל מבחן 24 שאלות, שש בכל תחום: מילולי, לוגי, כמותי ומרחבי.</Text>
-          <Text style={styles.note}>{notice}</Text>
+          <Text style={styles.kicker}>פסיכוטכני פלוס · מבחנים מיוחדים</Text>
+          <Text accessibilityRole="header" style={styles.title}>איך תרצו להתאמן?</Text>
+          <Text style={styles.body}>שלושה מבחני חשיבה ושני מבחני ריכוז. בכולם מתרגלים בקצב אישי, בלי הגבלת זמן.</Text>
         </View>
-        {reasoningForms.map(f=><View key={f.id} style={styles.panel}>
-          <Text style={styles.sectionTitle}>{f.title}</Text>
-          <Text style={styles.body}>24 שאלות · ללא הגבלת זמן · תוצאות והסברים בסיום</Text>
-          <Action title={`להתחיל את ${f.title}`} onPress={()=>start(f)}/>
+        {[
+          { title: 'חשיבה בסגנון IQ', notice, forms: reasoningForms },
+          { title: 'ריכוז ודיוק', notice: attentionNotice, forms: attentionForms },
+        ].map(section=><View key={section.title} style={styles.group}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>{section.title}</Text>
+          <Text style={styles.note}>{section.notice}</Text>
+          {section.forms.map(f=><View key={f.id} style={styles.panel}>
+            <Text style={styles.sectionTitle}>{f.title}</Text>
+            <Text style={styles.body}>{f.description ?? 'חשיבה מילולית, לוגית, כמותית ומרחבית.'}</Text>
+            <Text style={styles.note}>{f.items.length} שאלות · תוצאות והסברים בסיום</Text>
+            <Action title={`להתחיל את ${f.title}`} onPress={()=>start(f)}/>
+          </View>)}
         </View>)}
         <Text style={styles.note}>התוצאות מוצגות במכשיר בסיום ולא נשמרות בפרופיל.</Text>
       </> : result ? <>
@@ -100,11 +122,11 @@ export default function ReasoningTestsScreen() {
           <Text style={styles.kicker}>{form.title} · תוצאות</Text>
           <Text accessibilityRole="header" style={styles.title}>{result.correct} מתוך {result.total} נכונות</Text>
           <Text style={styles.body}>{result.skipped===0?'כל השאלות נענו.':`שאלות ללא תשובה: ${result.skipped}. הן נכללות בסך השאלות.`}</Text>
-          <Text style={styles.note}>{notice}</Text>
+          <Text style={styles.note}>{isAttention ? attentionNotice : notice}</Text>
         </View>
         <View style={styles.panel}>
           <Text accessibilityRole="header" style={styles.sectionTitle}>דיוק לפי תחום</Text>
-          {Object.entries(result.byDomain).map(([domain,r])=><View key={domain} style={styles.domainRow}>
+          {Object.entries(result.byDomain).filter(([,r])=>r.total>0).map(([domain,r])=><View key={domain} style={styles.domainRow}>
             <Text style={styles.score}>{r.correct}/{r.total}</Text>
             <Text style={styles.body}>{reasoningDomains[domain as keyof typeof reasoningDomains]}</Text>
           </View>)}
@@ -113,6 +135,7 @@ export default function ReasoningTestsScreen() {
         {review && form.items.map((q,i)=><View key={q.id} style={styles.panel}>
           <Text style={styles.kicker}>שאלה {i+1} · {reasoningDomains[q.domain]}</Text>
           <Text style={styles.sectionTitle}>{q.prompt}</Text>
+          {q.board && <Board rows={q.board}/>}
           <Text style={styles.body}>התשובה שלך: {answers[i]==null?'לא נענתה':q.options[answers[i] as number]}</Text>
           <Text style={styles.score}>תשובה נכונה: {q.options[q.answer]}</Text>
           {q.optionGrids && <Diagram cells={q.optionGrids[q.answer]} size={68}/>}
@@ -149,6 +172,7 @@ export default function ReasoningTestsScreen() {
           <View style={styles.track}><View style={[styles.fill,{width:`${((index+1)/form.items.length)*100}%`}]}/></View>
           <Text style={styles.note}>{reasoningDomains[question.domain]} · נענו {answered} מתוך {form.items.length}</Text>
           <Text accessibilityRole="header" style={styles.sectionTitle}>{question.prompt}</Text>
+          {question.board && <Board rows={question.board}/>}
           {question.grid && <Diagram cells={question.grid}/>}
         </View>
         <View style={question.grid?styles.gridOptions:styles.textOptions}>
@@ -193,6 +217,13 @@ const styles=StyleSheet.create({
   pressed:{opacity:.8},
   actionLabel:{fontFamily:FontFamily.bold,fontSize:16,color:'#120E29',textAlign:'center'},
   secondaryLabel:{color:Colors.text},
+  group:{gap:9},
+  board:{gap:5,padding:7,backgroundColor:'#18253C',borderRadius:12},
+  boardRow:{direction:'ltr',gap:3},
+  cue:{color:Colors.cyan,fontFamily:FontFamily.bold,textAlign:'right',writingDirection:'rtl',fontSize:14},
+  cells:{direction:'ltr',flexDirection:'row',gap:4},
+  cell:{flex:1,alignItems:'center',justifyContent:'center',minHeight:34,borderRadius:6,backgroundColor:'#263653'},
+  token:{color:Colors.text,fontFamily:FontFamily.bold,fontSize:17,textAlign:'center',writingDirection:'ltr'},
   diagram:{alignSelf:'center'},
   gridOptions:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',rowGap:8},
   textOptions:{gap:8},
