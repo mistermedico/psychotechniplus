@@ -27,15 +27,27 @@ jobs:
         with:
           eas-version: 20.2.0
           token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install Expo project dependencies
+        run: npm ci --no-audit --no-fund
       - name: Inspect the exact Expo build
         shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
           build_json="$RUNNER_TEMP/verified-ios-build.json"
           status=""
           for i in $(seq 1 18); do
             if ! eas build:view "$BUILD_ID" --json >"$build_json" 2>"$RUNNER_TEMP/eas-inspect-error"; then
-              echo "::error::Expo refused or could not return build metadata."
+              if grep -qiE 'unknown flag|unexpected argument|unknown command' "$RUNNER_TEMP/eas-inspect-error"; then
+                echo "::error::EAS CLI rejected the command syntax."
+              elif grep -qiE 'not authorized|access denied|not logged|not authenticated|invalid token' "$RUNNER_TEMP/eas-inspect-error"; then
+                echo "::error::Expo did not authorize reading this build."
+              elif grep -qiE 'package|resolve|project|config' "$RUNNER_TEMP/eas-inspect-error"; then
+                echo "::error::EAS CLI could not load the project's configuration."
+              else
+                echo "::error::EAS CLI could not read build metadata."
+              fi
               exit 1
             fi
             status="$(jq -r '.status' "$build_json")"
