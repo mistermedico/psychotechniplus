@@ -76,6 +76,10 @@ export function constructionGrade(item:ConstructionItem, answer:ConstructionAnsw
   return {exact:!!a.length&&result.exact,fraction:a.length?result.fraction:0,skipped:a.length===0,complete:a.length>0};
 }
 
+export function constructionGradeCategory(grade:ReturnType<typeof constructionGrade>) {
+  return grade.skipped?'skipped':grade.exact?'correct':grade.fraction>0?'partial':'wrong';
+}
+
 export function scoreConstruction(items:readonly ConstructionItem[], answers:readonly ConstructionAnswer[]) {
   type T=ReturnType<typeof empty>;
   function empty(){return {correct:0,points:0,total:0,partial:0,wrong:0,skipped:0};}
@@ -84,14 +88,12 @@ export function scoreConstruction(items:readonly ConstructionItem[], answers:rea
   const byType=new Map<string,T>();
   for(const [i,item] of items.entries()){
     const result=constructionGrade(item,answers[i]??null);
+    const category=constructionGradeCategory(result);
     const d=byDomain.get(item.domain)??empty(), t=byType.get(item.label)??empty();
     for(const row of [total,d,t]){
       row.total++;
       row.points+=result.fraction;
-      if(result.skipped) row.skipped++;
-      else if(result.exact) row.correct++;
-      else if(result.fraction>0) row.partial++;
-      else row.wrong++;
+      row[category]++;
     }
     byDomain.set(item.domain,d); byType.set(item.label,t);
   }

@@ -4,7 +4,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Colors} from '../constants/colors';
 import {FontFamily} from '../constants/theme';
 import {constructionItems,type ConstructionItem} from '../data/constructionTests';
-import {constructionGrade,parsePracticeNumber,percent,scoreConstruction,type ConstructionAnswer} from '../data/practiceScoring';
+import {constructionGrade,constructionGradeCategory,parsePracticeNumber,percent,scoreConstruction,type ConstructionAnswer} from '../data/practiceScoring';
 import {reasoningDomains} from '../data/reasoningTests';
 
 const domainNames=reasoningDomains as Record<string,string>;
@@ -96,8 +96,9 @@ function Explain({item,answer}:{item:ConstructionItem;answer:ConstructionAnswer}
   const grade=constructionGrade(item,answer);
   const list=asIndexes(answer);
   const display=(ids:readonly number[],options:readonly string[])=>ids.map(n=>options[n]).join(' · ');
+  const status={skipped:'לא נענתה',correct:'פתרון מלא',partial:`ניקוד חלקי: ${percent(grade.fraction)}`,wrong:'תשובה שגויה'}[constructionGradeCategory(grade)];
   return <View style={s.panel}>
-    <Text style={s.kicker}>{item.label} · {grade.skipped?'לא נענתה':grade.exact?'פתרון מלא':`ניקוד חלקי: ${percent(grade.fraction)}`}</Text>
+    <Text style={s.kicker}>{item.label} · {status}</Text>
     <Text style={s.section}>{item.prompt}</Text>
     {item.type==='grid'?<>
       <Grid side={item.side} picked={list} label="הלוח שלכם"/>
