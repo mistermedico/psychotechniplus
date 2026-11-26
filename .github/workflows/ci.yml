@@ -37,7 +37,7 @@ jobs:
         run: npm run typecheck
 
       - name: Verify reasoning and visual search
-        run: node --test scripts/verify-reasoning-tests.mjs scripts/verify-timed-reasoning.mjs scripts/verify-visual-search.mjs
+        run: node --test scripts/verify-reasoning-tests.mjs scripts/verify-timed-reasoning.mjs scripts/verify-visual-search.mjs scripts/verify-construction-tests.mjs scripts/verify-practice-scoring.mjs
 
       - name: Web build
         run: npm run build:web
