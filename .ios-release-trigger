@@ -1,4 +1,4 @@
 psychotechniplus iOS production release
-version=1.0.12
-source_commit=1e6b9f79585c35dde36c16db4569ce9485d3ffe2
-purpose=keep App Store/TestFlight binary aligned with the deployed web source and shared RevenueCat entitlement
+version=1.0.19
+source_commit=c7317ae3ef53a4b70261929a2593ad116df0278f
+purpose=build the new reasoning and attention exercises and upload to TestFlight
