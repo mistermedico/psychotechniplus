@@ -53,12 +53,13 @@ jobs:
       - name: iOS JavaScript export
         run: npm run build:ios-js
 
-      - name: Trigger production build and TestFlight submission
-        run: >
-          eas build
-          --platform ios
-          --profile production
-          --non-interactive
-          --auto-submit
-          --no-wait
-          --message "GitHub release ${GITHUB_SHA}"
+      - name: Trigger production build and optional TestFlight submission
+        shell: bash
+        run: |
+          submit_args=(--auto-submit)
+          if grep -qx 'submit=manual' .ios-release-trigger; then
+            echo "Build the signed archive without automatic submission."
+            submit_args=()
+          fi
+          eas build --platform ios --profile production --non-interactive \
+            "${submit_args[@]}" --no-wait --message "GitHub release ${GITHUB_SHA}"

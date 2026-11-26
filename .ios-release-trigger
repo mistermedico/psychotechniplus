@@ -1,4 +1,5 @@
 psychotechniplus iOS production release
 version=1.0.19
 source_commit=c7317ae3ef53a4b70261929a2593ad116df0278f
-purpose=build the new reasoning and attention exercises and upload to TestFlight
+submit=manual
+purpose=prepare a signed archive while automatic TestFlight submission lacks an Apple API key
