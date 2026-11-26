@@ -425,7 +425,7 @@ function FreePracticePane({
             <View style={styles.cognitiveIcon}><Text style={styles.cognitiveIconText}>◈</Text></View>
             <View style={styles.cognitiveCopy}>
               <Text style={styles.cognitiveTitle}>מבחני חשיבה וריכוז</Text>
-              <Text style={styles.cognitiveBody}>שלושה מבחני חשיבה בסגנון IQ ושני מבחני ריכוז</Text>
+              <Text style={styles.cognitiveBody}>ארבעה מבחני חשיבה, אתגרים מתוזמנים וחיפוש חזותי אינטראקטיבי</Text>
               <Text style={styles.cognitiveMeta}>תרגול עצמאי · לא מבחן מתוקנן</Text>
             </View>
             <Text style={styles.cognitiveArrow}>‹</Text>
